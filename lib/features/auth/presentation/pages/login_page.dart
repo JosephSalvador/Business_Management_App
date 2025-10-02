@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../bloc/auth_bloc.dart';
-
 import '../../../../shared/providers/user_provider.dart';
 
 class LoginPage extends StatefulWidget {
@@ -46,11 +45,11 @@ class _LoginPageState extends State<LoginPage> {
   void _login() {
     if (_formKey.currentState!.validate()) {
       context.read<AuthBloc>().add(
-        LoginRequested(
-          username: _usernameController.text.trim(),
-          password: _passwordController.text.trim(),
-        ),
-      );
+            LoginRequested(
+              username: _usernameController.text.trim(),
+              password: _passwordController.text.trim(),
+            ),
+          );
     }
   }
 
@@ -59,9 +58,10 @@ class _LoginPageState extends State<LoginPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthSuccess) {
-          // Update user provider with logged-in user
           Provider.of<UserProvider>(context, listen: false).login(state.user);
-          context.go('/dashboard');
+          WidgetsBinding.instance.addPostFrameCallback((_){
+            context.go('/dashboard');
+          });
         } else if (state is AuthFailure) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -78,19 +78,12 @@ class _LoginPageState extends State<LoginPage> {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                // Header
                 _buildHeader(),
                 const SizedBox(height: 40),
-                
-                // Login Form
-                _buildLoginForm(),
+                _buildLoginForm(context),
                 const SizedBox(height: 30),
-                
-                // Quick Test Accounts
                 _buildSampleAccounts(),
                 const SizedBox(height: 20),
-                
-                // Additional Options
                 _buildAdditionalOptions(),
               ],
             ),
@@ -129,7 +122,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildLoginForm() {
+  Widget _buildLoginForm(BuildContext context) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -185,7 +178,22 @@ class _LoginPageState extends State<LoginPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              // Forgot Password Link
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => context.go('/forgot-password'),
+                  child: Text(
+                    'Forgot Password?',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               BlocBuilder<AuthBloc, AuthState>(
                 builder: (context, state) {
                   return SizedBox(
@@ -205,7 +213,8 @@ class _LoginPageState extends State<LoginPage> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation(Colors.white),
                               ),
                             )
                           : Text(
@@ -283,12 +292,18 @@ class _LoginPageState extends State<LoginPage> {
 
   Color _getRoleColor(String role) {
     switch (role) {
-      case 'Admin': return Colors.red.shade100;
-      case 'Manager': return Colors.orange.shade100;
-      case 'Salesperson': return Colors.green.shade100;
-      case 'Accountant': return Colors.purple.shade100;
-      case 'Viewer': return Colors.blue.shade100;
-      default: return Colors.grey.shade100;
+      case 'Admin':
+        return Colors.red.shade100;
+      case 'Manager':
+        return Colors.orange.shade100;
+      case 'Salesperson':
+        return Colors.green.shade100;
+      case 'Accountant':
+        return Colors.purple.shade100;
+      case 'Viewer':
+        return Colors.blue.shade100;
+      default:
+        return Colors.grey.shade100;
     }
   }
 }

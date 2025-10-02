@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 
 class UserProvider with ChangeNotifier {
@@ -9,16 +11,44 @@ class UserProvider with ChangeNotifier {
   bool get isLoggedIn => _isLoggedIn;
   List<String> get currentUserPrivileges => _currentUser?.privileges ?? [];
 
-  void login(User user) {
-    _currentUser = user;
-    _isLoggedIn = true;
+  UserProvider() {
+    loadUserSession();
+  }
+
+  // Load user session from SharedPreferences
+  Future<void> loadUserSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    _isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+    if (_isLoggedIn) {
+      final userJsonString = prefs.getString('userData');
+      if (userJsonString != null) {
+        final userMap = jsonDecode(userJsonString);
+        _currentUser = User.fromJson(userMap);
+      }
+    }
     notifyListeners();
   }
 
-  void logout() {
+  // Save user session and log in
+  Future<void> login(User user) async {
+    _currentUser = user;
+    _isLoggedIn = true;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    await prefs.setString('userData', jsonEncode(user.toJson()));
+  }
+
+  // Logout and clear session
+  Future<void> logout() async {
     _currentUser = null;
     _isLoggedIn = false;
     notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   }
 
   bool hasPrivilege(String privilege) {
@@ -29,8 +59,11 @@ class UserProvider with ChangeNotifier {
     return privileges.any((privilege) => hasPrivilege(privilege));
   }
 
-  void updateuser(User updatedUser) {
+  void updateUser(User updatedUser) async {
     _currentUser = updatedUser;
     notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userData', jsonEncode(updatedUser.toJson()));
   }
 }

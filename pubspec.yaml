@@ -21,8 +21,17 @@ dependencies:
   fluttertoast: ^8.2.2
   loading_animation_widget: ^1.2.0+3
   shimmer: ^3.0.0
+  share_plus: ^7.2.1
+  esc_pos_utils_plus: ^2.0.1
+  flutter_blue_plus: ^1.30.0
+  permission_handler: ^11.0.1
+  pdf: ^3.10.4
+  printing: ^5.11.2
+  image: ^4.0.17
+  
 
   provider: any
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -33,3 +42,5 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+
+

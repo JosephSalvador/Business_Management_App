@@ -1,57 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class Responsive {
   static bool isMobile(BuildContext context) =>
       MediaQuery.of(context).size.width < 600;
 
-  static bool isTablet(BuildContext context) =>
-      MediaQuery.of(context).size.width >= 600 &&
-      MediaQuery.of(context).size.width < 1200;
-
-  static bool isDesktop(BuildContext context) =>
-      MediaQuery.of(context).size.width >= 1200;
-
-  // Specific web detection
-  static bool isWeb(BuildContext context) => kIsWeb;
-
-  static bool isWebMobile(BuildContext context) => 
-      kIsWeb && MediaQuery.of(context).size.width < 600;
-
-  static bool isWebTablet(BuildContext context) => 
-      kIsWeb && MediaQuery.of(context).size.width >= 600 &&
-      MediaQuery.of(context).size.width < 1200;
-
-  static bool isWebDesktop(BuildContext context) => 
-      kIsWeb && MediaQuery.of(context).size.width >= 1200;
-
-  static double getContentWidth(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    
-    if (isWebDesktop(context)) {
-      return 1400; // Wider for web desktop
-    } else if (isDesktop(context)) {
-      return 1200; // Desktop app
-    } else if (isWebTablet(context)) {
-      return 800; // Web tablet
-    } else if (isTablet(context)) {
-      return 800; // App tablet
-    } else if (isWebMobile(context)) {
-      return screenWidth * 0.95; // Web mobile
-    } else {
-      return screenWidth; // App mobile - full width
-    }
+  static bool isTablet(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    return w >= 600 && w < 1024;
   }
 
+  static bool isDesktop(BuildContext context) =>
+      MediaQuery.of(context).size.width >= 1024;
+
+  /// Columns for dashboard/grid usage.
+  static int gridColumns(BuildContext context) {
+    if (isDesktop(context)) return 4;
+    if (isTablet(context)) return 3;
+    return 2;
+  }
+
+  /// Card aspect ratio (width / height).
+  static double cardAspectRatio(BuildContext context) {
+    if (isDesktop(context)) return 1.8;
+    if (isTablet(context)) return 1.6;
+    return 1.3;
+  }
+
+  /// Constrain content width on large screens.
+  static double getContentWidth(BuildContext context) {
+    if (isDesktop(context)) return 1200;
+    if (isTablet(context)) return 900;
+    return double.infinity;
+  }
+
+  /// Padding to use on pages (mobile / tablet / desktop).
   static EdgeInsets getPagePadding(BuildContext context) {
-    if (isWebDesktop(context)) {
-      return const EdgeInsets.symmetric(horizontal: 40, vertical: 20);
-    } else if (isDesktop(context)) {
-      return const EdgeInsets.symmetric(horizontal: 32, vertical: 20);
-    } else if (isWebTablet(context) || isTablet(context)) {
-      return const EdgeInsets.all(24);
-    } else {
-      return const EdgeInsets.all(16);
-    }
+    if (isMobile(context)) return const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+    if (isTablet(context)) return const EdgeInsets.symmetric(horizontal: 24, vertical: 20);
+    return const EdgeInsets.symmetric(horizontal: 32, vertical: 24);
   }
 }
