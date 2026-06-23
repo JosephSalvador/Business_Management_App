@@ -194,7 +194,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _getRoleColor(user.role).withOpacity(0.1),
+                    color: _getRoleColor(user.role).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(

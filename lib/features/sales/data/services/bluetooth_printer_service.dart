@@ -1,5 +1,6 @@
 // services/bluetooth_printer_service.dart
 import 'package:business_management_system/shared/models/printer_model.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -17,7 +18,7 @@ class BluetoothPrinterService {
   // ---------------------- DEVICE DISCOVERY ----------------------
 
   static Stream<List<BluetoothDevice>> discoverPrinters() {
-    print('🔍 Starting universal Bluetooth scan...');
+    debugPrint('🔍 Starting universal Bluetooth scan...');
 
     FlutterBluePlus.startScan(
       timeout: const Duration(seconds: 15),
@@ -29,11 +30,11 @@ class BluetoothPrinterService {
       (List<ScanResult> results) {
         final devices = results.map((result) => result.device).toList();
 
-        print('📡 Found ${devices.length} Bluetooth devices');
+        debugPrint('📡 Found ${devices.length} Bluetooth devices');
         for (var device in devices) {
           final name =
               device.platformName.isEmpty ? 'Unknown' : device.platformName;
-          print('   📱 $name - ${device.remoteId}');
+          debugPrint('   📱 $name - ${device.remoteId}');
         }
 
         return devices;
@@ -45,10 +46,10 @@ class BluetoothPrinterService {
 
   static Future<bool> connectToDevice(BluetoothDevice device) async {
     try {
-      print('🔗 Attempting to connect to ${device.platformName}...');
+      debugPrint('🔗 Attempting to connect to ${device.platformName}...');
 
       if (device.isConnected) {
-        print('✅ Already connected to ${device.platformName}');
+        debugPrint('✅ Already connected to ${device.platformName}');
         return true;
       }
 
@@ -56,14 +57,14 @@ class BluetoothPrinterService {
       await Future.delayed(const Duration(seconds: 2));
 
       if (device.isConnected) {
-        print('✅ Successfully connected to ${device.platformName}');
+        debugPrint('✅ Successfully connected to ${device.platformName}');
         return true;
       } else {
-        print('❌ Connection failed to ${device.platformName}');
+        debugPrint('❌ Connection failed to ${device.platformName}');
         return false;
       }
     } catch (e) {
-      print('❌ Failed to connect to ${device.platformName}: $e');
+      debugPrint('❌ Failed to connect to ${device.platformName}: $e');
       return false;
     }
   }
@@ -73,13 +74,13 @@ class BluetoothPrinterService {
   static Future<void> printToDevice(BluetoothDevice device, Sale sale,
       {bool savePrinter = true}) async {
     try {
-      print('🖨️ Attempting to print to ${device.platformName}...');
+      debugPrint('🖨️ Attempting to print to ${device.platformName}...');
 
       final List<int> bytes = await _generateReceiptBytes(sale);
-      print('📄 Generated ${bytes.length} bytes of receipt data');
+      debugPrint('📄 Generated ${bytes.length} bytes of receipt data');
 
       List<BluetoothService> services = await device.discoverServices();
-      print('📡 Found ${services.length} services on ${device.platformName}');
+      debugPrint('📡 Found ${services.length} services on ${device.platformName}');
 
       BluetoothCharacteristic? writeCharacteristic;
 
@@ -102,7 +103,7 @@ class BluetoothPrinterService {
 
       await _sendDataInChunks(writeCharacteristic, bytes);
 
-      print('✅ Receipt sent to ${device.platformName} successfully!');
+      debugPrint('✅ Receipt sent to ${device.platformName} successfully!');
 
       if (savePrinter) {
         await _savePrinterAfterSuccess(device);
@@ -110,20 +111,20 @@ class BluetoothPrinterService {
 
       await Future.delayed(const Duration(seconds: 2));
     } catch (e) {
-      print('❌ Print failed on ${device.platformName}: $e');
+      debugPrint('❌ Print failed on ${device.platformName}: $e');
       rethrow;
     }
   }
 
   static Future<void> _sendDataInChunks(
       BluetoothCharacteristic characteristic, List<int> data) async {
-    print('📦 Sending ${data.length} bytes in chunks of $maxChunkSize...');
+    debugPrint('📦 Sending ${data.length} bytes in chunks of $maxChunkSize...');
 
     for (int i = 0; i < data.length; i += maxChunkSize) {
       final end = i + maxChunkSize < data.length ? i + maxChunkSize : data.length;
       final chunk = data.sublist(i, end);
 
-      print('   📤 Sending chunk ${(i ~/ maxChunkSize) + 1}: ${chunk.length} bytes');
+      debugPrint('   📤 Sending chunk ${(i ~/ maxChunkSize) + 1}: ${chunk.length} bytes');
 
       try {
         if (characteristic.properties.writeWithoutResponse) {
@@ -134,12 +135,12 @@ class BluetoothPrinterService {
         await Future.delayed(
             const Duration(milliseconds: delayBetweenChunks));
       } catch (e) {
-        print('   ❌ Failed to write chunk: $e');
+        debugPrint('   ❌ Failed to write chunk: $e');
         throw Exception('Failed to write data chunk: $e');
       }
     }
 
-    print('✅ All chunks sent successfully!');
+    debugPrint('✅ All chunks sent successfully!');
   }
 
   // ---------------------- SAVED PRINTER ----------------------
@@ -158,9 +159,9 @@ class BluetoothPrinterService {
     try {
       final savedPrinter = _deviceToSavedPrinter(device);
       await PrinterStorageService.saveDefaultPrinter(savedPrinter);
-      print('💾 Printer saved as default: ${device.platformName}');
+      debugPrint('💾 Printer saved as default: ${device.platformName}');
     } catch (e) {
-      print('❌ Failed to save printer: $e');
+      debugPrint('❌ Failed to save printer: $e');
     }
   }
 
@@ -168,11 +169,11 @@ class BluetoothPrinterService {
     try {
       final savedPrinter = await PrinterStorageService.getDefaultPrinter();
       if (savedPrinter == null) {
-        print('ℹ️ No saved printer found');
+        debugPrint('ℹ️ No saved printer found');
         return null;
       }
 
-      print('🔍 Looking for saved printer: ${savedPrinter.name}');
+      debugPrint('🔍 Looking for saved printer: ${savedPrinter.name}');
       FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
 
       BluetoothDevice? foundDevice;
@@ -180,7 +181,7 @@ class BluetoothPrinterService {
         for (final result in results) {
           if (result.device.remoteId.str == savedPrinter.address) {
             foundDevice = result.device;
-            print('✅ Found saved printer: ${foundDevice!.platformName}');
+            debugPrint('✅ Found saved printer: ${foundDevice!.platformName}');
             break;
           }
         }
@@ -193,15 +194,15 @@ class BluetoothPrinterService {
       if (foundDevice != null) {
         final connected = await connectToDevice(foundDevice!);
         if (connected) {
-          print('✅ Successfully reconnected to saved printer: ${foundDevice!.platformName}');
+          debugPrint('✅ Successfully reconnected to saved printer: ${foundDevice!.platformName}');
           return foundDevice;
         }
       }
 
-      print('❌ Could not reconnect to saved printer');
+      debugPrint('❌ Could not reconnect to saved printer');
       return null;
     } catch (e) {
-      print('❌ Error connecting to saved printer: $e');
+      debugPrint('❌ Error connecting to saved printer: $e');
       return null;
     }
   }
@@ -307,9 +308,9 @@ class BluetoothPrinterService {
     try {
       await FlutterBluePlus.stopScan();
       _isScanning = false;
-      print('🛑 Bluetooth scan stopped');
+      debugPrint('🛑 Bluetooth scan stopped');
     } catch (e) {
-      print('❌ Error stopping scan: $e');
+      debugPrint('❌ Error stopping scan: $e');
     }
   }
 
@@ -317,7 +318,7 @@ class BluetoothPrinterService {
     try {
       return await FlutterBluePlus.isAvailable;
     } catch (e) {
-      print('❌ Bluetooth not available: $e');
+      debugPrint('❌ Bluetooth not available: $e');
       return false;
     }
   }
@@ -326,14 +327,14 @@ class BluetoothPrinterService {
     try {
       return await FlutterBluePlus.isOn;
     } catch (e) {
-      print('❌ Bluetooth not on: $e');
+      debugPrint('❌ Bluetooth not on: $e');
       return false;
     }
   }
 
   static Future<bool> checkPermissions() async {
     try {
-      print('🔐 Checking Bluetooth permissions...');
+      debugPrint('🔐 Checking Bluetooth permissions...');
 
       final bluetoothScanStatus = await Permission.bluetoothScan.status;
       final bluetoothConnectStatus = await Permission.bluetoothConnect.status;
@@ -351,7 +352,7 @@ class BluetoothPrinterService {
 
       return bluetoothScanStatus.isGranted && bluetoothConnectStatus.isGranted;
     } catch (e) {
-      print('❌ Permission error: $e');
+      debugPrint('❌ Permission error: $e');
       return false;
     }
   }

@@ -58,7 +58,7 @@ class DashboardPage extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: color.withOpacity(0.15),
+                backgroundColor: color.withValues(alpha: 0.15),
                 child: Icon(icon, color: color),
               ),
               const SizedBox(width: 12),
@@ -90,16 +90,17 @@ class DashboardPage extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            // ignore: deprecated_member_use
-            colors: [color.withOpacity(0.85), color.withOpacity(0.65)],
+            colors: [
+              color.withValues(alpha: 0.85),
+              color.withValues(alpha: 0.65),
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              // ignore: deprecated_member_use
-              color: color.withOpacity(0.25),
+              color: color.withValues(alpha: 0.25),
               blurRadius: 8,
               offset: const Offset(2, 4),
             ),
@@ -124,8 +125,7 @@ class DashboardPage extends StatelessWidget {
               title,
               style: GoogleFonts.inter(
                 fontSize: 14,
-                // ignore: deprecated_member_use
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
               ),
               textAlign: TextAlign.center,
             ),

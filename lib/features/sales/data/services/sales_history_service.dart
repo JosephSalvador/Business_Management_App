@@ -57,10 +57,11 @@ class SalesHistoryItem extends StatelessWidget {
   }
 
   void _shareSale(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await ReceiptShareService.shareReceiptAsText(sale);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Failed to share receipt: $e'),
           backgroundColor: Colors.red,

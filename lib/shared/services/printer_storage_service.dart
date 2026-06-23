@@ -1,6 +1,7 @@
 // services/printer_storage_service.dart
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/printer_model.dart';
 
@@ -15,9 +16,9 @@ class PrinterStorageService {
       final prefs = await SharedPreferences.getInstance();
       final printerJson = printer.toJson();
       await prefs.setString(_defaultPrinterKey, json.encode(printerJson));
-      print('💾 Saved default printer: ${printer.name}');
+      debugPrint('💾 Saved default printer: ${printer.name}');
     } catch (e) {
-      print('❌ Failed to save printer: $e');
+      debugPrint('❌ Failed to save printer: $e');
     }
   }
 
@@ -33,7 +34,7 @@ class PrinterStorageService {
       }
       return null;
     } catch (e) {
-      print('❌ Failed to load saved printer: $e');
+      debugPrint('❌ Failed to load saved printer: $e');
       return null;
     }
   }
@@ -43,9 +44,9 @@ class PrinterStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_defaultPrinterKey);
-      print('🗑️ Cleared default printer');
+      debugPrint('🗑️ Cleared default printer');
     } catch (e) {
-      print('❌ Failed to clear printer: $e');
+      debugPrint('❌ Failed to clear printer: $e');
     }
   }
 
