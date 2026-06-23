@@ -228,15 +228,6 @@ class DashboardPage extends StatelessWidget {
             },
             itemBuilder: (BuildContext context) => [
               PopupMenuItem<String>(
-                value: 'profile',
-                child: Text('Profile', style: GoogleFonts.inter()),
-              ),
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Text('Settings', style: GoogleFonts.inter()),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem<String>(
                 value: 'logout',
                 child:
                     Text('Logout', style: GoogleFonts.inter(color: Colors.red)),

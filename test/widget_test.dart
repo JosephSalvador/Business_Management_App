@@ -1,22 +1,60 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:business_management_system/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:business_management_system/shared/models/user_model.dart';
+import 'package:business_management_system/shared/providers/user_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp()); // Remove const
+  test('User serialization writes privileges and reads legacy key', () {
+    final user = User(
+      id: '1',
+      username: 'admin',
+      email: 'admin@company.com',
+      role: 'Admin',
+      privileges: ['Manage Users'],
+      fullName: 'Admin User',
+      createdAt: DateTime.parse('2026-06-24T12:00:00.000Z'),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    final json = user.toJson();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(json['privileges'], ['Manage Users']);
+    expect(json.containsKey('priviledges'), isFalse);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    final restored = User.fromJson({
+      'id': '1',
+      'username': 'admin',
+      'email': 'admin@company.com',
+      'role': 'Admin',
+      'priviledges': ['Manage Users'],
+      'fullName': 'Admin User',
+      'createdAt': '2026-06-24T12:00:00.000Z',
+    });
+
+    expect(restored.privileges, ['Manage Users']);
+  });
+
+  test('UserProvider restores a saved session with legacy privileges key', () async {
+    SharedPreferences.setMockInitialValues({
+      'isLoggedIn': true,
+      'userData': jsonEncode({
+        'id': '1',
+        'username': 'admin',
+        'email': 'admin@company.com',
+        'role': 'Admin',
+        'priviledges': ['Manage Users', 'View Sales'],
+        'fullName': 'Admin User',
+        'isActive': true,
+        'createdAt': '2026-06-24T12:00:00.000Z',
+      }),
+    });
+
+    final provider = UserProvider();
+    await provider.loadUserSession();
+
+    expect(provider.isLoggedIn, isTrue);
+    expect(provider.currentUser?.privileges, ['Manage Users', 'View Sales']);
   });
 }

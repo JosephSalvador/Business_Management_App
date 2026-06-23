@@ -20,12 +20,14 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final privilegesJson = json['privileges'] ?? json['priviledges'] ?? const [];
+
     return User(
       id: json['id'],
       username: json['username'],
       email: json['email'],
       role: json['role'],
-      privileges: List<String>.from(json['priviledges']),
+      privileges: List<String>.from(privilegesJson),
       fullName: json['fullName'],
       isActive: json['isActive'] ?? true,
       createdAt: DateTime.parse(json['createdAt']),

@@ -7,6 +7,7 @@ import 'features/sales/presentation/pages/new_sale_page.dart';
 import 'features/user_management/presentation/pages/user_management_page.dart';
 import 'features/sales/presentation/pages/sales_page.dart';
 import 'shared/providers/user_provider.dart';
+import 'shared/widgets/not_found_page.dart';
 
 class AppRouter {
   static GoRouter router(UserProvider userProvider) {
@@ -34,32 +35,47 @@ class AppRouter {
           path: '/users',
           builder: (context, state) => const UserManagementPage(),
         ),
-        // Add these routes to your existing router
-GoRoute(
-  path: '/sales',
-  builder: (context, state) => const SalesPage(),
-),
-GoRoute(
-     path: '/sales/new',
-   builder: (context, state) => const NewSalePage(), // You can create this later
- ),
-GoRoute(
-  path: '/sales/history',
-  builder: (context, state) => const SalesPage(), // Same as main sales page
-),
+        GoRoute(
+          path: '/sales',
+          builder: (context, state) => const SalesPage(),
+        ),
+        GoRoute(
+          path: '/sales/new',
+          builder: (context, state) => const NewSalePage(),
+        ),
+        GoRoute(
+          path: '/sales/history',
+          builder: (context, state) => const SalesPage(),
+        ),
       ],
       redirect: (context, state) {
         final isLoggedIn = userProvider.isLoggedIn;
-        final isGoingToAuth = state.uri.path == '/login' ||
-            state.uri.path == '/register' ||
-            state.uri.path == '/forgot-password';
+        final currentPath = state.uri.path;
+        const authPaths = {
+          '/login',
+          '/register',
+          '/forgot-password',
+        };
+        const validPaths = {
+          '/login',
+          '/register',
+          '/forgot-password',
+          '/dashboard',
+          '/users',
+          '/sales',
+          '/sales/new',
+          '/sales/history',
+        };
+        final isKnownRoute = validPaths.contains(currentPath);
+        final isGoingToAuth = authPaths.contains(currentPath);
 
+        if (!isKnownRoute) return null;
         if (!isLoggedIn && !isGoingToAuth) return '/login';
         if (isLoggedIn && isGoingToAuth) return '/dashboard';
         return null;
       },
       errorBuilder: (context, state) {
-        return const DashboardPage();
+        return const NotFoundPage();
       },
     );
   }

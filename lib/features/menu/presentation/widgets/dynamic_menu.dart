@@ -14,30 +14,12 @@ class DynamicMenu extends StatelessWidget {
         return Icons.dashboard;
       case 'people':
         return Icons.people;
-      case 'inventory':
-        return Icons.inventory_2;
-      case 'add_box':
-        return Icons.add_box;
       case 'point_of_sale':
         return Icons.point_of_sale;
       case 'add_shopping_cart':
         return Icons.add_shopping_cart;
       case 'history':
         return Icons.history;
-      case 'receipt':
-        return Icons.receipt;
-      case 'analytics':
-        return Icons.analytics;
-      case 'assessment':
-        return Icons.assessment;
-      case 'summarize':
-        return Icons.summarize;
-      case 'warehouse':
-        return Icons.warehouse;
-      case 'description':
-        return Icons.description;
-      case 'settings':
-        return Icons.settings;
       default:
         return Icons.folder;
     }
@@ -123,17 +105,6 @@ class DynamicMenu extends StatelessWidget {
             ),
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.person, size: 20),
-                  title: Text(
-                    'Profile',
-                    style: GoogleFonts.inter(fontSize: 14),
-                  ),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    context.go('/profile');
-                  },
-                ),
                 ListTile(
                   leading: const Icon(Icons.logout, size: 20),
                   title: Text(

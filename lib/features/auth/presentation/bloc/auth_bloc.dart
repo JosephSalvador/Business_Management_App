@@ -1,5 +1,8 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../../../shared/models/user_model.dart';
 
@@ -35,8 +38,29 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  void _onAuthCheckRequested(AuthCheckRequested event, Emitter<AuthState> emit) {
-    // Check if user is already logged in (from local storage)
-    emit(AuthInitial());
+  Future<void> _onAuthCheckRequested(
+    AuthCheckRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+    if (!isLoggedIn) {
+      emit(AuthInitial());
+      return;
+    }
+
+    final userJsonString = prefs.getString('userData');
+    if (userJsonString == null || userJsonString.isEmpty) {
+      emit(AuthInitial());
+      return;
+    }
+
+    try {
+      final userMap = jsonDecode(userJsonString) as Map<String, dynamic>;
+      emit(AuthSuccess(user: User.fromJson(userMap)));
+    } catch (_) {
+      emit(AuthInitial());
+    }
   }
 }
