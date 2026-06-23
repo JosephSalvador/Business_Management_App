@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/printer_model.dart';
 
 class PrinterStorageService {
+  // ignore: unused_field
   static const String _savedPrinterKey = 'saved_printer';
   static const String _defaultPrinterKey = 'default_printer';
 
