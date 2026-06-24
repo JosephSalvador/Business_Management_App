@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
+  drift: ^2.21.0
+  drift_flutter: ^0.2.4
   http: ^1.1.0
   shared_preferences: ^2.2.2
   flutter_bloc: ^8.1.3
@@ -28,6 +30,9 @@ dependencies:
   pdf: ^3.10.4
   printing: ^5.11.2
   image: ^4.0.17
+  path: ^1.9.0
+  path_provider: ^2.1.4
+  sqlite3_flutter_libs: ^0.5.24
   
 
   provider: any
@@ -35,6 +40,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  build_runner: ^2.4.11
+  drift_dev: ^2.21.0
   flutter_lints: ^3.0.0
 
 flutter:
@@ -42,5 +49,4 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
-
 
