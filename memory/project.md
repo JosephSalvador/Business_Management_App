@@ -12,12 +12,19 @@
 ## architecture.md — current state (2026-08-05)
 
 - Modular monolith: Shared / Domain / Application / Infrastructure / API / Workers /
-  Notifications / Modules.*. Solution `backend/BusinessOS.slnx`.
+  Notifications / Modules.*. Solution `backend/BusinessOS.slnx` (includes the tests project).
 - Event-driven + outbox; CQRS (MediatR); UUID PKs; shared-DB tenancy with `tenant_id`.
-- **Honest status:** scaffold only. API is still the default weather template; Application,
-  Infrastructure, Notifications, Modules.Sales have no source files; Workers does not build;
-  build currently FAILS. Phase 0 real implementation is in progress.
-- Key docs: `docs/ArchitectureRules.md`, `docs/Architecture.md`, `docs/roadmap.md`.
+- **Implemented:** JWT auth (register/login/refresh/revoke) + BCrypt + account lockout;
+  RBAC with permission cache; audit pipeline (redacted); notification engine (email/SMS/
+  push/WhatsApp channels + welcome email + analytics/activity handlers); outbox-backed job
+  queue (`SendEmailJob` etc.) + scheduled jobs; local/S3 file storage; health endpoints
+  (`/health`, `/health/live`, `/health/ready`); API versioning (v1) + Swagger; exception
+  handler (ProblemDetails), correlation/security-headers middleware, rate limiting, CORS,
+  structured Serilog logging; options-pattern configuration. Build is clean
+  (`--warnaserror`, 0 warnings); `dotnet format` passes; 45 tests pass (34 unit + 11
+  integration) against a real Postgres.
+- Key docs: `MASTER_ARCHITECTURE.md` (single source of truth), `docs/ArchitectureRules.md`,
+  `docs/Architecture.md`, `docs/roadmap.md`.
 
 ## coding.md — see `docs/CodingStandards.md`
 
@@ -25,8 +32,9 @@
 
 ## database.md — see `docs/TechStack.md` + ADR-0002/0008
 
-- Local: podman postgres:17, db `businessos`, user `businessos`, password `Joseph662`,
-  port 5432. Redis `localhost:6379`, MinIO `localhost:9000/9001`.
+- Local: podman postgres:17, db `businessos`, user `businessos`, password `Joseph662.`
+  (trailing period is part of the password), port 5432. Redis `localhost:6379`, MinIO
+  `localhost:9000/9001`. Test DB: `businessos_test`.
 
 ## ux.md — product principles
 
@@ -43,11 +51,12 @@
 
 - System Postgres 17 `postgres` password unknown → we use our own container DB (ADR-0009).
 - Redis/minio binaries not installed → containers.
-- API project started from the .NET weather template; weather endpoint must be removed.
-- Workers project namespace is broken (`BusinessOS.Workers`); needs a real host.
+- Integration tests need real Postgres on `localhost:5432` → CI runs unit tests only.
 
 ## technical_debt.md
 
 - Flutter app: SharedPreferences + in-memory mocks still drive auth/products/sales; Drift DB
   (11 tables) is built but disconnected from the running app.
-- Roadmap checkboxes marked `[x]` for Phase 0 are aspirational — not all implemented.
+- Dev DB `businessos` may contain smoke-test users; `businessos_test` is recreated per run.
+- Roadmap checkboxes marked `[x]` for Phase 0 are aspirational — many are now real (see
+  "architecture.md" above).

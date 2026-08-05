@@ -25,4 +25,7 @@
   <Folder Name="/src/Workers/">
     <Project Path="src/Workers/BusinessOS.Workers.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BusinessOS.Tests/BusinessOS.Tests.csproj" />
+  </Folder>
 </Solution>

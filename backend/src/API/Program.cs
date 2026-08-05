@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Asp.Versioning;
+using BusinessOS.Api.Auditing;
 using BusinessOS.Api.Endpoints;
 using BusinessOS.Api.Exceptions;
 using BusinessOS.Api.Health;
@@ -7,9 +8,13 @@ using BusinessOS.Api.Http;
 using BusinessOS.Api.Middleware;
 using BusinessOS.Api.OpenApi;
 using BusinessOS.Application;
+using BusinessOS.Application.Ports;
 using BusinessOS.Infrastructure;
+using BusinessOS.Infrastructure.Authorization;
+using BusinessOS.Infrastructure.Jobs;
 using BusinessOS.Infrastructure.Persistence;
 using BusinessOS.Infrastructure.Security;
+using BusinessOS.Infrastructure.Storage;
 using BusinessOS.Notifications;
 using BusinessOS.Shared.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,7 +39,12 @@ var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration)
-    .AddNotifications(builder.Configuration);
+    .AddNotificationEngine()
+    .AddFileStorage(builder.Configuration)
+    .AddJobQueue()
+    .AddPermissionEngine();
+
+builder.Services.AddScoped<IAuditContextProvider, HttpAuditContextProvider>();
 
 builder.Services
     .Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName))
@@ -138,9 +148,7 @@ builder.Services.AddCors(options =>
     }
 });
 
-builder.Services
-    .AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("database");
+builder.Services.AddPlatformHealthChecks(builder.Configuration);
 
 builder.Services
     .AddOpenApi()
@@ -178,6 +186,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 }
 
 app.MapHealthChecks("/health");
+app.MapPlatformHealthEndpoints();
 
 app.MapAuthEndpoints();
 

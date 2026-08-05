@@ -1,9 +1,0 @@
-{
-  "BusinessOS.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/joberthix\/Documents\/Workspaces\/learning\/business_app\/backend\/src\/API",
-  "BusinessOS.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/joberthix\/Documents\/Workspaces\/learning\/business_app\/backend\/src\/Application",
-  "BusinessOS.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/joberthix\/Documents\/Workspaces\/learning\/business_app\/backend\/src\/Domain",
-  "BusinessOS.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/joberthix\/Documents\/Workspaces\/learning\/business_app\/backend\/src\/Infrastructure",
-  "BusinessOS.Modules.Sales, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/joberthix\/Documents\/Workspaces\/learning\/business_app\/backend\/src\/Modules\/Sales",
-  "BusinessOS.Notifications, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/joberthix\/Documents\/Workspaces\/learning\/business_app\/backend\/src\/Notifications",
-  "BusinessOS.Shared, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/home\/joberthix\/Documents\/Workspaces\/learning\/business_app\/backend\/src\/Shared"
-}

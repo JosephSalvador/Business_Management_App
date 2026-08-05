@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, lint and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
+
+      - name: Restore
+        run: dotnet restore backend/BusinessOS.slnx
+
+      - name: Build
+        run: dotnet build backend/BusinessOS.slnx --no-restore --configuration Release --warnaserror
+
+      - name: Lint
+        run: dotnet format backend/BusinessOS.slnx --no-restore --verify-no-changes
+
+      # The integration tests (BusinessOS.Tests.Integration.*) spin up the full
+      # WebApplicationFactory stack and require a real PostgreSQL server, which is NOT
+      # available in CI. Run them locally against a Postgres instance instead. Here we
+      # filter to unit tests only (FullyQualifiedName does not contain "Integration").
+      #
+      # The tests project is part of BusinessOS.slnx, so restore/build above already
+      # compile it; `dotnet test` reuses that build (build already done above).
+      - name: Test
+        run: dotnet test backend/tests/BusinessOS.Tests/BusinessOS.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory ./TestResults --filter "FullyQualifiedName!~Integration"
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: ./TestResults
+          if-no-files-found: error

@@ -1,6 +1,7 @@
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Events;
 using Microsoft.Extensions.Logging;
+using EmailMessage = BusinessOS.Application.Notifications.EmailMessage;
 
 namespace BusinessOS.Notifications;
 

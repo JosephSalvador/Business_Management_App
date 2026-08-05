@@ -3,9 +3,9 @@ using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Shared;
+using BusinessOS.Shared.Configuration;
 using MediatR;
 using Microsoft.Extensions.Options;
-using BusinessOS.Shared.Configuration;
 
 namespace BusinessOS.Application.Features.Auth.Commands;
 
