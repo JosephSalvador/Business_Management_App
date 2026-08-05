@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-BusinessOS.Workers-c0d98d5a-2a52-41b2-93b0-1c8d980b0399</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application\BusinessOS.Application.csproj" />
+    <ProjectReference Include="..\Infrastructure\BusinessOS.Infrastructure.csproj" />
+    <ProjectReference Include="..\Notifications\BusinessOS.Notifications.csproj" />
+    <ProjectReference Include="..\Shared\BusinessOS.Shared.csproj" />
+  </ItemGroup>
+</Project>

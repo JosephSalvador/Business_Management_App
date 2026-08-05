@@ -1,0 +1,45 @@
+@host = http://localhost:5000
+
+### Register a new organization (tenant + admin user)
+POST {{host}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "demo@acme.local",
+  "password": "Admin@12345",
+  "fullName": "Demo Owner",
+  "phone": "255712345678",
+  "organizationName": "Acme Ltd"
+}
+
+### Login (seeded dev user)
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.local",
+  "password": "Admin@12345"
+}
+
+### Refresh token (replace refreshToken with a value from login)
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "PASTE_REFRESH_TOKEN_HERE"
+}
+
+### Revoke session / logout (replace refreshToken with a value from login)
+POST {{host}}/api/v1/auth/revoke
+Content-Type: application/json
+
+{
+  "refreshToken": "PASTE_REFRESH_TOKEN_HERE"
+}
+
+### Current user (requires Bearer token)
+GET {{host}}/api/v1/users/me
+Authorization: Bearer PASTE_ACCESS_TOKEN_HERE
+
+### Health
+GET {{host}}/health
