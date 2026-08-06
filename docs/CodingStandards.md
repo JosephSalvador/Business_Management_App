@@ -21,6 +21,8 @@
   transport DTOs.
 - **Nullability:** `nullable` enabled; `String.Empty` over `""`; avoid `null!` unless mapped EF.
 - **EF:** repositories in Infrastructure; context maps configured in one place per aggregate.
+  Every mapping declares `ToTable(name, schema)` using the `Tables`/`Schemas` catalog in
+  `Infrastructure/Persistence/TableNames.cs` — never raw table-name strings or provider defaults.
 
 ## Dart (Flutter)
 

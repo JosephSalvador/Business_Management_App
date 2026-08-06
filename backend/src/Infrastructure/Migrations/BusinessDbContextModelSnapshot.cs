@@ -73,7 +73,7 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "CreatedAt");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Domain.Features.FeatureFlag", b =>
@@ -113,7 +113,7 @@ namespace BusinessOS.Infrastructure.Migrations
                     b.HasIndex("TenantId", "Key")
                         .IsUnique();
 
-                    b.ToTable("FeatureFlags");
+                    b.ToTable("FeatureFlags", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Domain.Identity.Permission", b =>
@@ -148,7 +148,7 @@ namespace BusinessOS.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Permissions");
+                    b.ToTable("Permissions", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Domain.Identity.RefreshToken", b =>
@@ -201,7 +201,7 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("RefreshTokens", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Domain.Identity.Role", b =>
@@ -215,6 +215,10 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsSystem")
                         .HasColumnType("boolean");
@@ -235,9 +239,10 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId", "Name");
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique();
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Domain.Identity.User", b =>
@@ -298,7 +303,59 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", "public");
+                });
+
+            modelBuilder.Entity("BusinessOS.Domain.Identity.UserBranch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AssignedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\" = true");
+
+                    b.HasIndex("UserId", "BranchId")
+                        .IsUnique();
+
+                    b.ToTable("UserBranches", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Domain.Tenants.Branch", b =>
@@ -356,7 +413,7 @@ namespace BusinessOS.Infrastructure.Migrations
                     b.HasIndex("TenantId", "Code")
                         .IsUnique();
 
-                    b.ToTable("Branches");
+                    b.ToTable("Branches", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Domain.Tenants.Tenant", b =>
@@ -414,7 +471,7 @@ namespace BusinessOS.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Tenants");
+                    b.ToTable("Tenants", "public");
                 });
 
             modelBuilder.Entity("BusinessOS.Infrastructure.Persistence.OutboxMessage", b =>
@@ -448,7 +505,7 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.HasIndex("ProcessedAt", "OccurredAt");
 
-                    b.ToTable("OutboxMessages");
+                    b.ToTable("OutboxMessages", "public");
                 });
 
             modelBuilder.Entity("RolePermissions", b =>
@@ -463,7 +520,7 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("RolePermissions");
+                    b.ToTable("RolePermissions", "public");
                 });
 
             modelBuilder.Entity("UserRoles", b =>
@@ -478,7 +535,22 @@ namespace BusinessOS.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserRoles");
+                    b.ToTable("UserRoles", "public");
+                });
+
+            modelBuilder.Entity("BusinessOS.Domain.Identity.UserBranch", b =>
+                {
+                    b.HasOne("BusinessOS.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BusinessOS.Domain.Identity.User", null)
+                        .WithMany("Branches")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RolePermissions", b =>
@@ -509,6 +581,11 @@ namespace BusinessOS.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("BusinessOS.Domain.Identity.User", b =>
+                {
+                    b.Navigation("Branches");
                 });
 #pragma warning restore 612, 618
         }

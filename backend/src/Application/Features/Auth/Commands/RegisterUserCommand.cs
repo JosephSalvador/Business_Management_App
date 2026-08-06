@@ -70,7 +70,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
             tenant.Currency),
             cancellationToken);
 
-        var adminRole = Role.Create(tenant.Id, "Administrator", isSystem: true);
+        var adminRole = Role.Create(tenant.Id, SystemRoles.Administrator, isSystem: true);
         var allPermissions = await _roles.GetPermissionsByNamesAsync(PermissionNames.All, cancellationToken);
         adminRole.Grant(allPermissions);
         await _roles.AddAsync(adminRole, cancellationToken);

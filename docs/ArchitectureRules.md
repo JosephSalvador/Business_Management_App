@@ -20,6 +20,19 @@
 - Everything configurable: tax rules, numbering sequences, currencies, units, dynamic fields, UI strings.
 - API-first: a REST endpoint exists before the UI screen.
 
+## Database schema strategy
+
+- All tables live in the `public` schema during Platform and Foundation phases to keep migration
+  complexity low.
+- Every EF Core entity mapping declares its schema explicitly with
+  `ToTable("<Table>", "<Schema>")` — never rely on provider defaults.
+- Table names and schemas come from the catalog in
+  `backend/src/Infrastructure/Persistence/TableNames.cs`, grouped by bounded context
+  (Organization, Identity, Platform, ...). Mappings reference these constants only.
+- A bounded context moves into its own PostgreSQL schema by changing its schema constant in
+  `TableNames.cs` and generating one migration. Do not split schemas until Sales, Inventory,
+  and Accounting are stable.
+
 ## Process rules
 
 - Read `docs/ArchitectureRules.md` + `docs/CodingStandards.md` + the feature spec before coding.

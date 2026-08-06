@@ -6,6 +6,7 @@ namespace BusinessOS.Domain.Identity;
 public sealed class User : AggregateRoot
 {
     private readonly List<Role> _roles = new();
+    private readonly List<UserBranch> _branches = new();
 
     private User(Guid id, Guid tenantId, string email, string passwordHash, string fullName, string? phone)
         : base(id)
@@ -27,11 +28,21 @@ public sealed class User : AggregateRoot
     public int FailedLoginCount { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
     public IReadOnlyCollection<Role> Roles => _roles.AsReadOnly();
+    public IReadOnlyCollection<UserBranch> Branches => _branches.AsReadOnly();
+    public Guid? DefaultBranchId => _branches.FirstOrDefault(b => b.IsDefault)?.BranchId;
 
     public static User Create(Guid id, Guid tenantId, string email, string passwordHash, string fullName, string? phone)
     {
         var user = new User(id, tenantId, email, passwordHash, fullName, phone);
         user.AddDomainEvent(new UserRegisteredEvent(
+            Guid.NewGuid(), DateTime.UtcNow, user.Id, tenantId, email, fullName));
+        return user;
+    }
+
+    public static User CreateManaged(Guid id, Guid tenantId, string email, string passwordHash, string fullName, string? phone)
+    {
+        var user = new User(id, tenantId, email, passwordHash, fullName, phone);
+        user.AddDomainEvent(new UserCreatedEvent(
             Guid.NewGuid(), DateTime.UtcNow, user.Id, tenantId, email, fullName));
         return user;
     }
@@ -44,11 +55,78 @@ public sealed class User : AggregateRoot
         }
     }
 
+    public void SetRoles(IEnumerable<Role> roles)
+    {
+        var assigned = roles.ToList();
+        if (assigned.Count == _roles.Count && _roles.All(r => assigned.Any(a => a.Id == r.Id)))
+        {
+            return;
+        }
+
+        _roles.Clear();
+        _roles.AddRange(assigned);
+
+        AddDomainEvent(new UserRolesChangedEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, assigned.Select(r => r.Id).ToArray()));
+    }
+
+    public void AssignBranches(IEnumerable<UserBranchAssignment> assignments, Guid assignedBy, DateTime assignedAt)
+    {
+        var list = assignments.ToList();
+
+        if (list.Count != list.Select(a => a.BranchId).Distinct().Count())
+        {
+            throw new ArgumentException("A branch cannot be assigned more than once.", nameof(assignments));
+        }
+
+        if (list.Count(a => a.IsDefault) > 1)
+        {
+            throw new ArgumentException("At most one branch can be the default.", nameof(assignments));
+        }
+
+        var unchanged = list.Count == _branches.Count
+            && _branches.All(b => list.Any(a => a.BranchId == b.BranchId && a.IsDefault == b.IsDefault));
+        if (unchanged)
+        {
+            return;
+        }
+
+        _branches.Clear();
+        foreach (var assignment in list)
+        {
+            _branches.Add(UserBranch.Assign(TenantId, Id, assignment.BranchId, assignment.IsDefault, assignedBy, assignedAt));
+        }
+
+        AddDomainEvent(new UserBranchesChangedEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, TenantId,
+            list.Select(a => a.BranchId).ToArray(),
+            list.FirstOrDefault(a => a.IsDefault)?.BranchId));
+    }
+
+    public void UpdateProfile(string fullName, string? phone)
+    {
+        FullName = fullName.Trim();
+        Phone = phone;
+
+        AddDomainEvent(new UserProfileUpdatedEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, FullName, Phone));
+    }
+
     public void MarkEmailVerified() => EmailVerified = true;
 
-    public void Activate() => IsActive = true;
+    public void Activate()
+    {
+        IsActive = true;
+        AddDomainEvent(new UserStatusChangedEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, IsActive));
+    }
 
-    public void Deactivate() => IsActive = false;
+    public void Deactivate()
+    {
+        IsActive = false;
+        AddDomainEvent(new UserStatusChangedEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, IsActive));
+    }
 
     public void ChangePassword(string passwordHash) => PasswordHash = passwordHash;
 

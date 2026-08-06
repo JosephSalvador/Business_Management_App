@@ -46,7 +46,7 @@ public sealed class DatabaseSeeder
 
         var adminRoles = await _db.Roles
             .Include(r => r.Permissions)
-            .Where(r => r.IsSystem && r.Name == "Administrator")
+            .Where(r => r.IsSystem && r.Name == SystemRoles.Administrator)
             .ToListAsync(cancellationToken);
 
         if (adminRoles.Count > 0)
@@ -85,7 +85,7 @@ public sealed class DatabaseSeeder
         var tenant = Tenant.Create(Guid.NewGuid(), "Acme Ltd");
         await _db.Tenants.AddAsync(tenant, cancellationToken);
 
-        var adminRole = Role.Create(tenant.Id, "Administrator", isSystem: true);
+        var adminRole = Role.Create(tenant.Id, SystemRoles.Administrator, isSystem: true);
         var allPermissions = await _db.Permissions
             .Where(p => PermissionNames.All.Contains(p.Name))
             .ToListAsync(cancellationToken);
