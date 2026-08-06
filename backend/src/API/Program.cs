@@ -189,6 +189,7 @@ app.MapHealthChecks("/health");
 app.MapPlatformHealthEndpoints();
 
 app.MapAuthEndpoints();
+app.MapOrganizationEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
 {

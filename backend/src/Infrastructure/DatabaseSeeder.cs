@@ -44,9 +44,41 @@ public sealed class DatabaseSeeder
             _logger.LogInformation("Seeded {Count} permissions.", missing.Length);
         }
 
-        const string demoEmail = "admin@acme.local";
-        if (await _db.Users.AnyAsync(u => u.Email == demoEmail, cancellationToken))
+        var adminRoles = await _db.Roles
+            .Include(r => r.Permissions)
+            .Where(r => r.IsSystem && r.Name == "Administrator")
+            .ToListAsync(cancellationToken);
+
+        if (adminRoles.Count > 0)
         {
+            var grantPermissions = await _db.Permissions
+                .Where(p => PermissionNames.All.Contains(p.Name))
+                .ToListAsync(cancellationToken);
+
+            foreach (var role in adminRoles)
+            {
+                role.Grant(grantPermissions);
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Re-granted permissions to {Count} system administrator roles.", adminRoles.Count);
+        }
+
+        const string demoEmail = "admin@acme.local";
+        var demoUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == demoEmail, cancellationToken);
+        if (demoUser is not null)
+        {
+            if (!await _db.Branches.AnyAsync(b => b.TenantId == demoUser.TenantId, cancellationToken))
+            {
+                _db.Branches.Add(Branch.Create(
+                    demoUser.TenantId,
+                    Branch.DefaultName,
+                    Branch.DefaultCode,
+                    Tenant.DefaultCurrency));
+                await _db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Seeded default branch for the demo tenant.");
+            }
+
             return;
         }
 

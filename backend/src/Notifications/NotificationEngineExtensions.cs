@@ -21,6 +21,9 @@ public static class NotificationEngineExtensions
         services.AddScoped<IDomainEventHandler<UserRegisteredEvent>, UserRegisteredNotificationHandler>();
         services.AddScoped<IDomainEventHandler<UserRegisteredEvent>, UserRegisteredAnalyticsHandler>();
         services.AddScoped<IDomainEventHandler<UserRegisteredEvent>, UserRegisteredActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<BranchCreatedEvent>, BranchActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<BranchUpdatedEvent>, BranchActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<BranchStatusChangedEvent>, BranchActivityFeedHandler>();
 
         return services;
     }

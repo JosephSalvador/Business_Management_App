@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace BusinessOS.Infrastructure.Persistence.Migrations
+namespace BusinessOS.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddUserLockout : Migration

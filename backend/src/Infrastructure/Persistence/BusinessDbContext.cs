@@ -17,6 +17,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -31,8 +32,25 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
         {
             entity.HasKey(t => t.Id);
             entity.Property(t => t.Name).IsRequired().HasMaxLength(200);
+            entity.Property(t => t.ContactEmail).HasMaxLength(320);
+            entity.Property(t => t.ContactPhone).HasMaxLength(30);
+            entity.Property(t => t.Address).HasColumnType("text");
+            entity.Property(t => t.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(t => t.TaxId).HasMaxLength(64);
             entity.Property(t => t.DatabaseSchema).HasMaxLength(64);
             entity.HasIndex(t => t.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<Branch>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Name).IsRequired().HasMaxLength(200);
+            entity.Property(b => b.Code).IsRequired().HasMaxLength(50);
+            entity.Property(b => b.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(b => b.Address).HasColumnType("text");
+            entity.Property(b => b.Phone).HasMaxLength(30);
+            entity.Property(b => b.Email).HasMaxLength(320);
+            entity.HasIndex(b => new { b.TenantId, b.Code }).IsUnique();
         });
 
         modelBuilder.Entity<User>(entity =>

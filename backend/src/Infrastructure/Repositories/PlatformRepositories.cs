@@ -21,6 +21,41 @@ public sealed class TenantRepository : ITenantRepository
         => _db.Tenants.AddAsync(tenant, cancellationToken).AsTask();
 }
 
+public sealed class BranchRepository : IBranchRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public BranchRepository(BusinessDbContext db) => _db = db;
+
+    public Task<Branch?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Branches.FirstOrDefaultAsync(b => b.TenantId == tenantId && b.Id == id, cancellationToken);
+
+    public Task<Branch?> GetByCodeAsync(Guid tenantId, string code, CancellationToken cancellationToken = default)
+        => _db.Branches.FirstOrDefaultAsync(b => b.TenantId == tenantId && b.Code == code, cancellationToken);
+
+    public async Task<IReadOnlyList<Branch>> ListAsync(
+        Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default)
+        => await _db.Branches
+            .Where(b => b.TenantId == tenantId)
+            .OrderBy(b => b.Code)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Branch>> ListAllAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.Branches
+            .Where(b => b.TenantId == tenantId)
+            .OrderBy(b => b.Code)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        => _db.Branches.CountAsync(b => b.TenantId == tenantId, cancellationToken);
+
+    public Task AddAsync(Branch branch, CancellationToken cancellationToken = default)
+        => _db.Branches.AddAsync(branch, cancellationToken).AsTask();
+}
+
 public sealed class UserRepository : IUserRepository
 {
     private readonly BusinessDbContext _db;

@@ -221,7 +221,9 @@ Each module owns its models, rules, events, commands, and queries (DDD). Platfor
 Platform (Phase 0) → then Core Business modules, in this order:
 
 1. **Auth (real)** — server login/register, refresh, OTP, offline session.
-2. **Organizations & Branches** — tenant hierarchy.
+2. **Organizations & Branches** — tenant hierarchy. `[x] backend slice 2026-08-06` — spec
+   `specs/organizations-branches.md`; Flutter onboarding screens + Drift `branches` cache are
+   the follow-up (POS phase).
 3. **Users, Roles & Permissions** — CRUD against server RBAC + feature flags.
 4. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
 5. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns, discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo Pesa, Mixx).

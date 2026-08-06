@@ -9,7 +9,7 @@
 - **Positioning:** the African alternative to Odoo / Zoho / SAP B1 / Dynamics 365. Platform,
   not a single ERP.
 
-## architecture.md — current state (2026-08-05)
+## architecture.md — current state (2026-08-06)
 
 - Modular monolith: Shared / Domain / Application / Infrastructure / API / Workers /
   Notifications / Modules.*. Solution `backend/BusinessOS.slnx` (includes the tests project).
@@ -21,10 +21,18 @@
   (`/health`, `/health/live`, `/health/ready`); API versioning (v1) + Swagger; exception
   handler (ProblemDetails), correlation/security-headers middleware, rate limiting, CORS,
   structured Serilog logging; options-pattern configuration. Build is clean
-  (`--warnaserror`, 0 warnings); `dotnet format` passes; 45 tests pass (34 unit + 11
-  integration) against a real Postgres.
+  (`--warnaserror`, 0 warnings); `dotnet format` passes.
+- **Phase 1 slice 1 (Organizations & Branches, done 2026-08-06):** `Tenant` organization
+  profile (contact/address/currency/taxId); `Branch` aggregate with code normalization;
+  tenant-scoped `IBranchRepository`; `Features/Organizations` + `Features/Branches`
+  commands/queries with validators + `PagedResult<T>`; endpoints
+  `GET/PUT /api/v1/organization`, `GET/POST /api/v1/branches`,
+  `GET/PUT /api/v1/branches/{id}`, `PATCH /api/v1/branches/{id}/status` — all gated with
+  `RequirePermission` (readiness gap #3 closed); registration auto-creates the default
+  `HQ` branch; seeder re-grants new permissions to existing admin roles; outbox-backed
+  `BranchActivityFeedHandler`; 62 tests pass (unit + integration against real Postgres).
 - Key docs: `MASTER_ARCHITECTURE.md` (single source of truth), `docs/ArchitectureRules.md`,
-  `docs/Architecture.md`, `docs/roadmap.md`.
+  `docs/Architecture.md`, `docs/roadmap.md`, `specs/organizations-branches.md`.
 
 ## coding.md — see `docs/CodingStandards.md`
 
@@ -52,6 +60,8 @@
 - System Postgres 17 `postgres` password unknown → we use our own container DB (ADR-0009).
 - Redis/minio binaries not installed → containers.
 - Integration tests need real Postgres on `localhost:5432` → CI runs unit tests only.
+- Success `Result<T>` endpoints return **200**, not 201 (platform `ToApiResult` convention) —
+  documented in the Organizations & Branches spec.
 
 ## technical_debt.md
 

@@ -4,7 +4,9 @@ using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared;
+using BusinessOS.Shared.Configuration;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace BusinessOS.Application.Features.Auth.Commands;
 
@@ -18,29 +20,35 @@ public sealed record RegisterUserCommand(
 public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, Result<AuthResponse>>
 {
     private readonly ITenantRepository _tenants;
+    private readonly IBranchRepository _branches;
     private readonly IRoleRepository _roles;
     private readonly IUserRepository _users;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAuditLogRepository _auditLogs;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
+    private readonly IOptions<PaymentsOptions> _paymentsOptions;
 
     public RegisterUserCommandHandler(
         ITenantRepository tenants,
+        IBranchRepository branches,
         IRoleRepository roles,
         IUserRepository users,
         IRefreshTokenRepository refreshTokens,
         IAuditLogRepository auditLogs,
         IPasswordHasher passwordHasher,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        IOptions<PaymentsOptions> paymentsOptions)
     {
         _tenants = tenants;
+        _branches = branches;
         _roles = roles;
         _users = users;
         _refreshTokens = refreshTokens;
         _auditLogs = auditLogs;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
+        _paymentsOptions = paymentsOptions;
     }
 
     public async Task<Result<AuthResponse>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
@@ -52,8 +60,15 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
             return Error.Conflict("Email is already registered.");
         }
 
-        var tenant = Tenant.Create(Guid.NewGuid(), command.OrganizationName.Trim());
+        var tenant = Tenant.Create(Guid.NewGuid(), command.OrganizationName.Trim(), _paymentsOptions.Value.Currency);
         await _tenants.AddAsync(tenant, cancellationToken);
+
+        await _branches.AddAsync(Branch.Create(
+            tenant.Id,
+            Branch.DefaultName,
+            Branch.DefaultCode,
+            tenant.Currency),
+            cancellationToken);
 
         var adminRole = Role.Create(tenant.Id, "Administrator", isSystem: true);
         var allPermissions = await _roles.GetPermissionsByNamesAsync(PermissionNames.All, cancellationToken);

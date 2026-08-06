@@ -45,6 +45,19 @@ reliably — plus a `MASTER_ARCHITECTURE.md` single source of truth and a Readin
     `"AccessToken":"***REDACTED***"`, `"RefreshToken":"***REDACTED***"` — secrets never stored.
   - Outbox `UserRegisteredEvent` marked processed.
 
+### Post-Phase-1 verification (Organizations & Branches, 2026-08-06)
+
+- `dotnet build` all projects — **0 warnings, 0 errors** (warnings-as-errors).
+- `dotnet format --verify-no-changes` — **passes** (removed BOM from new EF migration).
+- `dotnet test backend/tests/BusinessOS.Tests` — **62/62 pass** (integration against real
+  Postgres `businessos_test`), including 17 new tests (unit: Branch/Tenant; integration:
+  default HQ branch on register, CRUD + status flow, duplicate code → Conflict, 403 for a
+  `Branches.View`-only role, tenant isolation, audit rows, outbox dispatch of
+  `BranchCreatedEvent`).
+- Migrations applied to dev DB: `InitialCreate` → `AddUserLockout` →
+  `AddOrganizationProfileAndBranches`; seeder re-granted new permissions to existing
+  `Administrator` roles and seeded the demo tenant's default `HQ` branch.
+
 ## 4. Known remaining gaps (Phase 0.5 → Phase 1)
 
 These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
@@ -53,9 +66,11 @@ These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
    visibility gating per tenant is not wired.
 2. **Tenant provisioning endpoint** — registration creates a tenant implicitly; no explicit
    admin provisioning API yet (Phase 0 open item).
-3. **`RequirePermission` applied to live business endpoints** — engine and extension exist;
-   only auth/`users/me` endpoints exist so far. First Phase 1 module must gate its endpoints
-   with `RequirePermission(PermissionNames.X)` as part of the slice.
+3. ~~**`RequirePermission` applied to live business endpoints**~~ — **CLOSED 2026-08-06** by
+   the Organizations & Branches slice: `GET/PUT /api/v1/organization` and
+   `GET/POST/PUT/PATCH /api/v1/branches*` are gated with
+   `RequirePermission(PermissionNames.Organizations/Branches.*)`, with integration tests
+   proving 403 for a `Branches.View`-only role and tenant isolation.
 4. **Redis in dev** — falls back to in-memory cache when Redis is not configured; permission
    cache is in-process (per-instance). A shared Redis cache is optional infra.
 5. **OpenTelemetry metrics/tracing** — structured logging exists; OTel exporter is a roadmap
@@ -78,5 +93,7 @@ stack: module entity → `CreateXxxCommand` → outbox event → audit + notific
 
 1. Feature-flag service (table, service, endpoints, `IFeatureFlagService` in Application).
 2. Tenant provisioning endpoint (`/api/v1/admin/tenants` or onboarding flow).
-3. First business slice with `RequirePermission` + integration test (e.g. Products/Sales).
+3. ~~First business slice with `RequirePermission` + integration test~~ — **done**
+   (Organizations & Branches). Next slices: per-branch pricing (foundation for POS) or
+   Sales + Offline POS.
 4. ADRs for Phase 0.5 decisions.

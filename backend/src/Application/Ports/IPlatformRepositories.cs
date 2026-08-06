@@ -20,6 +20,17 @@ public interface ITenantRepository
     Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default);
 }
 
+public interface IBranchRepository
+{
+    Task<Branch?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<Branch?> GetByCodeAsync(Guid tenantId, string code, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Branch>> ListAsync(
+        Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Branch>> ListAllAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddAsync(Branch branch, CancellationToken cancellationToken = default);
+}
+
 public interface IUserRepository
 {
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);

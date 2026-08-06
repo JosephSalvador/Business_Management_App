@@ -26,6 +26,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<BusinessDbContext>());
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IBranchRepository, BranchRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();

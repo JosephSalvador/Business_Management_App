@@ -4,6 +4,14 @@ public static class PermissionNames
 {
     public const string DashboardView = "Dashboard.View";
 
+    public const string OrganizationsView = "Organizations.View";
+    public const string OrganizationsManage = "Organizations.Manage";
+
+    public const string BranchesView = "Branches.View";
+    public const string BranchesCreate = "Branches.Create";
+    public const string BranchesUpdate = "Branches.Update";
+    public const string BranchesDelete = "Branches.Delete";
+
     public const string UsersView = "Users.View";
     public const string UsersCreate = "Users.Create";
     public const string UsersUpdate = "Users.Update";
@@ -27,6 +35,8 @@ public static class PermissionNames
     public static IReadOnlyList<string> All { get; } = new[]
     {
         DashboardView,
+        OrganizationsView, OrganizationsManage,
+        BranchesView, BranchesCreate, BranchesUpdate, BranchesDelete,
         UsersView, UsersCreate, UsersUpdate, UsersDelete,
         RolesView, RolesManage,
         SalesCreate, SalesView, SalesDelete,
