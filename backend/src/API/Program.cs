@@ -20,6 +20,7 @@ using BusinessOS.Shared.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
@@ -79,7 +80,6 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-var rateLimiting = builder.Configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>() ?? new();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -95,24 +95,32 @@ builder.Services.AddRateLimiter(options =>
     };
 
     options.AddPolicy("auth", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
+    {
+        var authOptions = httpContext.RequestServices
+            .GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+        return RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = rateLimiting.AuthPermitLimit,
-                Window = TimeSpan.FromSeconds(rateLimiting.AuthWindowSeconds),
+                PermitLimit = authOptions.AuthPermitLimit,
+                Window = TimeSpan.FromSeconds(authOptions.AuthWindowSeconds),
                 QueueLimit = 0,
-            }));
+            });
+    });
 
     options.AddPolicy("global", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
+    {
+        var authOptions = httpContext.RequestServices
+            .GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+        return RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = rateLimiting.GlobalPermitLimit,
-                Window = TimeSpan.FromSeconds(rateLimiting.GlobalWindowSeconds),
+                PermitLimit = authOptions.GlobalPermitLimit,
+                Window = TimeSpan.FromSeconds(authOptions.GlobalWindowSeconds),
                 QueueLimit = 0,
-            }));
+            });
+    });
 });
 
 builder.Services.AddApiVersioning(options =>

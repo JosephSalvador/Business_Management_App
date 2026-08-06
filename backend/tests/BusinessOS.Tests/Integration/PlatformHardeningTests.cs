@@ -20,6 +20,18 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
 
     public Task InitializeAsync() => Task.CompletedTask;
 
+    [Fact]
+    public void RateLimits_AreLiftedInTests()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var options = scope.ServiceProvider
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessOS.Shared.Configuration.RateLimitingOptions>>()
+            .Value;
+        Assert.Equal(10000, options.AuthPermitLimit);
+        Assert.Equal(10000, options.GlobalPermitLimit);
+    }
+
+
     public Task DisposeAsync()
     {
         _client.Dispose();
@@ -36,7 +48,8 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
             fullName = "Hardening Tester",
             organizationName = $"Hardening Org {Guid.NewGuid():N}",
         });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected OK, got {response.StatusCode}: {body}");
         return email;
     }
 
@@ -102,7 +115,10 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
         for (var i = 0; i < 5; i++)
         {
             var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Wrong-Pass" });
-            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                Assert.Fail($"Attempt {i}: {await response.Content.ReadAsStringAsync()}");
+            }
         }
 
         var locked = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Passw0rd!" });

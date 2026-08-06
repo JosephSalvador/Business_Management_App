@@ -17,6 +17,8 @@ public sealed class BusinessOsApiFactory : WebApplicationFactory<Program>
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Default"] = TestConnectionString,
+                ["RateLimiting:AuthPermitLimit"] = "10000",
+                ["RateLimiting:GlobalPermitLimit"] = "10000",
             });
         });
     }
