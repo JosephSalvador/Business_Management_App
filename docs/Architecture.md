@@ -78,6 +78,9 @@ database; the seam exists so read models/snapshots can diverge later.
 - Shared database; `tenant_id` on every tenant-owned row.
 - Repository guardrail: queries cannot run without a tenant filter (enforced in the query
   pipeline).
+- Reference data that composes aggregates (e.g. the permission catalog feeding
+  `Role.Grant`) is returned **tracked** by its repository so EF attaches it instead of
+  re-inserting it.
 - Schema-per-tenant is the documented escape hatch for enterprise, not the default.
 - Feature flags gate module visibility per tenant.
 

@@ -30,7 +30,7 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
             return Error.Unauthorized("Not authenticated.");
         }
 
-        var user = await _users.GetByIdAsync(_tenantContext.UserId.Value, cancellationToken);
+        var user = await _users.GetByIdWithRolesAsync(_tenantContext.TenantId, _tenantContext.UserId.Value, cancellationToken);
         if (user is null)
         {
             return Error.NotFound("User not found.");
@@ -39,7 +39,7 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
         var permissions = new List<string>();
         foreach (var roleId in user.Roles.Select(r => r.Id))
         {
-            permissions.AddRange(await _roles.GetPermissionsAsync(roleId, cancellationToken));
+            permissions.AddRange(await _roles.GetPermissionsAsync(_tenantContext.TenantId, roleId, cancellationToken));
         }
 
         var result = new UserDto(

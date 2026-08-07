@@ -80,6 +80,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
         {
             entity.ToTable(Tables.Identity.UserBranches, Schemas.Identity);
             entity.HasKey(ub => ub.Id);
+            entity.Property(ub => ub.Id).ValueGeneratedOnAdd();
             entity.Property(ub => ub.AssignedBy).IsRequired();
             entity.HasIndex(ub => ub.TenantId);
             entity.HasIndex(ub => ub.BranchId);

@@ -114,7 +114,7 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<A
         var permissions = new List<string>();
         foreach (var roleId in roleIds)
         {
-            permissions.AddRange(await _roles.GetPermissionsAsync(roleId, cancellationToken));
+            permissions.AddRange(await _roles.GetPermissionsAsync(user.TenantId, roleId, cancellationToken));
         }
 
         return permissions.Distinct().ToArray();

@@ -22,6 +22,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
     private readonly ITenantRepository _tenants;
     private readonly IBranchRepository _branches;
     private readonly IRoleRepository _roles;
+    private readonly IPermissionRepository _permissions;
     private readonly IUserRepository _users;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAuditLogRepository _auditLogs;
@@ -33,6 +34,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         ITenantRepository tenants,
         IBranchRepository branches,
         IRoleRepository roles,
+        IPermissionRepository permissions,
         IUserRepository users,
         IRefreshTokenRepository refreshTokens,
         IAuditLogRepository auditLogs,
@@ -43,6 +45,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         _tenants = tenants;
         _branches = branches;
         _roles = roles;
+        _permissions = permissions;
         _users = users;
         _refreshTokens = refreshTokens;
         _auditLogs = auditLogs;
@@ -71,7 +74,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
             cancellationToken);
 
         var adminRole = Role.Create(tenant.Id, SystemRoles.Administrator, isSystem: true);
-        var allPermissions = await _roles.GetPermissionsByNamesAsync(PermissionNames.All, cancellationToken);
+        var allPermissions = await _permissions.ResolveByNamesAsync(PermissionNames.All, cancellationToken);
         adminRole.Grant(allPermissions);
         await _roles.AddAsync(adminRole, cancellationToken);
 

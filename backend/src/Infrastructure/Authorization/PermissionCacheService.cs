@@ -31,7 +31,7 @@ public sealed class PermissionCacheService : IPermissionService
             return cached.Permissions;
         }
 
-        var permissions = await LoadPermissionsAsync(userId, ct);
+        var permissions = await LoadPermissionsAsync(userId, tenantId, ct);
         _cache[key] = new CachedPermissions(permissions, _time.GetUtcNow());
         return permissions;
     }
@@ -45,9 +45,10 @@ public sealed class PermissionCacheService : IPermissionService
     private bool IsFresh(CachedPermissions cached)
         => _time.GetUtcNow() - cached.LoadedAt < CacheLifetime;
 
-    private async Task<IReadOnlyCollection<string>> LoadPermissionsAsync(Guid userId, CancellationToken ct)
+    private async Task<IReadOnlyCollection<string>> LoadPermissionsAsync(
+        Guid userId, Guid tenantId, CancellationToken ct)
     {
-        var user = await _users.GetByIdAsync(userId, ct);
+        var user = await _users.GetByIdWithRolesAsync(tenantId, userId, ct);
         if (user is null)
         {
             return Array.Empty<string>();
@@ -56,7 +57,7 @@ public sealed class PermissionCacheService : IPermissionService
         var permissions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var role in user.Roles)
         {
-            permissions.UnionWith(await _roles.GetPermissionsAsync(role.Id, ct));
+            permissions.UnionWith(await _roles.GetPermissionsAsync(tenantId, role.Id, ct));
         }
 
         return permissions.ToArray();

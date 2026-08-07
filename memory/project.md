@@ -31,8 +31,22 @@
   `RequirePermission` (readiness gap #3 closed); registration auto-creates the default
   `HQ` branch; seeder re-grants new permissions to existing admin roles; outbox-backed
   `BranchActivityFeedHandler`; 62 tests pass (unit + integration against real Postgres).
+- **Phase 1 slice 2a (Users, Roles & Permissions), tasks 001–003 done 2026-08-07:**
+  domain hardening (`UserBranch` invariants: single default, duplicate-rejection, stale
+  replacement; `User.SetRoles` no-op on identical; `SystemRoles.Administrator` constant);
+  migration `20260806_AddUserRoleAndBranchManagement` (UserBranches table + Roles
+  Description + unique `(TenantId, Name)`); repository ports/implementations
+  (`IUserRepository` tenant-scoped `GetByIdAsync/GetByIdWithRolesAsync/ListAsync/CountAsync/
+  CountActiveAdministratorsAsync`, `IRoleRepository` `GetByIdAsync/GetByNameAsync/ListAsync/
+  GetPermissionsAsync/RemoveAsync`, new `IPermissionRepository` `ListAsync/GetByNameAsync/
+  ResolveByNamesAsync`); auth callers updated (register/login/refresh/current-user/cache).
+  Key decisions: `UserBranch` is managed only through the `User` aggregate (no child repo);
+  `IPermissionRepository` returns **tracked** catalog entities so grants attach without
+  re-inserting the catalog; EF child-state pitfall (client Guid keys in added children must
+  use default keys so EF treats them as Added, not Modified). 91 tests pass.
 - Key docs: `MASTER_ARCHITECTURE.md` (single source of truth), `docs/ArchitectureRules.md`,
-  `docs/Architecture.md`, `docs/roadmap.md`, `specs/organizations-branches.md`.
+  `docs/Architecture.md`, `docs/roadmap.md`, `specs/organizations-branches.md`,
+  `specs/users-roles-permissions.md`.
 
 ## coding.md — see `docs/CodingStandards.md`
 

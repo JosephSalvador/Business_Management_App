@@ -34,16 +34,32 @@ public interface IBranchRepository
 public interface IUserRepository
 {
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
-    Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<User?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<User?> GetByIdWithRolesAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<User>> ListAsync(
+        Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<int> CountActiveAdministratorsAsync(
+        Guid tenantId, Guid excludeUserId, CancellationToken cancellationToken = default);
     Task AddAsync(User user, CancellationToken cancellationToken = default);
 }
 
 public interface IRoleRepository
 {
+    Task<Role?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<Role?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Role>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetPermissionsAsync(
+        Guid tenantId, Guid roleId, CancellationToken cancellationToken = default);
     Task AddAsync(Role role, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<string>> GetPermissionsAsync(Guid roleId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<Permission>> GetPermissionsByNamesAsync(
+    Task RemoveAsync(Role role, CancellationToken cancellationToken = default);
+}
+
+public interface IPermissionRepository
+{
+    Task<IReadOnlyList<Permission>> ListAsync(CancellationToken cancellationToken = default);
+    Task<Permission?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Permission>> ResolveByNamesAsync(
         IEnumerable<string> names, CancellationToken cancellationToken = default);
 }
 

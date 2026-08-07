@@ -67,10 +67,42 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
-    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<User?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
         => _db.Users
+            .AsSplitQuery()
             .Include(u => u.Roles)
-            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+            .Include(u => u.Branches)
+            .FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Id == id, cancellationToken);
+
+    public Task<User?> GetByIdWithRolesAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Users
+            .AsNoTracking()
+            .Include(u => u.Roles)
+            .FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<User>> ListAsync(
+        Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default)
+        => await _db.Users
+            .AsNoTracking()
+            .Where(u => u.TenantId == tenantId)
+            .Include(u => u.Roles)
+            .OrderBy(u => u.Email)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        => _db.Users.CountAsync(u => u.TenantId == tenantId, cancellationToken);
+
+    public Task<int> CountActiveAdministratorsAsync(
+        Guid tenantId, Guid excludeUserId, CancellationToken cancellationToken = default)
+        => _db.Users.CountAsync(u =>
+            u.TenantId == tenantId
+            && u.Id != excludeUserId
+            && u.IsActive
+            && u.Roles.Any(r =>
+                r.TenantId == tenantId && r.IsSystem && r.Name == SystemRoles.Administrator),
+            cancellationToken);
 
     public Task AddAsync(User user, CancellationToken cancellationToken = default)
         => _db.Users.AddAsync(user, cancellationToken).AsTask();
@@ -82,30 +114,70 @@ public sealed class RoleRepository : IRoleRepository
 
     public RoleRepository(BusinessDbContext db) => _db = db;
 
-    public Task<Role?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default)
+    public Task<Role?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
         => _db.Roles
             .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.TenantId == tenantId && r.Id == id, cancellationToken);
+
+    public Task<Role?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default)
+        => _db.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.TenantId == tenantId && r.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<Role>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.Roles
+            .AsNoTracking()
+            .Where(r => r.TenantId == tenantId)
+            .Include(r => r.Permissions)
+            .OrderBy(r => r.Name)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<string>> GetPermissionsAsync(
+        Guid tenantId,
+        Guid roleId,
+        CancellationToken cancellationToken = default)
+        => await _db.Roles
+            .Where(r => r.TenantId == tenantId && r.Id == roleId)
+            .SelectMany(r => r.Permissions.Select(p => p.Name))
+            .Distinct()
+            .OrderBy(p => p)
+            .ToListAsync(cancellationToken);
 
     public Task AddAsync(Role role, CancellationToken cancellationToken = default)
         => _db.Roles.AddAsync(role, cancellationToken).AsTask();
 
-    public async Task<IReadOnlyList<string>> GetPermissionsAsync(
-        Guid roleId,
-        CancellationToken cancellationToken = default)
-        => await _db.Roles
-            .Where(r => r.Id == roleId)
-            .SelectMany(r => r.Permissions.Select(p => p.Name))
-            .Distinct()
+    public Task RemoveAsync(Role role, CancellationToken cancellationToken = default)
+    {
+        _db.Roles.Remove(role);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class PermissionRepository : IPermissionRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public PermissionRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<Permission>> ListAsync(CancellationToken cancellationToken = default)
+        => await _db.Permissions
+            .OrderBy(p => p.Name)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<Permission>> GetPermissionsByNamesAsync(
+    public Task<Permission?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+        => _db.Permissions
+            .FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<Permission>> ResolveByNamesAsync(
         IEnumerable<string> names,
         CancellationToken cancellationToken = default)
     {
-        var nameList = names.ToArray();
+        var nameList = names.Distinct().ToArray();
         return await _db.Permissions
             .Where(p => nameList.Contains(p.Name))
+            .OrderBy(p => p.Name)
             .ToListAsync(cancellationToken);
     }
 }

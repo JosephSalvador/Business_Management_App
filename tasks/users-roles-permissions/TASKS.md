@@ -18,13 +18,16 @@
 - [x] 002 **Persistence**: `UserBranches` `DbSet` + mapping (unique `(UserId, BranchId)`,
       partial unique index on default per user); `Roles.Description` column + unique
       `(TenantId, Name)` index; EF migration `20260806_AddUserRoleAndBranchManagement`.
-- [ ] 003 **Ports + repositories**: extend `IUserRepository` (tenant-scoped
-      `GetByIdAsync(tenantId, id)`, `ListAsync(tenantId, page, pageSize)`, `CountAsync`,
+- [x] 003 **Ports + repositories**: extend `IUserRepository` (tenant-scoped
+      `GetByIdAsync(tenantId, id)`, `GetByIdWithRolesAsync(tenantId, id)`,
+      `ListAsync(tenantId, page, pageSize)`, `CountAsync`,
       `CountActiveAdministratorsAsync(tenantId, excludeUserId)`); extend `IRoleRepository`
-      (`GetByIdAsync(tenantId, id)`, `ListAsync(tenantId)`, `RemoveAsync`); add
-      `IUserBranchRepository` (`ListByUserAsync`, `ReplaceAllAsync`); add
-      `IPermissionRepository` (`ListAsync` catalog); update auth callers of the old
-      `GetByIdAsync(id)` signature; register in `Infrastructure/DependencyInjection`.
+      (`GetByIdAsync(tenantId, id)`, `GetByNameAsync(tenantId, name)`,
+      `ListAsync(tenantId)`, `GetPermissionsAsync(tenantId, roleId)`, `RemoveAsync`); add
+      `IPermissionRepository` (`ListAsync`, `GetByNameAsync`, `ResolveByNamesAsync`);
+      update auth callers of the old `GetByIdAsync(id)`/`GetPermissionsAsync(roleId)`
+      signatures; register in `Infrastructure/DependencyInjection`. `UserBranch` is managed
+      through the `User` aggregate only (no `IUserBranchRepository`).
 - [ ] 004 **Application — users**: `Features/Users` commands/queries + DTOs + validators:
       `ListUsersQuery`, `GetUserQuery`, `CreateUserCommand` (initial password, roles,
       branches), `UpdateUserCommand`, `SetUserStatusCommand` (self + last-admin guards),

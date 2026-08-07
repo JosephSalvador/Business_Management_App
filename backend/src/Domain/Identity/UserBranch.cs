@@ -23,5 +23,5 @@ public sealed class UserBranch : Entity
     public DateTime AssignedAt { get; private set; }
 
     internal static UserBranch Assign(Guid tenantId, Guid userId, Guid branchId, bool isDefault, Guid assignedBy, DateTime assignedAt)
-        => new(Guid.NewGuid(), tenantId, userId, branchId, isDefault, assignedBy, assignedAt);
+        => new(Guid.Empty, tenantId, userId, branchId, isDefault, assignedBy, assignedAt);
 }

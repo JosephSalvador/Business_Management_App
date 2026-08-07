@@ -19,11 +19,25 @@ public sealed class PermissionCacheServiceTests
         public int GetByIdCalls { get; private set; }
 
         public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default) => Task.FromResult(User);
-        public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        public Task<User?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default)
         {
             GetByIdCalls++;
             return Task.FromResult(User);
         }
+
+        public Task<User?> GetByIdWithRolesAsync(Guid tenantId, Guid id, CancellationToken ct = default)
+        {
+            GetByIdCalls++;
+            return Task.FromResult(User);
+        }
+
+        public Task<IReadOnlyList<User>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<User>>(User is null ? Array.Empty<User>() : new[] { User });
+
+        public Task<int> CountAsync(Guid tenantId, CancellationToken ct = default) => Task.FromResult(0);
+
+        public Task<int> CountActiveAdministratorsAsync(Guid tenantId, Guid excludeUserId, CancellationToken ct = default)
+            => Task.FromResult(0);
 
         public Task AddAsync(User user, CancellationToken ct = default) => Task.CompletedTask;
     }
@@ -36,12 +50,21 @@ public sealed class PermissionCacheServiceTests
 
         public void SetPermissions(Guid roleId, params string[] permissions) => _permissions[roleId] = permissions;
 
+        public Task<Role?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default)
+            => Task.FromResult<Role?>(null);
+
         public Task<Role?> GetByNameAsync(Guid tenantId, string name, CancellationToken ct = default)
             => Task.FromResult<Role?>(null);
 
+        public Task<IReadOnlyList<Role>> ListAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Role>>(Array.Empty<Role>());
+
         public Task AddAsync(Role role, CancellationToken ct = default) => Task.CompletedTask;
 
-        public Task<IReadOnlyList<string>> GetPermissionsAsync(Guid roleId, CancellationToken ct = default)
+        public Task RemoveAsync(Role role, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<string>> GetPermissionsAsync(
+            Guid tenantId, Guid roleId, CancellationToken ct = default)
         {
             GetPermissionsCalls++;
             IReadOnlyList<string> result = _permissions.TryGetValue(roleId, out var permissions)
@@ -49,11 +72,6 @@ public sealed class PermissionCacheServiceTests
                 : Array.Empty<string>();
             return Task.FromResult(result);
         }
-
-        public Task<IReadOnlyList<Permission>> GetPermissionsByNamesAsync(
-            IEnumerable<string> names,
-            CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<Permission>>(Array.Empty<Permission>());
     }
 
     private static (User User, StubUserRepository Users, StubRoleRepository Roles) CreateWorld(

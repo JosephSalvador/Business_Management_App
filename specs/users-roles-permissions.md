@@ -105,6 +105,16 @@ DTO shapes:
   split is not needed — see "Decisions").
 - Migration name: `20260806_AddUserRoleAndBranchManagement`.
 
+Persistence notes (from Task 003):
+- `UserBranch` is an aggregate child of `User` — there is **no** `IUserBranchRepository`;
+  assignments are replaced through `User.AssignBranches` and persisted by the `User`
+  aggregate's repository.
+- `IPermissionRepository` returns the **tracked** catalog entities so they can be attached to
+  roles (`Role.Grant`) without EF re-inserting the catalog rows; catalog reads are reference
+  data for aggregate composition.
+- `IUserRepository.GetByIdAsync` reads roles and branches with `AsSplitQuery`; reads use
+  `AsNoTracking` except where entities must attach to aggregates.
+
 ## Validation
 
 - Create user: email required + valid + globally unique → `Conflict` on duplicate; fullName
