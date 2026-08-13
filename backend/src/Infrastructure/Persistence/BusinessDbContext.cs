@@ -188,6 +188,27 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
         await base.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+        => await Database.BeginTransactionAsync(cancellationToken);
+
+    public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        var transaction = Database.CurrentTransaction;
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+    }
+
+    public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        var transaction = Database.CurrentTransaction;
+        if (transaction is not null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+        }
+    }
+
     private async Task<IReadOnlyList<DispatchedEvent>> SaveAndDispatchAsync(CancellationToken cancellationToken)
     {
         var pending = new List<DispatchedEvent>();

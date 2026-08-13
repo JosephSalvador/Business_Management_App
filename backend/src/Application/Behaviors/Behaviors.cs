@@ -44,11 +44,19 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEventBus _eventBus;
+    private readonly ITenantAdvisoryLock _advisoryLock;
+    private readonly ITenantContext _tenantContext;
 
-    public TransactionBehavior(IUnitOfWork unitOfWork, IEventBus eventBus)
+    public TransactionBehavior(
+        IUnitOfWork unitOfWork,
+        IEventBus eventBus,
+        ITenantAdvisoryLock advisoryLock,
+        ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _eventBus = eventBus;
+        _advisoryLock = advisoryLock;
+        _tenantContext = tenantContext;
     }
 
     public async Task<TResponse> Handle(
@@ -56,25 +64,55 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
-        var response = await next();
+        var requiresLock = request is IRequiresTenantAdvisoryLock;
 
-        var dispatched = await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        if (response.IsFailure)
+        if (requiresLock)
         {
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            await _advisoryLock.AcquireAsync(_tenantContext.TenantId, cancellationToken);
+        }
+
+        try
+        {
+            var response = await next();
+
+            var dispatched = await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (response.IsFailure)
+            {
+                if (requiresLock)
+                {
+                    await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                }
+
+                return response;
+            }
+
+            if (requiresLock)
+            {
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+            }
+
+            foreach (var item in dispatched)
+            {
+                await _eventBus.PublishAsync(item.Event, cancellationToken);
+            }
+
+            if (dispatched.Count > 0)
+            {
+                await _unitOfWork.MarkProcessedAsync(dispatched.Select(d => d.OutboxMessageId).ToArray(), cancellationToken);
+            }
+
             return response;
         }
-
-        foreach (var item in dispatched)
+        catch
         {
-            await _eventBus.PublishAsync(item.Event, cancellationToken);
-        }
+            if (requiresLock)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            }
 
-        if (dispatched.Count > 0)
-        {
-            await _unitOfWork.MarkProcessedAsync(dispatched.Select(d => d.OutboxMessageId).ToArray(), cancellationToken);
+            throw;
         }
-
-        return response;
     }
 }

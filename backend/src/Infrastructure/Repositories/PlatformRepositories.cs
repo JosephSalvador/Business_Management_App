@@ -49,6 +49,22 @@ public sealed class BranchRepository : IBranchRepository
             .OrderBy(b => b.Code)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Branch>> ListByIdsAsync(
+        Guid tenantId, IEnumerable<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.Distinct().ToArray();
+        if (idList.Length == 0)
+        {
+            return Array.Empty<Branch>();
+        }
+
+        return await _db.Branches
+            .AsNoTracking()
+            .Where(b => b.TenantId == tenantId && idList.Contains(b.Id))
+            .OrderBy(b => b.Code)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default)
         => _db.Branches.CountAsync(b => b.TenantId == tenantId, cancellationToken);
 
@@ -84,8 +100,10 @@ public sealed class UserRepository : IUserRepository
         Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default)
         => await _db.Users
             .AsNoTracking()
+            .AsSplitQuery()
             .Where(u => u.TenantId == tenantId)
             .Include(u => u.Roles)
+            .Include(u => u.Branches)
             .OrderBy(u => u.Email)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -133,6 +151,21 @@ public sealed class RoleRepository : IRoleRepository
             .Include(r => r.Permissions)
             .OrderBy(r => r.Name)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Role>> GetManyByIdsAsync(
+        Guid tenantId, IEnumerable<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.Distinct().ToArray();
+        if (idList.Length == 0)
+        {
+            return Array.Empty<Role>();
+        }
+
+        return await _db.Roles
+            .Where(r => r.TenantId == tenantId && idList.Contains(r.Id))
+            .Include(r => r.Permissions)
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<string>> GetPermissionsAsync(
         Guid tenantId,
@@ -209,6 +242,21 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
             {
                 token.Revoke();
             }
+        }
+    }
+
+    public async Task RevokeAllForUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var tokens = await _db.RefreshTokens
+            .Where(t => t.TenantId == tenantId && t.UserId == userId && t.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in tokens)
+        {
+            token.Revoke();
         }
     }
 

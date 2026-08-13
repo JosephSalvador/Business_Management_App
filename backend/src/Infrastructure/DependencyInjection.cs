@@ -1,6 +1,7 @@
 using BusinessOS.Application.Ports;
 using BusinessOS.Infrastructure.Caching;
 using BusinessOS.Infrastructure.Events;
+using BusinessOS.Infrastructure.Locking;
 using BusinessOS.Infrastructure.Persistence;
 using BusinessOS.Infrastructure.Repositories;
 using BusinessOS.Infrastructure.Security;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<ITenantContext, HttpTenantContext>();
         services.AddScoped<IEventBus, InProcessEventBus>();
+        services.AddScoped<ITenantAdvisoryLock, TenantAdvisoryLock>();
         services.AddScoped<DatabaseSeeder>();
 
         var jwtOptions = configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();

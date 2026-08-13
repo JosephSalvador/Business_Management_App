@@ -198,6 +198,7 @@ app.MapPlatformHealthEndpoints();
 
 app.MapAuthEndpoints();
 app.MapOrganizationEndpoints();
+app.MapIdentityEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
 {

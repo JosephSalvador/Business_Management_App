@@ -12,6 +12,9 @@ public interface IUnitOfWork
 {
     Task<IReadOnlyList<DispatchedEvent>> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task MarkProcessedAsync(IReadOnlyCollection<Guid> outboxMessageIds, CancellationToken cancellationToken = default);
+    Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+    Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
 }
 
 public interface ITenantRepository
@@ -27,6 +30,7 @@ public interface IBranchRepository
     Task<IReadOnlyList<Branch>> ListAsync(
         Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Branch>> ListAllAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Branch>> ListByIdsAsync(Guid tenantId, IEnumerable<Guid> ids, CancellationToken cancellationToken = default);
     Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task AddAsync(Branch branch, CancellationToken cancellationToken = default);
 }
@@ -49,6 +53,8 @@ public interface IRoleRepository
     Task<Role?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<Role?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Role>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Role>> GetManyByIdsAsync(
+        Guid tenantId, IEnumerable<Guid> ids, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<string>> GetPermissionsAsync(
         Guid tenantId, Guid roleId, CancellationToken cancellationToken = default);
     Task AddAsync(Role role, CancellationToken cancellationToken = default);
@@ -68,6 +74,7 @@ public interface IRefreshTokenRepository
     Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken cancellationToken = default);
     Task AddAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
     Task RevokeFamilyAsync(Guid familyId, Guid revokedByTokenId, CancellationToken cancellationToken = default);
+    Task RevokeAllForUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
     Task<int> DeleteExpiredAsync(DateTime cutoff, CancellationToken cancellationToken = default);
 }
 

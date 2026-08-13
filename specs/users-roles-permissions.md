@@ -32,6 +32,7 @@ permissions and branch-scoped access without revisiting the authorization model.
 - A **role** belongs to exactly one tenant; role names are unique per tenant.
 - **System roles** (`IsSystem = true`, e.g. Administrator) cannot be renamed or deleted, but
   their permission set may be adjusted. **Custom roles** are fully editable/deletable.
+  (Explicit decision recorded in `docs/adr/0001-system-role-permissions.md`.)
 - Deleting a role leaves its users intact but removes those grants (they lose that role).
 - The **permission catalog** is seeded (`PermissionNames.All`); the slice manages
   *assignment* of existing permissions to roles, not the catalog itself.

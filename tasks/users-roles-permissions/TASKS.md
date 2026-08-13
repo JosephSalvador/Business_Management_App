@@ -28,18 +28,26 @@
       update auth callers of the old `GetByIdAsync(id)`/`GetPermissionsAsync(roleId)`
       signatures; register in `Infrastructure/DependencyInjection`. `UserBranch` is managed
       through the `User` aggregate only (no `IUserBranchRepository`).
-- [ ] 004 **Application — users**: `Features/Users` commands/queries + DTOs + validators:
+- [x] 004 **Application — users**: `Features/Users` commands/queries + DTOs + validators:
       `ListUsersQuery`, `GetUserQuery`, `CreateUserCommand` (initial password, roles,
       branches), `UpdateUserCommand`, `SetUserStatusCommand` (self + last-admin guards),
       `DeleteUserCommand` (soft delete + revoke refresh tokens), `SetUserRolesCommand`,
-      `GetUserBranchesQuery`, `SetUserBranchesCommand` (default-branch invariant).
-- [ ] 005 **Application — roles**: `Features/Roles` commands/queries + DTOs + validators:
+      `GetUserBranchesQuery`, `SetUserBranchesCommand` (default-branch invariant). Last-admin
+      guard centralized in `UserAdminGuard` using `SystemRoles.Administrator`; admin-removing
+      ops (deactivate/delete/demote) run inside a per-tenant PostgreSQL transaction advisory
+      lock acquired on the same DB transaction as the mutation (`ITenantAdvisoryLock` +
+      `TransactionBehavior`). Lifecycle (active/deactivated) is separate from auth state
+      (refresh-token revocation only on soft delete).
+- [x] 005 **Application — roles**: `Features/Roles` commands/queries + DTOs + validators:
       `ListRolesQuery`, `GetRoleQuery`, `CreateRoleCommand`, `UpdateRoleCommand`,
       `DeleteRoleCommand` (system-role guard), `GetRolePermissionsQuery`,
       `SetRolePermissionsCommand` (catalog validation); `GetPermissionsQuery` catalog;
       `RoleDto`/`UserDto` mappers shared with 004.
-- [ ] 006 **API endpoints**: `IdentityEndpoints` (users, roles, permissions groups) with
+- [x] 006 **API endpoints**: `IdentityEndpoints` (users, roles, permissions groups) with
       `RequirePermission(PermissionNames.Users.* / Roles.*)`; register in `Program.cs`.
+      `DeleteRoleCommand` aligned to non-generic `Result` (→ `204`), matching
+      `DeleteUserCommand`. System-role permission-set rule recorded in
+      `docs/adr/0001-system-role-permissions.md`.
 - [ ] 007 **Event consumers**: `IdentityActivityFeedHandler` (logs identity events) in
       Notifications; register in `NotificationEngineExtensions`.
 - [ ] 008 **Tests**: unit (last-admin guard, branch-assignment invariants, grant idempotency,
