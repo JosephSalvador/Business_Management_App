@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.4.0 — 2026-08-07 — Phase 1: Users, Roles & Permissions (backend slice)
+
+### Users, Roles & Permissions
+- **Domain:** `UserBranch` entity (`AssignBranches` invariants: single default, default ∈
+  assigned, duplicate rejection, stale-child replacement); `User.SetRoles` no-op on
+  identical sets; `Role.Description` + `Clone` + `Rename`/`Delete` guard helpers; new
+  identity domain events (`UserCreatedEvent`, `UserProfileUpdatedEvent`,
+  `UserRolesChangedEvent`, `UserStatusChangedEvent`, `UserBranchesChangedEvent`,
+  `RoleCreatedEvent`, `RoleUpdatedEvent`, `RolePermissionsChangedEvent`,
+  `RoleDeletedEvent`); `SystemRoles.Administrator` constant.
+- **Persistence:** `UserBranches` table (unique `(UserId, BranchId)` + partial unique index
+  on default per user), `Roles.Description` column + unique `(TenantId, Name)` index via
+  migration `20260806_AddUserRoleAndBranchManagement`; `UserBranch` managed through the
+  `User` aggregate (no child repository); `IPermissionRepository` returns the **tracked**
+  catalog so `Role.Grant` attaches without re-inserting it.
+- **Repositories:** `IUserRepository` tenant-scoped `GetByIdAsync(tenantId, id)`,
+  `GetByIdWithRolesAsync`, `ListAsync(tenantId, page, pageSize)`, `CountAsync`,
+  `CountActiveAdministratorsAsync(tenantId, excludeUserId)`; `IRoleRepository`
+  `GetByIdAsync(tenantId, id)`, `GetByNameAsync`, `ListAsync(tenantId)`,
+  `GetPermissionsAsync(tenantId, roleId)`, `RemoveAsync`; new `IPermissionRepository`
+  (`ListAsync`, `GetByNameAsync`, `ResolveByNamesAsync`).
+- **Application:** `Features/Users` (list/get/create/update/status/delete, roles, branches)
+  and `Features/Roles` (list/get/create/update/delete, permissions) with validators,
+  DTOs, mappers, and `UserAdminGuard` (self + last-active-Administrator protection).
+- **API:** `IdentityEndpoints` — users, roles and permission-catalog routes under
+  `/api/v1`, gated with `RequirePermission(Users.* / Roles.*)`.
+- **Events:** `IdentityActivityFeedHandler` (outbox-backed activity feed) registered in the
+  notification engine.
+- **Tests:** 154 passing (unit + integration) — branch-assignment invariants, last-admin
+  guard, role grant idempotency, user/role CRUD + status, duplicate email/role → Conflict,
+  self + last-admin protection, permission round-trip, tenant isolation, 403 for
+  `Users.View`-only role, audit rows, outbox dispatch.
+
+### Docs
+- Spec `specs/users-roles-permissions.md` persistence notes; tasks
+  `tasks/users-roles-permissions/TASKS.md` all ticked; roadmap item 3 marked
+  `[x] backend slice`; `memory/project.md` and readiness report updated.
+
 ## v0.3.0 — 2026-08-06 — Phase 1: Organizations & Branches (backend slice)
 
 ### Organizations & Branches

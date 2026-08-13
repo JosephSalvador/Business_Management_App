@@ -265,10 +265,10 @@ Every task must end with:
 - Outbox ✅ Complete
 - Organizations ✅ Complete
 - Branches ✅ Complete
+- Users, Roles & Permissions ✅ Complete
 - Platform Ready ✅ Yes
 - Current Phase: Phase 1
-- Current Slice: Identity & Workforce Management
-- Current Task: Task 001 — Domain Layer
+- Current Slice: Dashboard (next) — after Users, Roles & Permissions (Slice 2a, 2026-08-07)
 
 Design the domain to support future: Employees, Departments, Teams, Job Titles, HR, Payroll,
 Attendance, Invitations, Sessions, Devices, SSO, MFA, External Identity Providers.

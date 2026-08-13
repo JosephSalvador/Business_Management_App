@@ -58,6 +58,19 @@ reliably — plus a `MASTER_ARCHITECTURE.md` single source of truth and a Readin
   `AddOrganizationProfileAndBranches`; seeder re-granted new permissions to existing
   `Administrator` roles and seeded the demo tenant's default `HQ` branch.
 
+### Post-Phase-1 verification (Users, Roles & Permissions, 2026-08-07)
+
+- `dotnet build` all projects — **0 warnings, 0 errors** (warnings-as-errors);
+  `dotnet format --verify-no-changes` — **passes**.
+- `dotnet test backend/tests/BusinessOS.Tests` — **154/154 pass** (unit + integration
+  against real Postgres `businessos_test`): user/role/branch-assignment domain invariants,
+  repository tenant isolation, user/role CRUD + status endpoints, duplicate email/role →
+  Conflict, self + last-active-Administrator protection, permission round-trip, 403 for a
+  `Users.View`-only role, audit rows, outbox dispatch.
+- Migration `20260806_AddUserRoleAndBranchManagement` applied (UserBranches table, Roles
+  Description + unique `(TenantId, Name)`); identity repository + application slices
+  verified.
+
 ## 4. Known remaining gaps (Phase 0.5 → Phase 1)
 
 These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
@@ -76,7 +89,7 @@ These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
 5. **OpenTelemetry metrics/tracing** — structured logging exists; OTel exporter is a roadmap
    item, not required for Phase 1.
 6. **Integration-test coverage** — 11 integration tests cover auth + hardening flows; module
-   slices (e.g. Sales) will extend them (webhook-style `WebApplicationFactory` factory ready).
+   slices extend them (154 tests pass after the Users/Roles/Permissions slice).
 7. **ADR for Phase 0.5 decisions** — new decisions (audit-redaction, permission cache,
    options pattern, outbox job queue) are captured in docs; dedicated ADRs recommended as a
    follow-up documentation task.

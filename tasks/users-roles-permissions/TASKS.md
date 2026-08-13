@@ -54,6 +54,6 @@
       system-role immutability) + integration (user/role/branch CRUD, duplicate email/role →
       Conflict, self + last-admin protection, permission round-trip, tenant isolation, 403 for
       `Users.View`-only role, audit rows, outbox dispatch).
-- [ ] 009 **Docs + verification**: build (`--warnaserror`), `dotnet format`, full test run;
+- [x] 009 **Docs + verification**: build (`--warnaserror`), `dotnet format`, full test run;
       update `docs/roadmap.md`, changelog v0.4.0, `memory/project.md`, readiness report;
       tick spec checkboxes.

@@ -225,6 +225,9 @@ Platform (Phase 0) → then Core Business modules, in this order:
    `specs/organizations-branches.md`; Flutter onboarding screens + Drift `branches` cache are
    the follow-up (POS phase).
 3. **Users, Roles & Permissions** — CRUD against server RBAC + feature flags.
+   `[x] backend slice 2026-08-07` — spec `specs/users-roles-permissions.md` (domain,
+   repositories, application layer, `IdentityEndpoints`, activity-feed handler, 154 tests);
+   Flutter admin screens are the follow-up.
 4. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
 5. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns, discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo Pesa, Mixx).
 6. **Inventory** — products, warehouses, stock movements, counts, transfers, batches.

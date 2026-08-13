@@ -3,6 +3,10 @@
 > Phase 1, second slice (first part of Identity & Workforce Management). Approval required
 > before coding. Tasks in `tasks/users-roles-permissions/TASKS.md`.
 >
+> **Status: implemented & verified 2026-08-13.** Backend slice complete (tasks 001–009);
+> tests green (154/154). Flutter admin screens remain as listed under Future improvements /
+> Offline & sync.
+>
 > Deferred to **Slice 2b** (separate spec): invitations, password policies/history, sessions
 > & device tracking, login history, force-logout/token versioning.
 
