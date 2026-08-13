@@ -186,6 +186,6 @@ public sealed class Product : AggregateRoot
         return true;
     }
 
-    private static string? NormalizeIdentifier(string? value)
+    public static string? NormalizeIdentifier(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

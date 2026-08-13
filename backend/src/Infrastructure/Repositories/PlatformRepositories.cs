@@ -330,6 +330,9 @@ public sealed class ProductRepository : IProductRepository
         CancellationToken cancellationToken = default)
         => ApplyFilter(_db.Products, tenantId, filter).CountAsync(cancellationToken);
 
+    public Task AddAsync(Product product, CancellationToken cancellationToken = default)
+        => _db.Products.AddAsync(product, cancellationToken).AsTask();
+
     public Task<bool> VariantSkuExistsAsync(
         Guid tenantId,
         string sku,

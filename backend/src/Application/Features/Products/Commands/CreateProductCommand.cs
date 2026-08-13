@@ -1,0 +1,83 @@
+using BusinessOS.Application.Features.Products.Dtos;
+using BusinessOS.Application.Features.Products.Queries;
+using BusinessOS.Application.Ports;
+using BusinessOS.Domain.Catalog;
+using BusinessOS.Shared;
+using MediatR;
+
+namespace BusinessOS.Application.Features.Products.Commands;
+
+public sealed record CreateProductCommand(
+    string Name,
+    string? Description,
+    string? Sku,
+    string? Barcode,
+    Guid? CategoryId,
+    Guid? BrandId,
+    Guid UnitOfMeasureId,
+    ProductType ProductType,
+    ProductStatus Status = ProductStatus.Draft)
+    : IRequest<Result<ProductDto>>, IRequiresTenantAdvisoryLock;
+
+public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<ProductDto>>
+{
+    private readonly ITenantContext _tenantContext;
+    private readonly IProductRepository _products;
+    private readonly ICategoryRepository _categories;
+    private readonly IBrandRepository _brands;
+    private readonly IUnitOfMeasureRepository _units;
+
+    public CreateProductCommandHandler(
+        ITenantContext tenantContext,
+        IProductRepository products,
+        ICategoryRepository categories,
+        IBrandRepository brands,
+        IUnitOfMeasureRepository units)
+    {
+        _tenantContext = tenantContext;
+        _products = products;
+        _categories = categories;
+        _brands = brands;
+        _units = units;
+    }
+
+    public async Task<Result<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        if (await ProductReferenceGuard.EnsureReferencesValidAsync(
+                _tenantContext, _categories, _brands, _units,
+                command.UnitOfMeasureId, command.CategoryId, command.BrandId, cancellationToken) is { } error)
+        {
+            return error;
+        }
+
+        var sku = Product.NormalizeIdentifier(command.Sku);
+        var barcode = Product.NormalizeIdentifier(command.Barcode);
+
+        if (sku is not null && await _products.GetBySkuAsync(tenantId, sku, cancellationToken) is not null)
+        {
+            return Error.Conflict("A product with this SKU already exists.");
+        }
+
+        if (barcode is not null && await _products.GetByBarcodeAsync(tenantId, barcode, cancellationToken) is not null)
+        {
+            return Error.Conflict("A product with this barcode already exists.");
+        }
+
+        var product = Product.Create(
+            tenantId,
+            command.Name,
+            command.Description,
+            sku,
+            barcode,
+            command.CategoryId,
+            command.BrandId,
+            command.UnitOfMeasureId,
+            command.ProductType,
+            command.Status);
+
+        await _products.AddAsync(product, cancellationToken);
+        return Result.Success(ProductMappers.ToDto(product));
+    }
+}

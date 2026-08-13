@@ -104,6 +104,7 @@ public interface IProductRepository
     Task<IReadOnlyList<Product>> ListAsync(
         Guid tenantId, int page, int pageSize, ProductListFilter filter, CancellationToken cancellationToken = default);
     Task<int> CountAsync(Guid tenantId, ProductListFilter filter, CancellationToken cancellationToken = default);
+    Task AddAsync(Product product, CancellationToken cancellationToken = default);
     Task<bool> VariantSkuExistsAsync(
         Guid tenantId, string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default);
     Task<bool> VariantBarcodeExistsAsync(

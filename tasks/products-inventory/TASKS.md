@@ -27,7 +27,7 @@
       `GetByBarcodeAsync`, `CountAsync`), `ICatalogRepository`-style ports for
       categories/brands/uoms (`ListAsync`, `GetByIdAsync`, `GetByNameAsync`, `AddAsync`,
       `RemoveAsync`); register in `Infrastructure/DependencyInjection`.
-- [ ] 004 **Application — products**: `Features/Products` commands/queries
+- [x] 004 **Application — products**: `Features/Products` commands/queries
       (`ListProductsQuery`, `GetProductQuery`, `CreateProductCommand`, `UpdateProductCommand`,
       `SetProductStatusCommand`, `DeleteProductCommand`, `SetProductVariantsCommand`,
       `GetProductVariantsQuery`) + DTOs/mappers/validators.
