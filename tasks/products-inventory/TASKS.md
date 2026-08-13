@@ -33,7 +33,7 @@
       `GetProductVariantsQuery`) + DTOs/mappers/validators.
 - [x] 005 **Application — catalog reference**: `Features/Catalog` commands/queries for
       categories/brands/units (`List/Create/Update/Get`, category cycle validation).
-- [ ] 006 **API endpoints**: `CatalogEndpoints` (products group) + `ReferenceDataEndpoints`
+- [x] 006 **API endpoints**: `CatalogEndpoints` (products group) + `ReferenceDataEndpoints`
       (categories/brands/units groups) with `RequirePermission(Products.* / Categories.* /
       Brands.* / Units.*)`; register in `Program.cs`.
 - [ ] 007 **Event consumers**: `CatalogActivityFeedHandler` in Notifications; register in
