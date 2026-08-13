@@ -36,7 +36,7 @@
 - [x] 006 **API endpoints**: `CatalogEndpoints` (products group) + `ReferenceDataEndpoints`
       (categories/brands/units groups) with `RequirePermission(Products.* / Categories.* /
       Brands.* / Units.*)`; register in `Program.cs`.
-- [ ] 007 **Event consumers**: `CatalogActivityFeedHandler` in Notifications; register in
+- [x] 007 **Event consumers**: `CatalogActivityFeedHandler` in Notifications; register in
       `NotificationEngineExtensions`.
 - [ ] 008 **Tests**: unit (product invariants, category cycle guard) + integration (CRUD,
       duplicate sku → Conflict, variant round-trip, status, 403, tenant isolation, audit rows,

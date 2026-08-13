@@ -33,6 +33,10 @@ public static class NotificationEngineExtensions
         services.AddScoped<IDomainEventHandler<RoleUpdatedEvent>, IdentityActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<RolePermissionsChangedEvent>, IdentityActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<RoleDeletedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<ProductCreatedEvent>, CatalogActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<ProductUpdatedEvent>, CatalogActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<ProductStatusChangedEvent>, CatalogActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<ProductVariantsChangedEvent>, CatalogActivityFeedHandler>();
 
         return services;
     }
