@@ -24,6 +24,15 @@ public static class NotificationEngineExtensions
         services.AddScoped<IDomainEventHandler<BranchCreatedEvent>, BranchActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<BranchUpdatedEvent>, BranchActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<BranchStatusChangedEvent>, BranchActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<UserCreatedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<UserProfileUpdatedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<UserRolesChangedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<UserStatusChangedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<UserBranchesChangedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<RoleCreatedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<RoleUpdatedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<RolePermissionsChangedEvent>, IdentityActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<RoleDeletedEvent>, IdentityActivityFeedHandler>();
 
         return services;
     }
