@@ -265,13 +265,16 @@ Every task must end with:
 - Outbox ✅ Complete
 - Organizations ✅ Complete
 - Branches ✅ Complete
-- Users, Roles & Permissions ✅ Complete
+- Identity — Users, Roles & Permissions (Slice 2a) ✅ Complete 2026-08-13
 - Platform Ready ✅ Yes
 - Current Phase: Phase 1
-- Current Slice: Dashboard (next) — after Users, Roles & Permissions (Slice 2a, 2026-08-07)
+- Current Slice: Identity & Workforce Management — Slice 2a done; Slice 2b deferred
+  (invitations, password policies/history, sessions, login history)
+- Current Task: Task 009 — Docs + verification (done 2026-08-13); next slice:
+  **Product & Inventory Foundation (Slice 3)** — design end-to-end before coding
 
-Design the domain to support future: Employees, Departments, Teams, Job Titles, HR, Payroll,
-Attendance, Invitations, Sessions, Devices, SSO, MFA, External Identity Providers.
+Design the identity domain to support future: Employees, Departments, Teams, Job Titles, HR,
+Payroll, Attendance, Invitations, Sessions, Devices, SSO, MFA, External Identity Providers.
 
 Implement ONLY the approved functionality. Create extension points for the remaining
 functionality.

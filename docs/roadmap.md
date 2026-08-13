@@ -225,17 +225,46 @@ Platform (Phase 0) → then Core Business modules, in this order:
    `specs/organizations-branches.md`; Flutter onboarding screens + Drift `branches` cache are
    the follow-up (POS phase).
 3. **Users, Roles & Permissions** — CRUD against server RBAC + feature flags.
-   `[x] backend slice 2026-08-07` — spec `specs/users-roles-permissions.md` (domain,
+   `[x] backend slice 2026-08-13` — spec `specs/users-roles-permissions.md` (domain,
    repositories, application layer, `IdentityEndpoints`, activity-feed handler, 154 tests);
    Flutter admin screens are the follow-up.
-4. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
-5. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns, discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo Pesa, Mixx).
-6. **Inventory** — products, warehouses, stock movements, counts, transfers, batches.
-7. **Purchasing** — suppliers, RFQs, POs, goods-received, supplier bills.
-8. **Accounting basics** — chart of accounts, journal entries, general ledger, trial balance.
-9. **Reporting + Tax** — PDF/Excel/CSV, TRA e-receipt compliance, VAT summaries; tax rules loaded from config (no hardcoding).
-10. **Workflow Engine v1** — approvals for purchases, expenses, sales discounts.
-11. **Dynamic Forms v1** — custom fields on Customer/Product/Sale.
+4. **Product & Inventory Foundation (Slice 3)** — **build before Sales/POS** so a sale always
+   resolves a real product/SKU/unit/price/tax/branch/stock. See "Slice 3 — Product & Inventory
+   Foundation" below.
+5. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
+6. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns,
+   discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo
+   Pesa, Mixx by Yas, HaloPesa).
+7. **Inventory** — products, warehouses, stock movements, counts, transfers, batches.
+8. **Purchasing** — suppliers, RFQs, POs, goods-received, supplier bills.
+9. **Accounting basics** — chart of accounts, journal entries, general ledger, trial balance.
+10. **Reporting + Tax** — PDF/Excel/CSV, TRA e-receipt compliance, VAT summaries; tax rules
+    loaded from config (no hardcoding).
+11. **Workflow Engine v1** — approvals for purchases, expenses, sales discounts.
+12. **Dynamic Forms v1** — custom fields on Customer/Product/Sale.
+
+### Slice 3 — Product & Inventory Foundation (proposed next)
+
+To be designed end-to-end before any Product/Inventory code is written — the product model
+feeds Sales/POS, Purchasing, and Accounting, so it must be right first.
+
+```
+Product Catalog   → SKU, barcode, categories, brands, units of measure,
+                    variants, images, status, product types
+Business Pricing  → per-branch prices, retail/wholesale, customer-specific prices,
+                    price lists, effective dates, min-quantity pricing, discount rules
+Inventory         → warehouses, stock locations, opening stock, stock balances,
+                    stock movements, adjustments, transfers, reservations
+```
+
+- Multi-branch stock follows the existing `Branch` architecture
+  (Company → Branch → Warehouse/Shop), making Slice 1's branch model genuinely useful.
+- **Country-pack principle:** do **not** hardcode Tanzania into the core domain. Core carries
+  the generic engines; a **Tanzania Country Pack** (TZS, VAT, TRA-compatible tax, EFD
+  integration architecture, M-Pesa/Airtel/Mixx/HaloPesa/bank/cash) ships alongside, with
+  Kenya/Uganda packs to follow. Core = African Business OS; packs = per-country compliance.
+- Work order: Product Catalog → Inventory Foundation → Pricing Engine → Customers → Sales
+  Domain → Offline POS → Payments (Phase 1 "commercial engine").
 
 **MVP non-negotiables:** offline with reliable sync, mobile money, TRA fiscal compliance, Swahili UI, low bandwidth, guided onboarding < 10 min, audit on every write, events on every mutation.
 

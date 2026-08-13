@@ -58,18 +58,40 @@ reliably — plus a `MASTER_ARCHITECTURE.md` single source of truth and a Readin
   `AddOrganizationProfileAndBranches`; seeder re-granted new permissions to existing
   `Administrator` roles and seeded the demo tenant's default `HQ` branch.
 
-### Post-Phase-1 verification (Users, Roles & Permissions, 2026-08-07)
+### Post-Phase-1 verification (Users, Roles & Permissions, 2026-08-13)
 
 - `dotnet build` all projects — **0 warnings, 0 errors** (warnings-as-errors);
-  `dotnet format --verify-no-changes` — **passes**.
+  `dotnet format` (`whitespace` + `style`, `--verify-no-changes`) — **passes**.
 - `dotnet test backend/tests/BusinessOS.Tests` — **154/154 pass** (unit + integration
   against real Postgres `businessos_test`): user/role/branch-assignment domain invariants,
   repository tenant isolation, user/role CRUD + status endpoints, duplicate email/role →
-  Conflict, self + last-active-Administrator protection, permission round-trip, 403 for a
-  `Users.View`-only role, audit rows, outbox dispatch.
+  Conflict, self + last-active-Administrator protection (incl. the **concurrent advisory-lock
+  race** — two simultaneous last-admin deactivations, exactly one succeeds), permission
+  round-trip, 403 for a `Users.View`-only role, **audit rows for every identity mutation**,
+  outbox dispatch of identity events.
 - Migration `20260806_AddUserRoleAndBranchManagement` applied (UserBranches table, Roles
   Description + unique `(TenantId, Name)`); identity repository + application slices
   verified.
+
+### Slice 2a release checkpoint (2026-08-13)
+
+**Slice 2a — Identity Management (Users, Roles & Permissions) is release-ready.**
+
+| Gate | Status |
+|---|---|
+| Spec `specs/users-roles-permissions.md` | ✅ implemented & verified |
+| Tasks `tasks/users-roles-permissions/TASKS.md` | ✅ 001–009 ticked |
+| Build `--warnaserror` | ✅ 0 warnings, 0 errors |
+| `dotnet format` verify | ✅ whitespace + style clean |
+| Full test suite | ✅ 154/154 (unit + integration vs. `businessos_test`) |
+| Permissions (Users.*, Roles.*) | ✅ all 17 endpoints `RequirePermission`-gated |
+| Audit | ✅ every mutation writes a redacted audit row |
+| Events | ✅ 9 identity events outbox-dispatched + consumed |
+| Migration | ✅ `20260806_AddUserRoleAndBranchManagement` applied to dev DB |
+| Changelog | ✅ v0.4.0 |
+| Slice 2b (deferred) | invitations, password policies/history, sessions, login history |
+
+Recorded as changelog entry v0.4.0 (matches v0.1.0–v0.3.0 local-release convention; no git tag).
 
 ## 4. Known remaining gaps (Phase 0.5 → Phase 1)
 
@@ -99,14 +121,17 @@ These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
 **Approved to begin Phase 1 (Core Business MVP).** The platform backend satisfies the Phase 0
 Definition of Done: build clean, tests green, audit on every mutation, events on every
 mutation, RBAC engine ready, notifications + job queue ready, storage ready, health/CI in
-place. Start with the first vertical slice (e.g. **Sales + Offline POS**) and prove the full
-stack: module entity → `CreateXxxCommand` → outbox event → audit + notification + sync.
+place. With Organizations & Branches (Slice 1) and Users/Roles/Permissions (Slice 2a) complete,
+the administrative layer every transactional module depends on is in place. Next slice:
+**Product & Inventory Foundation (Slice 3)** — products/SKU/barcode/units, per-branch pricing,
+warehouses + stock, so a sale always resolves a real product/price/tax/branch/stock. Design
+Slice 3 end-to-end before writing code (it feeds Sales/POS, Purchasing, and Accounting).
 
 ## 6. Suggested next tasks
 
 1. Feature-flag service (table, service, endpoints, `IFeatureFlagService` in Application).
 2. Tenant provisioning endpoint (`/api/v1/admin/tenants` or onboarding flow).
 3. ~~First business slice with `RequirePermission` + integration test~~ — **done**
-   (Organizations & Branches). Next slices: per-branch pricing (foundation for POS) or
-   Sales + Offline POS.
+   (Organizations & Branches). Next slices: **Product & Inventory Foundation (Slice 3)**,
+   then per-branch pricing engine, then Sales + Offline POS.
 4. ADRs for Phase 0.5 decisions.

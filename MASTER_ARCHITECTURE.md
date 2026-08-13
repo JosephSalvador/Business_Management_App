@@ -217,8 +217,9 @@ error handling verified.
   API versioning, configuration, security headers/rate limiting/lockout, file storage,
   messaging/jobs/events, notification engine + email queue, permission engine, audit engine,
   health + CI. → **Platform Readiness Report** gates the next phase.
-- **Phase 1 — Core Business MVP:** Auth (real), Organizations & Branches, Users/Roles/Permissions,
-  Dashboard, Sales + Offline POS, Inventory, Purchasing, Accounting basics, Reporting + Tax,
+- **Phase 1 — Core Business MVP:** Auth (real), Organizations & Branches ✅ (2026-08-06),
+  Users/Roles/Permissions ✅ (2026-08-13), Product & Inventory Foundation (Slice 3, next),
+  Sales + Offline POS, Dashboard, Inventory, Purchasing, Accounting basics, Reporting + Tax,
   Workflow v1, Dynamic Forms v1.
 - **Phase 2 — Enterprise:** HR, Payroll, Projects, Assets, Fleet, Help Desk, Documents,
   Analytics, Report Builder, OpenTelemetry, search indexing.

@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.0 — 2026-08-07 — Phase 1: Users, Roles & Permissions (backend slice)
+## v0.4.0 — 2026-08-13 — Phase 1: Users, Roles & Permissions (backend slice)
 
 ### Users, Roles & Permissions
 - **Domain:** `UserBranch` entity (`AssignBranches` invariants: single default, default ∈
@@ -24,6 +24,10 @@
 - **Application:** `Features/Users` (list/get/create/update/status/delete, roles, branches)
   and `Features/Roles` (list/get/create/update/delete, permissions) with validators,
   DTOs, mappers, and `UserAdminGuard` (self + last-active-Administrator protection).
+  Admin-removing ops run inside a per-tenant PostgreSQL transaction advisory lock (same DB
+  transaction as the mutation) — the concurrent last-admin race has a passing integration
+  test proving exactly one succeeds. Users are **soft-deleted** (deactivate + revoke
+  refresh-token families); deactivation keeps refresh tokens active.
 - **API:** `IdentityEndpoints` — users, roles and permission-catalog routes under
   `/api/v1`, gated with `RequirePermission(Users.* / Roles.*)`.
 - **Events:** `IdentityActivityFeedHandler` (outbox-backed activity feed) registered in the
@@ -34,9 +38,13 @@
   `Users.View`-only role, audit rows, outbox dispatch.
 
 ### Docs
-- Spec `specs/users-roles-permissions.md` persistence notes; tasks
+- Spec `specs/users-roles-permissions.md` implemented & verified; tasks
   `tasks/users-roles-permissions/TASKS.md` all ticked; roadmap item 3 marked
-  `[x] backend slice`; `memory/project.md` and readiness report updated.
+  `[x] backend slice` + Slice 3 (Product & Inventory Foundation) outlined as the proposed
+  next slice; `memory/project.md` and readiness report updated.
+- **Known tech debt:** Swagger UI shows no Authorize button — the top-level OpenAPI `security`
+  requirement serializes as `{}` (Bearer scheme IS declared; runtime 401/403 enforcement is
+  proven). Platform-wide Swagger config redesign deferred.
 
 ## v0.3.0 — 2026-08-06 — Phase 1: Organizations & Branches (backend slice)
 

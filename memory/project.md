@@ -9,7 +9,7 @@
 - **Positioning:** the African alternative to Odoo / Zoho / SAP B1 / Dynamics 365. Platform,
   not a single ERP.
 
-## architecture.md — current state (2026-08-06)
+## architecture.md — current state (2026-08-13)
 
 - Modular monolith: Shared / Domain / Application / Infrastructure / API / Workers /
   Notifications / Modules.*. Solution `backend/BusinessOS.slnx` (includes the tests project).
@@ -31,22 +31,31 @@
   `RequirePermission` (readiness gap #3 closed); registration auto-creates the default
   `HQ` branch; seeder re-grants new permissions to existing admin roles; outbox-backed
   `BranchActivityFeedHandler`; 62 tests pass (unit + integration against real Postgres).
-- **Phase 1 slice 2a (Users, Roles & Permissions), done 2026-08-07:** domain hardening
-  (`UserBranch` invariants: single default, duplicate-rejection, stale replacement;
-  `User.SetRoles` no-op on identical; `SystemRoles.Administrator` constant); migration
-  `20260806_AddUserRoleAndBranchManagement` (UserBranches table + Roles Description +
+- **Phase 1 slice 2a (Users, Roles & Permissions), done 2026-08-13 (tasks 001–009):**
+  domain hardening (`UserBranch` invariants: single default, duplicate-rejection, stale
+  replacement; `User.SetRoles` no-op on identical; `SystemRoles.Administrator` constant);
+  migration `20260806_AddUserRoleAndBranchManagement` (UserBranches table + Roles Description +
   unique `(TenantId, Name)`); tenant-scoped repositories (`IUserRepository`
-  `GetByIdAsync/GetByIdWithRolesAsync/ListAsync/CountAsync/CountActiveAdministratorsAsync`,
-  `IRoleRepository` `GetByIdAsync/GetByNameAsync/ListAsync/GetPermissionsAsync/RemoveAsync`,
+  `GetByIdAsync/GetByIdWithRolesAsync/ListAsync/CountAsync/CountActiveAdministratorsAsync/
+  RevokeAllForUserAsync/ListByIdsAsync`, `IRoleRepository`
+  `GetByIdAsync/GetByNameAsync/ListAsync/GetPermissionsAsync/GetManyByIdsAsync/RemoveAsync`,
   new `IPermissionRepository` `ListAsync/GetByNameAsync/ResolveByNamesAsync`); application
-  layer `Features/Users` + `Features/Roles` (commands/queries/validators/DTOs/mappers/
-  `UserAdminGuard`); `IdentityEndpoints` (users/roles/permissions under `/api/v1`);
-  `IdentityActivityFeedHandler`. Key decisions: `UserBranch` is managed only through the
-  `User` aggregate (no child repo); `IPermissionRepository` returns **tracked** catalog
-  entities so grants attach without re-inserting the catalog; EF child-state pitfall (client
-  Guid keys in added children must use default keys so EF treats them as Added, not Modified).
-  **154 tests pass** (unit + integration); build clean (`--warnaserror`), `dotnet format`
-  clean. Changelog v0.4.0.
+  layer `Features/Users` (6 commands, 3 queries) + `Features/Roles` (4 commands, 4 queries)
+  with validators/DTOs/mappers/`UserAdminGuard`; `IdentityEndpoints` — 17 endpoints under
+  `/api/v1/users`, `/api/v1/roles`, `/api/v1/permissions`, all `RequirePermission`-gated
+  (Users.View/Create/Update/Delete, Roles.View/Manage); `IdentityActivityFeedHandler` consumes
+  the 9 identity domain events. Guardrails: users **deactivated never hard-deleted** (DELETE =
+  deactivate + revoke refresh-token families); self-deactivate/self-delete → Conflict; last
+  active `Administrator` protected (`UserAdminGuard`, lockout prevention) enforced inside a
+  per-tenant Postgres transaction advisory lock (`pg_advisory_xact_lock`, same DB transaction
+  as the mutation); system roles non-renamable/non-deletable but permission-adjustable
+  (ADR-0001); role deletion removes grants but never users. Key decisions: `UserBranch` is
+  managed only through the `User` aggregate (no child repo); `IPermissionRepository` returns
+  **tracked** catalog entities so grants attach without re-inserting the catalog; EF
+  child-state pitfall (client Guid keys in added children must use default keys so EF treats
+  them as Added, not Modified). **154 tests pass** (unit + integration incl. concurrent
+  last-admin race + audit rows for every mutation); build clean (`--warnaserror`),
+  `dotnet format` clean. Changelog v0.4.0.
 - Key docs: `MASTER_ARCHITECTURE.md` (single source of truth), `docs/ArchitectureRules.md`,
   `docs/Architecture.md`, `docs/roadmap.md`, `specs/organizations-branches.md`,
   `specs/users-roles-permissions.md`.
@@ -84,6 +93,9 @@
 
 - Flutter app: SharedPreferences + in-memory mocks still drive auth/products/sales; Drift DB
   (11 tables) is built but disconnected from the running app.
+- Swagger UI shows no Authorize button: the top-level OpenAPI `security` requirement
+  serializes as `{}` (Bearer scheme IS declared; runtime 401/403 enforcement proven). Do not
+  redesign platform-wide Swagger config unless asked — recorded in Task 006 report.
 - Dev DB `businessos` may contain smoke-test users; `businessos_test` is recreated per run.
 - Roadmap checkboxes marked `[x]` for Phase 0 are aspirational — many are now real (see
   "architecture.md" above).
