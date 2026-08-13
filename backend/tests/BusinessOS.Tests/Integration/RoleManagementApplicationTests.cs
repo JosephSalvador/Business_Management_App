@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using BusinessOS.Api.Http;
 using BusinessOS.Application.Features.Roles.Commands;
 using BusinessOS.Application.Features.Roles.Queries;
 using BusinessOS.Domain.Identity;
@@ -62,6 +63,9 @@ public sealed class RoleManagementApplicationTests : IClassFixture<BusinessOsApi
                 },
                 authenticationType: "TestAuth")),
         };
+        var requestContext = scope.ServiceProvider.GetRequiredService<RequestContext>();
+        requestContext.UserId = userId;
+        requestContext.TenantId = tenantId;
         return scope;
     }
 
@@ -242,6 +246,37 @@ public sealed class RoleManagementApplicationTests : IClassFixture<BusinessOsApi
         var outbox = recent.FirstOrDefault(o => o.Payload.Contains(created.Value.Id.ToString()));
         Assert.NotNull(outbox);
         Assert.NotNull(outbox!.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task RoleMutations_WriteAuditRows()
+    {
+        var world = await SeedWorldAsync("roleaudit");
+        using var scope = CreateAuthenticatedScope(world.TenantId, world.AdminUserId);
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+
+        var created = await sender.Send(new CreateRoleCommand("Audited", "First"));
+        Assert.True(created.IsSuccess, created.Error.Message);
+        var roleId = created.Value.Id;
+
+        Assert.True((await sender.Send(new UpdateRoleCommand(roleId, "Audited 2", "Second"))).IsSuccess);
+        Assert.True((await sender.Send(new SetRolePermissionsCommand(roleId, new[] { "Users.View" }))).IsSuccess);
+        Assert.True((await sender.Send(new DeleteRoleCommand(roleId))).IsSuccess);
+
+        using var db = CreateDbContext();
+        foreach (var action in new[]
+                 {
+                     "CreateRoleCommand",
+                     "UpdateRoleCommand",
+                     "SetRolePermissionsCommand",
+                     "DeleteRoleCommand",
+                 })
+        {
+            var log = await db.AuditLogs.FirstOrDefaultAsync(
+                l => l.Action == action && l.TenantId == world.TenantId);
+            Assert.NotNull(log);
+            Assert.Equal(world.AdminUserId, log!.UserId);
+        }
     }
 
     [Fact]

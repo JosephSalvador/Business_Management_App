@@ -50,7 +50,7 @@
       `docs/adr/0001-system-role-permissions.md`.
 - [x] 007 **Event consumers**: `IdentityActivityFeedHandler` (logs identity events) in
       Notifications; register in `NotificationEngineExtensions`.
-- [ ] 008 **Tests**: unit (last-admin guard, branch-assignment invariants, grant idempotency,
+- [x] 008 **Tests**: unit (last-admin guard, branch-assignment invariants, grant idempotency,
       system-role immutability) + integration (user/role/branch CRUD, duplicate email/role →
       Conflict, self + last-admin protection, permission round-trip, tenant isolation, 403 for
       `Users.View`-only role, audit rows, outbox dispatch).

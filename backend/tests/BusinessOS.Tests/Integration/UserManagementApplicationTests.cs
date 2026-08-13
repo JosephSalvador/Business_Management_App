@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using BusinessOS.Api.Http;
 using BusinessOS.Application.Features.Users.Commands;
 using BusinessOS.Application.Features.Users.Queries;
 using BusinessOS.Domain.Identity;
@@ -76,6 +77,9 @@ public sealed class UserManagementApplicationTests : IClassFixture<BusinessOsApi
                 },
                 authenticationType: "TestAuth")),
         };
+        var requestContext = scope.ServiceProvider.GetRequiredService<RequestContext>();
+        requestContext.UserId = userId;
+        requestContext.TenantId = tenantId;
         return scope;
     }
 
@@ -298,6 +302,79 @@ public sealed class UserManagementApplicationTests : IClassFixture<BusinessOsApi
         var deactivate = await sender.Send(new SetUserStatusCommand(worldA.AdminUserIds[0], IsActive: false));
         Assert.True(deactivate.IsFailure);
         Assert.Equal("NotFound", deactivate.Error.Code);
+    }
+
+    [Fact]
+    public async Task SetUserBranches_ReplaceAll_ClearsPriorAssignments()
+    {
+        var world = await SeedWorldAsync("branchreplace");
+        var (tenantId, hq, targetId) = (world.TenantId, world.BranchIds[0], world.AdminUserIds[0]);
+
+        Guid second;
+        using (var db = CreateDbContext())
+        {
+            var branch = Branch.Create(tenantId, "Second", "SEC", "TZS");
+            db.Branches.Add(branch);
+            await db.SaveChangesAsync();
+            second = branch.Id;
+        }
+
+        using var scope = CreateAuthenticatedScope(tenantId, targetId);
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+
+        var result = await sender.Send(new SetUserBranchesCommand(targetId, new[] { second }, second));
+
+        Assert.True(result.IsSuccess, result.Error.Message);
+        var dto = Assert.Single(result.Value);
+        Assert.Equal(second, dto.BranchId);
+        Assert.True(dto.IsDefault);
+
+        using var verify = CreateDbContext();
+        var persisted = await verify.Users
+            .Include(u => u.Branches)
+            .SingleAsync(u => u.Id == targetId);
+        Assert.Single(persisted.Branches);
+        Assert.Equal(second, Assert.Single(persisted.Branches).BranchId);
+        Assert.Equal(second, persisted.DefaultBranchId);
+        Assert.NotEqual(hq, persisted.DefaultBranchId);
+    }
+
+    [Fact]
+    public async Task UserMutations_WriteAuditRows()
+    {
+        var world = await SeedWorldAsync("useraudit");
+        using var scope = CreateAuthenticatedScope(world.TenantId, world.AdminUserIds[0]);
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+
+        var email = $"audited-{Guid.NewGuid():N}@test.local";
+        var created = await sender.Send(new CreateUserCommand(
+            email, "Passw0rd!", "Audited", null,
+            new[] { world.AdminRoleId }, world.BranchIds, world.BranchIds[0]));
+        Assert.True(created.IsSuccess, created.Error.Message);
+        var userId = created.Value.Id;
+
+        Assert.True((await sender.Send(new UpdateUserCommand(userId, "Audited 2", "255700000002"))).IsSuccess);
+        Assert.True((await sender.Send(new SetUserRolesCommand(userId, Array.Empty<Guid>()))).IsSuccess);
+        Assert.True((await sender.Send(new SetUserBranchesCommand(userId, world.BranchIds, world.BranchIds[0]))).IsSuccess);
+        Assert.True((await sender.Send(new SetUserStatusCommand(userId, IsActive: false))).IsSuccess);
+        Assert.True((await sender.Send(new DeleteUserCommand(userId))).IsSuccess);
+
+        using var db = CreateDbContext();
+        foreach (var action in new[]
+                 {
+                     "CreateUserCommand",
+                     "UpdateUserCommand",
+                     "SetUserRolesCommand",
+                     "SetUserBranchesCommand",
+                     "SetUserStatusCommand",
+                     "DeleteUserCommand",
+                 })
+        {
+            var log = await db.AuditLogs.FirstOrDefaultAsync(
+                l => l.Action == action && l.TenantId == world.TenantId);
+            Assert.NotNull(log);
+            Assert.Equal(world.AdminUserIds[0], log!.UserId);
+        }
     }
 
     private async Task<Guid> GetUserIdByEmailAsync(string prefix)
