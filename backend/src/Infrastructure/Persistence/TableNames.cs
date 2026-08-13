@@ -10,6 +10,7 @@ public static class Schemas
 {
     public const string Organization = "public";
     public const string Identity = "public";
+    public const string Catalog = "public";
     public const string Platform = "public";
 }
 
@@ -34,6 +35,15 @@ public static class Tables
         public const string UserRoles = "UserRoles";
         public const string RolePermissions = "RolePermissions";
         public const string RefreshTokens = "RefreshTokens";
+    }
+
+    public static class Catalog
+    {
+        public const string ProductCategories = "ProductCategories";
+        public const string Brands = "Brands";
+        public const string UnitsOfMeasure = "UnitsOfMeasure";
+        public const string Products = "Products";
+        public const string ProductVariants = "ProductVariants";
     }
 
     public static class Platform

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Tenants;
@@ -24,6 +25,11 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
@@ -137,6 +143,87 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(a => a.IpAddress).HasMaxLength(64);
             entity.HasIndex(a => new { a.TenantId, a.CreatedAt });
             entity.HasIndex(a => new { a.EntityType, a.EntityId });
+        });
+
+        modelBuilder.Entity<ProductCategory>(entity =>
+        {
+            entity.ToTable(Tables.Catalog.ProductCategories, Schemas.Catalog);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+            entity.HasIndex(c => new { c.TenantId, c.Name }).IsUnique();
+            entity.HasOne<ProductCategory>()
+                .WithMany()
+                .HasForeignKey(c => c.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Brand>(entity =>
+        {
+            entity.ToTable(Tables.Catalog.Brands, Schemas.Catalog);
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Name).IsRequired().HasMaxLength(200);
+            entity.HasIndex(b => new { b.TenantId, b.Name });
+        });
+
+        modelBuilder.Entity<UnitOfMeasure>(entity =>
+        {
+            entity.ToTable(Tables.Catalog.UnitsOfMeasure, Schemas.Catalog);
+            entity.HasKey(u => u.Id);
+            entity.Property(u => u.Name).IsRequired().HasMaxLength(100);
+            entity.Property(u => u.Abbreviation).IsRequired().HasMaxLength(10);
+            entity.HasIndex(u => new { u.TenantId, u.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.ToTable(Tables.Catalog.Products, Schemas.Catalog);
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+            entity.Property(p => p.Description).HasColumnType("text");
+            entity.Property(p => p.Sku).HasMaxLength(64);
+            entity.Property(p => p.Barcode).HasMaxLength(64);
+            entity.Property(p => p.ProductType).IsRequired();
+            entity.Property(p => p.Status).IsRequired().HasDefaultValue(ProductStatus.Draft);
+            entity.HasIndex(p => p.TenantId);
+            entity.HasIndex(p => new { p.TenantId, p.Sku })
+                .IsUnique()
+                .HasFilter("\"Sku\" IS NOT NULL");
+            entity.HasIndex(p => new { p.TenantId, p.Barcode })
+                .IsUnique()
+                .HasFilter("\"Barcode\" IS NOT NULL");
+            entity.HasOne<ProductCategory>()
+                .WithMany()
+                .HasForeignKey(p => p.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Brand>()
+                .WithMany()
+                .HasForeignKey(p => p.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UnitOfMeasure>()
+                .WithMany()
+                .HasForeignKey(p => p.UnitOfMeasureId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(p => p.Variants)
+                .WithOne()
+                .HasForeignKey(v => v.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductVariant>(entity =>
+        {
+            entity.ToTable(Tables.Catalog.ProductVariants, Schemas.Catalog);
+            entity.HasKey(v => v.Id);
+            entity.Property(v => v.Id).ValueGeneratedOnAdd();
+            entity.Property(v => v.Name).IsRequired().HasMaxLength(200);
+            entity.Property(v => v.Sku).HasMaxLength(64);
+            entity.Property(v => v.Barcode).HasMaxLength(64);
+            entity.HasIndex(v => v.TenantId);
+            entity.HasIndex(v => new { v.TenantId, v.Sku })
+                .IsUnique()
+                .HasFilter("\"Sku\" IS NOT NULL");
+            entity.HasIndex(v => new { v.TenantId, v.Barcode })
+                .IsUnique()
+                .HasFilter("\"Barcode\" IS NOT NULL");
         });
 
         modelBuilder.Entity<FeatureFlag>(entity =>

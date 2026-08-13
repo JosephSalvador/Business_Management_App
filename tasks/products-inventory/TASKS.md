@@ -19,7 +19,7 @@
       `ProductUpdatedEvent`, `ProductStatusChangedEvent`, `ProductVariantsChangedEvent`);
       new `PermissionNames`: `Products.View/Create/Update/Delete`, `Categories.View/Manage`,
       `Brands.View/Manage`, `Units.View/Manage`.
-- [ ] 002 **Persistence**: `ProductCategories`, `Brands`, `UnitsOfMeasure`, `Products`,
+- [x] 002 **Persistence**: `ProductCategories`, `Brands`, `UnitsOfMeasure`, `Products`,
       `ProductVariants` DbSets + mappings (partial unique on tenant+sku/barcode); EF migration
       `20260813_AddProductInventoryAndPricing` (catalog tables only).
 - [ ] 003 **Ports + repositories**: `IProductRepository` (tenant-scoped
