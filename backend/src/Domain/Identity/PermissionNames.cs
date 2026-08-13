@@ -24,6 +24,20 @@ public static class PermissionNames
     public const string SalesView = "Sales.View";
     public const string SalesDelete = "Sales.Delete";
 
+    public const string ProductsView = "Products.View";
+    public const string ProductsCreate = "Products.Create";
+    public const string ProductsUpdate = "Products.Update";
+    public const string ProductsDelete = "Products.Delete";
+
+    public const string CategoriesView = "Categories.View";
+    public const string CategoriesManage = "Categories.Manage";
+
+    public const string BrandsView = "Brands.View";
+    public const string BrandsManage = "Brands.Manage";
+
+    public const string UnitsView = "Units.View";
+    public const string UnitsManage = "Units.Manage";
+
     public const string InventoryView = "Inventory.View";
     public const string InventoryManage = "Inventory.Manage";
 
@@ -40,6 +54,10 @@ public static class PermissionNames
         UsersView, UsersCreate, UsersUpdate, UsersDelete,
         RolesView, RolesManage,
         SalesCreate, SalesView, SalesDelete,
+        ProductsView, ProductsCreate, ProductsUpdate, ProductsDelete,
+        CategoriesView, CategoriesManage,
+        BrandsView, BrandsManage,
+        UnitsView, UnitsManage,
         InventoryView, InventoryManage,
         AccountingView, AccountingApprove,
         AuditView,
