@@ -22,7 +22,7 @@
 - [x] 002 **Persistence**: `ProductCategories`, `Brands`, `UnitsOfMeasure`, `Products`,
       `ProductVariants` DbSets + mappings (partial unique on tenant+sku/barcode); EF migration
       `20260813_AddProductInventoryAndPricing` (catalog tables only).
-- [ ] 003 **Ports + repositories**: `IProductRepository` (tenant-scoped
+- [x] 003 **Ports + repositories**: `IProductRepository` (tenant-scoped
       `GetByIdAsync`, `ListAsync(page,pageSize,search,filter)`, `GetBySkuAsync`,
       `GetByBarcodeAsync`, `CountAsync`), `ICatalogRepository`-style ports for
       categories/brands/uoms (`ListAsync`, `GetByIdAsync`, `GetByNameAsync`, `AddAsync`,

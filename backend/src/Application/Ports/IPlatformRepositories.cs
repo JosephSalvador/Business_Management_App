@@ -1,4 +1,5 @@
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Tenants;
@@ -86,4 +87,52 @@ public interface IAuditLogRepository
 public interface IFeatureFlagRepository
 {
     Task<FeatureFlag?> GetAsync(Guid tenantId, string key, CancellationToken cancellationToken = default);
+}
+
+public sealed record ProductListFilter(
+    string? Search,
+    Guid? CategoryId,
+    Guid? BrandId,
+    ProductType? ProductType,
+    ProductStatus? Status);
+
+public interface IProductRepository
+{
+    Task<Product?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<Product?> GetBySkuAsync(Guid tenantId, string sku, CancellationToken cancellationToken = default);
+    Task<Product?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Product>> ListAsync(
+        Guid tenantId, int page, int pageSize, ProductListFilter filter, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, ProductListFilter filter, CancellationToken cancellationToken = default);
+    Task<bool> VariantSkuExistsAsync(
+        Guid tenantId, string sku, Guid? excludeProductId = null, CancellationToken cancellationToken = default);
+    Task<bool> VariantBarcodeExistsAsync(
+        Guid tenantId, string barcode, Guid? excludeProductId = null, CancellationToken cancellationToken = default);
+}
+
+public interface ICategoryRepository
+{
+    Task<ProductCategory?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<ProductCategory?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProductCategory>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddAsync(ProductCategory category, CancellationToken cancellationToken = default);
+    Task RemoveAsync(ProductCategory category, CancellationToken cancellationToken = default);
+}
+
+public interface IBrandRepository
+{
+    Task<Brand?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<Brand?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Brand>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddAsync(Brand brand, CancellationToken cancellationToken = default);
+    Task RemoveAsync(Brand brand, CancellationToken cancellationToken = default);
+}
+
+public interface IUnitOfMeasureRepository
+{
+    Task<UnitOfMeasure?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<UnitOfMeasure?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UnitOfMeasure>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken = default);
+    Task RemoveAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken = default);
 }

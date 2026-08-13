@@ -1,5 +1,6 @@
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Tenants;
@@ -284,4 +285,204 @@ public sealed class FeatureFlagRepository : IFeatureFlagRepository
 
     public Task<FeatureFlag?> GetAsync(Guid tenantId, string key, CancellationToken cancellationToken = default)
         => _db.FeatureFlags.FirstOrDefaultAsync(f => f.TenantId == tenantId && f.Key == key, cancellationToken);
+}
+
+public sealed class ProductRepository : IProductRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public ProductRepository(BusinessDbContext db) => _db = db;
+
+    public Task<Product?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Products
+            .AsSplitQuery()
+            .Include(p => p.Variants)
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Id == id, cancellationToken);
+
+    public Task<Product?> GetBySkuAsync(Guid tenantId, string sku, CancellationToken cancellationToken = default)
+        => _db.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Sku == sku, cancellationToken);
+
+    public Task<Product?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken cancellationToken = default)
+        => _db.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Barcode == barcode, cancellationToken);
+
+    public async Task<IReadOnlyList<Product>> ListAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        ProductListFilter filter,
+        CancellationToken cancellationToken = default)
+        => await ApplyFilter(_db.Products, tenantId, filter)
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(p => p.Variants)
+            .OrderBy(p => p.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountAsync(
+        Guid tenantId,
+        ProductListFilter filter,
+        CancellationToken cancellationToken = default)
+        => ApplyFilter(_db.Products, tenantId, filter).CountAsync(cancellationToken);
+
+    public Task<bool> VariantSkuExistsAsync(
+        Guid tenantId,
+        string sku,
+        Guid? excludeProductId = null,
+        CancellationToken cancellationToken = default)
+        => _db.ProductVariants.AnyAsync(
+            v => v.TenantId == tenantId && v.Sku == sku && (excludeProductId == null || v.ProductId != excludeProductId),
+            cancellationToken);
+
+    public Task<bool> VariantBarcodeExistsAsync(
+        Guid tenantId,
+        string barcode,
+        Guid? excludeProductId = null,
+        CancellationToken cancellationToken = default)
+        => _db.ProductVariants.AnyAsync(
+            v => v.TenantId == tenantId && v.Barcode == barcode && (excludeProductId == null || v.ProductId != excludeProductId),
+            cancellationToken);
+
+    private static IQueryable<Product> ApplyFilter(
+        IQueryable<Product> query,
+        Guid tenantId,
+        ProductListFilter filter)
+    {
+        var filtered = query.Where(p => p.TenantId == tenantId);
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim();
+            filtered = filtered.Where(p =>
+                p.Name.Contains(term)
+                || (p.Sku != null && p.Sku.Contains(term))
+                || (p.Barcode != null && p.Barcode.Contains(term)));
+        }
+
+        if (filter.CategoryId.HasValue)
+        {
+            filtered = filtered.Where(p => p.CategoryId == filter.CategoryId);
+        }
+
+        if (filter.BrandId.HasValue)
+        {
+            filtered = filtered.Where(p => p.BrandId == filter.BrandId);
+        }
+
+        if (filter.ProductType.HasValue)
+        {
+            filtered = filtered.Where(p => p.ProductType == filter.ProductType.Value);
+        }
+
+        if (filter.Status.HasValue)
+        {
+            filtered = filtered.Where(p => p.Status == filter.Status.Value);
+        }
+
+        return filtered;
+    }
+}
+
+public sealed class CategoryRepository : ICategoryRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public CategoryRepository(BusinessDbContext db) => _db = db;
+
+    public Task<ProductCategory?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.ProductCategories
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Id == id, cancellationToken);
+
+    public Task<ProductCategory?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default)
+        => _db.ProductCategories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<ProductCategory>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.ProductCategories
+            .AsNoTracking()
+            .Where(c => c.TenantId == tenantId)
+            .OrderBy(c => c.Name)
+            .ToListAsync(cancellationToken);
+
+    public Task AddAsync(ProductCategory category, CancellationToken cancellationToken = default)
+        => _db.ProductCategories.AddAsync(category, cancellationToken).AsTask();
+
+    public Task RemoveAsync(ProductCategory category, CancellationToken cancellationToken = default)
+    {
+        _db.ProductCategories.Remove(category);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class BrandRepository : IBrandRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public BrandRepository(BusinessDbContext db) => _db = db;
+
+    public Task<Brand?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Brands
+            .FirstOrDefaultAsync(b => b.TenantId == tenantId && b.Id == id, cancellationToken);
+
+    public Task<Brand?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default)
+        => _db.Brands
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.TenantId == tenantId && b.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<Brand>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.Brands
+            .AsNoTracking()
+            .Where(b => b.TenantId == tenantId)
+            .OrderBy(b => b.Name)
+            .ToListAsync(cancellationToken);
+
+    public Task AddAsync(Brand brand, CancellationToken cancellationToken = default)
+        => _db.Brands.AddAsync(brand, cancellationToken).AsTask();
+
+    public Task RemoveAsync(Brand brand, CancellationToken cancellationToken = default)
+    {
+        _db.Brands.Remove(brand);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class UnitOfMeasureRepository : IUnitOfMeasureRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public UnitOfMeasureRepository(BusinessDbContext db) => _db = db;
+
+    public Task<UnitOfMeasure?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.UnitsOfMeasure
+            .FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Id == id, cancellationToken);
+
+    public Task<UnitOfMeasure?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default)
+        => _db.UnitsOfMeasure
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<UnitOfMeasure>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.UnitsOfMeasure
+            .AsNoTracking()
+            .Where(u => u.TenantId == tenantId)
+            .OrderBy(u => u.Name)
+            .ToListAsync(cancellationToken);
+
+    public Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken = default)
+        => _db.UnitsOfMeasure.AddAsync(unitOfMeasure, cancellationToken).AsTask();
+
+    public Task RemoveAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken = default)
+    {
+        _db.UnitsOfMeasure.Remove(unitOfMeasure);
+        return Task.CompletedTask;
+    }
 }
