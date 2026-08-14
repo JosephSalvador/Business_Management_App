@@ -9,7 +9,8 @@
 > branch and stock.
 >
 > **Sub-slice status (3a Product Catalog): implemented & verified 2026-08-13** (tasks 001–009);
-> 3b Inventory Foundation and 3c Pricing Engine are pending.
+> **3b Inventory Foundation: implemented & verified 2026-08-14** (tasks 010–020);
+> 3c Pricing Engine is pending.
 
 ## Feature
 

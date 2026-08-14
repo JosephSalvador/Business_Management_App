@@ -1,8 +1,8 @@
 # Changelog
 
-## v0.5.0 — 2026-08-13 — Slice 3a: Product Catalog (backend slice)
+## v0.5.0 — 2026-08-14 — Slice 3: Product & Inventory Foundation (backend slice)
 
-### Product Catalog
+### 3a — Product Catalog
 - **Domain (`Domain/Catalog`):** `Product` aggregate (`Create` factory, `UpdateProfile`,
   `UpdateIdentifiers` with `NormalizeIdentifier` trim, `SetStatus`, replace-all
   `SetVariants`); `ProductVariant` child (internal `Assign`/`Rename`, no-op replace
@@ -37,10 +37,31 @@
   CRUD + status, duplicate sku → `Conflict`, variant round-trip with stable ids, reference
   data, 403 for `Products.View`-only role, tenant isolation, audit rows, outbox dispatch.
 
+### 3b — Inventory Foundation
+- **Domain (`Domain/Inventory`):** `Warehouse` aggregate with uppercase code normalization,
+  default `MAIN` stock location, replace-all location management, activate/deactivate lifecycle,
+  and warehouse domain events; immutable `StockMovement` ledger with `OpeningStock` movement type;
+  `StockBalance` running quantity guardrails. Added `Warehouses.*` and `Inventory.*`
+  permissions.
+- **Persistence:** `Warehouses`, `StockLocations`, `StockBalances`, and `StockMovements` tables
+  via migration `20260814051054_AddInventoryWarehousesAndStock`; tenant-scoped warehouse code
+  uniqueness; warehouse-location uniqueness; functional stock-balance uniqueness for nullable
+  variants; ledger indexes for stock history.
+- **Repositories/Application/API:** tenant-scoped warehouse and stock repositories, row locking for
+  balances, per-tenant advisory locks around inventory mutations, warehouse commands/queries,
+  opening-stock recording, stock balance/movement list queries, and `InventoryEndpoints` under
+  `/api/v1/warehouses` and `/api/v1/inventory/*` with permission gates.
+- **Events:** `InventoryActivityFeedHandler` records warehouse lifecycle and stock ledger activity
+  through the existing outbox-backed notification pipeline.
+- **Tests:** 205 passing (unit + integration) — warehouse invariants, stock ledger math and
+  no-negative guardrails, warehouse CRUD/status/locations, opening stock balance+movement,
+  duplicate opening conflict, variant validation, tenant isolation, permissions, audit rows, and
+  outbox events.
+
 ### Docs
 - Spec `specs/products-inventory.md` sub-slice 3a implemented & verified; tasks
-  `tasks/products-inventory/TASKS.md` 001–009 ticked; `memory/project.md` updated. 3b
-  (Inventory Foundation) and 3c (Pricing Engine) remain.
+  `tasks/products-inventory/TASKS.md` 001–009 ticked. Sub-slice 3b implemented & verified; tasks
+  010–020 ticked; `memory/project.md` updated. 3c (Pricing Engine) remains pending.
 
 ## v0.4.0 — 2026-08-13 — Phase 1: Users, Roles & Permissions (backend slice)
 

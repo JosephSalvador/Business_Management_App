@@ -44,56 +44,56 @@
 - [x] 009 **Docs + commit**: `dotnet build --warnaserror`, `dotnet format`, full test run;
       changelog bullet, `memory/project.md`; tick 3a tasks; completion report.
 
-## 3b — Inventory Foundation (proposed, pending approval)
+## 3b — Inventory Foundation
 
 Scope: `Tenant → Branch → Warehouse → StockLocation` + immutable `StockMovement` ledger +
 opening-stock recording. Adjustments, transfers, reservations, purchases and sales are
 **out of scope** (their planned endpoints stay "deferred" in the spec).
 
-- [ ] 010 **3a errata — cross-table SKU/barcode uniqueness**: `CreateProductCommand` /
+- [x] 010 **3a errata — cross-table SKU/barcode uniqueness**: `CreateProductCommand` /
       `UpdateProductCommand` also reject a sku/barcode already used by a variant
       (`VariantSkuExistsAsync`/`VariantBarcodeExistsAsync`); `SetProductVariantsCommand` also
       rejects a sku/barcode already used by a product (`GetBySkuAsync`/`GetByBarcodeAsync`);
       integration test proving the product-sku-vs-variant-sku collision → `Conflict`. Per-table
       DB indexes + per-tenant advisory lock stay as is.
-- [ ] 011 **Domain — Warehouse + StockLocation**: `Warehouse` aggregate (Create with default
+- [x] 011 **Domain — Warehouse + StockLocation**: `Warehouse` aggregate (Create with default
       location, UpdateProfile, Activate/Deactivate, code normalization uppercase, soft delete =
       deactivate) + `StockLocation` child (warehouse-scoped unique code, `Assign`/`Rename`);
       events (`WarehouseCreatedEvent`, `WarehouseUpdatedEvent`, `WarehouseStatusChangedEvent`);
       `PermissionNames`: `Warehouses.View/Create/Update/Delete`.
-- [ ] 012 **Domain — Stock ledger**: `StockBalance` (key
+- [x] 012 **Domain — Stock ledger**: `StockBalance` (key
       `TenantId+WarehouseId+LocationId+ProductId+VariantId?`, running quantity) + `StockMovement`
       (immutable ledger row: signed quantityDelta, `MovementType` = `OpeningStock` for 3b,
       nullable `ReferenceType/ReferenceId`, `EffectiveAt`); `RecordOpeningStock` invariants
       (first movement on that key only, quantity > 0, sellable-unit key consistency, no
       negative); events (`OpeningStockRecordedEvent`, `StockMovementRecordedEvent`).
-- [ ] 013 **Persistence**: `Warehouses`, `StockLocations`, `StockBalances`, `StockMovements`
+- [x] 013 **Persistence**: `Warehouses`, `StockLocations`, `StockBalances`, `StockMovements`
       DbSets + mappings (`Warehouses` unique `(TenantId, Code)` + `BranchId` Restrict FK;
       `StockLocations` unique `(WarehouseId, Code)`; `StockBalances` functional unique
       `(TenantId, WarehouseId, StockLocationId, ProductId, COALESCE(VariantId))`; ledger index
       `(TenantId, ProductId, CreatedAt)`; Restrict FKs to product/variant/location); migration
       `AddInventoryWarehousesAndStock`.
-- [ ] 014 **Ports + repositories**: `IWarehouseRepository` (tenant-scoped `GetByIdAsync` with
+- [x] 014 **Ports + repositories**: `IWarehouseRepository` (tenant-scoped `GetByIdAsync` with
       locations, `GetByCodeAsync`, `ListAsync(page,pageSize,search,branchId)`, `CountAsync`,
       `AddAsync`) + `IStockRepository` (`GetOrCreateBalanceAsync`, `GetBalanceWithLockAsync`
       using `FOR UPDATE`, `AddMovementAsync`, `ListBalancesAsync`, `ListMovementsAsync`);
       register in DI.
-- [ ] 015 **Application — warehouses**: `Features/Inventory` warehouse commands/queries
+- [x] 015 **Application — warehouses**: `Features/Inventory` warehouse commands/queries
       (List/Get/Create/Update/SetStatus/Delete + `SetStockLocationsCommand` replace-all) +
       validators; advisory lock on mutations.
-- [ ] 016 **Application — stock (opening)**: `RecordOpeningStockCommand` (row-lock
+- [x] 016 **Application — stock (opening)**: `RecordOpeningStockCommand` (row-lock
       serialization), `ListStockBalancesQuery`, `ListStockMovementsQuery` + validators.
-- [ ] 017 **API endpoints**: `InventoryEndpoints` (warehouses group + `/inventory/stock`,
+- [x] 017 **API endpoints**: `InventoryEndpoints` (warehouses group + `/inventory/stock`,
       `/inventory/movements`, `/inventory/stock/opening`) with
       `RequirePermission(Warehouses.* / Inventory.View / Inventory.Manage)`; register.
-- [ ] 018 **Event consumers**: `InventoryActivityFeedHandler` in Notifications (warehouse +
+- [x] 018 **Event consumers**: `InventoryActivityFeedHandler` in Notifications (warehouse +
       opening-stock events); register.
-- [ ] 019 **Tests**: unit (warehouse code normalization + default location + deactivate; ledger
+- [x] 019 **Tests**: unit (warehouse code normalization + default location + deactivate; ledger
       opening math, first-movement-only, no-negative, sellable-unit key) + integration
       (warehouse CRUD + status + locations, opening → balance + movement visible, duplicate code
       → Conflict, duplicate opening → Conflict, tenant isolation, 403, audit rows, outbox
       dispatch).
-- [ ] 020 **Docs + commit**: build/format/tests; changelog, memory; tick 3b; completion report;
+- [x] 020 **Docs + commit**: build/format/tests; changelog, memory; tick 3b; completion report;
       pause for review.
 
 ## 3c — Pricing Engine

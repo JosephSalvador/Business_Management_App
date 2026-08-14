@@ -9,7 +9,7 @@
 - **Positioning:** the African alternative to Odoo / Zoho / SAP B1 / Dynamics 365. Platform,
   not a single ERP.
 
-## architecture.md — current state (2026-08-13)
+## architecture.md — current state (2026-08-14)
 
 - Modular monolith: Shared / Domain / Application / Infrastructure / API / Workers /
   Notifications / Modules.*. Solution `backend/BusinessOS.slnx` (includes the tests project).
@@ -74,8 +74,26 @@
   `Conflict`, cycle → `Validation`); API `CatalogEndpoints` + `ReferenceDataEndpoints` all
   `RequirePermission`-gated; `DELETE /products/{id}` = soft delete (status `Inactive`);
   `CatalogActivityFeedHandler` consumes the product events. 181 tests pass (unit +
-  integration). Spec sub-slice 3a marked implemented & verified; 3b Inventory Foundation and
-  3c Pricing Engine pending.
+  integration). Spec sub-slice 3a marked implemented & verified; 3b Inventory Foundation now
+  implemented in the following entry; 3c Pricing Engine pending.
+
+- **Phase 1 slice 3b (Inventory Foundation), done 2026-08-14 (tasks 010–020):** 3a errata fixed
+  cross-table product/variant SKU and barcode uniqueness in application commands; new
+  `Domain/Inventory` aggregate `Warehouse` with default `MAIN` `StockLocation`, uppercase code
+  normalization, replace-all locations, soft delete via deactivate, and warehouse lifecycle
+  events; immutable `StockMovement` ledger (`OpeningStock` only in 3b, signed quantity delta,
+  effective/created timestamps, opening-stock events) plus `StockBalance` running quantity with
+  no-negative guard. New permissions `Warehouses.View/Create/Update/Delete` and
+  `Inventory.View/Manage`. Migration `20260814051054_AddInventoryWarehousesAndStock` adds
+  `Warehouses`, `StockLocations`, `StockBalances`, `StockMovements`; stock-balance uniqueness
+  uses a COALESCE functional unique index to handle null `VariantId`. New warehouse and stock
+  repositories include tenant-scoped list/count APIs, `GetBalanceWithLockAsync` using Postgres
+  `FOR UPDATE`, and movement persistence. Application/API layer adds warehouse CRUD/status/
+  locations, opening-stock recording, stock balance and movement queries, and endpoints under
+  `/api/v1/warehouses` and `/api/v1/inventory/*`, all permission-gated. Opening stock is
+  auditable and creates both ledger movement and derived balance in the same mutation path.
+  `InventoryActivityFeedHandler` consumes warehouse and stock events. 205 tests pass (unit +
+  integration). Spec sub-slice 3b marked implemented & verified; 3c Pricing Engine pending.
 
 ## coding.md — see `docs/CodingStandards.md`
 
