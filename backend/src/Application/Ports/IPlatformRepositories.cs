@@ -180,14 +180,30 @@ public interface IStockRepository
     Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
         Guid tenantId,
-        Guid warehouseId,
-        Guid? stockLocationId = null,
+        int page,
+        int pageSize,
+        Guid? warehouseId = null,
         Guid? productId = null,
+        string? search = null,
+        CancellationToken cancellationToken = default);
+    Task<int> CountBalancesAsync(
+        Guid tenantId,
+        Guid? warehouseId = null,
+        Guid? productId = null,
+        string? search = null,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
         Guid tenantId,
-        Guid warehouseId,
-        Guid? stockLocationId = null,
+        int page,
+        int pageSize,
+        Guid? warehouseId = null,
         Guid? productId = null,
+        StockMovementType? type = null,
+        CancellationToken cancellationToken = default);
+    Task<int> CountMovementsAsync(
+        Guid tenantId,
+        Guid? warehouseId = null,
+        Guid? productId = null,
+        StockMovementType? type = null,
         CancellationToken cancellationToken = default);
 }

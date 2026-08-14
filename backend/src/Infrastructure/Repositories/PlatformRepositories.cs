@@ -617,18 +617,64 @@ public sealed class StockRepository : IStockRepository
 
     public async Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
         Guid tenantId,
-        Guid warehouseId,
-        Guid? stockLocationId = null,
+        int page,
+        int pageSize,
+        Guid? warehouseId = null,
         Guid? productId = null,
+        string? search = null,
         CancellationToken cancellationToken = default)
-    {
-        var query = _db.StockBalances
+        => await ApplyBalanceFilter(_db, tenantId, warehouseId, productId, search)
             .AsNoTracking()
-            .Where(b => b.TenantId == tenantId && b.WarehouseId == warehouseId);
+            .OrderBy(b => b.WarehouseId)
+            .ThenBy(b => b.StockLocationId)
+            .ThenBy(b => b.ProductId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
 
-        if (stockLocationId.HasValue)
+    public Task<int> CountBalancesAsync(
+        Guid tenantId,
+        Guid? warehouseId = null,
+        Guid? productId = null,
+        string? search = null,
+        CancellationToken cancellationToken = default)
+        => ApplyBalanceFilter(_db, tenantId, warehouseId, productId, search).CountAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        Guid? warehouseId = null,
+        Guid? productId = null,
+        StockMovementType? type = null,
+        CancellationToken cancellationToken = default)
+        => await ApplyMovementFilter(_db, tenantId, warehouseId, productId, type)
+            .AsNoTracking()
+            .OrderByDescending(m => m.OccurredAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountMovementsAsync(
+        Guid tenantId,
+        Guid? warehouseId = null,
+        Guid? productId = null,
+        StockMovementType? type = null,
+        CancellationToken cancellationToken = default)
+        => ApplyMovementFilter(_db, tenantId, warehouseId, productId, type).CountAsync(cancellationToken);
+
+    private static IQueryable<StockBalance> ApplyBalanceFilter(
+        BusinessDbContext db,
+        Guid tenantId,
+        Guid? warehouseId,
+        Guid? productId,
+        string? search)
+    {
+        var query = db.StockBalances.Where(b => b.TenantId == tenantId);
+
+        if (warehouseId.HasValue)
         {
-            query = query.Where(b => b.StockLocationId == stockLocationId.Value);
+            query = query.Where(b => b.WarehouseId == warehouseId.Value);
         }
 
         if (productId.HasValue)
@@ -636,26 +682,35 @@ public sealed class StockRepository : IStockRepository
             query = query.Where(b => b.ProductId == productId.Value);
         }
 
-        return await query
-            .OrderBy(b => b.StockLocationId)
-            .ThenBy(b => b.ProductId)
-            .ToListAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Join(
+                    db.Products.Where(p => p.TenantId == tenantId),
+                    b => b.ProductId,
+                    p => p.Id,
+                    (b, p) => new { b, p })
+                .Where(x => x.p.Name.Contains(term)
+                    || (x.p.Sku != null && x.p.Sku.Contains(term))
+                    || (x.p.Barcode != null && x.p.Barcode.Contains(term)))
+                .Select(x => x.b);
+        }
+
+        return query;
     }
 
-    public async Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+    private static IQueryable<StockMovement> ApplyMovementFilter(
+        BusinessDbContext db,
         Guid tenantId,
-        Guid warehouseId,
-        Guid? stockLocationId = null,
-        Guid? productId = null,
-        CancellationToken cancellationToken = default)
+        Guid? warehouseId,
+        Guid? productId,
+        StockMovementType? type)
     {
-        var query = _db.StockMovements
-            .AsNoTracking()
-            .Where(m => m.TenantId == tenantId && m.WarehouseId == warehouseId);
+        var query = db.StockMovements.Where(m => m.TenantId == tenantId);
 
-        if (stockLocationId.HasValue)
+        if (warehouseId.HasValue)
         {
-            query = query.Where(m => m.StockLocationId == stockLocationId.Value);
+            query = query.Where(m => m.WarehouseId == warehouseId.Value);
         }
 
         if (productId.HasValue)
@@ -663,8 +718,11 @@ public sealed class StockRepository : IStockRepository
             query = query.Where(m => m.ProductId == productId.Value);
         }
 
-        return await query
-            .OrderByDescending(m => m.OccurredAt)
-            .ToListAsync(cancellationToken);
+        if (type.HasValue)
+        {
+            query = query.Where(m => m.MovementType == type.Value);
+        }
+
+        return query;
     }
 }

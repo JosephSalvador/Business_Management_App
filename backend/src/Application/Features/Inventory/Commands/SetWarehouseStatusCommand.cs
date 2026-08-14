@@ -13,18 +13,23 @@ public sealed class SetWarehouseStatusCommandHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IWarehouseRepository _warehouses;
+    private readonly IBranchRepository _branches;
 
-    public SetWarehouseStatusCommandHandler(ITenantContext tenantContext, IWarehouseRepository warehouses)
+    public SetWarehouseStatusCommandHandler(
+        ITenantContext tenantContext,
+        IWarehouseRepository warehouses,
+        IBranchRepository branches)
     {
         _tenantContext = tenantContext;
         _warehouses = warehouses;
+        _branches = branches;
     }
 
     public async Task<Result<WarehouseDto>> Handle(
         SetWarehouseStatusCommand command, CancellationToken cancellationToken)
     {
-        var warehouse = await _warehouses.GetByIdAsync(
-            _tenantContext.TenantId, command.Id, cancellationToken);
+        var tenantId = _tenantContext.TenantId;
+        var warehouse = await _warehouses.GetByIdAsync(tenantId, command.Id, cancellationToken);
         if (warehouse is null)
         {
             return Error.NotFound("Warehouse not found.");
@@ -39,6 +44,7 @@ public sealed class SetWarehouseStatusCommandHandler
             warehouse.Deactivate();
         }
 
-        return Result.Success(WarehouseMappers.ToDto(warehouse));
+        var branch = await _branches.GetByIdAsync(tenantId, warehouse.BranchId, cancellationToken);
+        return Result.Success(WarehouseMappers.ToDto(warehouse, branch?.Name ?? string.Empty));
     }
 }

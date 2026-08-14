@@ -5,10 +5,11 @@ namespace BusinessOS.Application.Features.Inventory;
 
 internal static class WarehouseMappers
 {
-    internal static WarehouseDto ToDto(Warehouse warehouse) => new(
+    internal static WarehouseDto ToDto(Warehouse warehouse, string branchName) => new(
         warehouse.Id,
         warehouse.TenantId,
         warehouse.BranchId,
+        branchName,
         warehouse.Name,
         warehouse.Code,
         warehouse.Description,
@@ -22,4 +23,20 @@ internal static class WarehouseMappers
 
     internal static StockLocationSpec ToSpec(StockLocationInput input)
         => new(input.Id ?? Guid.Empty, input.Code, input.Name);
+
+    internal static StockBalanceDto ToBalanceDto(StockBalance balance) => new(
+        balance.WarehouseId,
+        balance.StockLocationId,
+        balance.ProductId,
+        balance.VariantId,
+        balance.Quantity);
+
+    internal static StockMovementDto ToMovementDto(StockMovement movement) => new(
+        movement.Id,
+        movement.MovementType,
+        movement.Quantity,
+        movement.Reason,
+        movement.OccurredAt,
+        movement.CreatedBy,
+        movement.CreatedAt);
 }

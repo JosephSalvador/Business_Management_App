@@ -36,7 +36,7 @@ public sealed class CreateWarehouseCommandHandler
         var tenantId = _tenantContext.TenantId;
         var normalizedCode = Warehouse.NormalizeCode(command.Code);
 
-        if (await _branches.GetByIdAsync(tenantId, command.BranchId, cancellationToken) is null)
+        if (await _branches.GetByIdAsync(tenantId, command.BranchId, cancellationToken) is not { } branch)
         {
             return Error.Validation("The branch does not exist in this tenant.");
         }
@@ -50,6 +50,6 @@ public sealed class CreateWarehouseCommandHandler
             tenantId, command.BranchId, command.Name, normalizedCode, command.Description);
 
         await _warehouses.AddAsync(warehouse, cancellationToken);
-        return Result.Success(WarehouseMappers.ToDto(warehouse));
+        return Result.Success(WarehouseMappers.ToDto(warehouse, branch.Name));
     }
 }

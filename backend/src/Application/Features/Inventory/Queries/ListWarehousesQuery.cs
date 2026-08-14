@@ -14,11 +14,16 @@ public sealed class ListWarehousesQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IWarehouseRepository _warehouses;
+    private readonly IBranchRepository _branches;
 
-    public ListWarehousesQueryHandler(ITenantContext tenantContext, IWarehouseRepository warehouses)
+    public ListWarehousesQueryHandler(
+        ITenantContext tenantContext,
+        IWarehouseRepository warehouses,
+        IBranchRepository branches)
     {
         _tenantContext = tenantContext;
         _warehouses = warehouses;
+        _branches = branches;
     }
 
     public async Task<Result<PagedResult<WarehouseDto>>> Handle(
@@ -29,7 +34,14 @@ public sealed class ListWarehousesQueryHandler
             tenantId, request.Page, request.PageSize, request.Search, request.BranchId, cancellationToken);
         var total = await _warehouses.CountAsync(tenantId, request.Search, request.BranchId, cancellationToken);
 
-        var items = warehouses.Select(WarehouseMappers.ToDto).ToList();
+        var branches = await _branches.ListByIdsAsync(
+            tenantId, warehouses.Select(w => w.BranchId).Distinct(), cancellationToken);
+        var branchNames = branches.ToDictionary(b => b.Id, b => b.Name);
+
+        var items = warehouses
+            .Select(w => WarehouseMappers.ToDto(
+                w, branchNames.TryGetValue(w.BranchId, out var name) ? name : string.Empty))
+            .ToList();
         return Result.Success(new PagedResult<WarehouseDto>(items, request.Page, request.PageSize, total));
     }
 }

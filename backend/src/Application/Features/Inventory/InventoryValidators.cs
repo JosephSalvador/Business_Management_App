@@ -52,3 +52,18 @@ public sealed class SetStockLocationsCommandValidator : AbstractValidator<SetSto
             });
     }
 }
+
+public sealed class RecordOpeningStockCommandValidator : AbstractValidator<RecordOpeningStockCommand>
+{
+    public RecordOpeningStockCommandValidator()
+    {
+        RuleFor(x => x.WarehouseId).NotEmpty();
+        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x.UnitOfMeasureId).NotEmpty();
+        RuleFor(x => x.Quantity).GreaterThan(0);
+        RuleFor(x => x.EffectiveAt).NotEqual(default(DateTime));
+        RuleFor(x => x.ReferenceType).MaximumLength(100);
+        RuleFor(x => x.Reason).MaximumLength(500);
+        RuleFor(x => x.CorrelationId).MaximumLength(64);
+    }
+}
