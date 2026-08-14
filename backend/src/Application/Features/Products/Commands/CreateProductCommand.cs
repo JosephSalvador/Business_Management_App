@@ -65,6 +65,16 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             return Error.Conflict("A product with this barcode already exists.");
         }
 
+        if (sku is not null && await _products.VariantSkuExistsAsync(tenantId, sku, cancellationToken: cancellationToken))
+        {
+            return Error.Conflict("A variant with this SKU already exists.");
+        }
+
+        if (barcode is not null && await _products.VariantBarcodeExistsAsync(tenantId, barcode, cancellationToken: cancellationToken))
+        {
+            return Error.Conflict("A variant with this barcode already exists.");
+        }
+
         var product = Product.Create(
             tenantId,
             command.Name,

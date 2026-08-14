@@ -288,6 +288,54 @@ public sealed class CatalogEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     }
 
     [Fact]
+    public async Task CrossTableSkuUniqueness_ProductAndVariantCannotShareIdentifier()
+    {
+        var (token, _) = await RegisterAsync("crosstable");
+        var unitId = await CreateUnitAsync(token, "Bottles");
+
+        Authorize(token);
+        var productSku = $"SKU-{Guid.NewGuid():N}";
+        var productWithSku = await _client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "With SKU",
+            sku = productSku,
+            unitOfMeasureId = unitId,
+            productType = 0,
+        });
+        Assert.Equal(HttpStatusCode.OK, productWithSku.StatusCode);
+
+        var productB = await _client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "Variant carrier",
+            unitOfMeasureId = unitId,
+            productType = 0,
+        });
+        var productBId = GetProperty(Body(await productB.Content.ReadAsStringAsync()), "id");
+
+        var variantCollidesWithProduct = await _client.PutAsJsonAsync($"/api/v1/products/{productBId}/variants", new
+        {
+            variants = new[] { new { id = (string?)null, name = "Small", sku = productSku, barcode = (string?)null } },
+        });
+        Assert.Equal(HttpStatusCode.Conflict, variantCollidesWithProduct.StatusCode);
+
+        var variantSku = $"VSKU-{Guid.NewGuid():N}";
+        var setVariants = await _client.PutAsJsonAsync($"/api/v1/products/{productBId}/variants", new
+        {
+            variants = new[] { new { id = (string?)null, name = "Small", sku = variantSku, barcode = (string?)null } },
+        });
+        Assert.Equal(HttpStatusCode.OK, setVariants.StatusCode);
+
+        var productCollidesWithVariant = await _client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "Tries variant sku",
+            sku = variantSku,
+            unitOfMeasureId = unitId,
+            productType = 0,
+        });
+        Assert.Equal(HttpStatusCode.Conflict, productCollidesWithVariant.StatusCode);
+    }
+
+    [Fact]
     public async Task LimitedViewer_CanReadButCannotCreateProducts()
     {
         var (_, tenantId) = await RegisterAsync("catalogviewer");

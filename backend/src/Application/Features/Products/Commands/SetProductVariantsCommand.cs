@@ -58,6 +58,11 @@ public sealed class SetProductVariantsCommandHandler
             {
                 return Error.Conflict("A variant with this SKU already exists.");
             }
+
+            if (await _products.GetBySkuAsync(tenantId, sku!, cancellationToken) is not null)
+            {
+                return Error.Conflict("A product with this SKU already exists.");
+            }
         }
 
         foreach (var barcode in barcodes)
@@ -65,6 +70,11 @@ public sealed class SetProductVariantsCommandHandler
             if (await _products.VariantBarcodeExistsAsync(tenantId, barcode!, command.Id, cancellationToken))
             {
                 return Error.Conflict("A variant with this barcode already exists.");
+            }
+
+            if (await _products.GetByBarcodeAsync(tenantId, barcode!, cancellationToken) is not null)
+            {
+                return Error.Conflict("A product with this barcode already exists.");
             }
         }
 

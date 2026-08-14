@@ -78,6 +78,18 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             return Error.Conflict("A product with this barcode already exists.");
         }
 
+        if (sku is not null
+            && await _products.VariantSkuExistsAsync(tenantId, sku, command.Id, cancellationToken))
+        {
+            return Error.Conflict("A variant with this SKU already exists.");
+        }
+
+        if (barcode is not null
+            && await _products.VariantBarcodeExistsAsync(tenantId, barcode, command.Id, cancellationToken))
+        {
+            return Error.Conflict("A variant with this barcode already exists.");
+        }
+
         product.UpdateProfile(command.Name, command.Description, command.CategoryId, command.BrandId, command.UnitOfMeasureId);
         product.UpdateIdentifiers(sku, barcode);
 
