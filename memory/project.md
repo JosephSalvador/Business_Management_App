@@ -60,6 +60,23 @@
   `docs/Architecture.md`, `docs/roadmap.md`, `specs/organizations-branches.md`,
   `specs/users-roles-permissions.md`.
 
+- **Phase 1 slice 3a (Product Catalog), done 2026-08-13 (tasks 001–009):** `Domain/Catalog`
+  aggregates `Product` (variants via replace-all `SetVariants`, product-level sku/barcode
+  null when variants exist, `NormalizeIdentifier` trim, sellable = status `Active`),
+  `ProductCategory` (optional parent, cycle guard in app layer), `Brand`, `UnitOfMeasure`;
+  4 product domain events; new permissions `Products.*`, `Categories.*`, `Brands.*`,
+  `Units.*`; migration `20260813_AddProductInventoryAndPricing` (5 catalog tables, partial
+  unique tenant+sku/barcode); repositories `IProductRepository` (+filtered
+  `ListAsync`/`CountAsync`, variant sku/barcode existence checks) +
+  `ICategoryRepository`/`IBrandRepository`/`IUnitOfMeasureRepository`; application
+  `Features/Products` (6 commands incl. `SetProductVariantsCommand`, 3 queries) +
+  `Features/Catalog` (categories/brands/units commands+queries, duplicate name →
+  `Conflict`, cycle → `Validation`); API `CatalogEndpoints` + `ReferenceDataEndpoints` all
+  `RequirePermission`-gated; `DELETE /products/{id}` = soft delete (status `Inactive`);
+  `CatalogActivityFeedHandler` consumes the product events. 181 tests pass (unit +
+  integration). Spec sub-slice 3a marked implemented & verified; 3b Inventory Foundation and
+  3c Pricing Engine pending.
+
 ## coding.md — see `docs/CodingStandards.md`
 
 ## api.md — see `docs/APIStandards.md`

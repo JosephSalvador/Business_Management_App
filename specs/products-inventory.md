@@ -7,6 +7,9 @@
 > **Sub-slices:** 3a Product Catalog → 3b Inventory Foundation → 3c Pricing Engine → 3d Docs &
 > verification. Built before Sales/POS so a sale always resolves a real product, price, tax,
 > branch and stock.
+>
+> **Sub-slice status (3a Product Catalog): implemented & verified 2026-08-13** (tasks 001–009);
+> 3b Inventory Foundation and 3c Pricing Engine are pending.
 
 ## Feature
 

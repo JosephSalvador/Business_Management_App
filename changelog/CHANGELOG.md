@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.5.0 — 2026-08-13 — Slice 3a: Product Catalog (backend slice)
+
+### Product Catalog
+- **Domain (`Domain/Catalog`):** `Product` aggregate (`Create` factory, `UpdateProfile`,
+  `UpdateIdentifiers` with `NormalizeIdentifier` trim, `SetStatus`, replace-all
+  `SetVariants`); `ProductVariant` child (internal `Assign`/`Rename`, no-op replace
+  detection); `ProductCategory` (optional `ParentId`, cycle guard in application layer),
+  `Brand`, `UnitOfMeasure`; enums `ProductType` (`Product`/`Service`) and `ProductStatus`
+  (`Draft`/`Active`/`Inactive`, sellable = `Active`); product-level sku/barcode must be null
+  when variants exist; variant names unique (trim, case-sensitive); 4 domain events
+  (`ProductCreatedEvent`, `ProductUpdatedEvent`, `ProductStatusChangedEvent`,
+  `ProductVariantsChangedEvent`). New permissions `Products.View/Create/Update/Delete`,
+  `Categories.View/Manage`, `Brands.View/Manage`, `Units.View/Manage` (auto-granted to admin
+  roles by the seeder).
+- **Persistence:** `ProductCategories`, `Brands`, `UnitsOfMeasure`, `Products`,
+  `ProductVariants` tables via migration `20260813_AddProductInventoryAndPricing`; partial
+  unique indexes on tenant+sku/barcode (products and variants); category/brand/uom
+  `Restrict` FKs, product→variants `Cascade`.
+- **Repositories:** `IProductRepository` (tenant-scoped `GetByIdAsync` with variants,
+  `GetBySkuAsync`/`GetByBarcodeAsync`, `ListAsync`/`CountAsync` with
+  `ProductListFilter` search/category/brand/type/status, `AddAsync`,
+  `VariantSkuExistsAsync`/`VariantBarcodeExistsAsync`), `ICategoryRepository`,
+  `IBrandRepository`, `IUnitOfMeasureRepository`.
+- **Application:** `Features/Products` commands (create/update/status/delete/variants) +
+  queries (list/get/get-variants) with validators and `ProductReferenceGuard`; `Features/Catalog`
+  reference-data commands/queries for categories/brands/units with duplicate-name → `Conflict`
+  and category cycle (self/ancestor) → `Validation`; mutations run inside a per-tenant
+  transaction advisory lock.
+- **API:** `CatalogEndpoints` (products group: list/get/create/update/status/delete/
+  variants) + `ReferenceDataEndpoints` (categories/brands/units), all
+  `RequirePermission`-gated; `DELETE /products/{id}` is a soft delete (status → `Inactive`).
+- **Events:** `CatalogActivityFeedHandler` consumes the 4 product domain events (outbox-backed
+  activity feed).
+- **Tests:** 181 passing (unit + integration) — product invariants, category cycle guard,
+  CRUD + status, duplicate sku → `Conflict`, variant round-trip with stable ids, reference
+  data, 403 for `Products.View`-only role, tenant isolation, audit rows, outbox dispatch.
+
+### Docs
+- Spec `specs/products-inventory.md` sub-slice 3a implemented & verified; tasks
+  `tasks/products-inventory/TASKS.md` 001–009 ticked; `memory/project.md` updated. 3b
+  (Inventory Foundation) and 3c (Pricing Engine) remain.
+
 ## v0.4.0 — 2026-08-13 — Phase 1: Users, Roles & Permissions (backend slice)
 
 ### Users, Roles & Permissions

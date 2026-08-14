@@ -228,9 +228,11 @@ Platform (Phase 0) → then Core Business modules, in this order:
    `[x] backend slice 2026-08-13` — spec `specs/users-roles-permissions.md` (domain,
    repositories, application layer, `IdentityEndpoints`, activity-feed handler, 154 tests);
    Flutter admin screens are the follow-up.
-4. **Product & Inventory Foundation (Slice 3)** — **build before Sales/POS** so a sale always
-   resolves a real product/SKU/unit/price/tax/branch/stock. See "Slice 3 — Product & Inventory
-   Foundation" below.
+ 4. **Product & Inventory Foundation (Slice 3)** — **build before Sales/POS** so a sale always
+    resolves a real product/SKU/unit/price/tax/branch/stock. See "Slice 3 — Product & Inventory
+    Foundation" below. `[x] sub-slice 3a Product Catalog 2026-08-13` — spec
+    `specs/products-inventory.md` (domain, migration, repositories, application, API,
+    activity-feed consumer, 181 tests). 3b Inventory Foundation and 3c Pricing Engine remain.
 5. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
 6. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns,
    discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo

@@ -41,7 +41,7 @@
 - [x] 008 **Tests**: unit (product invariants, category cycle guard) + integration (CRUD,
       duplicate sku → Conflict, variant round-trip, status, 403, tenant isolation, audit rows,
       outbox dispatch).
-- [ ] 009 **Docs + commit**: `dotnet build --warnaserror`, `dotnet format`, full test run;
+- [x] 009 **Docs + commit**: `dotnet build --warnaserror`, `dotnet format`, full test run;
       changelog bullet, `memory/project.md`; tick 3a tasks; completion report.
 
 ## 3b — Inventory Foundation
