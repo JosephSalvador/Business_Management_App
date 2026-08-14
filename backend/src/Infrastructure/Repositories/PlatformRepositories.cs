@@ -3,6 +3,7 @@ using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
+using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -487,5 +488,183 @@ public sealed class UnitOfMeasureRepository : IUnitOfMeasureRepository
     {
         _db.UnitsOfMeasure.Remove(unitOfMeasure);
         return Task.CompletedTask;
+    }
+}
+
+public sealed class WarehouseRepository : IWarehouseRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public WarehouseRepository(BusinessDbContext db) => _db = db;
+
+    public Task<Warehouse?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Warehouses
+            .AsSplitQuery()
+            .Include(w => w.Locations)
+            .FirstOrDefaultAsync(w => w.TenantId == tenantId && w.Id == id, cancellationToken);
+
+    public Task<Warehouse?> GetByCodeAsync(Guid tenantId, string code, CancellationToken cancellationToken = default)
+        => _db.Warehouses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(w => w.TenantId == tenantId && w.Code == code, cancellationToken);
+
+    public async Task<IReadOnlyList<Warehouse>> ListAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        string? search,
+        Guid? branchId,
+        CancellationToken cancellationToken = default)
+        => await ApplyFilter(_db.Warehouses, tenantId, search, branchId)
+            .AsNoTracking()
+            .OrderBy(w => w.Code)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountAsync(
+        Guid tenantId,
+        string? search,
+        Guid? branchId,
+        CancellationToken cancellationToken = default)
+        => ApplyFilter(_db.Warehouses, tenantId, search, branchId).CountAsync(cancellationToken);
+
+    public Task AddAsync(Warehouse warehouse, CancellationToken cancellationToken = default)
+        => _db.Warehouses.AddAsync(warehouse, cancellationToken).AsTask();
+
+    private static IQueryable<Warehouse> ApplyFilter(
+        IQueryable<Warehouse> query,
+        Guid tenantId,
+        string? search,
+        Guid? branchId)
+    {
+        var filtered = query.Where(w => w.TenantId == tenantId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            filtered = filtered.Where(w => w.Name.Contains(term) || w.Code.Contains(term));
+        }
+
+        if (branchId.HasValue)
+        {
+            filtered = filtered.Where(w => w.BranchId == branchId.Value);
+        }
+
+        return filtered;
+    }
+}
+
+public sealed class StockRepository : IStockRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public StockRepository(BusinessDbContext db) => _db = db;
+
+    public Task<StockBalance?> GetBalanceAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid stockLocationId,
+        Guid productId,
+        Guid? variantId,
+        CancellationToken cancellationToken = default)
+        => _db.StockBalances.FirstOrDefaultAsync(
+            b => b.TenantId == tenantId
+                && b.WarehouseId == warehouseId
+                && b.StockLocationId == stockLocationId
+                && b.ProductId == productId
+                && b.VariantId == variantId,
+            cancellationToken);
+
+    public Task<StockBalance?> GetBalanceWithLockAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid stockLocationId,
+        Guid productId,
+        Guid? variantId,
+        CancellationToken cancellationToken = default)
+        => _db.StockBalances
+            .FromSqlRaw(
+                $"SELECT * FROM {Schemas.Inventory}.\"{Tables.Inventory.StockBalances}\" " +
+                "WHERE \"TenantId\" = {0} AND \"WarehouseId\" = {1} AND \"StockLocationId\" = {2} " +
+                "AND \"ProductId\" = {3} AND \"VariantId\" IS NOT DISTINCT FROM {4} FOR UPDATE",
+                tenantId, warehouseId, stockLocationId, productId, variantId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<StockBalance> GetOrCreateBalanceAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid stockLocationId,
+        Guid productId,
+        Guid? variantId,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = await GetBalanceAsync(
+            tenantId, warehouseId, stockLocationId, productId, variantId, cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var created = StockBalance.Create(
+            tenantId, warehouseId, stockLocationId, productId, variantId);
+        _db.StockBalances.Add(created);
+        return created;
+    }
+
+    public Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken = default)
+        => _db.StockMovements.AddAsync(movement, cancellationToken).AsTask();
+
+    public async Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid? stockLocationId = null,
+        Guid? productId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.StockBalances
+            .AsNoTracking()
+            .Where(b => b.TenantId == tenantId && b.WarehouseId == warehouseId);
+
+        if (stockLocationId.HasValue)
+        {
+            query = query.Where(b => b.StockLocationId == stockLocationId.Value);
+        }
+
+        if (productId.HasValue)
+        {
+            query = query.Where(b => b.ProductId == productId.Value);
+        }
+
+        return await query
+            .OrderBy(b => b.StockLocationId)
+            .ThenBy(b => b.ProductId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid? stockLocationId = null,
+        Guid? productId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.StockMovements
+            .AsNoTracking()
+            .Where(m => m.TenantId == tenantId && m.WarehouseId == warehouseId);
+
+        if (stockLocationId.HasValue)
+        {
+            query = query.Where(m => m.StockLocationId == stockLocationId.Value);
+        }
+
+        if (productId.HasValue)
+        {
+            query = query.Where(m => m.ProductId == productId.Value);
+        }
+
+        return await query
+            .OrderByDescending(m => m.OccurredAt)
+            .ToListAsync(cancellationToken);
     }
 }

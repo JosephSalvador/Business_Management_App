@@ -2,6 +2,7 @@ using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
+using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Events;
 
@@ -136,4 +137,57 @@ public interface IUnitOfMeasureRepository
     Task<IReadOnlyList<UnitOfMeasure>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken = default);
     Task RemoveAsync(UnitOfMeasure unitOfMeasure, CancellationToken cancellationToken = default);
+}
+
+public interface IWarehouseRepository
+{
+    Task<Warehouse?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<Warehouse?> GetByCodeAsync(Guid tenantId, string code, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Warehouse>> ListAsync(
+        Guid tenantId,
+        int page,
+        int pageSize,
+        string? search,
+        Guid? branchId,
+        CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, string? search, Guid? branchId, CancellationToken cancellationToken = default);
+    Task AddAsync(Warehouse warehouse, CancellationToken cancellationToken = default);
+}
+
+public interface IStockRepository
+{
+    Task<StockBalance?> GetBalanceAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid stockLocationId,
+        Guid productId,
+        Guid? variantId,
+        CancellationToken cancellationToken = default);
+    Task<StockBalance?> GetBalanceWithLockAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid stockLocationId,
+        Guid productId,
+        Guid? variantId,
+        CancellationToken cancellationToken = default);
+    Task<StockBalance> GetOrCreateBalanceAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid stockLocationId,
+        Guid productId,
+        Guid? variantId,
+        CancellationToken cancellationToken = default);
+    Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid? stockLocationId = null,
+        Guid? productId = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+        Guid tenantId,
+        Guid warehouseId,
+        Guid? stockLocationId = null,
+        Guid? productId = null,
+        CancellationToken cancellationToken = default);
 }

@@ -38,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IBrandRepository, BrandRepository>();
         services.AddScoped<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
+        services.AddScoped<IWarehouseRepository, WarehouseRepository>();
+        services.AddScoped<IStockRepository, StockRepository>();
 
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<ITenantContext, HttpTenantContext>();
