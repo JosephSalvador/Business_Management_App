@@ -131,13 +131,23 @@ productType, status, variants, createdAt, updatedAt. Sellable = status `Active`.
 | PUT | `/api/v1/warehouses/{id}` | `Warehouses.Update` | `UpdateWarehouseRequest` | 200 `WarehouseDto` |
 | PATCH | `/api/v1/warehouses/{id}/status` | `Warehouses.Update` | `{ isActive }` | 200 `WarehouseDto` |
 | DELETE | `/api/v1/warehouses/{id}` | `Warehouses.Delete` | — | 204 |
+| PUT | `/api/v1/warehouses/{id}/locations` | `Warehouses.Update` | `{ locations[] }` replace-all | 200 `List<StockLocationDto>` |
 | GET | `/api/v1/inventory/stock` | `Inventory.View` | `?page&pageSize&warehouseId&productId&search` | 200 `PagedResult<StockBalanceDto>` |
 | GET | `/api/v1/inventory/movements` | `Inventory.View` | `?page&pageSize&warehouseId&productId&type` | 200 `PagedResult<StockMovementDto>` |
 | POST | `/api/v1/inventory/stock/opening` | `Inventory.Manage` | `{ warehouseId, locationId?, productId, variantId?, quantity, effectiveAt }` | 200 `StockBalanceDto` |
-| POST | `/api/v1/inventory/stock/adjustments` | `Inventory.Manage` | `{ warehouseId, locationId?, productId, variantId?, quantityDelta, reason, effectiveAt }` | 200 `StockBalanceDto` |
-| POST | `/api/v1/inventory/stock/transfers` | `Inventory.Manage` | `{ fromWarehouseId, fromLocationId?, toWarehouseId, toLocationId?, productId, variantId?, quantity, reference }` | 200 |
+
+> **3b scope:** only warehouse + location + `StockBalance`/`StockMovement` ledger + **opening-stock
+> recording** are implemented in 3b. The planned adjustment/transfer endpoints below are
+> **deferred** to a later inventory slice (their flows couple to purchasing/sales/approvals and
+> are deliberately not built in 3b):
+
+| Method | Route | Permission | Status |
+|---|---|---|---|
+| POST | `/api/v1/inventory/stock/adjustments` | `Inventory.Manage` | deferred |
+| POST | `/api/v1/inventory/stock/transfers` | `Inventory.Manage` | deferred |
 
 `WarehouseDto` = id, tenantId, branchId, branchName, name, code, isActive, locations, createdAt.
+`StockLocationDto` = id, warehouseId, code, name, isActive.
 `StockBalanceDto` = warehouseId, locationId, productId, variantId?, quantity. `StockMovementDto`
 = id, type, quantityDelta, reason, effectiveAt, createdBy, createdAt.
 
@@ -165,17 +175,22 @@ New bounded contexts in the `TableNames` catalog (`Schemas` stay `public`):
 - **Catalog:** `ProductCategories`, `Brands`, `UnitsOfMeasure`, `Products`,
   `ProductVariants`. `Products.Sku`/`Barcode` partial unique (per tenant, non-null);
   `ProductVariants` partial unique on tenant+sku/barcode; FK to tenant-scoped references.
-- **Inventory:** `Warehouses` (unique `(TenantId, Code)`), `StockLocations` (unique
-  `(WarehouseId, Code)`), `StockBalances`, `StockMovements`. `StockBalances` unique
+- **Inventory:** `Warehouses` (unique `(TenantId, Code)`, `BranchId` FK `Restrict` — a branch
+  owns many warehouses), `StockLocations` (unique `(WarehouseId, Code)`), `StockBalances`,
+  `StockMovements`. `StockBalances` unique
   `(TenantId, WarehouseId, LocationId, ProductId, COALESCE(VariantId, '<empty>'))` functional
-  unique index; `StockMovements` index on `(TenantId, ProductId, CreatedAt)`.
+  unique index; `StockMovements` index on `(TenantId, ProductId, CreatedAt)`. Ledger rows are
+  **immutable** (no UPDATE/DELETE); `ReferenceType`/`ReferenceId` are nullable placeholders for
+  future sale/purchase/transfer links.
 - **Pricing:** `PriceLists` (unique `(TenantId, Name)` + partial unique on default),
   `ProductPrices` (unique `(PriceListId, ProductId, COALESCE(VariantId), COALESCE(BranchId),
   PriceType)`).
 
 All tables carry UUID PK + `CreatedAt`/`CreatedBy` + `UpdatedAt`/`UpdatedBy` (EF conventions),
 map `ToTable(name, schema)` via `Tables`/`Schemas`, and are tenant-scoped like every existing
-table. Migration: `20260813_AddProductInventoryAndPricing`.
+table. Each sub-slice ships its own migration: 3a shipped `20260813_AddProductInventoryAndPricing`
+(**catalog tables only — despite the slice-wide name, it contains no pricing tables**); 3b ships
+`AddInventoryWarehousesAndStock`; 3c ships `AddPricingPriceLists`.
 
 ## Validation
 
@@ -186,9 +201,13 @@ table. Migration: `20260813_AddProductInventoryAndPricing`.
 - Variants: at least one name; duplicate variant sku/barcode → `Conflict`.
 - Warehouse: name required ≤ 200; code required ≤ 20, normalized uppercase, unique per tenant →
   `Conflict`; branch exists in tenant.
-- Stock: product must be `Product` type and `Active`; opening only when no prior movements;
-  adjustments/transfers must not drive balance below zero (`Conflict`); transfer source ≠
-  destination; location/warehouse belong to the tenant.
+- Stock (3b): product must be `Product` type and `Active`; variant belongs to product; product
+  with variants requires `variantId` and product without variants requires it null (the
+  sellable-unit identity rule); opening allowed only when no prior movements on that
+  unit+location; quantity > 0; location/warehouse belong to the tenant; opening cannot drive
+  balance below zero.
+- Stock (future slices): adjustments/transfers must not drive balance below zero (`Conflict`);
+  transfer source ≠ destination.
 - Prices: price > 0; currency required (ISO 4217); price list + product exist in tenant;
   variant belongs to product; branch belongs to tenant; minQuantity ≥ 1; effective window
   `from ≤ to`; duplicate price key → `Conflict`.
@@ -209,11 +228,13 @@ Outbox-backed, consumed by activity-feed handlers (`CatalogActivityFeedHandler`,
 
 - `ProductCreatedEvent`, `ProductUpdatedEvent`, `ProductStatusChangedEvent`,
   `ProductVariantsChangedEvent`
-- `OpeningStockRecordedEvent`, `StockAdjustedEvent`, `StockTransferredEvent`
+- `WarehouseCreatedEvent`, `WarehouseUpdatedEvent`, `WarehouseStatusChangedEvent`,
+  `OpeningStockRecordedEvent`, `StockMovementRecordedEvent` (3b)
 - `PriceListCreatedEvent`, `PriceListUpdatedEvent`, `ProductPricesChangedEvent`
 
-Future slices listen for `StockMovementRecorded`-style events (Sales reduces stock, Purchasing
-increases it) without touching this slice.
+`StockAdjustedEvent` / `StockTransferredEvent` arrive with the deferred adjustment/transfer
+endpoints. Future slices listen for `StockMovementRecorded`-style events (Sales reduces stock,
+Purchasing increases it) without touching this slice.
 
 ## Reports
 
@@ -222,14 +243,16 @@ None in this slice. Stock balances and movements are the future inventory-report
 ## Tests
 
 - **Unit:** product invariants (sku/barcode rule, variants replace), category cycle guard,
-  warehouse code normalization + default location, stock ledger math (opening/adjust/transfer,
-  no negative balance), price resolver (branch override, price type, min-quantity, effective
-  dates, tie-break), system rules.
+  warehouse code normalization + default location + deactivate, stock ledger math (opening
+  stock: first-movement-only, no negative balance, sellable-unit key consistency), price
+  resolver (branch override, price type, min-quantity, effective dates, tie-break), system
+  rules.
 - **Integration** (WebApplicationFactory vs `businessos_test`): full product/category/brand/uom
-  CRUD + status; duplicate sku → Conflict; variant assignment round-trip; warehouse + location
-  CRUD; opening → balance; adjustment → balance; transfer → both balances; negative balance →
-  Conflict; tenant isolation (404); 403 for read-only roles; audit rows for every mutation;
-  outbox dispatch of catalog/inventory/pricing events.
+  CRUD + status; duplicate sku → Conflict; cross-table sku/barcode uniqueness (product sku vs
+  variant sku); variant assignment round-trip; warehouse + location CRUD + status; opening →
+  balance + movement visible; duplicate opening → Conflict; tenant isolation (404); 403 for
+  read-only roles; audit rows for every mutation; outbox dispatch of catalog/inventory events.
+  Adjustment/transfer flows are covered when those endpoints ship.
 
 ## Offline & sync
 
@@ -237,6 +260,68 @@ None in this slice. Stock balances and movements are the future inventory-report
 future device sync sources for the offline POS (product cache, stock view, price cache). Rows
 carry `UpdatedAt` for the `updatedAt` server-wins conflict strategy. No Flutter/Drift changes in
 this slice.
+
+## Slice 3a verification — architecture decisions (2026-08-13)
+
+Verified against the 3a code and migration `20260813210234_20260813_AddProductInventoryAndPricing`
+before 3b.
+
+1. **Product vs ProductVariant identity.** A sellable unit is identified by *either* the Product
+   (product-level `Sku`/`Barcode`, and the product has no variants) *or* a Variant (variant-level
+   `Sku`/`Barcode`; product-level must then be null). Enforced in the domain (`Product.SetVariants`,
+   `Product.UpdateIdentifiers` throw) and the application (`Create/UpdateProduct`,
+   `SetProductVariants` → `Validation`); covered by unit + integration tests. **POS decision
+   (documented):** a scanned/barcoded identifier resolves over the per-tenant union of Products +
+   Variants to exactly one sellable unit — either the Product or the (Product, Variant) pair.
+   Stock is therefore held per sellable unit: balance keys are `(location, productId, variantId?)`
+   with `variantId` null *only* when the product has no variants (3b ledger follows this).
+
+2. **SKU/barcode scope.** Within one tenant, `Sku`/`Barcode` are DB-unique **per table** (partial
+   unique indexes: `Products(TenantId, Sku)`, `Products(TenantId, Barcode)`,
+   `ProductVariants(TenantId, Sku)`, `ProductVariants(TenantId, Barcode)`). **Finding:** in 3a
+   uniqueness is **not** enforced **across** tables — `Create/UpdateProduct` check only `Products`
+   and `SetProductVariants` checks only `ProductVariants`, so a product SKU and another product's
+   variant SKU could collide in the same tenant and make POS scanning ambiguous. **Decision:**
+   identifiers are unique across the per-tenant union of products + variants. **Fix (3a errata,
+   3b task 010):** application cross-table checks in all three commands — race-free because every
+   catalog mutation runs under the per-tenant transaction advisory lock — plus an integration
+   test; the per-table DB indexes remain as the hard guarantee per table.
+
+3. **Historical transactions after archival.** `DELETE /products/{id}` is a soft delete
+   (`SetStatus(Inactive)`; `DeleteProductCommand`), and **no hard-delete path exists anywhere**.
+   Product rows persist forever, so future sales/inventory rows referencing a product stay valid
+   after archival. Reference FKs (category/brand/uom) are `Restrict`, so archived products cannot
+   be orphaned and referenced reference data cannot be deleted. **Standing rule: products are
+   never physically deleted.**
+
+4. **UOM forward-compatibility.** `UnitOfMeasure` is a flat per-tenant `{ Name, Abbreviation }`
+   catalog with stable Guid identity. Conversions (1 Carton = 24 Pieces, 1 Bag = 50 Kg) are a
+   purely additive later concern: a per-tenant `UnitOfMeasureConversion(BaseUomId, ToUomId,
+   Factor)` table or `BaseUomId`/`Factor` columns — no redesign of the 3a entity or migration.
+   No conversion fields are added in 3b.
+
+5. **Pricing was NOT implemented in 3a.** The 3a migration is named
+   `20260813_AddProductInventoryAndPricing` (the pre-planned *slice-wide* name) but contains
+   **only** the five catalog tables (`Brands`, `ProductCategories`, `UnitsOfMeasure`, `Products`,
+   `ProductVariants`). There is **no** `PriceLists`/`ProductPrices` table and **no** `Price`
+   column on `Products`/`ProductVariants` (deliberate — no throwaway `Product.Price`). The pricing
+   engine (branch-specific, wholesale/retail, customer-specific, quantity breaks, effective
+   dates, discounts) is 3c with its own design. Changelog and spec list only catalog tables
+   against the 3a migration; nothing claims pricing is complete.
+
+6. **Archived products cannot silently break historical references.** Same as (3): soft delete
+   only, ids are never reused or changed. The 3b ledger FKs (product/variant/location) are
+   `Restrict`, so an archived product remains fully referenceable. No referential gap found.
+
+### 3b scope (proposed, pending approval)
+
+`Company/Tenant → Branch → Warehouse → Stock Location` with tenant isolation, branch ownership
+(many warehouses per branch — never a single hardcoded warehouse), warehouse lifecycle/status,
+warehouse-scoped location codes, auditability, soft deletion (deactivate), and **opening stock
+recorded on an immutable `StockMovement` ledger** so balances are always explainable from
+movement history. 3b implements warehouses + locations + balances + ledger + opening stock
+**only**; adjustments, transfers, reservations, purchases, sales and the pricing engine are
+explicitly **out of scope** and their planned endpoints are listed as deferred above.
 
 ## Future improvements
 
@@ -246,4 +331,6 @@ this slice.
 - Multi-UoM conversions (base unit + conversion factors), physical stock counts (`Count`
   movement), batches/serial numbers.
 - Stock reservations (deferred: needs Sales), reorder points, multi-warehouse reporting.
+- Stock adjustments and transfers (deferred from 3b: their flows couple to purchasing/sales and
+  approval workflows; the ledger + balance model already supports them via future movement types).
 - Warehouse → its own `Modules/Catalog`/`Modules/Inventory` split if the monolith modularizes.
