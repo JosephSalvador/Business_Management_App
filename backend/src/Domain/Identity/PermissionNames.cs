@@ -38,6 +38,11 @@ public static class PermissionNames
     public const string UnitsView = "Units.View";
     public const string UnitsManage = "Units.Manage";
 
+    public const string WarehousesView = "Warehouses.View";
+    public const string WarehousesCreate = "Warehouses.Create";
+    public const string WarehousesUpdate = "Warehouses.Update";
+    public const string WarehousesDelete = "Warehouses.Delete";
+
     public const string InventoryView = "Inventory.View";
     public const string InventoryManage = "Inventory.Manage";
 
@@ -58,6 +63,7 @@ public static class PermissionNames
         CategoriesView, CategoriesManage,
         BrandsView, BrandsManage,
         UnitsView, UnitsManage,
+        WarehousesView, WarehousesCreate, WarehousesUpdate, WarehousesDelete,
         InventoryView, InventoryManage,
         AccountingView, AccountingApprove,
         AuditView,
