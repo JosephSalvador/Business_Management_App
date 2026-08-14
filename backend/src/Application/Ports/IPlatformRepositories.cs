@@ -3,6 +3,7 @@ using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
+using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Events;
 
@@ -205,5 +206,48 @@ public interface IStockRepository
         Guid? warehouseId = null,
         Guid? productId = null,
         StockMovementType? type = null,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IPriceListRepository
+{
+    Task<PriceList?> GetByIdAsync(
+        Guid tenantId, Guid id, bool includePrices = false, CancellationToken cancellationToken = default);
+    Task<PriceList?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
+    Task<PriceList?> GetDefaultAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PriceList>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProductPrice>> ResolvePricesAsync(
+        Guid tenantId,
+        Guid priceListId,
+        Guid productId,
+        Guid? variantId,
+        Guid? branchId,
+        PriceType priceType,
+        decimal quantity,
+        DateTime onDate,
+        CancellationToken cancellationToken = default);
+    Task AddAsync(PriceList priceList, CancellationToken cancellationToken = default);
+}
+
+public interface IProductPriceRepository
+{
+    Task<IReadOnlyList<ProductPrice>> ListAsync(
+        Guid tenantId,
+        Guid priceListId,
+        Guid? productId = null,
+        Guid? branchId = null,
+        PriceType? priceType = null,
+        CancellationToken cancellationToken = default);
+    Task UpsertManyAsync(
+        PriceList priceList, IEnumerable<ProductPriceSpec> prices, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProductPrice>> ResolveAsync(
+        Guid tenantId,
+        Guid priceListId,
+        Guid productId,
+        Guid? variantId,
+        Guid? branchId,
+        PriceType priceType,
+        decimal quantity,
+        DateTime onDate,
         CancellationToken cancellationToken = default);
 }

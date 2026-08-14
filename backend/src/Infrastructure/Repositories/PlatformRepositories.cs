@@ -4,6 +4,7 @@ using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
+using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -724,5 +725,175 @@ public sealed class StockRepository : IStockRepository
         }
 
         return query;
+    }
+}
+
+public sealed class PriceListRepository : IPriceListRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public PriceListRepository(BusinessDbContext db) => _db = db;
+
+    public Task<PriceList?> GetByIdAsync(
+        Guid tenantId,
+        Guid id,
+        bool includePrices = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.PriceLists.Where(p => p.TenantId == tenantId && p.Id == id);
+        if (includePrices)
+        {
+            query = query.AsSplitQuery().Include(p => p.Prices);
+        }
+
+        return query.FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<PriceList?> GetByNameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default)
+        => _db.PriceLists
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Name == name, cancellationToken);
+
+    public Task<PriceList?> GetDefaultAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        => _db.PriceLists
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.IsDefault, cancellationToken);
+
+    public async Task<IReadOnlyList<PriceList>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.PriceLists
+            .AsNoTracking()
+            .Where(p => p.TenantId == tenantId)
+            .OrderBy(p => p.Name)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ProductPrice>> ResolvePricesAsync(
+        Guid tenantId,
+        Guid priceListId,
+        Guid productId,
+        Guid? variantId,
+        Guid? branchId,
+        PriceType priceType,
+        decimal quantity,
+        DateTime onDate,
+        CancellationToken cancellationToken = default)
+        => await ProductPriceRepository.ApplyResolveFilter(
+                _db.ProductPrices,
+                tenantId,
+                priceListId,
+                productId,
+                variantId,
+                branchId,
+                priceType,
+                quantity,
+                onDate)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+    public Task AddAsync(PriceList priceList, CancellationToken cancellationToken = default)
+        => _db.PriceLists.AddAsync(priceList, cancellationToken).AsTask();
+}
+
+public sealed class ProductPriceRepository : IProductPriceRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public ProductPriceRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<ProductPrice>> ListAsync(
+        Guid tenantId,
+        Guid priceListId,
+        Guid? productId = null,
+        Guid? branchId = null,
+        PriceType? priceType = null,
+        CancellationToken cancellationToken = default)
+        => await ApplyListFilter(_db.ProductPrices, tenantId, priceListId, productId, branchId, priceType)
+            .AsNoTracking()
+            .OrderBy(p => p.ProductId)
+            .ThenBy(p => p.VariantId)
+            .ThenBy(p => p.BranchId)
+            .ThenBy(p => p.PriceType)
+            .ToListAsync(cancellationToken);
+
+    public Task UpsertManyAsync(
+        PriceList priceList, IEnumerable<ProductPriceSpec> prices, CancellationToken cancellationToken = default)
+    {
+        priceList.SetPrices(prices);
+        return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyList<ProductPrice>> ResolveAsync(
+        Guid tenantId,
+        Guid priceListId,
+        Guid productId,
+        Guid? variantId,
+        Guid? branchId,
+        PriceType priceType,
+        decimal quantity,
+        DateTime onDate,
+        CancellationToken cancellationToken = default)
+        => await ApplyResolveFilter(
+                _db.ProductPrices,
+                tenantId,
+                priceListId,
+                productId,
+                variantId,
+                branchId,
+                priceType,
+                quantity,
+                onDate)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+    internal static IQueryable<ProductPrice> ApplyResolveFilter(
+        IQueryable<ProductPrice> query,
+        Guid tenantId,
+        Guid priceListId,
+        Guid productId,
+        Guid? variantId,
+        Guid? branchId,
+        PriceType priceType,
+        decimal quantity,
+        DateTime onDate)
+        => query
+            .Where(p => p.TenantId == tenantId)
+            .Where(p => p.PriceListId == priceListId)
+            .Where(p => p.ProductId == productId)
+            .Where(p => p.VariantId == variantId)
+            .Where(p => p.PriceType == priceType)
+            .Where(p => p.MinQuantity <= quantity)
+            .Where(p => p.IsActive)
+            .Where(p => p.EffectiveFrom == null || p.EffectiveFrom <= onDate)
+            .Where(p => p.EffectiveTo == null || p.EffectiveTo >= onDate)
+            .Where(p => branchId.HasValue
+                ? p.BranchId == null || p.BranchId == branchId
+                : p.BranchId == null);
+
+    private static IQueryable<ProductPrice> ApplyListFilter(
+        IQueryable<ProductPrice> query,
+        Guid tenantId,
+        Guid priceListId,
+        Guid? productId,
+        Guid? branchId,
+        PriceType? priceType)
+    {
+        var filtered = query.Where(p => p.TenantId == tenantId && p.PriceListId == priceListId);
+
+        if (productId.HasValue)
+        {
+            filtered = filtered.Where(p => p.ProductId == productId.Value);
+        }
+
+        if (branchId.HasValue)
+        {
+            filtered = filtered.Where(p => p.BranchId == branchId.Value);
+        }
+
+        if (priceType.HasValue)
+        {
+            filtered = filtered.Where(p => p.PriceType == priceType.Value);
+        }
+
+        return filtered;
     }
 }
