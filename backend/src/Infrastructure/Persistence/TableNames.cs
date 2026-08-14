@@ -12,6 +12,7 @@ public static class Schemas
     public const string Identity = "public";
     public const string Catalog = "public";
     public const string Inventory = "public";
+    public const string Pricing = "public";
     public const string Platform = "public";
 }
 
@@ -53,6 +54,12 @@ public static class Tables
         public const string StockLocations = "StockLocations";
         public const string StockBalances = "StockBalances";
         public const string StockMovements = "StockMovements";
+    }
+
+    public static class Pricing
+    {
+        public const string PriceLists = "PriceLists";
+        public const string ProductPrices = "ProductPrices";
     }
 
     public static class Platform

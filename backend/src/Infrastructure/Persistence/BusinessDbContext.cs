@@ -5,6 +5,7 @@ using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
+using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Entities;
 using BusinessOS.Shared.Events;
@@ -35,6 +36,8 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<StockLocation> StockLocations => Set<StockLocation>();
     public DbSet<StockBalance> StockBalances => Set<StockBalance>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<PriceList> PriceLists => Set<PriceList>();
+    public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
     public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
@@ -311,6 +314,51 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.HasOne<UnitOfMeasure>()
                 .WithMany()
                 .HasForeignKey(m => m.UnitOfMeasureId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PriceList>(entity =>
+        {
+            entity.ToTable(Tables.Pricing.PriceLists, Schemas.Pricing);
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+            entity.Property(p => p.Currency).IsRequired().HasMaxLength(3);
+            entity.HasIndex(p => new { p.TenantId, p.Name }).IsUnique();
+            entity.HasIndex(p => p.TenantId)
+                .IsUnique()
+                .HasFilter("\"IsDefault\" = true");
+            entity.HasMany(p => p.Prices)
+                .WithOne()
+                .HasForeignKey(p => p.PriceListId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductPrice>(entity =>
+        {
+            entity.ToTable(Tables.Pricing.ProductPrices, Schemas.Pricing);
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Id).ValueGeneratedOnAdd();
+            entity.Property(p => p.PriceType).IsRequired();
+            entity.Property(p => p.Price).IsRequired();
+            entity.Property(p => p.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(p => p.MinQuantity).IsRequired();
+            entity.HasIndex(p => p.TenantId);
+            entity.HasIndex(p => p.ProductId);
+            entity.HasIndex(p => p.BranchId);
+            entity.HasIndex(p => p.VariantId);
+            entity.HasIndex(p => new { p.PriceListId, p.ProductId, p.VariantId, p.BranchId, p.PriceType })
+                .IsUnique();
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(p => p.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductVariant>()
+                .WithMany()
+                .HasForeignKey(p => p.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Branch>()
+                .WithMany()
+                .HasForeignKey(p => p.BranchId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
