@@ -46,6 +46,9 @@ public static class PermissionNames
     public const string InventoryView = "Inventory.View";
     public const string InventoryManage = "Inventory.Manage";
 
+    public const string PricingView = "Pricing.View";
+    public const string PricingManage = "Pricing.Manage";
+
     public const string AccountingView = "Accounting.View";
     public const string AccountingApprove = "Accounting.Approve";
 
@@ -65,6 +68,7 @@ public static class PermissionNames
         UnitsView, UnitsManage,
         WarehousesView, WarehousesCreate, WarehousesUpdate, WarehousesDelete,
         InventoryView, InventoryManage,
+        PricingView, PricingManage,
         AccountingView, AccountingApprove,
         AuditView,
     };
