@@ -11,6 +11,7 @@ public static class Schemas
     public const string Organization = "public";
     public const string Identity = "public";
     public const string Catalog = "public";
+    public const string Inventory = "public";
     public const string Platform = "public";
 }
 
@@ -44,6 +45,14 @@ public static class Tables
         public const string UnitsOfMeasure = "UnitsOfMeasure";
         public const string Products = "Products";
         public const string ProductVariants = "ProductVariants";
+    }
+
+    public static class Inventory
+    {
+        public const string Warehouses = "Warehouses";
+        public const string StockLocations = "StockLocations";
+        public const string StockBalances = "StockBalances";
+        public const string StockMovements = "StockMovements";
     }
 
     public static class Platform

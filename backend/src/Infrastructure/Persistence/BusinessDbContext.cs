@@ -4,6 +4,7 @@ using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
+using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Entities;
 using BusinessOS.Shared.Events;
@@ -30,6 +31,10 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<UnitOfMeasure> UnitsOfMeasure => Set<UnitOfMeasure>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<StockLocation> StockLocations => Set<StockLocation>();
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
@@ -224,6 +229,89 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.HasIndex(v => new { v.TenantId, v.Barcode })
                 .IsUnique()
                 .HasFilter("\"Barcode\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<Warehouse>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.Warehouses, Schemas.Inventory);
+            entity.HasKey(w => w.Id);
+            entity.Property(w => w.Name).IsRequired().HasMaxLength(200);
+            entity.Property(w => w.Code).IsRequired().HasMaxLength(50);
+            entity.Property(w => w.Description).HasColumnType("text");
+            entity.HasIndex(w => new { w.TenantId, w.Code }).IsUnique();
+            entity.HasIndex(w => w.BranchId);
+            entity.HasOne<Branch>()
+                .WithMany()
+                .HasForeignKey(w => w.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(w => w.Locations)
+                .WithOne()
+                .HasForeignKey(l => l.WarehouseId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StockLocation>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.StockLocations, Schemas.Inventory);
+            entity.HasKey(l => l.Id);
+            entity.Property(l => l.Id).ValueGeneratedOnAdd();
+            entity.Property(l => l.Code).IsRequired().HasMaxLength(50);
+            entity.Property(l => l.Name).IsRequired().HasMaxLength(200);
+            entity.HasIndex(l => l.TenantId);
+            entity.HasIndex(l => new { l.WarehouseId, l.Code }).IsUnique();
+        });
+
+        modelBuilder.Entity<StockBalance>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.StockBalances, Schemas.Inventory);
+            entity.HasKey(b => b.Id);
+            entity.HasIndex(b => b.TenantId);
+            entity.HasIndex(b => new { b.TenantId, b.WarehouseId, b.StockLocationId, b.ProductId, b.VariantId })
+                .IsUnique();
+            entity.HasOne<StockLocation>()
+                .WithMany()
+                .HasForeignKey(b => b.StockLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(b => b.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductVariant>()
+                .WithMany()
+                .HasForeignKey(b => b.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StockMovement>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.StockMovements, Schemas.Inventory);
+            entity.HasKey(m => m.Id);
+            entity.Property(m => m.MovementType).IsRequired();
+            entity.Property(m => m.ReferenceType).HasMaxLength(100);
+            entity.Property(m => m.Reason).HasMaxLength(500);
+            entity.Property(m => m.CorrelationId).HasMaxLength(64);
+            entity.HasIndex(m => new { m.TenantId, m.ProductId, m.CreatedAt });
+            entity.HasIndex(m => new { m.TenantId, m.WarehouseId, m.StockLocationId, m.ProductId, m.VariantId, m.OccurredAt });
+            entity.HasOne<Warehouse>()
+                .WithMany()
+                .HasForeignKey(m => m.WarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<StockLocation>()
+                .WithMany()
+                .HasForeignKey(m => m.StockLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(m => m.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductVariant>()
+                .WithMany()
+                .HasForeignKey(m => m.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UnitOfMeasure>()
+                .WithMany()
+                .HasForeignKey(m => m.UnitOfMeasureId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<FeatureFlag>(entity =>
