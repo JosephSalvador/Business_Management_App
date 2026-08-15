@@ -124,6 +124,23 @@
   entry; final build/format/test run clean. **Slice 3 — Product & Inventory Foundation is
   release-ready.** Next: Dashboard aggregates from events, or Sales + Offline POS (uses the
   now-real product/price/stock foundation).
+- **Phase 1 slice 5 (Operational Dashboard), done 2026-08-15 (tasks 001–005):** read-only
+  backend slice over existing catalog/inventory/pricing/organization tables — no domain
+  changes, no migrations, no events, no audit writes. `IDashboardRepository` (+ 3 snapshot
+  records + `LowStockItem`/`RecentActivityItem`) in `Application/Ports`, EF `DashboardRepository`
+  (tenant-scoped GROUP BY/SUM over existing DbSets, `Users` join for actor emails, newest-first);
+  `Features/Dashboard` DTOs + mapper + queries `GetDashboardSummaryQuery`/`GetLowStockQuery`/
+  `GetRecentActivityQuery` with FluentValidation (limit 1..100, maxQuantity ≥ 0); API
+  `DashboardEndpoints` `GET /api/v1/dashboard/summary`, `/low-stock?maxQuantity=&limit=`,
+  `/recent-activity?limit=` — all `RequirePermission(PermissionNames.DashboardView)`. KPIs:
+  catalog (products by status/type, variants, categories), inventory (warehouses, stock lines,
+  on-hand units, stocked/zero-stock products, movements), pricing (lists, default name, active
+  price products, branch overrides), organization (branches, users, roles). Revenue/VAT/top-
+  sellers KPIs deferred until the Sales domain exists (spec "Future improvements"). Tests:
+  6 unit + 6 integration (summary KPIs, low-stock ordering/threshold, recent-activity
+  newest-first with actor email, 403 for Dashboard.View-less role, tenant isolation, no audit
+  rows on reads). Full suite 236/236 passing; changelog v0.6.0. Flutter dashboard screens are
+  the follow-up.
 
 ## coding.md — see `docs/CodingStandards.md`
 

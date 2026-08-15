@@ -129,6 +129,40 @@ Recorded as changelog entry v0.4.0 (matches v0.1.0–v0.3.0 local-release conven
 
 Recorded as changelog entry v0.5.0 (matches local-release convention; no git tag).
 
+### Slice 5 (Dashboard) backend verification (2026-08-15)
+
+- `dotnet build` all projects — **0 warnings, 0 errors** (warnings-as-errors).
+- `dotnet format --verify-no-changes` — **passes** (whitespace + style).
+- `dotnet test backend/tests/BusinessOS.Tests` — **236/236 pass** (unit + integration against
+  real Postgres `businessos_test`): dashboard summary KPIs match a seeded tenant (catalog by
+  status/type, inventory on-hand + stocked/zero-stock lines, pricing lists + active-price +
+  branch-override counts, organization branches/users/roles), low-stock ordering + threshold +
+  limit validation, recent-activity newest-first with actor email, 403 for a
+  `Dashboard.View`-less role, tenant isolation (no cross-tenant leaks), and **no audit rows
+  written by dashboard reads**.
+- Read-only slice: no domain changes, no migrations, no events — queries run directly against
+  existing tables; new `Dashboard.View` permission is granted to all roles via the seeder
+  (`PermissionNames.All` refresh at startup).
+
+### Slice 5 release checkpoint (2026-08-15)
+
+**Slice 5 — Operational Dashboard is release-ready.**
+
+| Gate | Status |
+|---|---|
+| Spec `specs/dashboard.md` | ✅ implemented & verified |
+| Tasks `tasks/dashboard/TASKS.md` | ✅ 001–004 ticked (005 in flight) |
+| Build `--warnaserror` | ✅ 0 warnings, 0 errors |
+| `dotnet format` verify | ✅ whitespace + style clean |
+| Full test suite | ✅ 236/236 (unit + integration vs. `businessos_test`) |
+| Permission (`Dashboard.View`) | ✅ all 3 endpoints `RequirePermission`-gated |
+| Audit | ✅ read-only — no audit rows written by dashboard queries |
+| Migrations | ✅ none (read-only over existing tables) |
+| Changelog | ✅ v0.6.0 |
+| Flutter follow-up | dashboard screens wired to the real endpoints (deferred) |
+
+Recorded as changelog entry v0.6.0 (matches local-release convention; no git tag).
+
 ## 4. Known remaining gaps (Phase 0.5 → Phase 1)
 
 These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
@@ -160,8 +194,9 @@ mutation, RBAC engine ready, notifications + job queue ready, storage ready, hea
 place. With Organizations & Branches (Slice 1), Users/Roles/Permissions (Slice 2a), and
 **Product & Inventory Foundation (Slice 3)** complete — products/SKU/barcode/units,
 per-branch pricing, warehouses + stock — the commercial core is in place so a sale always
-resolves a real product/price/tax/branch/stock. Next slice: **Dashboard** (real aggregates
-from events) or straight to **Sales + Offline POS**, then Purchasing and Accounting.
+resolves a real product/price/tax/branch/stock. The **Operational Dashboard (Slice 5)**
+provides read-only summary/low-stock/recent-activity KPIs over that foundation. Next slice:
+**Sales + Offline POS**, then Purchasing and Accounting.
 
 ## 6. Suggested next tasks
 
@@ -170,5 +205,6 @@ from events) or straight to **Sales + Offline POS**, then Purchasing and Account
 3. ~~First business slice with `RequirePermission` + integration test~~ — **done**
    (Organizations & Branches). **Product & Inventory Foundation (Slice 3) also done
    2026-08-15** (products, per-branch pricing engine, warehouses + stock, 224 tests). Next:
-   Dashboard aggregates from events, then **Sales + Offline POS**.
+   **Sales + Offline POS** (the Operational Dashboard slice is done 2026-08-15 — summary/
+   low-stock/recent-activity KPIs, 236 tests).
 4. ADRs for Phase 0.5 decisions.

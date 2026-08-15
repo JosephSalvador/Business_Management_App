@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.6.0 — 2026-08-15 — Slice 5: Operational Dashboard (backend slice)
+
+- **Ports + repository:** `IDashboardRepository` in `Application/Ports` with snapshot records
+  (`DashboardCatalogSnapshot`, `DashboardInventorySnapshot`, `DashboardPricingSnapshot`,
+  `DashboardOrganizationSnapshot`, `DashboardSnapshot`) + `LowStockItem`/`RecentActivityItem`;
+  EF `DashboardRepository` in `Infrastructure/Repositories` — tenant-scoped GROUP BY/SUM
+  aggregations over existing catalog/inventory/pricing/organization tables, `Users` join for
+  actor emails, newest-first ordering; registered in DI.
+- **Application:** `Features/Dashboard` DTOs (`DashboardSummaryDto`, `DashboardLowStockDto`,
+  `DashboardActivityDto`), mapper, and queries `GetDashboardSummaryQuery`,
+  `GetLowStockQuery` (default `maxQuantity` 0, `limit` 20), `GetRecentActivityQuery`
+  (default `limit` 20) with FluentValidation (`limit` 1..100, `maxQuantity` >= 0).
+- **API:** `DashboardEndpoints` — `GET /api/v1/dashboard/summary`,
+  `GET /api/v1/dashboard/low-stock?maxQuantity=&limit=`,
+  `GET /api/v1/dashboard/recent-activity?limit=`, all
+  `RequirePermission(PermissionNames.DashboardView)`-gated; registered in `Program.cs`.
+- **KPIs:** catalog (products by status/type, variants, categories), inventory (warehouses,
+  stock lines, on-hand units, stocked/zero-stock products, movements), pricing (price lists,
+  default list name, active-price products, branch overrides), organization (branches, users,
+  roles).
+- **Scope:** read-only slice — no domain changes, no migrations, no events, no audit writes;
+  revenue/VAT/top-sellers KPIs deferred until the Sales domain exists (spec "Future
+  improvements").
+- **Tests:** 236 passing (6 new unit + 6 new integration) — summary KPIs match a seeded
+  tenant, low-stock ordering + threshold + limit validation, recent-activity newest-first with
+  actor email, 403 for a `Dashboard.View`-less role, tenant isolation, and no audit rows
+  written by dashboard reads.
+
+### Docs
+- Spec `specs/dashboard.md` implemented & verified; tasks `tasks/dashboard/TASKS.md` 001–004
+  ticked; roadmap item 5 marked `[x] backend slice`; readiness report Slice 5 verification +
+  release checkpoint; `memory/project.md` updated; final `dotnet build --warnaserror`,
+  `dotnet format` and full test run clean. **Slice 5 — Operational Dashboard:
+  release-ready.** Recorded as changelog v0.6.0 (no git tag).
+
 ## v0.5.0 — 2026-08-14 — Slice 3: Product & Inventory Foundation (backend slice)
 
 ### 3a — Product Catalog

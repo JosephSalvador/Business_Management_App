@@ -237,6 +237,11 @@ Platform (Phase 0) → then Core Business modules, in this order:
     upsert, price resolution, 224 tests), 3d docs & release checkpoint. Flutter admin screens
     and the offline POS build on this foundation are the follow-up.
 5. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
+   `[x] backend slice 2026-08-15` — spec `specs/dashboard.md`: read-only **Operational
+   Dashboard** over existing catalog/inventory/pricing/organization tables (summary KPIs,
+   low-stock, recent activity, 236 tests total). Revenue/VAT/top-sellers KPIs are deferred
+   until the Sales domain exists (see spec "Future improvements"). Flutter dashboard screens
+   are the follow-up.
 6. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns,
    discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo
    Pesa, Mixx by Yas, HaloPesa).
