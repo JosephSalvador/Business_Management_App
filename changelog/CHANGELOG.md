@@ -58,10 +58,44 @@
   duplicate opening conflict, variant validation, tenant isolation, permissions, audit rows, and
   outbox events.
 
+### 3c — Pricing Engine
+- **Domain (`Domain/Pricing`):** `PriceList` aggregate (per-tenant, unique name, at most one
+  `IsDefault` per tenant, effective window, replace-all `SetPrices`), `ProductPrice` child
+  (key = product/variant/branch/price-type, price > 0, minQuantity ≥ 1, window guard), pure
+  `PriceResolver` (branch override before all-branch base, price-type filter, highest qualifying
+  `MinQuantity`, latest `EffectiveFrom` tie-break, no price → no price), `ResolvedPrice`;
+  events `PriceListCreatedEvent`/`PriceListUpdatedEvent`/`ProductPricesChangedEvent`. New
+  permissions `Pricing.View/Manage` (auto-granted to admin roles by the seeder).
+- **Persistence:** `PriceLists` + `ProductPrices` tables via migration
+  `20260814113222_AddPricingPriceLists` (unique `(TenantId, Name)`, partial unique on default,
+  functional unique price key with `COALESCE` on nullable variant/branch).
+- **Repositories:** `IPriceListRepository` (`GetByIdAsync` with `includePrices`, `GetByNameAsync`,
+  `GetDefaultAsync`, `ListAsync`, `ResolvePricesAsync`) + `IProductPriceRepository`
+  (`ListAsync`, `UpsertManyAsync`, `ResolveAsync` with DB-side resolution filter).
+- **Application:** `Features/Pricing` commands (`CreatePriceListCommand`,
+  `UpdatePriceListCommand`, `SetProductPricesCommand` bulk upsert) + queries
+  (`ListPriceListsQuery`, `GetPriceListQuery`, `GetPriceListPricesQuery`, `ResolvePriceQuery`)
+  with FluentValidation (currency ISO-4217 case-insensitive, price > 0, minQuantity ≥ 1,
+  effective window), reference guards (product/variant consistency, tenant branch), duplicate
+  name/default → `Conflict`; mutations run inside the per-tenant transaction advisory lock.
+- **API:** `PricingEndpoints` — `/api/v1/price-lists` (list/create/get/update + prices get/put)
+  and `/api/v1/pricing/resolve`, all `RequirePermission(Pricing.View / Pricing.Manage)`-gated.
+- **Events:** `PricingActivityFeedHandler` consumes the 3 pricing domain events (outbox-backed
+  activity feed).
+- **Tests:** 224 passing (unit + integration) — price resolver (branch override, price type,
+  min-quantity, effective dates, tie-break, no-price), price-list CRUD + duplicate default →
+  `Conflict`, bulk upsert round-trip, resolve endpoint (base/branch/wholesale/no-price/variant
+  consistency), 403 for `Pricing.View`-only role, tenant isolation, audit rows, outbox dispatch.
+- **Fix (domain, found by 3c integration tests):** `ProductPrice.Assign` now keeps the default
+  key for added children (was `Guid.NewGuid()`), matching `StockLocation.Assign` — the
+  documented EF child-state pitfall (client Guid keys in added children must be default so EF
+  treats them as Added, not Modified; the old code produced `DbUpdateConcurrencyException`).
+
 ### Docs
 - Spec `specs/products-inventory.md` sub-slice 3a implemented & verified; tasks
   `tasks/products-inventory/TASKS.md` 001–009 ticked. Sub-slice 3b implemented & verified; tasks
-  010–020 ticked; `memory/project.md` updated. 3c (Pricing Engine) remains pending.
+  010–020 ticked. Sub-slice 3c (Pricing Engine) implemented & verified; tasks 021–028 ticked;
+  `memory/project.md` updated. 3d (final docs & release checkpoint, task 029) remains.
 
 ## v0.4.0 — 2026-08-13 — Phase 1: Users, Roles & Permissions (backend slice)
 

@@ -10,7 +10,8 @@
 >
 > **Sub-slice status (3a Product Catalog): implemented & verified 2026-08-13** (tasks 001–009);
 > **3b Inventory Foundation: implemented & verified 2026-08-14** (tasks 010–020);
-> 3c Pricing Engine is pending.
+> **3c Pricing Engine: implemented & verified 2026-08-15** (tasks 021–028); 3d Docs &
+> verification is pending.
 
 ## Feature
 
@@ -323,6 +324,15 @@ recorded on an immutable `StockMovement` ledger** so balances are always explain
 movement history. 3b implements warehouses + locations + balances + ledger + opening stock
 **only**; adjustments, transfers, reservations, purchases, sales and the pricing engine are
 explicitly **out of scope** and their planned endpoints are listed as deferred above.
+
+### 3c scope (proposed, pending approval)
+
+Price lists (per-tenant, unique name, at most one default, effective window) with
+**per-branch / retail / wholesale / min-quantity prices** in ISO-4217 currency, bulk upsert of
+prices, and a pure `PriceResolver` (branch override → all-branch base → price-type filter →
+highest qualifying min-quantity → latest effective-from). 3c implements the price-list CRUD,
+bulk price upsert, price queries and the resolve endpoint **only**; customer-specific prices,
+discount rules, and price-change history are explicitly **out of scope** (deferred below).
 
 ## Future improvements
 

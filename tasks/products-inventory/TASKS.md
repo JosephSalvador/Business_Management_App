@@ -98,26 +98,26 @@ opening-stock recording. Adjustments, transfers, reservations, purchases and sal
 
 ## 3c — Pricing Engine
 
-- [ ] 021 **Domain**: `PriceList` (default per tenant) + `ProductPrice` (branch override,
+- [x] 021 **Domain**: `PriceList` (default per tenant) + `ProductPrice` (branch override,
       price type, min-quantity, effective window); price-resolution pure function;
       events (`PriceListCreatedEvent`, `PriceListUpdatedEvent`,
       `ProductPricesChangedEvent`); `PermissionNames`: `Pricing.View/Manage`.
-- [ ] 022 **Persistence**: `PriceLists`, `ProductPrices` DbSets + mappings (unique price key);
+- [x] 022 **Persistence**: `PriceLists`, `ProductPrices` DbSets + mappings (unique price key);
       migration `AddPricingPriceLists`.
-- [ ] 023 **Ports + repositories**: `IPriceListRepository` (tenant-scoped CRUD,
+- [x] 023 **Ports + repositories**: `IPriceListRepository` (tenant-scoped CRUD,
       `GetDefaultAsync`, `ResolvePricesAsync`), `IProductPriceRepository`
       (`ListAsync`, `UpsertManyAsync`, `ResolveAsync`).
-- [ ] 024 **Application — pricing**: `Features/Pricing` commands/queries (`ListPriceListsQuery`,
+- [x] 024 **Application — pricing**: `Features/Pricing` commands/queries (`ListPriceListsQuery`,
       `GetPriceListQuery`, `CreatePriceListCommand`, `UpdatePriceListCommand`,
       `SetProductPricesCommand` bulk upsert, `GetPriceListPricesQuery`, `ResolvePriceQuery`)
       + `PriceResolver` (pure, unit-testable).
-- [ ] 025 **API endpoints**: `PricingEndpoints` (price lists group + resolve) with
+- [x] 025 **API endpoints**: `PricingEndpoints` (price lists group + resolve) with
       `RequirePermission(Pricing.View / Pricing.Manage)`.
-- [ ] 026 **Event consumers**: `PricingActivityFeedHandler` in Notifications; register.
-- [ ] 027 **Tests**: unit (resolver: branch override, price type, min-quantity, effective
+- [x] 026 **Event consumers**: `PricingActivityFeedHandler` in Notifications; register.
+- [x] 027 **Tests**: unit (resolver: branch override, price type, min-quantity, effective
       dates, tie-break, no-price) + integration (price list CRUD, bulk upsert round-trip,
       default per tenant, resolve endpoint, 403, tenant isolation, audit rows, outbox).
-- [ ] 028 **Docs + commit**: build/format/tests; changelog, memory; tick 3c; completion report.
+- [x] 028 **Docs + commit**: build/format/tests; changelog, memory; tick 3c; completion report.
 
 ## 3d — Docs & verification
 

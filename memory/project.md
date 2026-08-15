@@ -9,7 +9,7 @@
 - **Positioning:** the African alternative to Odoo / Zoho / SAP B1 / Dynamics 365. Platform,
   not a single ERP.
 
-## architecture.md — current state (2026-08-14)
+## architecture.md — current state (2026-08-15)
 
 - Modular monolith: Shared / Domain / Application / Infrastructure / API / Workers /
   Notifications / Modules.*. Solution `backend/BusinessOS.slnx` (includes the tests project).
@@ -94,6 +94,30 @@
   auditable and creates both ledger movement and derived balance in the same mutation path.
   `InventoryActivityFeedHandler` consumes warehouse and stock events. 205 tests pass (unit +
   integration). Spec sub-slice 3b marked implemented & verified; 3c Pricing Engine pending.
+
+- **Phase 1 slice 3c (Pricing Engine), done 2026-08-15 (tasks 021–028):** new
+  `Domain/Pricing` aggregate `PriceList` (per-tenant unique name, at most one `IsDefault` per
+  tenant, effective window, replace-all `SetPrices`) + child `ProductPrice` (price key =
+  product/variant/branch/price-type, price > 0, minQuantity ≥ 1, window guard), pure
+  `PriceResolver` (`ResolvedPrice`: branch override beats all-branch base, price-type filter,
+  highest qualifying min-quantity, latest `EffectiveFrom` tie-break, inactive/out-of-window/
+  no-price → null), events `PriceListCreatedEvent`/`PriceListUpdatedEvent`/
+  `ProductPricesChangedEvent`; permissions `Pricing.View/Manage`; migration
+  `20260814113222_AddPricingPriceLists` (`PriceLists` + `ProductPrices`, functional unique
+  price key with COALESCE on nullable variant/branch); repositories `IPriceListRepository`
+  (`GetByIdAsync` with `includePrices`, `GetByNameAsync`, `GetDefaultAsync`, `ListAsync`,
+  `ResolvePricesAsync`) + `IProductPriceRepository` (`ListAsync`, `UpsertManyAsync`,
+  `ResolveAsync` DB-side filter); application `Features/Pricing` (commands
+  `CreatePriceListCommand`/`UpdatePriceListCommand`/`SetProductPricesCommand` bulk upsert,
+  queries list/get/get-prices/resolve) with FluentValidation (ISO-4217 currency
+  case-insensitive, price > 0, minQuantity ≥ 1) and reference guards (product/variant
+  consistency, tenant branch); duplicate name/default → `Conflict`; API `PricingEndpoints`
+  `/api/v1/price-lists` + `/api/v1/pricing/resolve`, permission-gated; `PricingActivityFeedHandler`
+  consumes the 3 pricing events. **Erratum found by 3c integration tests:** `ProductPrice.Assign`
+  pre-generated child Guids → `DbUpdateConcurrencyException` on second bulk upsert; fixed to
+  keep default keys for added children (matches `StockLocation.Assign` and the documented EF
+  child-state pitfall). 224 tests pass (unit + integration). Spec sub-slice 3c marked
+  implemented & verified; 3d (final docs + release checkpoint, task 029) pending.
 
 ## coding.md — see `docs/CodingStandards.md`
 
