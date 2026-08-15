@@ -51,7 +51,7 @@ public sealed class ProductPrice : Entity
         bool isActive)
     {
         var productPrice = new ProductPrice(
-            id == Guid.Empty ? Guid.NewGuid() : id,
+            id,
             tenantId,
             priceListId,
             productId,
