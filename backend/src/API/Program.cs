@@ -203,6 +203,7 @@ app.MapCatalogEndpoints();
 app.MapReferenceDataEndpoints();
 app.MapInventoryEndpoints();
 app.MapPricingEndpoints();
+app.MapDashboardEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
 {
