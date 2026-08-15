@@ -251,3 +251,61 @@ public interface IProductPriceRepository
         DateTime onDate,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record DashboardCatalogSnapshot(
+    int TotalProducts,
+    int ActiveProducts,
+    int DraftProducts,
+    int InactiveProducts,
+    int ServiceProducts,
+    int TotalVariants,
+    int TotalCategories);
+
+public sealed record DashboardInventorySnapshot(
+    int TotalWarehouses,
+    int TotalStockLines,
+    decimal TotalOnHandUnits,
+    int StockedProducts,
+    int ZeroStockLines,
+    int TotalMovements);
+
+public sealed record DashboardPricingSnapshot(
+    int TotalPriceLists,
+    string? DefaultPriceListName,
+    int ActivePriceProducts,
+    int BranchOverrideProducts);
+
+public sealed record DashboardOrganizationSnapshot(
+    int TotalBranches,
+    int TotalUsers,
+    int ActiveUsers,
+    int TotalRoles);
+
+public sealed record DashboardSnapshot(
+    DashboardCatalogSnapshot Catalog,
+    DashboardInventorySnapshot Inventory,
+    DashboardPricingSnapshot Pricing,
+    DashboardOrganizationSnapshot Organization);
+
+public sealed record LowStockItem(Guid ProductId, string ProductName, string? Sku, decimal OnHand);
+
+public sealed record RecentActivityItem(
+    string Action,
+    string EntityType,
+    string? EntityId,
+    Guid? ActorUserId,
+    string? ActorEmail,
+    DateTime OccurredAt);
+
+/// <summary>
+/// Read-only operational KPIs over existing tables. Tenant-scoped; never mutates, raises
+/// events, or writes audit rows. Queries only, so it stays a projection of the source of truth.
+/// </summary>
+public interface IDashboardRepository
+{
+    Task<DashboardSnapshot> GetSummaryAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LowStockItem>> ListLowStockAsync(
+        Guid tenantId, decimal maxQuantity, int limit, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<RecentActivityItem>> ListRecentActivityAsync(
+        Guid tenantId, int limit, CancellationToken cancellationToken = default);
+}

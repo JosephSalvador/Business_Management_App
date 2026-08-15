@@ -897,3 +897,170 @@ public sealed class ProductPriceRepository : IProductPriceRepository
         return filtered;
     }
 }
+
+public sealed class DashboardRepository : IDashboardRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public DashboardRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<DashboardSnapshot> GetSummaryAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var statusCounts = await _db.Products
+            .Where(p => p.TenantId == tenantId)
+            .GroupBy(p => p.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var totalProducts = statusCounts.Sum(x => x.Count);
+        var activeProducts = statusCounts.FirstOrDefault(x => x.Status == ProductStatus.Active)?.Count ?? 0;
+        var draftProducts = statusCounts.FirstOrDefault(x => x.Status == ProductStatus.Draft)?.Count ?? 0;
+        var inactiveProducts = statusCounts.FirstOrDefault(x => x.Status == ProductStatus.Inactive)?.Count ?? 0;
+
+        var serviceProducts = await _db.Products
+            .CountAsync(p => p.TenantId == tenantId && p.ProductType == ProductType.Service, cancellationToken);
+        var totalVariants = await _db.ProductVariants
+            .CountAsync(v => v.TenantId == tenantId, cancellationToken);
+        var totalCategories = await _db.ProductCategories
+            .CountAsync(c => c.TenantId == tenantId, cancellationToken);
+
+        var catalog = new DashboardCatalogSnapshot(
+            totalProducts, activeProducts, draftProducts, inactiveProducts,
+            serviceProducts, totalVariants, totalCategories);
+
+        var totalWarehouses = await _db.Warehouses
+            .CountAsync(w => w.TenantId == tenantId, cancellationToken);
+        var totalStockLines = await _db.StockBalances
+            .CountAsync(b => b.TenantId == tenantId, cancellationToken);
+        var totalOnHandUnits = await _db.StockBalances
+            .Where(b => b.TenantId == tenantId)
+            .SumAsync(b => (decimal?)b.Quantity, cancellationToken) ?? 0m;
+
+        var productTotals = await _db.StockBalances
+            .Where(b => b.TenantId == tenantId)
+            .GroupBy(b => b.ProductId)
+            .Select(g => new { ProductId = g.Key, Total = g.Sum(b => b.Quantity) })
+            .ToListAsync(cancellationToken);
+
+        var stockedProducts = productTotals.Count(x => x.Total > 0);
+        var zeroStockLines = await _db.StockBalances
+            .CountAsync(b => b.TenantId == tenantId && b.Quantity <= 0, cancellationToken);
+        var totalMovements = await _db.StockMovements
+            .CountAsync(m => m.TenantId == tenantId, cancellationToken);
+
+        var inventory = new DashboardInventorySnapshot(
+            totalWarehouses, totalStockLines, totalOnHandUnits, stockedProducts, zeroStockLines, totalMovements);
+
+        var priceLists = await _db.PriceLists
+            .Where(pl => pl.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
+        var pricing = await BuildPricingSnapshotAsync(tenantId, priceLists, cancellationToken);
+
+        var totalBranches = await _db.Branches
+            .CountAsync(b => b.TenantId == tenantId, cancellationToken);
+        var totalUsers = await _db.Users
+            .CountAsync(u => u.TenantId == tenantId, cancellationToken);
+        var activeUsers = await _db.Users
+            .CountAsync(u => u.TenantId == tenantId && u.IsActive, cancellationToken);
+        var totalRoles = await _db.Roles
+            .CountAsync(r => r.TenantId == tenantId, cancellationToken);
+
+        var organization = new DashboardOrganizationSnapshot(
+            totalBranches, totalUsers, activeUsers, totalRoles);
+
+        return new DashboardSnapshot(catalog, inventory, pricing, organization);
+    }
+
+    public async Task<IReadOnlyList<LowStockItem>> ListLowStockAsync(
+        Guid tenantId, decimal maxQuantity, int limit, CancellationToken cancellationToken = default)
+    {
+        var totals = await _db.StockBalances
+            .Where(b => b.TenantId == tenantId)
+            .GroupBy(b => b.ProductId)
+            .Select(g => new { ProductId = g.Key, Total = g.Sum(b => b.Quantity) })
+            .Where(x => x.Total <= maxQuantity)
+            .OrderBy(x => x.Total)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        if (totals.Count == 0)
+        {
+            return Array.Empty<LowStockItem>();
+        }
+
+        var productIds = totals.Select(x => x.ProductId).ToArray();
+        var products = await _db.Products
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Name, p.Sku })
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        return totals
+            .Where(x => products.ContainsKey(x.ProductId))
+            .Select(x => new LowStockItem(
+                x.ProductId,
+                products[x.ProductId].Name,
+                products[x.ProductId].Sku,
+                x.Total))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<RecentActivityItem>> ListRecentActivityAsync(
+        Guid tenantId, int limit, CancellationToken cancellationToken = default)
+    {
+        var logs = await _db.AuditLogs
+            .Where(a => a.TenantId == tenantId)
+            .OrderByDescending(a => a.CreatedAt)
+            .ThenByDescending(a => a.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        if (logs.Count == 0)
+        {
+            return Array.Empty<RecentActivityItem>();
+        }
+
+        var actorIds = logs.Where(l => l.UserId.HasValue).Select(l => l.UserId!.Value).Distinct().ToArray();
+        var actors = await _db.Users
+            .Where(u => actorIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, cancellationToken);
+
+        return logs
+            .Select(l => new RecentActivityItem(
+                l.Action,
+                l.EntityType,
+                l.EntityId,
+                l.UserId,
+                l.UserId.HasValue && actors.ContainsKey(l.UserId.Value) ? actors[l.UserId.Value].Email : null,
+                l.CreatedAt))
+            .ToList();
+    }
+
+    private async Task<DashboardPricingSnapshot> BuildPricingSnapshotAsync(
+        Guid tenantId, IReadOnlyList<PriceList> priceLists, CancellationToken cancellationToken)
+    {
+        var defaultList = priceLists.FirstOrDefault(pl => pl.IsDefault);
+
+        if (defaultList is null)
+        {
+            return new DashboardPricingSnapshot(priceLists.Count, null, 0, 0);
+        }
+
+        var today = DateTime.UtcNow.Date;
+        var prices = await _db.ProductPrices
+            .Where(p => p.TenantId == tenantId
+                && p.PriceListId == defaultList.Id
+                && p.IsActive
+                && (p.EffectiveFrom == null || p.EffectiveFrom <= today)
+                && (p.EffectiveTo == null || p.EffectiveTo >= today))
+            .Select(p => new { p.ProductId, p.BranchId })
+            .ToListAsync(cancellationToken);
+
+        return new DashboardPricingSnapshot(
+            priceLists.Count,
+            defaultList.Name,
+            prices.Select(x => x.ProductId).Distinct().Count(),
+            prices.Where(x => x.BranchId != null).Select(x => x.ProductId).Distinct().Count());
+    }
+}
