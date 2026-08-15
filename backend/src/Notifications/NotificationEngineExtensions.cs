@@ -42,6 +42,9 @@ public static class NotificationEngineExtensions
         services.AddScoped<IDomainEventHandler<WarehouseStatusChangedEvent>, InventoryActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<OpeningStockRecordedEvent>, InventoryActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<StockMovementRecordedEvent>, InventoryActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<PriceListCreatedEvent>, PricingActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<PriceListUpdatedEvent>, PricingActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<ProductPricesChangedEvent>, PricingActivityFeedHandler>();
 
         return services;
     }
