@@ -121,6 +121,12 @@ opening-stock recording. Adjustments, transfers, reservations, purchases and sal
 
 ## 3d — Docs & verification
 
-- [ ] 029 **Docs + final verification**: `docs/roadmap.md` (item 4 `[x] backend slice`),
+- [x] 029 **Docs + final verification**: `docs/roadmap.md` (item 4 `[x] backend slice`),
       changelog v0.5.0, `memory/project.md`, readiness report, spec status note; final
       `dotnet build --warnaserror`, `dotnet format`, full test run; Slice 3 release checkpoint.
+
+---
+
+**Slice 3 — Product & Inventory Foundation: complete (2026-08-15).** 224 tests pass, build and
+format clean; changelog v0.5.0 + readiness-report release checkpoint recorded. Next phase:
+Dashboard aggregates or Sales + Offline POS.

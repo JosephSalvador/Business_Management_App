@@ -230,12 +230,12 @@ Platform (Phase 0) → then Core Business modules, in this order:
    Flutter admin screens are the follow-up.
  4. **Product & Inventory Foundation (Slice 3)** — **build before Sales/POS** so a sale always
     resolves a real product/SKU/unit/price/tax/branch/stock. See "Slice 3 — Product & Inventory
-    Foundation" below. `[x] sub-slice 3a Product Catalog 2026-08-13` — spec
-    `specs/products-inventory.md` (domain, migration, repositories, application, API,
-    activity-feed consumer, 181 tests). `[x] sub-slice 3b Inventory Foundation 2026-08-14`
-    (warehouses, stock locations, opening stock, ledger, 205 tests). `[x] sub-slice 3c Pricing
-    Engine 2026-08-15` (price lists, per-branch/wholesale pricing, bulk upsert, price
-    resolution, 224 tests). Sub-slice 3d (final docs & release checkpoint) remains.
+    Foundation" below. `[x] backend slice 2026-08-15` — spec `specs/products-inventory.md`:
+    3a Product Catalog (domain, migration, repositories, application, API, activity-feed
+    consumer, 181 tests), 3b Inventory Foundation (warehouses, stock locations, opening stock,
+    ledger, 205 tests), 3c Pricing Engine (price lists, per-branch/wholesale pricing, bulk
+    upsert, price resolution, 224 tests), 3d docs & release checkpoint. Flutter admin screens
+    and the offline POS build on this foundation are the follow-up.
 5. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
 6. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns,
    discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo

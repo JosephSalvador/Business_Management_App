@@ -93,6 +93,42 @@ reliably — plus a `MASTER_ARCHITECTURE.md` single source of truth and a Readin
 
 Recorded as changelog entry v0.4.0 (matches v0.1.0–v0.3.0 local-release convention; no git tag).
 
+### Slice 3 backend verification (2026-08-15)
+
+- `dotnet build` all projects — **0 warnings, 0 errors** (warnings-as-errors).
+- `dotnet format --verify-no-changes` — **passes** (whitespace + style; 0/314 files).
+- `dotnet test backend/tests/BusinessOS.Tests` — **224/224 pass** (unit + integration
+  against real Postgres `businessos_test`): product catalog + inventory + pricing domain
+  invariants, repository tenant isolation, product/warehouse/price-list CRUD + status, stock
+  ledger math, opening stock, duplicate sku/warehouse-code/price-list-name → Conflict, price
+  resolution (branch override, price type, min-quantity, effective dates, tie-break,
+  no-price), 403 for view-only roles, audit rows for every mutation, outbox dispatch of
+  catalog/inventory/pricing events.
+- Migrations applied to dev DB: `InitialCreate` → `AddUserLockout` →
+  `AddOrganizationProfileAndBranches` → `20260806_AddUserRoleAndBranchManagement` →
+  `20260813_AddProductInventoryAndPricing` → `20260814051054_AddInventoryWarehousesAndStock`
+  → `20260814113222_AddPricingPriceLists`.
+
+### Slice 3 release checkpoint (2026-08-15)
+
+**Slice 3 — Product & Inventory Foundation is release-ready.**
+
+| Gate | Status |
+|---|---|
+| Spec `specs/products-inventory.md` | ✅ 3a/3b/3c implemented & verified |
+| Tasks `tasks/products-inventory/TASKS.md` | ✅ 001–028 ticked |
+| Build `--warnaserror` | ✅ 0 warnings, 0 errors |
+| `dotnet format` verify | ✅ whitespace + style clean |
+| Full test suite | ✅ 224/224 (unit + integration vs. `businessos_test`) |
+| Permissions (Products.*, Categories.*, Brands.*, Units.*, Warehouses.*, Inventory.*, Pricing.*) | ✅ every endpoint `RequirePermission`-gated |
+| Audit | ✅ every mutation writes a redacted audit row |
+| Events | ✅ catalog/inventory/pricing events outbox-dispatched + consumed |
+| Migrations | ✅ 3 slice migrations applied to dev DB |
+| Changelog | ✅ v0.5.0 |
+| Flutter follow-up | Product/warehouse/price admin screens + offline POS build on this foundation (deferred) |
+
+Recorded as changelog entry v0.5.0 (matches local-release convention; no git tag).
+
 ## 4. Known remaining gaps (Phase 0.5 → Phase 1)
 
 These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
@@ -121,17 +157,18 @@ These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
 **Approved to begin Phase 1 (Core Business MVP).** The platform backend satisfies the Phase 0
 Definition of Done: build clean, tests green, audit on every mutation, events on every
 mutation, RBAC engine ready, notifications + job queue ready, storage ready, health/CI in
-place. With Organizations & Branches (Slice 1) and Users/Roles/Permissions (Slice 2a) complete,
-the administrative layer every transactional module depends on is in place. Next slice:
-**Product & Inventory Foundation (Slice 3)** — products/SKU/barcode/units, per-branch pricing,
-warehouses + stock, so a sale always resolves a real product/price/tax/branch/stock. Design
-Slice 3 end-to-end before writing code (it feeds Sales/POS, Purchasing, and Accounting).
+place. With Organizations & Branches (Slice 1), Users/Roles/Permissions (Slice 2a), and
+**Product & Inventory Foundation (Slice 3)** complete — products/SKU/barcode/units,
+per-branch pricing, warehouses + stock — the commercial core is in place so a sale always
+resolves a real product/price/tax/branch/stock. Next slice: **Dashboard** (real aggregates
+from events) or straight to **Sales + Offline POS**, then Purchasing and Accounting.
 
 ## 6. Suggested next tasks
 
 1. Feature-flag service (table, service, endpoints, `IFeatureFlagService` in Application).
 2. Tenant provisioning endpoint (`/api/v1/admin/tenants` or onboarding flow).
 3. ~~First business slice with `RequirePermission` + integration test~~ — **done**
-   (Organizations & Branches). Next slices: **Product & Inventory Foundation (Slice 3)**,
-   then per-branch pricing engine, then Sales + Offline POS.
+   (Organizations & Branches). **Product & Inventory Foundation (Slice 3) also done
+   2026-08-15** (products, per-branch pricing engine, warehouses + stock, 224 tests). Next:
+   Dashboard aggregates from events, then **Sales + Offline POS**.
 4. ADRs for Phase 0.5 decisions.

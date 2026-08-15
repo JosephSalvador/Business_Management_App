@@ -91,11 +91,18 @@
   documented EF child-state pitfall (client Guid keys in added children must be default so EF
   treats them as Added, not Modified; the old code produced `DbUpdateConcurrencyException`).
 
+### 3d — Docs & verification
+- **Release checkpoint:** roadmap item 4 marked `[x] backend slice`; `docs/PlatformReadinessReport.md`
+  gains the Slice 3 verification + release-ready checkpoint (224/224 tests, 7 migrations applied,
+  all endpoints permission-gated); spec `specs/products-inventory.md` marked implemented &
+  verified across 3a–3d; `memory/project.md` updated; final `dotnet build --warnaserror`,
+  `dotnet format` and full test run clean. Recorded as changelog v0.5.0 (no git tag).
+
 ### Docs
-- Spec `specs/products-inventory.md` sub-slice 3a implemented & verified; tasks
-  `tasks/products-inventory/TASKS.md` 001–009 ticked. Sub-slice 3b implemented & verified; tasks
-  010–020 ticked. Sub-slice 3c (Pricing Engine) implemented & verified; tasks 021–028 ticked;
-  `memory/project.md` updated. 3d (final docs & release checkpoint, task 029) remains.
+- Spec `specs/products-inventory.md` implemented & verified (3a–3d); tasks
+  `tasks/products-inventory/TASKS.md` 001–029 ticked; roadmap item 4 `[x] backend slice`;
+  readiness report release checkpoint; `memory/project.md` updated. **Slice 3 — Product &
+  Inventory Foundation: release-ready.**
 
 ## v0.4.0 — 2026-08-13 — Phase 1: Users, Roles & Permissions (backend slice)
 

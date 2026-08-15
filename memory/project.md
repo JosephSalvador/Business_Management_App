@@ -117,7 +117,13 @@
   pre-generated child Guids → `DbUpdateConcurrencyException` on second bulk upsert; fixed to
   keep default keys for added children (matches `StockLocation.Assign` and the documented EF
   child-state pitfall). 224 tests pass (unit + integration). Spec sub-slice 3c marked
-  implemented & verified; 3d (final docs + release checkpoint, task 029) pending.
+  implemented & verified.
+- **Phase 1 slice 3d (Docs & final verification), done 2026-08-15 (task 029):** roadmap item 4
+  marked `[x] backend slice`; `docs/PlatformReadinessReport.md` Slice 3 verification +
+  release-ready checkpoint; spec marked implemented & verified (3a–3d); changelog v0.5.0 final
+  entry; final build/format/test run clean. **Slice 3 — Product & Inventory Foundation is
+  release-ready.** Next: Dashboard aggregates from events, or Sales + Offline POS (uses the
+  now-real product/price/stock foundation).
 
 ## coding.md — see `docs/CodingStandards.md`
 

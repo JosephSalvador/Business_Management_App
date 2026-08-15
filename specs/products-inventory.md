@@ -8,10 +8,10 @@
 > verification. Built before Sales/POS so a sale always resolves a real product, price, tax,
 > branch and stock.
 >
-> **Sub-slice status (3a Product Catalog): implemented & verified 2026-08-13** (tasks 001–009);
-> **3b Inventory Foundation: implemented & verified 2026-08-14** (tasks 010–020);
-> **3c Pricing Engine: implemented & verified 2026-08-15** (tasks 021–028); 3d Docs &
-> verification is pending.
+> **Status: implemented & verified 2026-08-15** — all four sub-slices complete:
+> 3a Product Catalog (tasks 001–009) 2026-08-13, 3b Inventory Foundation (tasks 010–020)
+> 2026-08-14, 3c Pricing Engine (tasks 021–028) 2026-08-15, 3d Docs & verification
+> (task 029) 2026-08-15. Backend slice release-ready (224 tests pass).
 
 ## Feature
 
