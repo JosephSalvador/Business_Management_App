@@ -11,7 +11,26 @@ public sealed class TenantTests
         var tenant = Tenant.Create(Guid.NewGuid(), "Acme Ltd");
 
         Assert.Equal("TZS", tenant.Currency);
+        Assert.Equal("TZ", tenant.CountryCode);
         Assert.True(tenant.IsActive);
+    }
+
+    [Fact]
+    public void Create_WithCountryCode_NormalizesToUpper()
+    {
+        var tenant = Tenant.Create(Guid.NewGuid(), "Acme Ltd", countryCode: "ke");
+
+        Assert.Equal("KE", tenant.CountryCode);
+    }
+
+    [Fact]
+    public void UpdateCountryCode_SetsNormalizedCode()
+    {
+        var tenant = Tenant.Create(Guid.NewGuid(), "Acme Ltd");
+
+        tenant.UpdateCountryCode(" ug ");
+
+        Assert.Equal("UG", tenant.CountryCode);
     }
 
     [Fact]

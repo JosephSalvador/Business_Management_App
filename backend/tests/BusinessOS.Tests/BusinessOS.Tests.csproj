@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Application\BusinessOS.Application.csproj" />
+    <ProjectReference Include="..\..\src\Localizations\BusinessOS.Localizations.csproj" />
     <ProjectReference Include="..\..\src\Infrastructure\BusinessOS.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Domain\BusinessOS.Domain.csproj" />
     <ProjectReference Include="..\..\src\Shared\BusinessOS.Shared.csproj" />

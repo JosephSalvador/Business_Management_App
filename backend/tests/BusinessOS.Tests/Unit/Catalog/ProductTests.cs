@@ -177,6 +177,45 @@ public sealed class ProductTests
         Assert.Equal("V-SMALL-X", variant.Sku);
     }
 
+    [Fact]
+    public void Create_WithTaxCategoryId_StoresIt()
+    {
+        var taxCategoryId = Guid.NewGuid();
+
+        var product = Product.Create(
+            Guid.NewGuid(),
+            "Standard VAT Item",
+            null,
+            sku: null,
+            barcode: null,
+            categoryId: null,
+            brandId: null,
+            unitOfMeasureId: Guid.NewGuid(),
+            ProductType.Product,
+            taxCategoryId: taxCategoryId);
+
+        Assert.Equal(taxCategoryId, product.TaxCategoryId);
+    }
+
+    [Fact]
+    public void Create_WithoutTaxCategoryId_IsNull()
+    {
+        var product = MakeProduct();
+
+        Assert.Null(product.TaxCategoryId);
+    }
+
+    [Fact]
+    public void UpdateProfile_ChangesTaxCategoryId()
+    {
+        var product = MakeProduct();
+        var taxCategoryId = Guid.NewGuid();
+
+        product.UpdateProfile("New Name", null, null, null, Guid.NewGuid(), taxCategoryId);
+
+        Assert.Equal(taxCategoryId, product.TaxCategoryId);
+    }
+
     private static Product MakeProduct() => Product.Create(
         Guid.NewGuid(),
         "Test Product",

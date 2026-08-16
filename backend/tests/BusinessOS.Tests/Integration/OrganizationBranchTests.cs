@@ -220,6 +220,7 @@ public sealed class OrganizationBranchTests : IClassFixture<BusinessOsApiFactory
         var fetchedDoc = Body(await fetched.Content.ReadAsStringAsync());
         Assert.False(string.IsNullOrWhiteSpace(GetProperty(fetchedDoc, "name")));
         Assert.Equal("TZS", GetProperty(fetchedDoc, "currency"));
+        Assert.Equal("TZ", GetProperty(fetchedDoc, "countryCode"));
 
         var newName = $"Acme Renamed {Guid.NewGuid():N}";
         var updated = await _client.PutAsJsonAsync("/api/v1/organization", new
@@ -227,15 +228,33 @@ public sealed class OrganizationBranchTests : IClassFixture<BusinessOsApiFactory
             name = newName,
             contactEmail = "info@acme.local",
             contactPhone = "255700000000",
+            countryCode = "KE",
             taxId = "TIN-42",
         });
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         var updatedDoc = Body(await updated.Content.ReadAsStringAsync());
         Assert.Equal(newName, GetProperty(updatedDoc, "name"));
+        Assert.Equal("KE", GetProperty(updatedDoc, "countryCode"));
         Assert.Equal("TIN-42", GetProperty(updatedDoc, "taxId"));
 
         var again = await _client.GetAsync("/api/v1/organization");
         Assert.Equal(newName, GetProperty(Body(await again.Content.ReadAsStringAsync()), "name"));
+        Assert.Equal("KE", GetProperty(Body(await again.Content.ReadAsStringAsync()), "countryCode"));
+
+        var missingCode = await _client.PutAsJsonAsync("/api/v1/organization", new
+        {
+            name = "No Code",
+            taxId = "TIN-43",
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, missingCode.StatusCode);
+
+        var invalidCode = await _client.PutAsJsonAsync("/api/v1/organization", new
+        {
+            name = "Bad Code",
+            countryCode = "tz",
+            taxId = "TIN-44",
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidCode.StatusCode);
     }
 
     [Fact]

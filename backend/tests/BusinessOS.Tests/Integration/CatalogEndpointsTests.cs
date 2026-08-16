@@ -226,6 +226,42 @@ public sealed class CatalogEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     }
 
     [Fact]
+    public async Task Product_TaxCategoryAssignmentAndValidation()
+    {
+        var (token, _) = await RegisterAsync("taxcat");
+        var unitId = await CreateUnitAsync(token, "Bottles");
+
+        Guid standardCategoryId;
+        using (var db = CreateDbContext())
+        {
+            var standard = await db.TaxCategories.FirstAsync(c => c.Code == "VAT_STANDARD");
+            standardCategoryId = standard.Id;
+        }
+
+        Authorize(token);
+        var created = await _client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "Taxed Soda",
+            unitOfMeasureId = unitId,
+            productType = 0,
+            taxCategoryId = standardCategoryId,
+        });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        Assert.Equal(
+            standardCategoryId.ToString(),
+            GetProperty(Body(await created.Content.ReadAsStringAsync()), "taxCategoryId"));
+
+        var invalid = await _client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "Bad Tax",
+            unitOfMeasureId = unitId,
+            productType = 0,
+            taxCategoryId = Guid.NewGuid(),
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
+    [Fact]
     public async Task ProductVariants_RoundTripAndValidation()
     {
         var (token, _) = await RegisterAsync("variants");
