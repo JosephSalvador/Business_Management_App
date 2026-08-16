@@ -117,8 +117,10 @@
       `MovementType == Sale`), `discountAmount` non-nullable (`0m` not `null`), insufficient-stock
       needs `amountPaid = 200m`, `SetPrices` replaces (mixed cart PUTs both prices), Maize needs
       opening stock. See `memory/project.md` 014/015 entry.
-- [ ] 016 **Docs + commit**: build/format/tests; spec marked implemented & verified; changelog
+- [x] 016 **Docs + commit**: build/format/tests; spec marked implemented & verified; changelog
       v0.7.0, `memory/project.md`, roadmap item 6 `[x] backend slice`, readiness report Slice 6
-      checkpoint; completion report; pause for review.
+      checkpoint; completion report; pause for review. **Done 2026-08-16** — committed as
+      `feat(sales)` `f3600af`, `test(sales)` `4436179`, `docs(sales)` `b6605e5`; working tree clean.
+      **Slice 6 — Sales POS backend is release-ready.**
 - [ ] (future) **6c-void**: `VoidSaleCommand` + `StockMovementType.SaleVoid` reversal + stock
       add-back + `SaleVoidedEvent` + `POST /api/v1/sales/{id}/void` (`Sales.Delete`).
