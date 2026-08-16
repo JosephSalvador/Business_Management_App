@@ -34,6 +34,7 @@ public sealed class GetOrganizationQueryHandler : IRequestHandler<GetOrganizatio
             tenant.ContactPhone,
             tenant.Address,
             tenant.Currency,
+            tenant.CountryCode,
             tenant.TaxId,
             tenant.IsActive);
 

@@ -5,6 +5,7 @@ using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
+using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -1062,5 +1063,152 @@ public sealed class DashboardRepository : IDashboardRepository
             defaultList.Name,
             prices.Select(x => x.ProductId).Distinct().Count(),
             prices.Where(x => x.BranchId != null).Select(x => x.ProductId).Distinct().Count());
+    }
+}
+
+public sealed class TaxRuleRepository : ITaxRuleRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public TaxRuleRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<TaxRegime?> GetRegimeForTenantAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var countryCode = await _db.Tenants
+            .AsNoTracking()
+            .Where(t => t.Id == tenantId)
+            .Select(t => t.CountryCode)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return countryCode is null
+            ? null
+            : await _db.TaxRegimes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.CountryCode == countryCode, cancellationToken);
+    }
+
+    public Task<TaxCategory?> GetCategoryByIdAsync(
+        Guid id, CancellationToken cancellationToken = default)
+        => _db.TaxCategories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<TaxCategory>> ListCategoriesByCodesAsync(
+        IEnumerable<string> codes, CancellationToken cancellationToken = default)
+    {
+        var codeList = codes.Select(c => c.Trim().ToUpperInvariant()).Distinct().ToArray();
+        if (codeList.Length == 0)
+        {
+            return Array.Empty<TaxCategory>();
+        }
+
+        return await _db.TaxCategories
+            .AsNoTracking()
+            .Where(c => codeList.Contains(c.Code))
+            .OrderBy(c => c.Code)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TaxRule>> ListEffectiveRulesAsync(
+        Guid regimeId, DateTime onDate, CancellationToken cancellationToken = default)
+        => await _db.TaxRules
+            .AsNoTracking()
+            .Where(r => r.RegimeId == regimeId
+                && (r.EffectiveFrom == null || r.EffectiveFrom <= onDate)
+                && (r.EffectiveTo == null || r.EffectiveTo >= onDate))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TaxExemption>> ListExemptionsAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.TaxExemptions
+            .AsNoTracking()
+            .Where(e => e.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+}
+
+public sealed class SaleRepository : ISaleRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public SaleRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(Sale sale, CancellationToken cancellationToken = default)
+        => _db.Sales.AddAsync(sale, cancellationToken).AsTask();
+
+    public async Task<Sale?> GetByIdAsync(
+        Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => await _db.Sales
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(s => s.Lines)
+            .Include(s => s.Payments)
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Id == id, cancellationToken);
+
+    public async Task<Sale?> GetByClientSaleIdAsync(
+        Guid tenantId, Guid clientSaleId, CancellationToken cancellationToken = default)
+        => await _db.Sales
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(s => s.Lines)
+            .Include(s => s.Payments)
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.ClientSaleId == clientSaleId, cancellationToken);
+
+    public async Task<IReadOnlyList<Sale>> ListAsync(
+        Guid tenantId, int page, int pageSize, SaleListFilter filter, CancellationToken cancellationToken = default)
+        => await _db.Sales
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(s => s.Lines)
+            .Include(s => s.Payments)
+            .Where(ApplyFilter(tenantId, filter))
+            .OrderByDescending(s => s.SaleDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountAsync(Guid tenantId, SaleListFilter filter, CancellationToken cancellationToken = default)
+        => _db.Sales
+            .AsNoTracking()
+            .Where(ApplyFilter(tenantId, filter))
+            .CountAsync(cancellationToken);
+
+    private static System.Linq.Expressions.Expression<Func<Sale, bool>> ApplyFilter(
+        Guid tenantId, SaleListFilter filter)
+    {
+        return s => s.TenantId == tenantId
+            && (!filter.BranchId.HasValue || s.BranchId == filter.BranchId.Value)
+            && (!filter.FromDate.HasValue || s.SaleDate >= filter.FromDate.Value)
+            && (!filter.ToDate.HasValue || s.SaleDate < filter.ToDate.Value.AddDays(1))
+            && (!filter.Status.HasValue || s.Status == filter.Status.Value)
+            && (string.IsNullOrWhiteSpace(filter.Search)
+                || s.Number.Contains(filter.Search.Trim())
+                || (s.CustomerName != null && s.CustomerName.Contains(filter.Search.Trim())));
+    }
+}
+
+public sealed class NumberSequenceRepository : INumberSequenceRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public NumberSequenceRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<string> AllocateAsync(
+        Guid tenantId, string scope, DateTime date, CancellationToken cancellationToken = default)
+    {
+        var sequence = await _db.NumberSequences
+            .FromSqlRaw(
+                $"SELECT * FROM {Schemas.Sales}.\"{Tables.Sales.NumberSequences}\" " +
+                "WHERE \"TenantId\" = {0} AND \"Scope\" = {1} FOR UPDATE",
+                tenantId, scope)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (sequence is null)
+        {
+            sequence = NumberSequence.CreateSaleSequence(tenantId);
+            _db.NumberSequences.Add(sequence);
+        }
+
+        return sequence.Allocate(date);
     }
 }

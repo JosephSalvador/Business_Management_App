@@ -12,6 +12,9 @@
   <Folder Name="/src/Infrastructure/">
     <Project Path="src/Infrastructure/BusinessOS.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Localizations/">
+    <Project Path="src/Localizations/BusinessOS.Localizations.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Sales/">
     <Project Path="src/Modules/Sales/BusinessOS.Modules.Sales.csproj" />

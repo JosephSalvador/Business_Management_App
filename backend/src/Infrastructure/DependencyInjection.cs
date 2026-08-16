@@ -1,4 +1,5 @@
 using BusinessOS.Application.Ports;
+using BusinessOS.Application.Sales;
 using BusinessOS.Infrastructure.Caching;
 using BusinessOS.Infrastructure.Events;
 using BusinessOS.Infrastructure.Locking;
@@ -43,6 +44,10 @@ public static class DependencyInjection
         services.AddScoped<IPriceListRepository, PriceListRepository>();
         services.AddScoped<IProductPriceRepository, ProductPriceRepository>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
+        services.AddScoped<ITaxRuleRepository, TaxRuleRepository>();
+        services.AddScoped<ISaleRepository, SaleRepository>();
+        services.AddScoped<INumberSequenceRepository, NumberSequenceRepository>();
+        services.AddScoped<SaleStockDebitService>();
 
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<ITenantContext, HttpTenantContext>();

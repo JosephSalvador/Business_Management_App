@@ -7,5 +7,6 @@ public sealed record OrganizationDto(
     string? ContactPhone,
     string? Address,
     string Currency,
+    string CountryCode,
     string? TaxId,
     bool IsActive);

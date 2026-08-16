@@ -10,9 +10,11 @@ internal static class ProductReferenceGuard
         ICategoryRepository categories,
         IBrandRepository brands,
         IUnitOfMeasureRepository units,
+        ITaxRuleRepository taxRules,
         Guid unitOfMeasureId,
         Guid? categoryId,
         Guid? brandId,
+        Guid? taxCategoryId,
         CancellationToken cancellationToken)
     {
         var tenantId = tenantContext.TenantId;
@@ -32,6 +34,12 @@ internal static class ProductReferenceGuard
             && await brands.GetByIdAsync(tenantId, brandId.Value, cancellationToken) is null)
         {
             return Error.Validation("Brand does not exist in this tenant.");
+        }
+
+        if (taxCategoryId.HasValue
+            && await taxRules.GetCategoryByIdAsync(taxCategoryId.Value, cancellationToken) is null)
+        {
+            return Error.Validation("Tax category does not exist.");
         }
 
         return null;

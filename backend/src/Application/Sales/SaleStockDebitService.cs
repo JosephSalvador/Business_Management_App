@@ -1,0 +1,98 @@
+using BusinessOS.Application.Ports;
+using BusinessOS.Domain.Inventory;
+using BusinessOS.Shared;
+
+namespace BusinessOS.Application.Sales;
+
+/// <summary>One line to debit from stock for a sale.</summary>
+public sealed record StockDebitLine(
+    Guid ProductId,
+    Guid? VariantId,
+    string ProductName,
+    Guid UnitOfMeasureId,
+    decimal Quantity,
+    bool DebitsStock);
+
+/// <summary>
+/// Atomic stock debit for a completed sale. Service lines (<see cref="StockDebitLine.DebitsStock"/>
+/// false) are skipped. All stocked lines are checked under a row lock before any balance is
+/// touched, so an insufficient line rejects the whole sale with no movements written — the
+/// offline-sync availability strategy re-checks availability at sync time.
+/// </summary>
+public sealed record StockDebitRequest(
+    Guid TenantId,
+    Guid BranchId,
+    Guid WarehouseId,
+    Guid StockLocationId,
+    Guid SaleId,
+    DateTime OccurredAt,
+    Guid? CreatedBy,
+    IReadOnlyCollection<StockDebitLine> Lines);
+
+/// <summary>
+/// Reusable stock-debit path used by the sale command: locks each balance row
+/// (<c>GetBalanceWithLockAsync</c>), verifies enough stock for every stocked line, then writes a
+/// <see cref="StockMovementType.Sale"/> ledger row (negative delta, reference = sale id) and
+/// debits the balance. Whole-sale rejection returns a <c>Validation</c> failure before anything
+/// is written.
+/// </summary>
+public sealed class SaleStockDebitService
+{
+    private readonly IStockRepository _stock;
+
+    public SaleStockDebitService(IStockRepository stock)
+    {
+        _stock = stock;
+    }
+
+    public async Task<Result> DebitAsync(StockDebitRequest request, CancellationToken cancellationToken)
+    {
+        var stocked = request.Lines.Where(l => l.DebitsStock).ToList();
+        if (stocked.Count == 0)
+        {
+            return Result.Success();
+        }
+
+        var locked = new List<(StockDebitLine Line, StockBalance Balance)>(stocked.Count);
+        foreach (var line in stocked)
+        {
+            var balance = await _stock.GetBalanceWithLockAsync(
+                request.TenantId,
+                request.WarehouseId,
+                request.StockLocationId,
+                line.ProductId,
+                line.VariantId,
+                cancellationToken);
+
+            if (balance is null || balance.Quantity < line.Quantity)
+            {
+                return Result.Failure(Error.Validation($"Insufficient stock for '{line.ProductName}'."));
+            }
+
+            locked.Add((line, balance));
+        }
+
+        foreach (var (line, balance) in locked)
+        {
+            var movement = StockMovement.Record(
+                request.TenantId,
+                request.BranchId,
+                request.WarehouseId,
+                request.StockLocationId,
+                line.ProductId,
+                line.VariantId,
+                StockMovementType.Sale,
+                -line.Quantity,
+                line.UnitOfMeasureId,
+                request.OccurredAt,
+                referenceType: "Sale",
+                referenceId: request.SaleId,
+                createdBy: request.CreatedBy);
+
+            await _stock.AddMovementAsync(movement, cancellationToken);
+            balance.Apply(-line.Quantity);
+        }
+
+        return Result.Success();
+    }
+}

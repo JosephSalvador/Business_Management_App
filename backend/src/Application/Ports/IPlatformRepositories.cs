@@ -4,6 +4,7 @@ using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
+using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Events;
 
@@ -308,4 +309,56 @@ public interface IDashboardRepository
         Guid tenantId, decimal maxQuantity, int limit, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RecentActivityItem>> ListRecentActivityAsync(
         Guid tenantId, int limit, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Read model for the tax engine: the tenant's regime, its effective rules on a date, the
+/// global category catalog, and the tenant's exemptions. Queries only.
+/// </summary>
+public interface ITaxRuleRepository
+{
+    Task<TaxRegime?> GetRegimeForTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<TaxCategory?> GetCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TaxCategory>> ListCategoriesByCodesAsync(
+        IEnumerable<string> codes, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TaxRule>> ListEffectiveRulesAsync(
+        Guid regimeId, DateTime onDate, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TaxExemption>> ListExemptionsAsync(
+        Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public sealed record SaleListFilter(
+    Guid? BranchId,
+    DateTime? FromDate,
+    DateTime? ToDate,
+    SaleStatus? Status,
+    string? Search);
+
+/// <summary>
+/// Completed sale persistence. <see cref="GetByClientSaleIdAsync"/> is the idempotency replay
+/// path — the client's <c>ClientSaleId</c> is unique per tenant.
+/// </summary>
+public interface ISaleRepository
+{
+    Task AddAsync(Sale sale, CancellationToken cancellationToken = default);
+    Task<Sale?> GetByIdAsync(
+        Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<Sale?> GetByClientSaleIdAsync(
+        Guid tenantId, Guid clientSaleId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Sale>> ListAsync(
+        Guid tenantId, int page, int pageSize, SaleListFilter filter, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(
+        Guid tenantId, SaleListFilter filter, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Receipt numbering. <see cref="AllocateAsync"/> advances the tenant's sequence for
+/// <paramref name="scope"/> under <c>SELECT ... FOR UPDATE</c>, creating the row on first use,
+/// and returns the next rendered number. Concurrency is additionally serialized per tenant by
+/// the sale command's advisory lock, so two tenants never share a number.
+/// </summary>
+public interface INumberSequenceRepository
+{
+    Task<string> AllocateAsync(
+        Guid tenantId, string scope, DateTime date, CancellationToken cancellationToken = default);
 }

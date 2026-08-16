@@ -10,6 +10,7 @@ public sealed record UpdateOrganizationCommand(
     string? ContactEmail,
     string? ContactPhone,
     string? Address,
+    string CountryCode,
     string? TaxId) : IRequest<Result<OrganizationDto>>;
 
 public sealed class UpdateOrganizationCommandHandler
@@ -39,6 +40,7 @@ public sealed class UpdateOrganizationCommandHandler
             command.ContactPhone?.Trim(),
             command.Address?.Trim(),
             command.TaxId?.Trim());
+        tenant.UpdateCountryCode(command.CountryCode);
 
         var dto = new OrganizationDto(
             tenant.Id,
@@ -47,6 +49,7 @@ public sealed class UpdateOrganizationCommandHandler
             tenant.ContactPhone,
             tenant.Address,
             tenant.Currency,
+            tenant.CountryCode,
             tenant.TaxId,
             tenant.IsActive);
 

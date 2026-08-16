@@ -45,6 +45,7 @@ public static class NotificationEngineExtensions
         services.AddScoped<IDomainEventHandler<PriceListCreatedEvent>, PricingActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<PriceListUpdatedEvent>, PricingActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<ProductPricesChangedEvent>, PricingActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<SaleCompletedEvent>, SalesActivityFeedHandler>();
 
         return services;
     }

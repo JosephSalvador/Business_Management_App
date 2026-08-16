@@ -15,7 +15,8 @@ public sealed record UpdateProductCommand(
     string? Barcode,
     Guid? CategoryId,
     Guid? BrandId,
-    Guid UnitOfMeasureId)
+    Guid UnitOfMeasureId,
+    Guid? TaxCategoryId = null)
     : IRequest<Result<ProductDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, Result<ProductDto>>
@@ -25,19 +26,22 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
     private readonly ICategoryRepository _categories;
     private readonly IBrandRepository _brands;
     private readonly IUnitOfMeasureRepository _units;
+    private readonly ITaxRuleRepository _taxRules;
 
     public UpdateProductCommandHandler(
         ITenantContext tenantContext,
         IProductRepository products,
         ICategoryRepository categories,
         IBrandRepository brands,
-        IUnitOfMeasureRepository units)
+        IUnitOfMeasureRepository units,
+        ITaxRuleRepository taxRules)
     {
         _tenantContext = tenantContext;
         _products = products;
         _categories = categories;
         _brands = brands;
         _units = units;
+        _taxRules = taxRules;
     }
 
     public async Task<Result<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -50,8 +54,9 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
         }
 
         if (await ProductReferenceGuard.EnsureReferencesValidAsync(
-                _tenantContext, _categories, _brands, _units,
-                command.UnitOfMeasureId, command.CategoryId, command.BrandId, cancellationToken) is { } error)
+                _tenantContext, _categories, _brands, _units, _taxRules,
+                command.UnitOfMeasureId, command.CategoryId, command.BrandId,
+                command.TaxCategoryId, cancellationToken) is { } error)
         {
             return error;
         }
@@ -90,7 +95,13 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             return Error.Conflict("A variant with this barcode already exists.");
         }
 
-        product.UpdateProfile(command.Name, command.Description, command.CategoryId, command.BrandId, command.UnitOfMeasureId);
+        product.UpdateProfile(
+            command.Name,
+            command.Description,
+            command.CategoryId,
+            command.BrandId,
+            command.UnitOfMeasureId,
+            command.TaxCategoryId);
         product.UpdateIdentifiers(sku, barcode);
 
         return Result.Success(ProductMappers.ToDto(product));

@@ -6,6 +6,7 @@ using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
+using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Entities;
 using BusinessOS.Shared.Events;
@@ -40,6 +41,14 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
     public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<TaxCategory> TaxCategories => Set<TaxCategory>();
+    public DbSet<TaxRegime> TaxRegimes => Set<TaxRegime>();
+    public DbSet<TaxRule> TaxRules => Set<TaxRule>();
+    public DbSet<TaxExemption> TaxExemptions => Set<TaxExemption>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleLine> SaleLines => Set<SaleLine>();
+    public DbSet<SalePayment> SalePayments => Set<SalePayment>();
+    public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -211,6 +220,10 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 .WithMany()
                 .HasForeignKey(p => p.UnitOfMeasureId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TaxCategory>()
+                .WithMany()
+                .HasForeignKey(p => p.TaxCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(p => p.Variants)
                 .WithOne()
                 .HasForeignKey(v => v.ProductId)
@@ -379,6 +392,137 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(o => o.Payload).IsRequired().HasColumnType("jsonb");
             entity.HasIndex(o => new { o.ProcessedAt, o.OccurredAt });
         });
+
+        modelBuilder.Entity<TaxCategory>(entity =>
+        {
+            entity.ToTable(Tables.Sales.TaxCategories, Schemas.Sales);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Code).IsRequired().HasMaxLength(50);
+            entity.Property(c => c.Name).IsRequired().HasMaxLength(200);
+            entity.HasIndex(c => c.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<TaxRegime>(entity =>
+        {
+            entity.ToTable(Tables.Sales.TaxRegimes, Schemas.Sales);
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Code).IsRequired().HasMaxLength(50);
+            entity.Property(r => r.Name).IsRequired().HasMaxLength(200);
+            entity.Property(r => r.CountryCode).IsRequired().HasMaxLength(2);
+            entity.HasIndex(r => r.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<TaxRule>(entity =>
+        {
+            entity.ToTable(Tables.Sales.TaxRules, Schemas.Sales);
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Code).IsRequired().HasMaxLength(50);
+            entity.Property(r => r.Rate).IsRequired().HasColumnType("decimal(18,4)");
+            entity.Property(r => r.CalculationStrategyKey).HasMaxLength(100);
+            entity.HasIndex(r => new { r.RegimeId, r.CategoryId, r.Code, r.EffectiveFrom }).IsUnique();
+            entity.HasOne<TaxRegime>()
+                .WithMany()
+                .HasForeignKey(r => r.RegimeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TaxCategory>()
+                .WithMany()
+                .HasForeignKey(r => r.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TaxExemption>(entity =>
+        {
+            entity.ToTable(Tables.Sales.TaxExemptions, Schemas.Sales);
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TransactionType).HasMaxLength(50);
+            entity.HasIndex(e => new { e.TenantId, e.CategoryId });
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TaxCategory>()
+                .WithMany()
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Sale>(entity =>
+        {
+            entity.ToTable(Tables.Sales.SalesTable, Schemas.Sales);
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Number).IsRequired().HasMaxLength(50);
+            entity.Property(s => s.Currency).IsRequired().HasMaxLength(3);
+            entity.Property(s => s.CustomerName).HasMaxLength(200);
+            entity.Property(s => s.CustomerTin).HasMaxLength(100);
+            entity.Property(s => s.VoidReason).HasMaxLength(500);
+            entity.Property(s => s.BuyerTin).HasMaxLength(100);
+            entity.Property(s => s.BuyerName).HasMaxLength(200);
+            entity.Property(s => s.BuyerIdType).HasMaxLength(50);
+            entity.Property(s => s.BuyerMobile).HasMaxLength(50);
+            entity.Property(s => s.FiscalReceiptNumber).HasMaxLength(100);
+            entity.Property(s => s.FiscalVerificationCode).HasMaxLength(100);
+            entity.Property(s => s.FiscalZNumber).HasMaxLength(50);
+            entity.HasIndex(s => new { s.TenantId, s.ClientSaleId }).IsUnique();
+            entity.HasIndex(s => new { s.TenantId, s.Number })
+                .IsUnique()
+                .HasFilter("\"Number\" IS NOT NULL");
+            entity.HasIndex(s => new { s.TenantId, s.BranchId, s.SaleDate });
+            entity.HasMany(s => s.Lines)
+                .WithOne()
+                .HasForeignKey(l => l.SaleId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(s => s.Payments)
+                .WithOne()
+                .HasForeignKey(p => p.SaleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SaleLine>(entity =>
+        {
+            entity.ToTable(Tables.Sales.SaleLines, Schemas.Sales);
+            entity.HasKey(l => l.Id);
+            entity.Property(l => l.ProductName).IsRequired().HasMaxLength(200);
+            entity.Property(l => l.Sku).HasMaxLength(64);
+            entity.Property(l => l.Barcode).HasMaxLength(64);
+            entity.Property(l => l.UnitOfMeasureName).HasMaxLength(100);
+            entity.Property(l => l.TaxCode).IsRequired().HasMaxLength(50);
+            entity.Property(l => l.AppliedRate).HasColumnType("decimal(18,4)");
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(l => l.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductVariant>()
+                .WithMany()
+                .HasForeignKey(l => l.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UnitOfMeasure>()
+                .WithMany()
+                .HasForeignKey(l => l.UnitOfMeasureId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SalePayment>(entity =>
+        {
+            entity.ToTable(Tables.Sales.SalePayments, Schemas.Sales);
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Provider).HasMaxLength(100);
+            entity.Property(p => p.PhoneNumber).HasMaxLength(50);
+            entity.Property(p => p.Reference).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<NumberSequence>(entity =>
+        {
+            entity.ToTable(Tables.Sales.NumberSequences, Schemas.Sales);
+            entity.HasKey(n => n.Id);
+            entity.Property(n => n.Scope).IsRequired().HasMaxLength(100);
+            entity.Property(n => n.Prefix).IsRequired().HasMaxLength(50);
+            entity.Property(n => n.Pattern).IsRequired().HasMaxLength(200);
+            entity.HasIndex(n => new { n.TenantId, n.Scope }).IsUnique();
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(n => n.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -438,11 +582,13 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
 
         foreach (var entry in ChangeTracker.Entries<AggregateRoot>().ToList())
         {
+            var tenantId = entry.Entity.GetType().GetProperty("TenantId")?.GetValue(entry.Entity) as Guid?;
             foreach (var domainEvent in entry.Entity.DomainEvents)
             {
                 var message = new OutboxMessage
                 {
                     Id = Guid.NewGuid(),
+                    TenantId = tenantId,
                     Type = domainEvent.GetType().FullName ?? domainEvent.GetType().Name,
                     Payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
                     OccurredAt = domainEvent.OccurredAt,

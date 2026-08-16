@@ -15,6 +15,7 @@ public sealed record ProductDto(
     ProductType ProductType,
     ProductStatus Status,
     IReadOnlyList<ProductVariantDto> Variants,
+    Guid? TaxCategoryId,
     DateTime CreatedAt,
     DateTime? UpdatedAt);
 

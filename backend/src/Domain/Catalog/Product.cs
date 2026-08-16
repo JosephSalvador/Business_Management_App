@@ -18,7 +18,8 @@ public sealed class Product : AggregateRoot
         Guid? brandId,
         Guid unitOfMeasureId,
         ProductType productType,
-        ProductStatus status)
+        ProductStatus status,
+        Guid? taxCategoryId)
         : base(id)
     {
         TenantId = tenantId;
@@ -31,6 +32,7 @@ public sealed class Product : AggregateRoot
         UnitOfMeasureId = unitOfMeasureId;
         ProductType = productType;
         Status = status;
+        TaxCategoryId = taxCategoryId;
     }
 
     public Guid TenantId { get; private set; }
@@ -43,6 +45,7 @@ public sealed class Product : AggregateRoot
     public Guid UnitOfMeasureId { get; private set; }
     public ProductType ProductType { get; private set; }
     public ProductStatus Status { get; private set; }
+    public Guid? TaxCategoryId { get; private set; }
 
     public bool HasVariants => _variants.Count > 0;
     public IReadOnlyCollection<ProductVariant> Variants => _variants.AsReadOnly();
@@ -57,7 +60,8 @@ public sealed class Product : AggregateRoot
         Guid? brandId,
         Guid unitOfMeasureId,
         ProductType productType,
-        ProductStatus status = ProductStatus.Draft)
+        ProductStatus status = ProductStatus.Draft,
+        Guid? taxCategoryId = null)
     {
         var product = new Product(
             Guid.NewGuid(),
@@ -70,7 +74,8 @@ public sealed class Product : AggregateRoot
             brandId,
             unitOfMeasureId,
             productType,
-            status);
+            status,
+            taxCategoryId);
 
         product.AddDomainEvent(new ProductCreatedEvent(
             Guid.NewGuid(), DateTime.UtcNow, product.Id, tenantId, product.Name, product.Sku));
@@ -78,13 +83,20 @@ public sealed class Product : AggregateRoot
         return product;
     }
 
-    public void UpdateProfile(string name, string? description, Guid? categoryId, Guid? brandId, Guid unitOfMeasureId)
+    public void UpdateProfile(
+        string name,
+        string? description,
+        Guid? categoryId,
+        Guid? brandId,
+        Guid unitOfMeasureId,
+        Guid? taxCategoryId = null)
     {
         Name = name.Trim();
         Description = description;
         CategoryId = categoryId;
         BrandId = brandId;
         UnitOfMeasureId = unitOfMeasureId;
+        TaxCategoryId = taxCategoryId;
 
         AddDomainEvent(new ProductUpdatedEvent(Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, Name));
     }

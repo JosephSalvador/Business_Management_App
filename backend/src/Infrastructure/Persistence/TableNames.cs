@@ -14,6 +14,7 @@ public static class Schemas
     public const string Inventory = "public";
     public const string Pricing = "public";
     public const string Platform = "public";
+    public const string Sales = "public";
 }
 
 /// <summary>
@@ -67,5 +68,17 @@ public static class Tables
         public const string AuditLogs = "AuditLogs";
         public const string FeatureFlags = "FeatureFlags";
         public const string OutboxMessages = "OutboxMessages";
+    }
+
+    public static class Sales
+    {
+        public const string TaxCategories = "TaxCategories";
+        public const string TaxRegimes = "TaxRegimes";
+        public const string TaxRules = "TaxRules";
+        public const string TaxExemptions = "TaxExemptions";
+        public const string SalesTable = "Sales";
+        public const string SaleLines = "SaleLines";
+        public const string SalePayments = "SalePayments";
+        public const string NumberSequences = "NumberSequences";
     }
 }

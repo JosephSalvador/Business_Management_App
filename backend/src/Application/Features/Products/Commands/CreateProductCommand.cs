@@ -16,7 +16,8 @@ public sealed record CreateProductCommand(
     Guid? BrandId,
     Guid UnitOfMeasureId,
     ProductType ProductType,
-    ProductStatus Status = ProductStatus.Draft)
+    ProductStatus Status = ProductStatus.Draft,
+    Guid? TaxCategoryId = null)
     : IRequest<Result<ProductDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<ProductDto>>
@@ -26,19 +27,22 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
     private readonly ICategoryRepository _categories;
     private readonly IBrandRepository _brands;
     private readonly IUnitOfMeasureRepository _units;
+    private readonly ITaxRuleRepository _taxRules;
 
     public CreateProductCommandHandler(
         ITenantContext tenantContext,
         IProductRepository products,
         ICategoryRepository categories,
         IBrandRepository brands,
-        IUnitOfMeasureRepository units)
+        IUnitOfMeasureRepository units,
+        ITaxRuleRepository taxRules)
     {
         _tenantContext = tenantContext;
         _products = products;
         _categories = categories;
         _brands = brands;
         _units = units;
+        _taxRules = taxRules;
     }
 
     public async Task<Result<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
@@ -46,8 +50,9 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
         var tenantId = _tenantContext.TenantId;
 
         if (await ProductReferenceGuard.EnsureReferencesValidAsync(
-                _tenantContext, _categories, _brands, _units,
-                command.UnitOfMeasureId, command.CategoryId, command.BrandId, cancellationToken) is { } error)
+                _tenantContext, _categories, _brands, _units, _taxRules,
+                command.UnitOfMeasureId, command.CategoryId, command.BrandId,
+                command.TaxCategoryId, cancellationToken) is { } error)
         {
             return error;
         }
@@ -85,7 +90,8 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             command.BrandId,
             command.UnitOfMeasureId,
             command.ProductType,
-            command.Status);
+            command.Status,
+            command.TaxCategoryId);
 
         await _products.AddAsync(product, cancellationToken);
         return Result.Success(ProductMappers.ToDto(product));

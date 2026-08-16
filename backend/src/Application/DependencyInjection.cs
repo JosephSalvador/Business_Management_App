@@ -1,5 +1,6 @@
 using System.Reflection;
 using BusinessOS.Application.Behaviors;
+using BusinessOS.Application.Tax;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +19,7 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+        services.AddScoped<ITaxEngine, TaxService>();
 
         return services;
     }

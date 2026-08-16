@@ -89,6 +89,11 @@ public sealed class StockMovement : AggregateRoot
             throw new ArgumentException("Opening stock quantity must be positive.", nameof(quantity));
         }
 
+        if (movementType == StockMovementType.Sale && quantity >= 0)
+        {
+            throw new ArgumentException("Sale stock quantity must be negative.", nameof(quantity));
+        }
+
         var movement = new StockMovement(
             Guid.NewGuid(),
             tenantId,

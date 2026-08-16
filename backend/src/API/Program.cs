@@ -15,6 +15,7 @@ using BusinessOS.Infrastructure.Jobs;
 using BusinessOS.Infrastructure.Persistence;
 using BusinessOS.Infrastructure.Security;
 using BusinessOS.Infrastructure.Storage;
+using BusinessOS.Localizations;
 using BusinessOS.Notifications;
 using BusinessOS.Shared.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -43,7 +44,8 @@ builder.Services
     .AddNotificationEngine()
     .AddFileStorage(builder.Configuration)
     .AddJobQueue()
-    .AddPermissionEngine();
+    .AddPermissionEngine()
+    .AddLocalizations();
 
 builder.Services.AddScoped<IAuditContextProvider, HttpAuditContextProvider>();
 
@@ -204,6 +206,7 @@ app.MapReferenceDataEndpoints();
 app.MapInventoryEndpoints();
 app.MapPricingEndpoints();
 app.MapDashboardEndpoints();
+app.MapSalesEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
 {
