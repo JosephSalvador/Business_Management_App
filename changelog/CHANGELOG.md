@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.7.0 — 2026-08-16 — Slice 6: Sales POS backend
+
+- **Domain:** `Sale` aggregate (`SaleLine`, `SalePayment`, `SaleStatus`/`SaleSource`/
+  `FiscalStatus`/`PaymentMethod`, exact reconciliation + full-payment guard, fiscal
+  placeholders written only by the fiscal adapter), `SaleCompletedEvent`, `NumberSequence`
+  (`{prefix}-{year}-{sequence:NNN}`, monotonic `Allocate`, advisory-locked), and
+  `SaleStockDebitService` (row-lock, check-all-then-apply, whole-sale rejection,
+  `DebitsStock:false` service path).
+- **Tax Engine:** `TaxCategory`/`TaxRegime`/`TaxRule`/`TaxExemption` entities,
+  `ITaxEngine` port + `TaxService` (temporal rule matching, category fallback, exemption
+  overlay, strategy dispatch), core `DefaultPercentageTaxStrategy` (`Simple`), and
+  `TZ_DUAL_VAT` dual-VAT A/B plugin under `BusinessOS.Localizations.Tanzania.Tax` —
+  selection is data-driven via `TaxRule.CalculationStrategyKey` (core never references a
+  country).
+- **Catalog/tenant wiring:** `Products.TaxCategoryId`, `Tenants.CountryCode`
+  (`UpdateOrganizationCommand` requires `^[A-Z]{2}$`, tenant default `TZ`), migrations
+  `AddProductTaxCategory`/`AddTenantCountryCode`/`AddSalesAndTax`, tax catalog seeded
+  get-or-create.
+- **Application:** `CreateSaleCommand` (branch/warehouse resolution, per-line
+  `ResolvePricesAsync` + `PriceResolver`, `TaxEngine`, totals = Σ line taxes,
+  payments-cover-total, number allocated then stock debit, **idempotent `ClientSaleId`
+  replay**), `GetSaleQuery`/`ListSalesQuery` (branch/date-range/status/search filter,
+  paged), DTOs + mappers, FluentValidation validators, `ITaxEngine → TaxService` DI
+  registration.
+- **API + events:** `SalesEndpoints` — `POST/GET /api/v1/sales`, `GET /api/v1/sales/{id}`,
+  `RequirePermission(Sales.Create/View)`; POST honors an `Idempotency-Key` header
+  (authoritative `ClientSaleId` when parseable); `SalesActivityFeedHandler` consumes
+  `SaleCompletedEvent`; outbox writer stamps `OutboxMessage.TenantId`.
+- **Tests:** 357 passing (14 new integration tests: happy path, no-price 400,
+  insufficient-stock 400 with full rollback, mixed A/C cart, electronic w/o TIN → rate B,
+  service line skips stock, replay idempotency, header-vs-body key precedence, split
+  cash + M-Pesa, tenant isolation, 403 viewer, paged list). Integration run exposed and
+  fixed four real defects: missing `ITaxEngine` DI registration, `Sale.Reconcile`
+  cross-check incompatible with rate-B totals, auto-selected warehouse loading without
+  `Include(Locations)`, and un-stamped outbox `TenantId`.
+- **Scope:** core backend slice only — void/returns (6c-void), fiscal adapters, and the
+  Flutter offline POS are tracked follow-ups.
+
 ## v0.6.0 — 2026-08-15 — Slice 5: Operational Dashboard (backend slice)
 
 - **Ports + repository:** `IDashboardRepository` in `Application/Ports` with snapshot records

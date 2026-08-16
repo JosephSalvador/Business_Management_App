@@ -163,6 +163,48 @@ Recorded as changelog entry v0.5.0 (matches local-release convention; no git tag
 
 Recorded as changelog entry v0.6.0 (matches local-release convention; no git tag).
 
+### Slice 6 (Sales POS) backend verification (2026-08-16)
+
+- `dotnet build` all projects — **0 warnings, 0 errors** (warnings-as-errors).
+- `dotnet format` — clean.
+- `dotnet test backend/tests/BusinessOS.Tests` — **357/357 pass** (unit + integration against
+  real Postgres `businessos_test`): 14 new sales integration tests cover happy path (stock
+  5→4, `Sale` movement, `S-2026-000001`, audit row, processed outbox), no-price → 400,
+  insufficient stock → 400 with full rollback (no sale/movement/outbox; retry still issues
+  000001 — no sequence burn), mixed VAT A/C cart, electronic w/o TIN → rate B
+  (98.31/13.56), service line skips stock, `ClientSaleId`/`Idempotency-Key` replay (no double
+  stock/number/event), header-key precedence over body key, split cash + M-Pesa
+  reconciliation, tenant isolation, 403 for `Sales.View`-only role, paged list filters.
+- Integration run exposed and fixed four real defects: **missing `ITaxEngine → TaxService`
+  DI registration** (all sales 500'd); **`Sale.Reconcile` cross-check** `totalAmount ==
+  subtotal − discount` impossible under dual-VAT rate B (relaxed to header-as-aggregator
+  `total == Σ(lineTotal − disc)`); **auto-selected warehouse** (no `warehouseId`) loaded via
+  `ListAsync` without `Include(Locations)` → `ResolveStockLocation` crash (now `GetByIdAsync`
+  + null → 404); **outbox `TenantId` never stamped** (all rows NULL; now stamped from the
+  aggregate so tenant-scoped outbox queries work).
+
+### Slice 6 release checkpoint (2026-08-16)
+
+**Slice 6 — Sales POS backend is release-ready.**
+
+| Gate | Status |
+|---|---|
+| Spec `specs/sales-pos.md` | ✅ implemented & verified |
+| Tasks `tasks/sales-pos/TASKS.md` | ✅ 001–015 ticked (016 in flight) |
+| Build `--warnaserror` | ✅ 0 warnings, 0 errors |
+| `dotnet format` verify | ✅ whitespace + style clean |
+| Full test suite | ✅ 357/357 (unit + integration vs. `businessos_test`) |
+| Permission (`Sales.Create`/`Sales.View`) | ✅ all 3 endpoints `RequirePermission`-gated |
+| Audit | ✅ audit row written per sale |
+| Events | ✅ `SaleCompletedEvent` → outbox → activity-feed consumer |
+| Idempotency | ✅ `ClientSaleId` + `Idempotency-Key` replay (no double stock/number/event) |
+| Stock debit | ✅ row-locked, check-all-then-apply, whole-sale rejection, full rollback on failure |
+| Migrations | ✅ `AddProductTaxCategory`, `AddTenantCountryCode`, `AddSalesAndTax` applied to dev DB |
+| Changelog | ✅ v0.7.0 |
+| Flutter follow-up | offline POS (device queue, sync, Drift) + fiscal adapters (deferred) |
+
+Recorded as changelog entry v0.7.0 (matches local-release convention; no git tag).
+
 ## 4. Known remaining gaps (Phase 0.5 → Phase 1)
 
 These are **non-blocking for Phase 1 module starts** but tracked as next tasks:
@@ -195,8 +237,10 @@ place. With Organizations & Branches (Slice 1), Users/Roles/Permissions (Slice 2
 **Product & Inventory Foundation (Slice 3)** complete — products/SKU/barcode/units,
 per-branch pricing, warehouses + stock — the commercial core is in place so a sale always
 resolves a real product/price/tax/branch/stock. The **Operational Dashboard (Slice 5)**
-provides read-only summary/low-stock/recent-activity KPIs over that foundation. Next slice:
-**Sales + Offline POS**, then Purchasing and Accounting.
+provides read-only summary/low-stock/recent-activity KPIs over that foundation. **Sales POS
+backend (Slice 6) is now done 2026-08-16** — the first mutating slice to consume the whole
+commercial core: a sale always resolves a real product/price/tax/branch/stock, debits stock,
+and emits an event (357 tests). Next: Purchasing and Accounting, then the Flutter offline POS.
 
 ## 6. Suggested next tasks
 
@@ -204,7 +248,9 @@ provides read-only summary/low-stock/recent-activity KPIs over that foundation. 
 2. Tenant provisioning endpoint (`/api/v1/admin/tenants` or onboarding flow).
 3. ~~First business slice with `RequirePermission` + integration test~~ — **done**
    (Organizations & Branches). **Product & Inventory Foundation (Slice 3) also done
-   2026-08-15** (products, per-branch pricing engine, warehouses + stock, 224 tests). Next:
-   **Sales + Offline POS** (the Operational Dashboard slice is done 2026-08-15 — summary/
-   low-stock/recent-activity KPIs, 236 tests).
+   2026-08-15** (products, per-branch pricing engine, warehouses + stock, 224 tests).
+   **Sales POS backend (Slice 6) done 2026-08-16** (357 tests) — dashboard and sales
+   endpoints give a complete server-side commercial core. Next: **Purchasing** then
+   **Accounting**, or the **Flutter offline POS** (device queue, sync, Drift, thermal
+   print, fiscal adapters) as the client follow-up.
 4. ADRs for Phase 0.5 decisions.

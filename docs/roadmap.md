@@ -245,6 +245,13 @@ Platform (Phase 0) → then Core Business modules, in this order:
 6. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns,
    discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo
    Pesa, Mixx by Yas, HaloPesa).
+   `[x] backend slice 2026-08-16` — spec `specs/sales-pos.md`: Sales domain (`Sale`
+   aggregate, exact reconciliation + full payment), Tax Engine (temporal rules, exemptions,
+   strategy dispatch, `TZ_DUAL_VAT` dual-VAT A/B plugin under `Localizations/`), numbering
+   (`NumberSequence`), row-locked stock debit, `CreateSaleQuery`/`ListSalesQuery` +
+   `SalesEndpoints` (`Sales.Create`/`Sales.View`), `ClientSaleId`/`Idempotency-Key` replay,
+   `SaleCompletedEvent` activity-feed consumer, 357 tests. Void/returns and fiscal adapters
+   are the follow-up (6c-void); Flutter offline POS builds on this foundation.
 7. **Inventory** — products, warehouses, stock movements, counts, transfers, batches.
 8. **Purchasing** — suppliers, RFQs, POs, goods-received, supplier bills.
 9. **Accounting basics** — chart of accounts, journal entries, general ledger, trial balance.

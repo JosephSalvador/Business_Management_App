@@ -33,6 +33,28 @@
   `TableNames.cs` and generating one migration. Do not split schemas until Sales, Inventory,
   and Accounting are stable.
 
+## Localization strategy (tax, fiscal, revenue authorities)
+
+Country-specific behavior is a plug-in, never core logic. This is the Odoo `l10n_*` pattern:
+the core tax engine is agnostic and the database decides which plug-in applies.
+
+- Every localization lives under `backend/src/Localizations/<Country>/` (e.g. `Tanzania/Tax/`,
+  `Tanzania/Fiscal/`, `Kenya/Tax/`). The core references `ITaxCalculationStrategy` (and standard
+  domain events), never a country by name.
+- The platform selects a localization at sale time through the `CalculationStrategyKey` stored on
+  the tenant regime's `TaxRule` rows. The core blindly asks DI for the strategy; no `if
+  (country == "TZ")` switches anywhere.
+- **No core changes for a new country.** A localization only implements the strategy contract or
+  consumes standard domain events. Never alter the `Sale` aggregate to add a country-specific
+  column.
+- **Localization never blocks checkout.** Fiscal/revenue-authority integration (e.g. TRA VFD) runs
+  as an asynchronous outbox consumer, strictly opt-in per tenant. A government API being down can
+  never reject or delay a sale.
+- **Rely on the snapshot.** Localizations read from `TaxLineSnapshot` and the `Sale` fiscal
+  placeholders (e.g. `FiscalReceiptNumber`) — never recompute the totals on the fly.
+- Core fallback stays `DefaultPercentageTaxStrategy` (`Simple`), which covers the majority of
+  jurisdictions. Shipped localizations: `TZ_DUAL_VAT` in `Localizations/Tanzania/Tax/`.
+
 ## Process rules
 
 - Read `docs/ArchitectureRules.md` + `docs/CodingStandards.md` + the feature spec before coding.

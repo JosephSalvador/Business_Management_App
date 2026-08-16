@@ -141,6 +141,74 @@
   newest-first with actor email, 403 for Dashboard.View-less role, tenant isolation, no audit
   rows on reads). Full suite 236/236 passing; changelog v0.6.0. Flutter dashboard screens are
   the follow-up.
+- **Phase 1 slice 6 (Sales POS backend), in progress (tasks 004–013 done 2026-08-16):** the
+  active slice (6a core + 6b application/API/events + 6c tests/docs). See
+  `tasks/sales-pos/TASKS.md`. **Localization strategy (locked):** core never references a
+  country; selection is data-driven via `TaxRule.CalculationStrategyKey` (`Simple` fallback in
+  `DefaultPercentageTaxStrategy`; `TZ_DUAL_VAT` in `Localizations/Tanzania/Tax/TzDualVatTaxStrategy`).
+  Done: 004 `Products.TaxCategoryId` + `Tenants.CountryCode` (+ migration `AddProductTaxCategory`/
+  `AddTenantCountryCode`, `ProductReferenceGuard`, `ITaxRuleRepository` EF impl + DI); 005
+  `UpdateOrganizationCommand` requires `CountryCode` (`^[A-Z]{2}$`, tenant default `TZ`);
+  002a localization reorg (`Localizations/BusinessOS.Localizations.csproj`,
+  `AddLocalizations()`); 006 `Sale` aggregate (`SaleLine`, `SalePayment`, enums
+  `SaleStatus/SaleSource/FiscalStatus/PaymentMethod`, `SaleCompletedEvent`, exact
+  reconciliation + full payment, fiscal placeholders written only by the fiscal adapter); 007
+  `NumberSequence` (pattern `{prefix}-{year}-{sequence:NNN}`, monotonic `Allocate`, manual
+  placeholder parsing); 008 `SaleStockDebitService` (row-lock, check-all-then-apply,
+  whole-sale rejection, `DebitsStock:false` skip, movement refs `Sale`/SaleId); 009 migration
+  `20260816061229_AddSalesAndTax` (Sales/SaleLines/SalePayments/NumberSequences, unique
+  `(TenantId, ClientSaleId)` + partial unique `(TenantId, Number)`, cascade FKs) applied to
+  dev DB; 010 repositories `ISaleRepository` (+`SaleListFilter`) and
+  `INumberSequenceRepository.AllocateAsync` (advisory-lock + `SELECT ... FOR UPDATE`,
+  get-or-create via `NumberSequence.CreateSaleSequence`) + EF impls + DI registration; 011
+  `CreateSaleCommand` + handler (branch/warehouse resolution — explicit warehouse must belong
+  to branch else `Validation`, default = branch's first warehouse; price via
+  `ResolvePricesAsync` + `PriceResolver` (Retail); per-line tax item + `TaxEngine`; totals =
+  Σ line taxes, `TotalAmount` = Σ(lineTotal − disc); payments must fully cover; number
+  allocated then `SaleStockDebitService`; persist + event) + `CreateSaleCommandValidator`
+  (`EffectiveAt ≤ UtcNow+5min` skew, lines/payments non-empty, line qty ≥ 1, discount ≥ 0) +
+  `SalesDtos` + `SalesMappers` (customer nulled when Name/Tin/IsVatRegistered all null) +
+  **idempotent `ClientSaleId` replay** (existing sale returned before any side work). Default
+  tax category `VAT_STANDARD`; money 2-dp `MidpointRounding.AwayFromZero`. Unit tests: +14
+  command (happy path, replay, no-price, payments-below-total, non-active, branch-not-found,
+  service line skips stock, discount applies/caps, split payment, no-cashier, wrong-branch
+  warehouse, insufficient stock zero-movements, variant-without-variant) + 7 validator
+  (future-skew, empty lines, fractional qty, no payments, bad source, negative discount).
+  Full suite 331/331 passing, build `--warnaserror` clean. Integration coverage lands in
+  014/015. 012 queries `GetSaleQuery`/`ListSalesQuery` (branch/date-range/status/search
+  `SaleListFilter`, paged `PagedResult<SaleDto>`, reuses 011 DTOs/mappers; not-found → 404)
+  + `GetSaleQueryValidator`/`ListSalesQueryValidator` (page ≥ 1, pageSize 1..100,
+  FromDate ≤ ToDate); unit tests +10 (suite 341/341). 013 `SalesEndpoints` `POST/GET
+  `/api/v1/sales` + `GET /{id}` (`Sales.Create`/`Sales.View`) + `Program.cs` registration +
+  `SalesActivityFeedHandler` (`SaleCompletedEvent`); POST honors `Idempotency-Key` header
+  (authoritative `ClientSaleId` when parseable); spec contract `customer { name?, phone?,
+  tin? }` threaded through (`CustomerPhone` → `Sale.BuyerMobile`, `SaleCustomerDto.Phone`);
+  unit tests +2 customer snapshot (suite 343/343). **Next:** 014 offline contract,
+  015 integration suite, 016 docs + commit.
+- **014/015 offline contract + integration suite, done 2026-08-16:** 14 integration tests
+  (`SalesOfflineContractTests` + `SalesEndpointsTests`, real API + Postgres) added and green —
+  full suite 357/357, build `--warnaserror` clean. Coverage: happy path (stock 5→4, `Sale`
+  movement, `S-2026-000001`, audit row, processed outbox), no-price → 400, insufficient stock →
+  400 with full rollback (no sale/movement/outbox; retry issues 000001 proving no sequence
+  burn), split cash + M-Pesa reconciliation, mixed A/C cart, electronic w/o TIN → rate B
+  (98.31/13.56), service line skips stock, replay idempotency (no double stock/number/event),
+  `Idempotency-Key` authoritative over body `clientSaleId`, tenant isolation, 403 for viewer.
+  **Real defects found & fixed by the integration run:** (1) `ITaxEngine → TaxService` was never
+  registered in DI — all sales 500'd (`Unable to resolve service`); added `AddScoped` in
+  `Application/DependencyInjection.cs`. (2) `Sale.Reconcile` demanded `totalAmount == subtotal −
+  discount`, impossible under dual-VAT rate B (collectable 98.31 < shelf gross 100); relaxed to
+  header-as-aggregator (`total == Σ(lineTotal − disc)`), the cross-check removed deliberately.
+  (3) `CreateSaleCommandHandler` else-branch (no `warehouseId`) loaded the branch warehouse via
+  `ListAsync` (`AsNoTracking`, no `Include(Locations)`) then `ResolveStockLocation` threw
+  `Sequence contains no elements`; now re-loads via `GetByIdAsync` (locations included). (4)
+  Outbox writer never populated `OutboxMessage.TenantId` (column existed, all rows NULL); now
+  stamped from the aggregate's `TenantId` via reflection — the shared-DB integration tests can
+  assert tenant-scoped, and tenant-scoped outbox queries work. Test-side fixes only: opening
+  stock writes a `StockMovement` (so "exactly 1 movement" → filter `MovementType == Sale`);
+  `discountAmount` must be `0m` not `null` (non-nullable `decimal` in
+  `CreateSaleLineInput`); insufficient-stock test needs `amountPaid = 200m` (payment check runs
+  before stock check); `SetPrices` REPLACES the list's prices (mixed cart must PUT both prices
+  in one call); Maize Flour needs opening stock. **Next:** 016 docs + commit.
 
 ## coding.md — see `docs/CodingStandards.md`
 
