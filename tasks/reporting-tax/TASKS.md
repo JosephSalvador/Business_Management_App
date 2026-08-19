@@ -52,5 +52,5 @@
 - [x] 012 **Unit tests — full suite**: Target 25+ unit tests across all handlers, validators,
        and CSV export. Verify: date range filtering, branch filtering, top-N limiting, CSV
        encoding, edge cases (empty data, single sale, multiple tax codes).
-- [ ] 013 **Docs + Commit**: Update `memory/project.md`. Mark spec implemented. Changelog
+- [x] 013 **Docs + Commit**: Update `memory/project.md`. Mark spec implemented. Changelog
        entry. Commit.
