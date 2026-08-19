@@ -207,6 +207,9 @@ app.MapInventoryEndpoints();
 app.MapPricingEndpoints();
 app.MapDashboardEndpoints();
 app.MapSalesEndpoints();
+app.MapPurchasingEndpoints();
+app.MapAccountingEndpoints();
+app.MapReportingEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
 {

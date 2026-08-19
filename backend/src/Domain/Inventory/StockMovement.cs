@@ -26,6 +26,7 @@ public sealed class StockMovement : AggregateRoot
         Guid? referenceId,
         string? reason,
         string? correlationId,
+        Guid? batchId,
         Guid? createdBy)
         : base(id)
     {
@@ -43,6 +44,7 @@ public sealed class StockMovement : AggregateRoot
         ReferenceId = referenceId;
         Reason = reason;
         CorrelationId = correlationId;
+        BatchId = batchId;
         CreatedBy = createdBy;
         CreatedAt = occurredAt;
     }
@@ -61,6 +63,7 @@ public sealed class StockMovement : AggregateRoot
     public Guid? ReferenceId { get; private set; }
     public string? Reason { get; private set; }
     public string? CorrelationId { get; private set; }
+    public Guid? BatchId { get; private set; }
 
     public static StockMovement Record(
         Guid tenantId,
@@ -77,6 +80,7 @@ public sealed class StockMovement : AggregateRoot
         Guid? referenceId = null,
         string? reason = null,
         string? correlationId = null,
+        Guid? batchId = null,
         Guid? createdBy = null)
     {
         if (quantity == 0)
@@ -92,6 +96,21 @@ public sealed class StockMovement : AggregateRoot
         if (movementType == StockMovementType.Sale && quantity >= 0)
         {
             throw new ArgumentException("Sale stock quantity must be negative.", nameof(quantity));
+        }
+
+        if (movementType == StockMovementType.SaleVoid && quantity <= 0)
+        {
+            throw new ArgumentException("Sale void stock quantity must be positive.", nameof(quantity));
+        }
+
+        if (movementType == StockMovementType.TransferIn && quantity <= 0)
+        {
+            throw new ArgumentException("Transfer in quantity must be positive.", nameof(quantity));
+        }
+
+        if (movementType == StockMovementType.TransferOut && quantity >= 0)
+        {
+            throw new ArgumentException("Transfer out quantity must be negative.", nameof(quantity));
         }
 
         var movement = new StockMovement(
@@ -110,6 +129,7 @@ public sealed class StockMovement : AggregateRoot
             referenceId,
             reason,
             correlationId,
+            batchId,
             createdBy);
 
         movement.AddDomainEvent(new StockMovementRecordedEvent(
@@ -121,6 +141,13 @@ public sealed class StockMovement : AggregateRoot
             movement.AddDomainEvent(new OpeningStockRecordedEvent(
                 Guid.NewGuid(), DateTime.UtcNow, movement.Id, tenantId, warehouseId, stockLocationId,
                 productId, variantId, quantity, occurredAt));
+        }
+
+        if (movementType == StockMovementType.Adjustment)
+        {
+            movement.AddDomainEvent(new StockAdjustedEvent(
+                Guid.NewGuid(), DateTime.UtcNow, movement.Id, tenantId, warehouseId, stockLocationId,
+                productId, variantId, quantity, reason ?? string.Empty, createdBy));
         }
 
         return movement;

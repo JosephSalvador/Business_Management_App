@@ -45,6 +45,18 @@ public sealed class GetSaleQueryValidator : AbstractValidator<GetSaleQuery>
     public GetSaleQueryValidator() => RuleFor(x => x.Id).NotEmpty();
 }
 
+public sealed class VoidSaleCommandValidator : AbstractValidator<VoidSaleCommand>
+{
+    public VoidSaleCommandValidator()
+    {
+        RuleFor(x => x.SaleId).NotEmpty();
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .WithMessage("A void reason is required.")
+            .MaximumLength(500);
+    }
+}
+
 public sealed class ListSalesQueryValidator : AbstractValidator<ListSalesQuery>
 {
     public ListSalesQueryValidator()

@@ -605,6 +605,14 @@ public sealed class CreateSaleCommandTests
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken ct = default)
             => Task.FromResult(Movements.Count);
+        public Task<IReadOnlyList<StockMovement>> ListMovementsByReferenceAsync(
+            Guid tenantId, string referenceType, Guid referenceId,
+            StockMovementType? type = null, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<StockMovement>>(Movements
+                .Where(m => m.ReferenceType == referenceType
+                    && m.ReferenceId == referenceId
+                    && (type == null || m.MovementType == type.Value))
+                .ToList());
     }
 
     private sealed class StubSaleRepository : ISaleRepository
@@ -617,6 +625,7 @@ public sealed class CreateSaleCommandTests
             Added = sale;
             return Task.CompletedTask;
         }
+        public Task UpdateAsync(Sale sale, CancellationToken ct = default) => Task.CompletedTask;
         public Task<Sale?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default)
             => Task.FromResult(Added?.Id == id ? Added : Replay);
         public Task<Sale?> GetByClientSaleIdAsync(Guid tenantId, Guid clientSaleId, CancellationToken ct = default)

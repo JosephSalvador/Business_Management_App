@@ -23,6 +23,8 @@ public static class PermissionNames
     public const string SalesCreate = "Sales.Create";
     public const string SalesView = "Sales.View";
     public const string SalesDelete = "Sales.Delete";
+    public const string SalesReportsView = "Sales.ReportsView";
+    public const string SalesReportsExport = "Sales.ReportsExport";
 
     public const string ProductsView = "Products.View";
     public const string ProductsCreate = "Products.Create";
@@ -50,7 +52,11 @@ public static class PermissionNames
     public const string PricingManage = "Pricing.Manage";
 
     public const string AccountingView = "Accounting.View";
+    public const string AccountingCreate = "Accounting.Create";
     public const string AccountingApprove = "Accounting.Approve";
+
+    public const string PurchasingView = "Purchasing.View";
+    public const string PurchasingManage = "Purchasing.Manage";
 
     public const string AuditView = "Audit.View";
 
@@ -61,7 +67,7 @@ public static class PermissionNames
         BranchesView, BranchesCreate, BranchesUpdate, BranchesDelete,
         UsersView, UsersCreate, UsersUpdate, UsersDelete,
         RolesView, RolesManage,
-        SalesCreate, SalesView, SalesDelete,
+        SalesCreate, SalesView, SalesDelete, SalesReportsView, SalesReportsExport,
         ProductsView, ProductsCreate, ProductsUpdate, ProductsDelete,
         CategoriesView, CategoriesManage,
         BrandsView, BrandsManage,
@@ -69,7 +75,8 @@ public static class PermissionNames
         WarehousesView, WarehousesCreate, WarehousesUpdate, WarehousesDelete,
         InventoryView, InventoryManage,
         PricingView, PricingManage,
-        AccountingView, AccountingApprove,
+        AccountingView, AccountingCreate, AccountingApprove,
+        PurchasingView, PurchasingManage,
         AuditView,
     };
 }

@@ -122,5 +122,9 @@
       checkpoint; completion report; pause for review. **Done 2026-08-16** — committed as
       `feat(sales)` `f3600af`, `test(sales)` `4436179`, `docs(sales)` `b6605e5`; working tree clean.
       **Slice 6 — Sales POS backend is release-ready.**
-- [ ] (future) **6c-void**: `VoidSaleCommand` + `StockMovementType.SaleVoid` reversal + stock
+- [x] (future) **6c-void**: `VoidSaleCommand` + `StockMovementType.SaleVoid` reversal + stock
       add-back + `SaleVoidedEvent` + `POST /api/v1/sales/{id}/void` (`Sales.Delete`).
+      **Already implemented** — domain `Sale.Void()`, `SaleStatus.Voided`, `SaleVoidedEvent`,
+      `VoidSaleCommand` + handler + validator, `SaleStockDebitService.RestoreAsync()`,
+      `POST /api/v1/sales/{id}/void` endpoint, unit tests (5 command + 4 validator + 3 stock
+      restore) all present and building. Verified 2026-08-17.

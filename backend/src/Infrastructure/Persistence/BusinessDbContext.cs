@@ -6,6 +6,8 @@ using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
+using BusinessOS.Domain.Accounting;
+using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Entities;
@@ -37,6 +39,10 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<StockLocation> StockLocations => Set<StockLocation>();
     public DbSet<StockBalance> StockBalances => Set<StockBalance>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<Transfer> Transfers => Set<Transfer>();
+    public DbSet<TransferLine> TransferLines => Set<TransferLine>();
+    public DbSet<StockCount> StockCounts => Set<StockCount>();
+    public DbSet<StockBatch> StockBatches => Set<StockBatch>();
     public DbSet<PriceList> PriceLists => Set<PriceList>();
     public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
     public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
@@ -49,6 +55,15 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
     public DbSet<SalePayment> SalePayments => Set<SalePayment>();
     public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<SupplierBill> SupplierBills => Set<SupplierBill>();
+    public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
+    public DbSet<TenantAccountMapping> TenantAccountMappings => Set<TenantAccountMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -296,6 +311,10 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 .WithMany()
                 .HasForeignKey(b => b.VariantId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<StockBatch>()
+                .WithMany()
+                .HasForeignKey(b => b.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<StockMovement>(entity =>
@@ -327,6 +346,103 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.HasOne<UnitOfMeasure>()
                 .WithMany()
                 .HasForeignKey(m => m.UnitOfMeasureId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<StockBatch>()
+                .WithMany()
+                .HasForeignKey(m => m.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Transfer>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.Transfers, Schemas.Inventory);
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.ReferenceType).HasMaxLength(100);
+            entity.Property(t => t.Reason).HasMaxLength(500);
+            entity.Property(t => t.Status).IsRequired();
+            entity.HasIndex(t => new { t.TenantId, t.SourceWarehouseId, t.DestinationWarehouseId });
+            entity.HasIndex(t => t.TenantId);
+            entity.HasOne<Warehouse>()
+                .WithMany()
+                .HasForeignKey(t => t.SourceWarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Warehouse>()
+                .WithMany()
+                .HasForeignKey(t => t.DestinationWarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<StockLocation>()
+                .WithMany()
+                .HasForeignKey(t => t.SourceLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<StockLocation>()
+                .WithMany()
+                .HasForeignKey(t => t.DestinationLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(t => t.Lines)
+                .WithOne()
+                .HasForeignKey(l => l.TransferId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TransferLine>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.TransferLines, Schemas.Inventory);
+            entity.HasKey(l => l.Id);
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(l => l.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductVariant>()
+                .WithMany()
+                .HasForeignKey(l => l.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<StockBatch>()
+                .WithMany()
+                .HasForeignKey(l => l.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StockCount>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.StockCounts, Schemas.Inventory);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Notes).HasMaxLength(500);
+            entity.Property(c => c.Status).IsRequired();
+            entity.HasIndex(c => c.TenantId);
+            entity.HasIndex(c => new { c.TenantId, c.WarehouseId, c.ProductId });
+            entity.HasOne<Warehouse>()
+                .WithMany()
+                .HasForeignKey(c => c.WarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<StockLocation>()
+                .WithMany()
+                .HasForeignKey(c => c.StockLocationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(c => c.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductVariant>()
+                .WithMany()
+                .HasForeignKey(c => c.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StockBatch>(entity =>
+        {
+            entity.ToTable(Tables.Inventory.StockBatches, Schemas.Inventory);
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.BatchNumber).IsRequired().HasMaxLength(100);
+            entity.Property(b => b.Notes).HasMaxLength(500);
+            entity.HasIndex(b => new { b.TenantId, b.ProductId, b.BatchNumber }).IsUnique();
+            entity.HasIndex(b => b.TenantId);
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(b => b.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductVariant>()
+                .WithMany()
+                .HasForeignKey(b => b.VariantId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -523,6 +639,137 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 .HasForeignKey(n => n.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        modelBuilder.Entity<Supplier>(entity =>
+        {
+            entity.ToTable(Tables.Purchasing.Suppliers, Schemas.Purchasing);
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
+            entity.Property(s => s.ContactName).HasMaxLength(200);
+            entity.Property(s => s.Email).HasMaxLength(320);
+            entity.Property(s => s.Phone).HasMaxLength(50);
+            entity.Property(s => s.Address).HasColumnType("text");
+            entity.Property(s => s.Tin).HasMaxLength(64);
+            entity.Property(s => s.Notes).HasMaxLength(500);
+            entity.HasIndex(s => new { s.TenantId, s.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<PurchaseOrder>(entity =>
+        {
+            entity.ToTable(Tables.Purchasing.PurchaseOrders, Schemas.Purchasing);
+            entity.HasKey(o => o.Id);
+            entity.Property(o => o.Reference).HasMaxLength(100);
+            entity.Property(o => o.Notes).HasMaxLength(500);
+            entity.Property(o => o.Status).IsRequired();
+            entity.HasIndex(o => new { o.TenantId, o.SupplierId });
+            entity.HasIndex(o => o.TenantId);
+            entity.HasOne<Supplier>()
+                .WithMany()
+                .HasForeignKey(o => o.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Warehouse>()
+                .WithMany()
+                .HasForeignKey(o => o.WarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(o => o.Lines)
+                .WithOne()
+                .HasForeignKey(l => l.PurchaseOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PurchaseOrderLine>(entity =>
+        {
+            entity.ToTable(Tables.Purchasing.PurchaseOrderLines, Schemas.Purchasing);
+            entity.HasKey(l => l.Id);
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(l => l.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SupplierBill>(entity =>
+        {
+            entity.ToTable(Tables.Purchasing.SupplierBills, Schemas.Purchasing);
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.BillNumber).HasMaxLength(100);
+            entity.Property(b => b.Notes).HasMaxLength(500);
+            entity.Property(b => b.Status).IsRequired();
+            entity.HasIndex(b => new { b.TenantId, b.PurchaseOrderId }).IsUnique();
+            entity.HasIndex(b => b.TenantId);
+            entity.HasOne<Supplier>()
+                .WithMany()
+                .HasForeignKey(b => b.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<PurchaseOrder>()
+                .WithMany()
+                .HasForeignKey(b => b.PurchaseOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SupplierPayment>(entity =>
+        {
+            entity.ToTable(Tables.Purchasing.SupplierPayments, Schemas.Purchasing);
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Provider).HasMaxLength(100);
+            entity.Property(p => p.PhoneNumber).HasMaxLength(50);
+            entity.Property(p => p.Reference).HasMaxLength(200);
+            entity.HasIndex(p => p.SupplierBillId);
+            entity.HasOne<SupplierBill>()
+                .WithMany()
+                .HasForeignKey(p => p.SupplierBillId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+            modelBuilder.Entity<Account>(entity =>
+            {
+                entity.ToTable(Tables.Accounting.Accounts, Schemas.Accounting);
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.Code).IsRequired().HasMaxLength(50);
+                entity.Property(a => a.Name).IsRequired().HasMaxLength(200);
+                entity.HasIndex(a => new { a.TenantId, a.Code }).IsUnique();
+                entity.HasIndex(a => a.TenantId);
+            });
+
+            modelBuilder.Entity<JournalEntry>(entity =>
+            {
+                entity.ToTable(Tables.Accounting.JournalEntries, Schemas.Accounting);
+                entity.HasKey(j => j.Id);
+                entity.Property(j => j.Description).IsRequired().HasMaxLength(500);
+                entity.Property(j => j.SourceType).HasMaxLength(100);
+                entity.HasIndex(j => j.TenantId);
+                entity.HasIndex(j => new { j.TenantId, j.EntryDate });
+                entity.HasIndex(j => new { j.SourceType, j.SourceId });
+            });
+
+            modelBuilder.Entity<JournalEntryLine>(entity =>
+            {
+                entity.ToTable(Tables.Accounting.JournalEntryLines, Schemas.Accounting);
+                entity.HasKey(l => l.Id);
+                entity.HasIndex(l => l.JournalEntryId);
+                entity.HasIndex(l => l.AccountId);
+                entity.HasOne<JournalEntry>()
+                    .WithMany()
+                    .HasForeignKey(l => l.JournalEntryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<Account>()
+                    .WithMany()
+                    .HasForeignKey(l => l.AccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<TenantAccountMapping>(entity =>
+            {
+                entity.ToTable(Tables.Accounting.TenantAccountMappings, Schemas.Accounting);
+                entity.HasKey(m => m.Id);
+                entity.Property(m => m.MappingKey).IsRequired().HasMaxLength(100);
+                entity.HasIndex(m => m.TenantId);
+                entity.HasIndex(m => new { m.TenantId, m.MappingKey }).IsUnique();
+                entity.HasIndex(m => m.AccountId);
+                entity.HasOne<Account>()
+                    .WithMany()
+                    .HasForeignKey(m => m.AccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

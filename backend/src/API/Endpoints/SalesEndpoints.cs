@@ -34,6 +34,9 @@ public static class SalesEndpoints
         sales.MapGet("/", ListSalesAsync)
             .RequirePermission(PermissionNames.SalesView)
             .WithName("ListSales");
+        sales.MapPost("/{id:guid}/void", VoidSaleAsync)
+            .RequirePermission(PermissionNames.SalesDelete)
+            .WithName("VoidSale");
 
         return app;
     }
@@ -87,6 +90,15 @@ public static class SalesEndpoints
         CancellationToken cancellationToken)
         => (await sender.Send(
             new ListSalesQuery(page, pageSize, branchId, from, to, status, search),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> VoidSaleAsync(
+        Guid id,
+        VoidSaleRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new VoidSaleCommand(id, request.Reason),
             cancellationToken)).ToApiResult();
 
     private sealed record CreateSaleRequest(

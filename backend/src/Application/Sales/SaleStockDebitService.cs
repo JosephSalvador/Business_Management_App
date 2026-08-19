@@ -95,4 +95,64 @@ public sealed class SaleStockDebitService
 
         return Result.Success();
     }
+
+    /// <summary>
+    /// Stock add-back for a voided sale: a compensating reversal of the original
+    /// <see cref="StockMovementType.Sale"/> rows. Each posted <see cref="StockMovementType.Sale"/>
+    /// movement for the sale gets a positive <see cref="StockMovementType.SaleVoid"/> ledger row
+    /// (same warehouse/location/product/variant/UoM/quantity, reference = sale id) and the balance
+    /// is credited. Add-back can never be insufficient (stock was physically returned), so the
+    /// balance is created if missing and no availability check runs.
+    /// </summary>
+    public async Task RestoreAsync(StockRestoreRequest request, CancellationToken cancellationToken)
+    {
+        var reversals = new List<(StockMovement Debit, StockBalance Balance)>(request.Movements.Count);
+        foreach (var debit in request.Movements)
+        {
+            var balance = await _stock.GetOrCreateBalanceAsync(
+                request.TenantId,
+                debit.WarehouseId,
+                debit.StockLocationId,
+                debit.ProductId,
+                debit.VariantId,
+                cancellationToken);
+
+            reversals.Add((debit, balance));
+        }
+
+        foreach (var (debit, balance) in reversals)
+        {
+            var movement = StockMovement.Record(
+                request.TenantId,
+                debit.BranchId,
+                debit.WarehouseId,
+                debit.StockLocationId,
+                debit.ProductId,
+                debit.VariantId,
+                StockMovementType.SaleVoid,
+                -debit.Quantity,
+                debit.UnitOfMeasureId,
+                request.OccurredAt,
+                referenceType: "Sale",
+                referenceId: request.SaleId,
+                reason: request.Reason,
+                createdBy: request.CreatedBy);
+
+            await _stock.AddMovementAsync(movement, cancellationToken);
+            balance.Apply(-debit.Quantity);
+        }
+    }
 }
+
+/// <summary>
+/// Compensating stock add-back for a voided sale. <see cref="Movements"/> are the original
+/// <see cref="StockMovementType.Sale"/> ledger rows of the sale; each is reversed with a positive
+/// <see cref="StockMovementType.SaleVoid"/> movement.
+/// </summary>
+public sealed record StockRestoreRequest(
+    Guid TenantId,
+    Guid SaleId,
+    DateTime OccurredAt,
+    Guid? CreatedBy,
+    string? Reason,
+    IReadOnlyCollection<StockMovement> Movements);

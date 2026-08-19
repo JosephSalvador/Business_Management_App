@@ -170,6 +170,8 @@ public sealed class SalesQueriesTests
             _sales.Add(sale);
             return Task.CompletedTask;
         }
+        public Task UpdateAsync(Sale sale, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
 
         public Task<Sale?> GetByIdAsync(
             Guid tenantId, Guid id, CancellationToken cancellationToken = default)

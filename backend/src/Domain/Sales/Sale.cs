@@ -305,6 +305,54 @@ public sealed class Sale : AggregateRoot
         return sale;
     }
 
+    /// <summary>
+    /// Voids a completed sale: a compensating status transition, never a delete — the receipt
+    /// number stays immutable and the original ledger rows stay posted. Stock is added back by
+    /// the command handler (compensating <see cref="StockMovementType.SaleVoid"/> movements), not
+    /// here. Idempotency is the caller's concern: a sale that is not <see cref="SaleStatus.Completed"/>
+    /// cannot be voided again (guarded before any state change).
+    /// </summary>
+    public void Void(string reason, Guid voidedBy, DateTime occurredAt)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("A void reason is required.", nameof(reason));
+        }
+
+        if (voidedBy == Guid.Empty)
+        {
+            throw new ArgumentException("A voiding user is required.", nameof(voidedBy));
+        }
+
+        if (occurredAt == default)
+        {
+            throw new ArgumentException("A void date is required.", nameof(occurredAt));
+        }
+
+        if (Status != SaleStatus.Completed)
+        {
+            throw new InvalidOperationException(
+                $"Only a completed sale can be voided (current status: {Status}).");
+        }
+
+        Status = SaleStatus.Voided;
+        VoidedAt = occurredAt;
+        VoidedBy = voidedBy;
+        VoidReason = Normalize(reason);
+
+        AddDomainEvent(new SaleVoidedEvent(
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            Id,
+            TenantId,
+            BranchId,
+            voidedBy,
+            Number,
+            Currency,
+            TotalAmount,
+            VoidReason!));
+    }
+
     private static void Reconcile(
         IReadOnlyCollection<SaleLine> lines,
         IReadOnlyCollection<SalePayment> payments,

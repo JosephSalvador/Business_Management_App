@@ -61,6 +61,54 @@ public static class InventoryEndpoints
         inventory.MapPost("/stock/opening", RecordOpeningStockAsync)
             .RequirePermission(PermissionNames.InventoryManage)
             .WithName("RecordOpeningStock");
+        inventory.MapPost("/stock/adjustments", AdjustStockAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("AdjustStock");
+
+        inventory.MapPost("/transfers", CreateTransferAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("CreateTransfer");
+        inventory.MapGet("/transfers", ListTransfersAsync)
+            .RequirePermission(PermissionNames.InventoryView)
+            .WithName("ListTransfers");
+        inventory.MapGet("/transfers/{id:guid}", GetTransferAsync)
+            .RequirePermission(PermissionNames.InventoryView)
+            .WithName("GetTransfer");
+        inventory.MapPost("/transfers/{id:guid}/complete", CompleteTransferAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("CompleteTransfer");
+        inventory.MapPost("/transfers/{id:guid}/cancel", CancelTransferAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("CancelTransfer");
+
+        inventory.MapPost("/counts", CreateStockCountAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("CreateStockCount");
+        inventory.MapGet("/counts", ListStockCountsAsync)
+            .RequirePermission(PermissionNames.InventoryView)
+            .WithName("ListStockCounts");
+        inventory.MapGet("/counts/{id:guid}", GetStockCountAsync)
+            .RequirePermission(PermissionNames.InventoryView)
+            .WithName("GetStockCount");
+        inventory.MapPost("/counts/{id:guid}/complete", CompleteStockCountAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("CompleteStockCount");
+        inventory.MapPost("/counts/{id:guid}/cancel", CancelStockCountAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("CancelStockCount");
+
+        inventory.MapPost("/batches", CreateStockBatchAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("CreateStockBatch");
+        inventory.MapGet("/batches", ListStockBatchesAsync)
+            .RequirePermission(PermissionNames.InventoryView)
+            .WithName("ListStockBatches");
+        inventory.MapGet("/batches/{id:guid}", GetStockBatchAsync)
+            .RequirePermission(PermissionNames.InventoryView)
+            .WithName("GetStockBatch");
+        inventory.MapPatch("/batches/{id:guid}/status", SetStockBatchStatusAsync)
+            .RequirePermission(PermissionNames.InventoryManage)
+            .WithName("SetStockBatchStatus");
 
         return app;
     }
@@ -162,6 +210,145 @@ public static class InventoryEndpoints
                 Reason: request.Reason),
             cancellationToken)).ToApiResult();
 
+    private static async Task<IResult> AdjustStockAsync(
+        AdjustStockRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new AdjustStockCommand(
+                request.WarehouseId,
+                request.LocationId,
+                request.ProductId,
+                request.VariantId,
+                request.QuantityDelta,
+                request.Reason,
+                request.EffectiveAt),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CreateTransferAsync(
+        CreateTransferRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new CreateTransferCommand(
+                request.SourceWarehouseId,
+                request.SourceLocationId,
+                request.DestinationWarehouseId,
+                request.DestinationLocationId,
+                request.ReferenceType,
+                request.ReferenceId,
+                request.Reason,
+                request.Lines),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ListTransfersAsync(
+        int page,
+        int pageSize,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new ListTransfersQuery(page, pageSize),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> GetTransferAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new GetTransferQuery(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CompleteTransferAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new CompleteTransferCommand(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CancelTransferAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new CancelTransferCommand(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CreateStockCountAsync(
+        CreateStockCountRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new CreateStockCountCommand(
+                request.WarehouseId,
+                request.StockLocationId,
+                request.ProductId,
+                request.VariantId,
+                request.CountedQuantity,
+                request.Notes),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ListStockCountsAsync(
+        int page,
+        int pageSize,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new ListStockCountsQuery(page, pageSize),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> GetStockCountAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new GetStockCountQuery(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CompleteStockCountAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new CompleteStockCountCommand(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CancelStockCountAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new CancelStockCountCommand(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CreateStockBatchAsync(
+        CreateStockBatchRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new CreateStockBatchCommand(
+                request.ProductId,
+                request.VariantId,
+                request.BatchNumber,
+                request.ManufacturerDate,
+                request.ExpiryDate,
+                request.SupplierId,
+                request.Notes),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ListStockBatchesAsync(
+        int page,
+        int pageSize,
+        Guid? productId,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new ListStockBatchesQuery(page, pageSize, productId),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> GetStockBatchAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new GetStockBatchQuery(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> SetStockBatchStatusAsync(
+        Guid id,
+        SetStockBatchStatusRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new SetStockBatchStatusCommand(id, request.IsActive),
+            cancellationToken)).ToApiResult();
+
     private sealed record SetWarehouseStatusRequest(bool IsActive);
 
     private sealed record SetStockLocationsRequest(IReadOnlyList<StockLocationInput> Locations);
@@ -174,5 +361,45 @@ public static class InventoryEndpoints
         decimal Quantity,
         Guid UnitOfMeasureId,
         DateTime EffectiveAt,
-        string? Reason);
+        string? Reason,
+        Guid? BatchId = null);
+
+    private sealed record AdjustStockRequest(
+        Guid WarehouseId,
+        Guid? LocationId,
+        Guid ProductId,
+        Guid? VariantId,
+        decimal QuantityDelta,
+        string Reason,
+        DateTime EffectiveAt,
+        Guid? BatchId = null);
+
+    private sealed record CreateTransferRequest(
+        Guid SourceWarehouseId,
+        Guid? SourceLocationId,
+        Guid DestinationWarehouseId,
+        Guid? DestinationLocationId,
+        string? ReferenceType,
+        Guid? ReferenceId,
+        string? Reason,
+        IReadOnlyList<TransferLineInput> Lines);
+
+    private sealed record CreateStockCountRequest(
+        Guid WarehouseId,
+        Guid? StockLocationId,
+        Guid ProductId,
+        Guid? VariantId,
+        decimal CountedQuantity,
+        string? Notes);
+
+    private sealed record CreateStockBatchRequest(
+        Guid ProductId,
+        Guid? VariantId,
+        string BatchNumber,
+        DateTime? ManufacturerDate,
+        DateTime? ExpiryDate,
+        Guid? SupplierId,
+        string? Notes);
+
+    private sealed record SetStockBatchStatusRequest(bool IsActive);
 }

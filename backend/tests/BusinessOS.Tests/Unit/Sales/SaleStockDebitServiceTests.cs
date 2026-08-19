@@ -146,6 +146,73 @@ public sealed class SaleStockDebitServiceTests
         Assert.Empty(stock.Movements);
     }
 
+    private static StockMovement DebitMovement(
+        decimal quantity,
+        Guid? productId = null,
+        Guid? variantId = null,
+        Guid? warehouseId = null,
+        Guid? locationId = null,
+        Guid? unitOfMeasureId = null)
+        => StockMovement.Record(
+            TenantId, BranchId, warehouseId ?? WarehouseId, locationId ?? LocationId,
+            productId ?? ProductId, variantId, StockMovementType.Sale, -quantity,
+            unitOfMeasureId ?? UnitOfMeasureId, OnDate, referenceType: "Sale",
+            referenceId: SaleId, createdBy: null);
+
+    private static StockRestoreRequest RestoreRequest(params StockMovement[] movements)
+        => new(TenantId, SaleId, OnDate, CreatedBy: Guid.NewGuid(), Reason: "Wrong item", movements);
+
+    [Fact]
+    public async Task Restore_ReversesEveryDebitMovement_AndCreditsBalance()
+    {
+        var stock = new FakeStockRepository();
+        stock.Seed(TenantId, WarehouseId, LocationId, ProductId, null, 97m);
+        var service = new SaleStockDebitService(stock);
+
+        await service.RestoreAsync(RestoreRequest(DebitMovement(3m)), CancellationToken.None);
+
+        var reversal = Assert.Single(stock.Movements);
+        Assert.Equal(StockMovementType.SaleVoid, reversal.MovementType);
+        Assert.Equal(3m, reversal.Quantity);
+        Assert.Equal("Sale", reversal.ReferenceType);
+        Assert.Equal(SaleId, reversal.ReferenceId);
+        Assert.Equal(ProductId, reversal.ProductId);
+        Assert.Equal(WarehouseId, reversal.WarehouseId);
+        Assert.Equal(LocationId, reversal.StockLocationId);
+        Assert.Equal(UnitOfMeasureId, reversal.UnitOfMeasureId);
+        Assert.Equal(100m, stock.Balance(ProductId).Quantity);
+    }
+
+    [Fact]
+    public async Task Restore_MultipleDebits_WritesOneReversalEach()
+    {
+        var stock = new FakeStockRepository();
+        stock.Seed(TenantId, WarehouseId, LocationId, ProductId, null, 10m);
+        var secondProduct = Guid.NewGuid();
+        stock.Seed(TenantId, WarehouseId, LocationId, secondProduct, null, 5m);
+        var service = new SaleStockDebitService(stock);
+
+        await service.RestoreAsync(
+            RestoreRequest(DebitMovement(3m), DebitMovement(2m, productId: secondProduct)),
+            CancellationToken.None);
+
+        Assert.Equal(2, stock.Movements.Count);
+        Assert.All(stock.Movements, m => Assert.Equal(StockMovementType.SaleVoid, m.MovementType));
+        Assert.Equal(13m, stock.Balance(ProductId).Quantity);
+        Assert.Equal(7m, stock.Balance(secondProduct).Quantity);
+    }
+
+    [Fact]
+    public async Task Restore_NoMovements_WritesNothing()
+    {
+        var stock = new FakeStockRepository();
+        var service = new SaleStockDebitService(stock);
+
+        await service.RestoreAsync(RestoreRequest(), CancellationToken.None);
+
+        Assert.Empty(stock.Movements);
+    }
+
     private sealed class FakeStockRepository : IStockRepository
     {
         private readonly Dictionary<(Guid Warehouse, Guid Location, Guid Product, Guid? Variant), StockBalance> _byKey = new();
@@ -214,5 +281,14 @@ public sealed class SaleStockDebitServiceTests
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken cancellationToken = default)
             => Task.FromResult(Movements.Count);
+
+        public Task<IReadOnlyList<StockMovement>> ListMovementsByReferenceAsync(
+            Guid tenantId, string referenceType, Guid referenceId,
+            StockMovementType? type = null, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockMovement>>(Movements
+                .Where(m => m.ReferenceType == referenceType
+                    && m.ReferenceId == referenceId
+                    && (type == null || m.MovementType == type.Value))
+                .ToList());
     }
 }

@@ -210,7 +210,49 @@
   before stock check); `SetPrices` REPLACES the list's prices (mixed cart must PUT both prices
   in one call); Maize Flour needs opening stock. **Next:** 016 docs + commit.
 
+- **Accounting (Slice 9) complete, done 2026-08-19 (tasks 001–026):** Domain entities
+  `Account` (`AccountType` enum: Asset/Liability/Equity/Revenue/Expense), `JournalEntry`
+  aggregate with `JournalEntryLine` children, `TenantAccountMapping`, `AccountMappingKeys`
+  constants; events `JournalEntryPostedEvent`/`JournalEntryVoidedEvent`; migration
+  `AddAccounting` (4 tables + indexes); repositories `IAccountRepository`,
+  `IJournalEntryRepository` (with `GetBySourceAsync` for idempotency),
+  `ITenantAccountMappingRepository` + EF impls + DI; commands `CreateAccount`,
+  `CreateJournalEntry`, `PostJournalEntry`, `VoidJournalEntry`, `CreateTenantAccountMapping`;
+  queries `ListAccounts`, `TrialBalance`, `GeneralLedger`, `GetTenantAccountMapping`;
+  `IAccountMappingService` for mapping resolution; API endpoints under `/api/v1/accounts`,
+  `/api/v1/journal-entries`, `/api/v1/account-mappings`, `/api/v1/accounting-reports`
+  (trial-balance, general-ledger) all permission-gated (`AccountingView`/`AccountingCreate`/
+  `AccountingApprove`); event consumers `PostSaleJournalEntryHandler`,
+  `PostSupplierBillJournalEntryHandler`, `PostSupplierPaymentJournalEntryHandler` (all
+  idempotent + mapping-resolved), `PostSaleVoidJournalEntryHandler` (reversing entry),
+  `AccountingActivityFeedHandler`; 14 unit tests passing. Integration tests blocked on Postgres.
+  **Next:** Reporting+Tax, Workflow v1, Dynamic Forms v1.
+
+- **Reporting+Tax (Slice 10) complete, done 2026-08-19 (tasks 001–012):** `IReportRepository`
+  (TaxSummary, SalesSummary, TopProducts queries using explicit Sale→SaleLine joins — no
+  navigation properties on domain entities) in `Application/Ports`; EF `ReportRepository` in
+  `Infrastructure`; `ICsvExportService` + `CsvExportService` (handles commas/quotes/newlines,
+  UTF-8); 4 query handlers (`TaxSummaryQuery`, `SalesSummaryQuery`, `TopProductsQuery`,
+  `DashboardTaxKpisQuery`); 3 export command handlers (`ExportTaxSummaryCommand`,
+  `ExportSalesSummaryCommand`, `ExportTopProductsCommand`); DTOs in `ReportingDtos.cs`;
+  FluentValidation in `ReportingValidators.cs`; new permissions `SalesReportsView` and
+  `SalesReportsExport` added to `PermissionNames`; API endpoints under `/api/v1/reports`
+  (tax-summary, sales-summary, top-products, dashboard-tax-kpis, export/*) all permission-gated;
+  DI registration for `IReportRepository`, `ICsvExportService`; 12 unit tests passing. Integration
+  tests blocked on Postgres (same as all other modules). Task 013 (docs + commit) pending.
+  **Next:** Workflow v1, Dynamic Forms v1.
+
 ## coding.md — see `docs/CodingStandards.md`
+
+## accounting_plan.md — Slice 9 (IMPLEMENTED)
+
+- **Spec:** `specs/accounting.md` · **Tasks:** `tasks/accounting/TASKS.md` (26 tasks, all done).
+- **Key architectural decisions:**
+  1. **No hardcoded accounts** — Event consumers resolve accounts via `IAccountMappingService`.
+  2. **Idempotency** — Every event consumer checks `(TenantId, SourceType, SourceId)`.
+  3. **Reversing entries** — Voiding a Posted JE creates a NEW mirroring JE (flipped debits/credits).
+  4. **CurrentBalance** — Updated synchronously on JE post via account mapping service.
+- **Status:** Implemented. 14 unit tests passing. Integration tests blocked on Postgres.
 
 ## api.md — see `docs/APIStandards.md`
 

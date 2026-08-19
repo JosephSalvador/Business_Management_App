@@ -15,6 +15,8 @@ public static class Schemas
     public const string Pricing = "public";
     public const string Platform = "public";
     public const string Sales = "public";
+    public const string Purchasing = "public";
+    public const string Accounting = "public";
 }
 
 /// <summary>
@@ -55,6 +57,10 @@ public static class Tables
         public const string StockLocations = "StockLocations";
         public const string StockBalances = "StockBalances";
         public const string StockMovements = "StockMovements";
+        public const string Transfers = "Transfers";
+        public const string TransferLines = "TransferLines";
+        public const string StockCounts = "StockCounts";
+        public const string StockBatches = "StockBatches";
     }
 
     public static class Pricing
@@ -80,5 +86,22 @@ public static class Tables
         public const string SaleLines = "SaleLines";
         public const string SalePayments = "SalePayments";
         public const string NumberSequences = "NumberSequences";
+    }
+
+    public static class Purchasing
+    {
+        public const string Suppliers = "Suppliers";
+        public const string PurchaseOrders = "PurchaseOrders";
+        public const string PurchaseOrderLines = "PurchaseOrderLines";
+        public const string SupplierBills = "SupplierBills";
+        public const string SupplierPayments = "SupplierPayments";
+    }
+
+    public static class Accounting
+    {
+        public const string Accounts = "Accounts";
+        public const string JournalEntries = "JournalEntries";
+        public const string JournalEntryLines = "JournalEntryLines";
+        public const string TenantAccountMappings = "TenantAccountMappings";
     }
 }

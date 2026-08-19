@@ -46,6 +46,14 @@ public static class NotificationEngineExtensions
         services.AddScoped<IDomainEventHandler<PriceListUpdatedEvent>, PricingActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<ProductPricesChangedEvent>, PricingActivityFeedHandler>();
         services.AddScoped<IDomainEventHandler<SaleCompletedEvent>, SalesActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<SaleVoidedEvent>, SalesActivityFeedHandler>();
+
+        services.AddScoped<IDomainEventHandler<JournalEntryPostedEvent>, AccountingActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<JournalEntryVoidedEvent>, AccountingActivityFeedHandler>();
+        services.AddScoped<IDomainEventHandler<SaleCompletedEvent>, PostSaleJournalEntryHandler>();
+        services.AddScoped<IDomainEventHandler<SupplierBillCreatedEvent>, PostSupplierBillJournalEntryHandler>();
+        services.AddScoped<IDomainEventHandler<SupplierBillPaidEvent>, PostSupplierPaymentJournalEntryHandler>();
+        services.AddScoped<IDomainEventHandler<SaleVoidedEvent>, PostSaleVoidJournalEntryHandler>();
 
         return services;
     }

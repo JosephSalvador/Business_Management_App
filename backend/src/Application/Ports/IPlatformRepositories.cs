@@ -1,9 +1,11 @@
+using BusinessOS.Domain.Accounting;
 using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
+using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared.Events;
@@ -208,6 +210,12 @@ public interface IStockRepository
         Guid? productId = null,
         StockMovementType? type = null,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockMovement>> ListMovementsByReferenceAsync(
+        Guid tenantId,
+        string referenceType,
+        Guid referenceId,
+        StockMovementType? type = null,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IPriceListRepository
@@ -341,6 +349,7 @@ public sealed record SaleListFilter(
 public interface ISaleRepository
 {
     Task AddAsync(Sale sale, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Sale sale, CancellationToken cancellationToken = default);
     Task<Sale?> GetByIdAsync(
         Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<Sale?> GetByClientSaleIdAsync(
@@ -361,4 +370,112 @@ public interface INumberSequenceRepository
 {
     Task<string> AllocateAsync(
         Guid tenantId, string scope, DateTime date, CancellationToken cancellationToken = default);
+}
+
+public interface ITransferRepository
+{
+    Task AddAsync(Transfer transfer, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Transfer transfer, CancellationToken cancellationToken = default);
+    Task<Transfer?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Transfer>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface IStockCountRepository
+{
+    Task AddAsync(StockCount count, CancellationToken cancellationToken = default);
+    Task UpdateAsync(StockCount count, CancellationToken cancellationToken = default);
+    Task<StockCount?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockCount>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface IStockBatchRepository
+{
+    Task AddAsync(StockBatch batch, CancellationToken cancellationToken = default);
+    Task UpdateAsync(StockBatch batch, CancellationToken cancellationToken = default);
+    Task<StockBatch?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<StockBatch?> GetByBatchNumberAsync(Guid tenantId, Guid productId, string batchNumber, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockBatch>> ListAsync(Guid tenantId, int page, int pageSize, Guid? productId = null, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, Guid? productId = null, CancellationToken cancellationToken = default);
+}
+
+public interface ISupplierRepository
+{
+    Task AddAsync(Supplier supplier, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Supplier supplier, CancellationToken cancellationToken = default);
+    Task<Supplier?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Supplier>> ListAsync(Guid tenantId, int page, int pageSize, string? search = null, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, string? search = null, CancellationToken cancellationToken = default);
+}
+
+public interface IPurchaseOrderRepository
+{
+    Task AddAsync(PurchaseOrder order, CancellationToken cancellationToken = default);
+    Task UpdateAsync(PurchaseOrder order, CancellationToken cancellationToken = default);
+    Task<PurchaseOrder?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PurchaseOrder>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface ISupplierBillRepository
+{
+    Task AddAsync(SupplierBill bill, CancellationToken cancellationToken = default);
+    Task UpdateAsync(SupplierBill bill, CancellationToken cancellationToken = default);
+    Task<SupplierBill?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<SupplierBill?> GetByPurchaseOrderAsync(Guid tenantId, Guid purchaseOrderId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SupplierBill>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface ISupplierPaymentRepository
+{
+    Task AddAsync(SupplierPayment payment, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SupplierBill>> ListByBillAsync(Guid tenantId, Guid supplierBillId, CancellationToken cancellationToken = default);
+}
+
+public interface IAccountRepository
+{
+    Task AddAsync(Account account, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Account account, CancellationToken cancellationToken = default);
+    Task<Account?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Account>> ListAsync(Guid tenantId, bool? isActive = null, CancellationToken cancellationToken = default);
+}
+
+public interface IJournalEntryRepository
+{
+    Task AddAsync(JournalEntry entry, CancellationToken cancellationToken = default);
+    Task UpdateAsync(JournalEntry entry, CancellationToken cancellationToken = default);
+    Task<JournalEntry?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<JournalEntry?> GetBySourceAsync(Guid tenantId, string sourceType, Guid sourceId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JournalEntry>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface ITenantAccountMappingRepository
+{
+    Task AddAsync(TenantAccountMapping mapping, CancellationToken cancellationToken = default);
+    Task<TenantAccountMapping?> GetByMappingKeyAsync(Guid tenantId, string mappingKey, CancellationToken cancellationToken = default);
+}
+
+public sealed record TaxSummaryLine(
+    string TaxCode, decimal AppliedRate,
+    decimal TotalBaseAmount, decimal TotalTaxAmount, decimal TotalLineTotal, int SaleCount);
+
+public sealed record SalesByBranchSummary(
+    Guid BranchId, string BranchName, int TotalSales, decimal TotalRevenue);
+
+public sealed record TopProductRow(
+    Guid ProductId, string ProductName, string? Sku,
+    decimal TotalQuantity, decimal TotalRevenue, decimal TotalTax, int Rank);
+
+public interface IReportRepository
+{
+    Task<IReadOnlyList<TaxSummaryLine>> GetTaxSummaryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<(int TotalSales, decimal TotalRevenue, decimal TotalTax, decimal TotalDiscount, decimal AverageSale,
+        IReadOnlyList<SalesByBranchSummary> ByBranch)> GetSalesSummaryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TopProductRow>> GetTopProductsAsync(
+        Guid tenantId, DateTime from, DateTime to, int limit, Guid? branchId, CancellationToken cancellationToken = default);
 }

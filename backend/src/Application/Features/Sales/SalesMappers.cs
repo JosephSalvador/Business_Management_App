@@ -33,7 +33,10 @@ internal static class SalesMappers
         sale.Lines.Select(ToLineDto).ToList(),
         sale.Payments.Select(ToPaymentDto).ToList(),
         sale.CreatedAt,
-        sale.UpdatedAt);
+        sale.UpdatedAt,
+        sale.VoidedAt,
+        sale.VoidedBy,
+        sale.VoidReason);
 
     internal static SaleLineDto ToLineDto(SaleLine line) => new(
         line.Id,

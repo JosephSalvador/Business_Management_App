@@ -16,7 +16,8 @@ public sealed class StockBalance : Entity
         Guid warehouseId,
         Guid stockLocationId,
         Guid productId,
-        Guid? variantId)
+        Guid? variantId,
+        Guid? batchId)
         : base(id)
     {
         TenantId = tenantId;
@@ -24,6 +25,7 @@ public sealed class StockBalance : Entity
         StockLocationId = stockLocationId;
         ProductId = productId;
         VariantId = variantId;
+        BatchId = batchId;
     }
 
     public Guid TenantId { get; private set; }
@@ -31,11 +33,12 @@ public sealed class StockBalance : Entity
     public Guid StockLocationId { get; private set; }
     public Guid ProductId { get; private set; }
     public Guid? VariantId { get; private set; }
+    public Guid? BatchId { get; private set; }
     public decimal Quantity { get; private set; }
 
     public static StockBalance Create(
-        Guid tenantId, Guid warehouseId, Guid stockLocationId, Guid productId, Guid? variantId)
-        => new(Guid.NewGuid(), tenantId, warehouseId, stockLocationId, productId, variantId);
+        Guid tenantId, Guid warehouseId, Guid stockLocationId, Guid productId, Guid? variantId, Guid? batchId = null)
+        => new(Guid.NewGuid(), tenantId, warehouseId, stockLocationId, productId, variantId, batchId);
 
     public void Apply(decimal quantityDelta)
     {

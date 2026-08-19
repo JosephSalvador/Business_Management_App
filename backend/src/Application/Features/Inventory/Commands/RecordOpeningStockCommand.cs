@@ -17,7 +17,8 @@ public sealed record RecordOpeningStockCommand(
     string? ReferenceType = null,
     Guid? ReferenceId = null,
     string? Reason = null,
-    string? CorrelationId = null)
+    string? CorrelationId = null,
+    Guid? BatchId = null)
     : IRequest<Result<StockBalanceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class RecordOpeningStockCommandHandler
@@ -105,6 +106,7 @@ public sealed class RecordOpeningStockCommandHandler
             command.ReferenceId,
             command.Reason,
             command.CorrelationId,
+            command.BatchId,
             _tenantContext.UserId);
 
         await _stock.AddMovementAsync(movement, cancellationToken);

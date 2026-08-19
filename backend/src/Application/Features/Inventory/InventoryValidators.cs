@@ -67,3 +67,93 @@ public sealed class RecordOpeningStockCommandValidator : AbstractValidator<Recor
         RuleFor(x => x.CorrelationId).MaximumLength(64);
     }
 }
+
+public sealed class AdjustStockCommandValidator : AbstractValidator<AdjustStockCommand>
+{
+    public AdjustStockCommandValidator()
+    {
+        RuleFor(x => x.WarehouseId).NotEmpty();
+        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x.QuantityDelta).NotEqual(0);
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
+        RuleFor(x => x.EffectiveAt).LessThanOrEqualTo(DateTime.UtcNow.AddMinutes(5));
+    }
+}
+
+public sealed class CreateTransferCommandValidator : AbstractValidator<CreateTransferCommand>
+{
+    public CreateTransferCommandValidator()
+    {
+        RuleFor(x => x.SourceWarehouseId).NotEmpty();
+        RuleFor(x => x.DestinationWarehouseId).NotEmpty();
+        RuleFor(x => x.Lines).NotEmpty();
+        RuleFor(x => x.Reason).MaximumLength(500);
+        RuleFor(x => x.ReferenceType).MaximumLength(100);
+        RuleForEach(x => x.Lines).ChildRules(line =>
+        {
+            line.RuleFor(l => l.ProductId).NotEmpty();
+            line.RuleFor(l => l.Quantity).GreaterThan(0);
+        });
+    }
+}
+
+public sealed class CompleteTransferCommandValidator : AbstractValidator<CompleteTransferCommand>
+{
+    public CompleteTransferCommandValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
+
+public sealed class CancelTransferCommandValidator : AbstractValidator<CancelTransferCommand>
+{
+    public CancelTransferCommandValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
+
+public sealed class CreateStockCountCommandValidator : AbstractValidator<CreateStockCountCommand>
+{
+    public CreateStockCountCommandValidator()
+    {
+        RuleFor(x => x.WarehouseId).NotEmpty();
+        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x.CountedQuantity).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Notes).MaximumLength(500);
+    }
+}
+
+public sealed class CompleteStockCountCommandValidator : AbstractValidator<CompleteStockCountCommand>
+{
+    public CompleteStockCountCommandValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
+
+public sealed class CancelStockCountCommandValidator : AbstractValidator<CancelStockCountCommand>
+{
+    public CancelStockCountCommandValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
+
+public sealed class CreateStockBatchCommandValidator : AbstractValidator<CreateStockBatchCommand>
+{
+    public CreateStockBatchCommandValidator()
+    {
+        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x.BatchNumber).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.Notes).MaximumLength(500);
+    }
+}
+
+public sealed class SetStockBatchStatusCommandValidator : AbstractValidator<SetStockBatchStatusCommand>
+{
+    public SetStockBatchStatusCommandValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}

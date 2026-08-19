@@ -1,3 +1,4 @@
+using BusinessOS.Application.Accounting;
 using BusinessOS.Application.Ports;
 using BusinessOS.Application.Sales;
 using BusinessOS.Infrastructure.Caching;
@@ -5,6 +6,7 @@ using BusinessOS.Infrastructure.Events;
 using BusinessOS.Infrastructure.Locking;
 using BusinessOS.Infrastructure.Persistence;
 using BusinessOS.Infrastructure.Repositories;
+using BusinessOS.Infrastructure.Persistence.Repositories;
 using BusinessOS.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -47,6 +49,19 @@ public static class DependencyInjection
         services.AddScoped<ITaxRuleRepository, TaxRuleRepository>();
         services.AddScoped<ISaleRepository, SaleRepository>();
         services.AddScoped<INumberSequenceRepository, NumberSequenceRepository>();
+        services.AddScoped<ITransferRepository, TransferRepository>();
+        services.AddScoped<IStockCountRepository, StockCountRepository>();
+        services.AddScoped<IStockBatchRepository, StockBatchRepository>();
+        services.AddScoped<ISupplierRepository, SupplierRepository>();
+        services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+        services.AddScoped<ISupplierBillRepository, SupplierBillRepository>();
+        services.AddScoped<ISupplierPaymentRepository, SupplierPaymentRepository>();
+        services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<IJournalEntryRepository, JournalEntryRepository>();
+        services.AddScoped<ITenantAccountMappingRepository, TenantAccountMappingRepository>();
+        services.AddScoped<IAccountMappingService, AccountMappingService>();
+        services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddSingleton<ICsvExportService, CsvExportService>();
         services.AddScoped<SaleStockDebitService>();
 
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();

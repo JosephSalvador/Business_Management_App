@@ -8,7 +8,8 @@ namespace BusinessOS.Notifications.Events;
 /// Fans sale domain events out to the activity feed.
 /// </summary>
 public sealed class SalesActivityFeedHandler
-    : IDomainEventHandler<SaleCompletedEvent>
+    : IDomainEventHandler<SaleCompletedEvent>,
+      IDomainEventHandler<SaleVoidedEvent>
 {
     private readonly ILogger<SalesActivityFeedHandler> _logger;
 
@@ -19,6 +20,15 @@ public sealed class SalesActivityFeedHandler
         _logger.LogInformation(
             "Activity feed: Sale {Number} ({Currency} {TotalAmount:N2}) completed for tenant {TenantId}",
             domainEvent.Number, domainEvent.Currency, domainEvent.TotalAmount, domainEvent.TenantId);
+        return Task.CompletedTask;
+    }
+
+    public Task HandleAsync(SaleVoidedEvent domainEvent, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Activity feed: Sale {Number} ({Currency} {TotalAmount:N2}) voided for tenant {TenantId}: {Reason}",
+            domainEvent.Number, domainEvent.Currency, domainEvent.TotalAmount, domainEvent.TenantId,
+            domainEvent.Reason);
         return Task.CompletedTask;
     }
 }

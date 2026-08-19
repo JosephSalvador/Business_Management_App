@@ -52,6 +52,9 @@ public sealed record SalePaymentDto(
     string? Reference,
     int OrderIndex);
 
+/// <summary>Body of <c>POST /api/v1/sales/{id}/void</c>. Reason is required.</summary>
+public sealed record VoidSaleRequest(string Reason);
+
 public sealed record SaleDto(
     Guid Id,
     Guid TenantId,
@@ -78,4 +81,7 @@ public sealed record SaleDto(
     IReadOnlyList<SaleLineDto> Lines,
     IReadOnlyList<SalePaymentDto> Payments,
     DateTime CreatedAt,
-    DateTime? UpdatedAt);
+    DateTime? UpdatedAt,
+    DateTime? VoidedAt = null,
+    Guid? VoidedBy = null,
+    string? VoidReason = null);

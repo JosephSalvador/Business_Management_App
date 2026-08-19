@@ -315,4 +315,81 @@ public sealed class SaleTests
         Assert.Throws<ArgumentOutOfRangeException>(() => Payment(0m));
         Assert.Throws<ArgumentOutOfRangeException>(() => Payment(-1m));
     }
+
+    [Fact]
+    public void Void_CompletedSale_TransitionsToVoided()
+    {
+        var sale = CreateSale();
+        var voidedBy = Guid.NewGuid();
+        var occurredAt = new DateTime(2026, 8, 16, 9, 30, 0, DateTimeKind.Utc);
+
+        sale.Void("Wrong item rung up", voidedBy, occurredAt);
+
+        Assert.Equal(SaleStatus.Voided, sale.Status);
+        Assert.Equal(occurredAt, sale.VoidedAt);
+        Assert.Equal(voidedBy, sale.VoidedBy);
+        Assert.Equal("Wrong item rung up", sale.VoidReason);
+    }
+
+    [Fact]
+    public void Void_RaisesSaleVoidedEvent()
+    {
+        var sale = CreateSale();
+        var voidedBy = Guid.NewGuid();
+
+        sale.Void("Cancelled by customer", voidedBy, new DateTime(2026, 8, 16, 9, 30, 0, DateTimeKind.Utc));
+
+        var @event = Assert.Single(sale.DomainEvents.OfType<SaleVoidedEvent>());
+        Assert.Equal(sale.Id, @event.SaleId);
+        Assert.Equal(TenantId, @event.TenantId);
+        Assert.Equal(BranchId, @event.BranchId);
+        Assert.Equal(voidedBy, @event.VoidedBy);
+        Assert.Equal("SALE-000001", @event.Number);
+        Assert.Equal("TZS", @event.Currency);
+        Assert.Equal(1000m, @event.TotalAmount);
+        Assert.Equal("Cancelled by customer", @event.Reason);
+        Assert.NotEqual(Guid.Empty, @event.EventId);
+    }
+
+    [Fact]
+    public void Void_AlreadyVoided_Throws()
+    {
+        var sale = CreateSale();
+        sale.Void("First reason", Guid.NewGuid(), new DateTime(2026, 8, 16, 9, 30, 0, DateTimeKind.Utc));
+
+        Assert.Throws<InvalidOperationException>(
+            () => sale.Void("Second reason", Guid.NewGuid(), new DateTime(2026, 8, 16, 10, 0, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public void Void_NormalizesReason()
+    {
+        var sale = CreateSale();
+        sale.Void("  Wrong item  ", Guid.NewGuid(), new DateTime(2026, 8, 16, 9, 30, 0, DateTimeKind.Utc));
+
+        Assert.Equal("Wrong item", sale.VoidReason);
+    }
+
+    [Fact]
+    public void Void_BlankReason_Throws()
+    {
+        var sale = CreateSale();
+        Assert.Throws<ArgumentException>(
+            () => sale.Void("   ", Guid.NewGuid(), new DateTime(2026, 8, 16, 9, 30, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public void Void_EmptyVoidedBy_Throws()
+    {
+        var sale = CreateSale();
+        Assert.Throws<ArgumentException>(
+            () => sale.Void("Reason", Guid.Empty, new DateTime(2026, 8, 16, 9, 30, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public void Void_DefaultOccurredAt_Throws()
+    {
+        var sale = CreateSale();
+        Assert.Throws<ArgumentException>(() => sale.Void("Reason", Guid.NewGuid(), default));
+    }
 }

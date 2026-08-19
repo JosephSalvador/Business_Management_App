@@ -31,7 +31,8 @@ public sealed class DatabaseSeeder
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        var existingNames = await _db.Permissions.Select(p => p.Name).ToListAsync(cancellationToken);        var missing = PermissionNames.All.Where(name => !existingNames.Contains(name)).ToArray();
+        var existingNames = await _db.Permissions.Select(p => p.Name).ToListAsync(cancellationToken);
+        var missing = PermissionNames.All.Where(name => !existingNames.Contains(name)).ToArray();
 
         foreach (var name in missing)
         {
