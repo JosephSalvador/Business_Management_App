@@ -35,6 +35,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // R8 chokes on sqlcipher_flutter_libs bytecode with this AGP
+            // version; minification is off until AGP is upgraded.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

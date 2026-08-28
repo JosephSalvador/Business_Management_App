@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
   static const Color primaryColor = Color(0xFF0066FF);
@@ -11,6 +10,8 @@ class AppColors {
   static const Color warningColor = Color(0xFFFFA502);
 }
 
+/// Swahili-first Business OS theme. Platform default typeface keeps the app
+/// small and legible on low-end Android devices.
 class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
@@ -23,37 +24,15 @@ class AppTheme {
         error: AppColors.errorColor,
       ),
       scaffoldBackgroundColor: AppColors.backgroundColor,
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surfaceColor,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        titleTextStyle: GoogleFonts.inter(
+        iconTheme: IconThemeData(color: Colors.black87),
+        titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: Colors.black87,
-        ),
-      ),
-      textTheme: TextTheme(
-        displayLarge: GoogleFonts.inter(
-          fontSize: 32,
-          fontWeight: FontWeight.w700,
-          color: Colors.black87,
-        ),
-        displayMedium: GoogleFonts.inter(
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        ),
-        bodyLarge: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-          color: Colors.black87,
-        ),
-        bodyMedium: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: Colors.black54,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -86,13 +65,10 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          textStyle: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
-      cardTheme: CardThemeData(  
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -108,7 +84,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: const Color(0xFF121212),
-      cardTheme: CardThemeData(  
+      cardTheme: CardThemeData(
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),

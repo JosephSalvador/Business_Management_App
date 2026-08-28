@@ -1,25 +1,28 @@
-// lib/features/auth/presentation/pages/forgot_password_page.dart
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:business_management_system/core/theme/app_theme.dart';
-import 'package:business_management_system/core/utils/responsive.dart';
-import 'package:business_management_system/core/widgets/responsive_layout.dart';
 
-import '../widgets/auth_header.dart';
-import '../widgets/custom_text_field.dart';
+import '../../../../core/di/providers.dart';
+import '../../../../core/network/app_exception.dart';
+import '../../../../core/routing/app_router.dart';
+import '../../../../l10n/loc.dart';
+import '../widgets/language_switcher.dart';
 
-class ForgotPasswordPage extends StatefulWidget {
+/// First step of password recovery: collect the email, request the reset code.
+/// The backend answers 204 whether or not the account exists — the page shows
+/// the same confirmation either way.
+class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
 
   @override
-  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
+  ConsumerState<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
-class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  final _emailController = TextEditingController();
+class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
-  bool _isSubmitted = false;
+  final _emailController = TextEditingController();
+  bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -27,147 +30,109 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isSubmitted = true;
-      });
-      // TODO: Implement password reset logic
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate() || _busy) {
+      return;
     }
-  }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
 
-  void _handleBack() {
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/login');
+    try {
+      await ref
+          .read(authControllerProvider.notifier)
+          .requestPasswordReset(email: _emailController.text);
+      if (mounted) {
+        context.push(
+            '${Routes.resetPassword}?email=${Uri.encodeComponent(_emailController.text.trim().toLowerCase())}');
+      }
+    } on AppException catch (error) {
+      setState(() => _error = error.message);
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Use safe area for proper spacing on notch devices
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _handleBack,
-        ),
+        title: Text(context.loc.forgotTitle),
+        actions: const [LanguageSwitcher()],
       ),
-      body: SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            // Make the scrollable area at least the height of the viewport (minus AppBar)
-            minHeight: MediaQuery.of(context).size.height - kToolbarHeight,
-          ),
-          child: IntrinsicHeight(
-            child: ResponsiveContainer(
-              child: Padding(
-                padding: Responsive.getPagePadding(context),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    // shrink to content and allow Spacer to push content if extra space exists
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 20),
-                      const AuthHeader(
-                        title: 'Reset Password',
-                        subtitle: 'Enter your email to receive reset instructions',
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      context.loc.forgotIntro,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: context.loc.emailLabel,
+                        border: const OutlineInputBorder(),
                       ),
-                      const SizedBox(height: 40),
-
-                      if (!_isSubmitted) ...[
-                        CustomTextField(
-                          controller: _emailController,
-                          label: 'Email Address',
-                          prefixIcon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your email';
-                            }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                .hasMatch(value)) {
-                              return 'Please enter a valid email';
-                            }
-                            return null;
-                          },
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
+                      validator: (value) {
+                        final email = value?.trim() ?? '';
+                        if (email.isEmpty) {
+                          return context.loc.emailRequired;
+                        }
+                        if (!email.contains('@')) {
+                          return context.loc.emailInvalid;
+                        }
+                        return null;
+                      },
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
                         ),
-                        const SizedBox(height: 30),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _submitForm,
-                            child: Text(
-                              'Send Reset Link',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ] else ...[
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Color.alphaBlend(
-                              AppColors.successColor.withAlpha(25),
-                              Theme.of(context).canvasColor,
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(
-                                Icons.check_circle,
-                                size: 64,
-                                color: AppColors.successColor,
-                              ),
-                              const SizedBox(height: 20),
-                              Text(
-                                'Check Your Email',
-                                style: GoogleFonts.inter(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.successColor,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'We\'ve sent password reset instructions to ${_emailController.text}',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 30),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    context.go('/login');
-                                  },
-                                  child: Text(
-                                    'Back to Login',
-                                    style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      // Push content to top if there is extra space
-                      const Spacer(),
-                      const SizedBox(height: 20),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
-                  ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _busy ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
+                      child: _busy
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(context.loc.sendCode),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => context.go(Routes.login),
+                        child: Text(context.loc.backToLogin),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -1,0 +1,117 @@
+import 'package:flutter/widgets.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:business_management_system/core/local/locale_store.dart';
+import 'package:business_management_system/l10n/generated/app_localizations.dart';
+
+/// Minimal in-memory platform so writes never hit the method channel.
+class _MemoryStoragePlatform extends FlutterSecureStoragePlatform {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> read({
+    required String key,
+    required Map<String, String> options,
+  }) async =>
+      values[key];
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    required Map<String, String> options,
+  }) async {
+    if (value == null) {
+      values.remove(key);
+    } else {
+      values[key] = value;
+    }
+  }
+
+  @override
+  Future<bool> containsKey({
+    required String key,
+    required Map<String, String> options,
+  }) async =>
+      values.containsKey(key);
+
+  @override
+  Future<void> delete({
+    required String key,
+    required Map<String, String> options,
+  }) async =>
+      values.remove(key);
+
+  @override
+  Future<void> deleteAll({required Map<String, String> options}) async =>
+      values.clear();
+
+  @override
+  Future<Map<String, String>> readAll({
+    required Map<String, String> options,
+  }) async =>
+      Map.of(values);
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() {
+    FlutterSecureStoragePlatform.instance = _MemoryStoragePlatform();
+  });
+
+  group('LocaleController', () {
+    test('defaults to Swahili — the product is Swahili-first', () {
+      final controller = LocaleController(LocaleStore());
+      expect(controller.state.languageCode, 'sw');
+    });
+
+    test('restore applies a stored preference', () {
+      final controller = LocaleController(LocaleStore());
+      controller.restore('en');
+      expect(controller.state.languageCode, 'en');
+    });
+
+    test('restore ignores null and unknown codes', () {
+      final controller = LocaleController(LocaleStore());
+      controller.restore(null);
+      expect(controller.state.languageCode, 'sw');
+
+      controller.restore('fr');
+      expect(controller.state.languageCode, 'sw',
+          reason: 'only supported locales may be applied');
+    });
+
+    test('setLocale switches and persists the choice', () async {
+      final store = LocaleStore();
+      final controller = LocaleController(store);
+
+      await controller.setLocale(const Locale('en'));
+      expect(controller.state.languageCode, 'en');
+      expect(await store.read(), 'en');
+    });
+  });
+
+  group('AppLocalizations', () {
+    test('Swahili and English both resolve every auth string', () {
+      final sw = lookupAppLocalizations(const Locale('sw'));
+      final en = lookupAppLocalizations(const Locale('en'));
+
+      for (final getter in [
+        (AppLocalizations l) => l.identifierLabel,
+        (AppLocalizations l) => l.forgotPassword,
+        (AppLocalizations l) => l.createAccount,
+        (AppLocalizations l) => l.resetCodeLabel,
+        (AppLocalizations l) => l.acceptTermsLink,
+        (AppLocalizations l) => l.strengthStrong,
+        (AppLocalizations l) => l.termsTitle,
+      ]) {
+        expect(getter(sw), isNotEmpty);
+        expect(getter(en), isNotEmpty);
+        expect(getter(sw), isNot(equals(getter(en))),
+            reason: 'translations must actually differ');
+      }
+    });
+  });
+}

@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.business_app">
 
+    <!-- Network access for the Business OS API (release builds don't inherit
+         the debug manifest's INTERNET permission). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- ✅ Bluetooth & Location Permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
@@ -19,7 +23,10 @@
     <application
         android:label="business_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
+        <!-- usesCleartextTraffic: DEV ONLY — the dev backend serves plain
+             HTTP on the LAN. Production must use HTTPS and drop this flag. -->
 
         <activity
             android:name=".MainActivity"
