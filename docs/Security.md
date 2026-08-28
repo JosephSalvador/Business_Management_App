@@ -21,7 +21,7 @@
 
 - No secrets in code or committed config. `appsettings.json` contains dev-only values;
   production config is injected (env vars / secret store) at deploy time.
-- `Joseph662` is the local dev DB password only. Never reuse for anything real.
+- `DATABASE_URL` env var holds the local dev DB password. Never hardcode in source.
 
 ## Data
 

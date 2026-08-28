@@ -44,8 +44,16 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Environment overrides (never commit real environment config)
+.env
+.env.local
+.env.production
+
 # .NET / backend
 **/bin/
 **/obj/
 *.user
 TestResults/
+**/appsettings.Development.json
+**/appsettings.Local.json
+backend/run-backend.sh

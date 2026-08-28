@@ -21,7 +21,7 @@
 
 | Service | How | Connection |
 |---|---|---|
-| PostgreSQL | Podman container, `postgres:17` | `localhost:5432`, db `businessos`, user `businessos`, password `Joseph662` |
+| PostgreSQL | Podman container, `postgres:17` | `localhost:5432`, db `businessos`, user `businessos`, password from `DATABASE_URL` env var |
 | Redis | Podman container, `redis:7` | `localhost:6379` |
 | MinIO | Podman container, `minio/minio` | `localhost:9000` / console `9001` |
 | API | `dotnet run` (API project) | `https://localhost:5001` / `http://localhost:5000` |

@@ -12,8 +12,8 @@ MinIO are not installed system-wide.
 ## Decision
 
 - Use the **system PostgreSQL 17** with a dedicated, app-owned role `businessos` and
-  database `businessos` (owner `businessos`). Dev password: `Joseph662.` (note: the trailing
-  period is part of the password).
+   database `businessos` (owner `businessos`). Dev password: set via `DATABASE_URL` env var
+   (the trailing period is part of the password).
 - Cache/queue: `ICacheService` interface with an in-memory fallback for dev; a Redis 7
   container (Podman) is provided via `deploy/docker-compose.yml` and used when running.
 - Files: MinIO container (Podman) via docker-compose, used from Phase 1 onward.

@@ -242,6 +242,105 @@
   tests blocked on Postgres (same as all other modules). Task 013 (docs + commit) pending.
   **Next:** Workflow v1, Dynamic Forms v1.
 
+- **M2 Email Verification + Onboarding (backend + Flutter), done 2026-08-23:** backend —
+  `EmailVerificationCode` domain (crypto-random 6-digit, SHA-256 at rest, TTL, max attempts,
+  resend cooldown via `SecurityOptions`), `VerificationCodeService` issuing through the outbox
+  `SendEmailJob` pipeline; register no longer returns tokens, login gates unverified accounts
+  (`AccountNotVerified` → 403); endpoints `POST /auth/verify-email`,
+  `/auth/resend-verification`, `GET /workspaces/mine`, `POST /organization/onboarding`;
+  migration `AddEmailVerificationAndOnboarding` (codes table + `Tenants.BusinessType` +
+  `Tenants.OnboardingCompletedAt`). Infra fixes surfaced by the new integration suite:
+  `BusinessOsApiFactory` env-var injection (JWT validated at Program.cs top level), missing
+  `[Migration]` attributes on three hand-written migrations (attribute-only Designer.cs added),
+  model snapshot regenerated, **OutboxJobQueue TenantId stamping** (`ITenantScopedEvent`
+  marker interface — production bug: 300 orphaned NULL-tenant rows), JournalEntry shadow-FK
+  duplicate relationship fix, seeder empty-currency fallback. 535/535 tests green on real
+  Postgres; fresh-DB migration chain verified end to end. Flutter — `AuthNeedsVerification`
+  controller state + verify/resend repository methods (register → RegisteredUser, no tokens);
+  new workspace feature (domain/repo/controller over `/workspaces/mine` + onboarding);
+  pure `journeyRedirect` router state machine (splash/login/register/verify/zero-workspace/
+  create-business/picker/home); pages VerifyEmail (60s cooldown), ZeroWorkspace
+  ("Hujaanzisha biashara bado"), CreateBusiness, WorkspacePicker; ScriptedAdapter now records
+  request bodies. flutter analyze clean, 38/38 tests green. Tech debt: attribute-only
+  Designer.cs ×3; single-tenant-per-user data model (registration IS org creation) — true
+  multi-workspace needs membership redesign.
+
+- **M3 Business Setup + Product Catalog (backend + Flutter), done 2026-08-23:** backend —
+  `CompleteOnboarding` now unconditionally (idempotent guards) ensures a default warehouse
+  "Main Store"/`MAINSTORE` (location `MAIN`) under the tenant's first active branch + default
+  "Retail Prices" price list in the tenant currency (command holds tenant advisory lock);
+  new `GET /api/v1/tax-categories` (`Products.View`, seeded TZ catalog VAT_STANDARD/VAT_ZERO/
+  EXEMPT); product search case-insensitive via `EF.Functions.ILike`; fixed latent bug —
+  `WarehouseRepository.ListAsync` lacked `.Include(Locations)` so list endpoints returned
+  empty `locations[]`. 540/540 tests green. Flutter — `features/products` end to end:
+  domain (Product/UnitOfMeasure/TaxCategory/Warehouse/StockBalance/PriceList), repository
+  over real endpoints with **GET-merge-PUT price upsert** (`PUT /price-lists/{id}/prices`
+  REPLACES all rows — preserve existing row ids!), CatalogController lazily seeds starter
+  units Kipande/Kilo/Lita/Gunia on setup entry, ProductsController enriches list with default-
+  list retail prices + stock totals client-side, StockController aggregates balances per
+  product; pages Products ("Hujaongeza bidhaa bado"), ProductForm (create sends status=1,
+  edit loads before first build; Conflict → duplicate-SKU message), OpeningStockSheet
+  (409 on repeat), StockPage; HomeShell bottom-nav IndexedStack Mauzo/Bidhaa/Stock/Ripoti/
+  Zaidi at `/home?tab=`; `/setup` shown after create-business, CTA → `/home?tab=bidhaa`;
+  all four products controllers reset on logout. flutter analyze clean, 55/55 tests green.
+  Real-API E2E verified the whole journey incl. API restart + fresh login persistence and
+   409 duplicate opening stock. Debt: backend search matches contiguous substrings only;
+   stock badges join one balances page (pageSize 200); buying price unsupported by backend.
+
+- **M5 Offline-first POS + Sync, done 2026-08-23:** local encrypted store via
+   `core/local` (Drift schema v1: meta/cached_products/cached_stock/local_sales/
+   lines/payments/sync_queue; SQLCipher key from flutter_secure_storage — plain
+   SQLite silently ignores PRAGMA key, so LocalDatabase warns when cipher_version
+   is absent, e.g. Linux desktop). DeviceIdentity = UUIDv4 in secure storage.
+   PosCatalogController is cache-FIRST (search never hits API); projected stock =
+   cached balance − Σ pending offline sale lines; grid blocks ≤0. Checkout falls
+   back to OfflineSaleRecorder on NetworkException/TimeoutException ONLY — the
+   recorder reuses the SAME clientSaleId the online attempt used, writes
+   sale+lines+payment+queue row atomically, and enforces the conservative stock
+   guard. Provisional receipts show "Mauzo ya Offline" until server confirms.
+   SyncEngine: single-flight FIFO drain, exponential backoff (5s→30min cap,
+   12 attempts then manual-only), price-drift pre-check → CONFLICT/PRICE,
+   insufficient stock → CONFLICT/STOCK, 403 → failed PERMISSION, 401 → pause
+   without attempt increment; failed/conflict rows are NEVER deleted.
+   ConnectivityMonitor distinguishes offline/unreachable/online via probe +
+   hysteresis + noteApiSuccess(); connectivity_plus alone is never trusted.
+   72 h offline selling window anchored by SessionJournal.markAuthenticated()
+   fired from AuthRepository.onSessionEstablished (login AND refresh).
+   Logout warns about pending count; DB retained encrypted per installation.
+   Backend change (only one): TenantActiveMiddleware — suspended tenant gets 403
+   on every authenticated request, cached 30 s (documented enforcement lag).
+   E2E m5_e2e.sh proves exactly-once incl. aborted-mid-request acceptance.
+   Debt: full-refetch catalog sync (no backend delta cursors); single warehouse
+   aggregate ('*') in cache; no device registration API yet.
+
+- **M4 POS Core / Sales (Flutter-only), done 2026-08-23:** backend sales engine reused
+   unchanged (540/540). Flutter `features/sales` end to end — domain (CartLine,
+   PaymentMethod ints Cash=0/MobileMoney=1/Card=2/BankTransfer=3/Credit=4/Other=5,
+   buildCreateSaleBody sends NO price fields, SaleDto/SaleLineData/SalePaymentData/PagedSales
+   parsers, buildReceiptText monospace ticket), SaleRepository (`POST /api/v1/sales` with
+   **Idempotency-Key header = clientSaleId Guid**; server header wins and replays return the
+   original SaleDto; GET /sales/{id}; GET /sales list with from/to/status/search;
+   GET /pricing/resolve → null on 404), CheckoutController (**clientSaleId drawn once per
+   logical sale and kept across retryable NetworkException/TimeoutException/ServerException/
+   UnknownException so retries can never double-charge; new key only after definitive
+   rejection or success; double-tap guarded by submitting state; pre-submit resolvePrice
+   per line with silent fallback to cart snapshot**), CartController, SalesHistoryController
+   (today window pageSize 100). Pages: PosPage (debounced search 300 ms, product grid,
+   out-of-stock guard, zero-price guard, bottom cart bar), CartSheet (± qty; qty→0 removes),
+   PaymentSheet (Cash/Mobile Money; ref.listenManual on CheckoutSuccess → clear cart +
+   refresh history + pop + pushReplacement success), SaleSuccessPage (server-truth
+   subtotal/VAT/total), ReceiptPreviewPage (copy + save .txt via path_provider — no
+   printer stack in M4), SalesHistoryPage, SaleDetailPage. Router /pos /pos/success /sales +
+   receipt/detail param routes; home tab 0 = POS; logout resets cart/checkout/history.
+   posBranchIdProvider fetches first branch via GET /branches (WorkspaceDto has no BranchId).
+   User-approved design decision: shelf prices are tax-inclusive server-side and there is no
+   tax-rules read API, so the cart shows Jumla only with hint "Bei zinajumuisha kodi." and the
+   exact Subtotal/VAT split appears solely on the success screen/receipt from server truth.
+   flutter analyze clean; 77/77 tests green. Real-API E2E (/tmp/opencode/m4_e2e.sh) verified
+   the full journey incl. oversell → 400 whole-sale reject, same-key replay returns ORIGINAL
+   sale with exactly one DB row, API restart + fresh login persistence, stock 50→48 stable.
+   Debt: no void/refund UI; receipt unit prices omit TSh symbol; offline POS deferred to M8.
+
 ## coding.md — see `docs/CodingStandards.md`
 
 ## accounting_plan.md — Slice 9 (IMPLEMENTED)
@@ -258,8 +357,8 @@
 
 ## database.md — see `docs/TechStack.md` + ADR-0002/0008
 
-- Local: podman postgres:17, db `businessos`, user `businessos`, password `Joseph662.`
-  (trailing period is part of the password), port 5432. Redis `localhost:6379`, MinIO
+- Local: podman postgres:17, db `businessos`, user `businessos`, password from `DATABASE_URL`
+  env var (trailing period is part of the password), port 5432. Redis `localhost:6379`, MinIO
   `localhost:9000/9001`. Test DB: `businessos_test`.
 
 ## ux.md — product principles
