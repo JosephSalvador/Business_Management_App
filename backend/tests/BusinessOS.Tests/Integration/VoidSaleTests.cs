@@ -20,7 +20,7 @@ public sealed class VoidSaleTests : SalesTestBase
     private async Task<(string Token, Guid TenantId, Guid BranchId, string ProductId, string WarehouseId)>
         FixtureAsync(string label)
     {
-        var (token, tenantId) = await RegisterAsync(label);
+        var (token, tenantId) = await RegisterVerifiedAsync(label);
         var unitId = await CreateUnitAsync(token, "Bottles");
         var productId = await CreateProductAsync(token, "Fanta 500ml", unitId);
         var priceListId = await CreatePriceListAsync(token, "Default");
@@ -88,7 +88,7 @@ public sealed class VoidSaleTests : SalesTestBase
     [Fact]
     public async Task VoidSale_ServiceOnlySale_RestoresNoStock_ButVoids()
     {
-        var (token, tenantIdString) = await RegisterAsync("void-service");
+        var (token, tenantIdString) = await RegisterVerifiedAsync("void-service");
         var tenantId = Guid.Parse(tenantIdString);
         var unitId = await CreateUnitAsync(token, "Hours");
         var serviceId = await CreateProductAsync(token, "Repair", unitId, productType: 1);

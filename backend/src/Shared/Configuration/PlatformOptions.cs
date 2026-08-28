@@ -88,4 +88,12 @@ public sealed class SecurityOptions
 
     public int MaxFailedLoginAttempts { get; set; } = 5;
     public int LockoutDurationMinutes { get; set; } = 15;
+    public int VerificationCodeTtlMinutes { get; set; } = 1440;
+    public int VerificationMaxAttempts { get; set; } = 5;
+    public int VerificationResendCooldownSeconds { get; set; } = 60;
+    public int PasswordResetCodeTtlMinutes { get; set; } = 30;
+    public int PasswordResetMaxAttempts { get; set; } = 5;
+    public int PasswordResetResendCooldownSeconds { get; set; } = 60;
+    public int InvitationCodeTtlHours { get; set; } = 72;
+    public int InvitationMaxAttempts { get; set; } = 5;
 }

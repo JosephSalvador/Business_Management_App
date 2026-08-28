@@ -13,7 +13,9 @@ public sealed class BusinessDbContextFactory : IDesignTimeDbContextFactory<Busin
     public BusinessDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
-            ?? "Host=localhost;Port=5432;Database=businessos;Username=businessos;Password=Joseph662.";
+            ?? throw new InvalidOperationException(
+                "DATABASE_URL environment variable is not set. " +
+                "Set it to your PostgreSQL connection string for design-time operations.");
 
         var options = new DbContextOptionsBuilder<BusinessDbContext>()
             .UseNpgsql(connectionString)

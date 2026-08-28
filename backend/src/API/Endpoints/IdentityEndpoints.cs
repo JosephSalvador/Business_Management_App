@@ -52,6 +52,9 @@ public static class IdentityEndpoints
         users.MapDelete("/{id:guid}", DeleteUserAsync)
             .RequirePermission(PermissionNames.UsersDelete)
             .WithName("DeleteUser");
+        users.MapPost("/invitations", IssueInvitationAsync)
+            .RequirePermission(PermissionNames.UsersCreate)
+            .WithName("IssueInvitation");
 
         var roles = api.MapGroup("/roles")
             .WithApiVersionSet(versionSet)
@@ -152,6 +155,11 @@ public static class IdentityEndpoints
         ISender sender,
         CancellationToken cancellationToken)
         => (await sender.Send(new DeleteUserCommand(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> IssueInvitationAsync(
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new IssueInvitationCommand(), cancellationToken)).ToApiResult();
 
     private static async Task<IResult> ListRolesAsync(
         ISender sender,

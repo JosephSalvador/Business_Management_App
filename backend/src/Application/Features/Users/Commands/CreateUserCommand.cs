@@ -42,10 +42,20 @@ public sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand
     {
         var tenantId = _tenantContext.TenantId;
         var email = command.Email.Trim().ToLowerInvariant();
+        var phone = PhoneNumber.Normalize(command.Phone);
+        if (command.Phone is not null && phone is null)
+        {
+            return Error.Validation("Phone number is not valid.");
+        }
 
         if (await _users.GetByEmailAsync(email, cancellationToken) is not null)
         {
             return Error.Conflict("Email is already registered.");
+        }
+
+        if (phone is not null && await _users.GetByPhoneAsync(phone, cancellationToken) is not null)
+        {
+            return Error.Conflict("Phone number is already registered.");
         }
 
         var roleIds = command.RoleIds?.Distinct().ToArray() ?? Array.Empty<Guid>();
@@ -74,7 +84,7 @@ public sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand
             email,
             _passwordHasher.Hash(command.Password),
             command.FullName.Trim(),
-            command.Phone?.Trim());
+            phone);
 
         foreach (var role in roles)
         {

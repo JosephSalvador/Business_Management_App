@@ -35,6 +35,9 @@ public static class DependencyInjection
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
+        services.AddScoped<IPasswordResetCodeRepository, PasswordResetCodeRepository>();
+        services.AddScoped<IInvitationCodeRepository, InvitationCodeRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IFeatureFlagRepository, FeatureFlagRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
@@ -74,6 +77,13 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(jwtOptions.Secret))
         {
             throw new InvalidOperationException("Jwt:Secret must be configured.");
+        }
+
+        if (jwtOptions.Secret.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "Jwt:Secret must be at least 32 characters. " +
+                "Use a cryptographically random string (e.g., 64+ chars from a CSPRNG).");
         }
 
         services.AddSingleton(jwtOptions);

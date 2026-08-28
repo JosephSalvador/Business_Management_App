@@ -91,17 +91,19 @@ public sealed class UserManagementApplicationTests : IClassFixture<BusinessOsApi
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
         var email = $"new-{Guid.NewGuid():N}@test.local";
+        var phone = TestPhones.Next();
         var result = await sender.Send(new CreateUserCommand(
             email,
             "Passw0rd!",
             "New User",
-            Phone: "255700000000",
+            Phone: phone,
             new[] { world.AdminRoleId },
             world.BranchIds,
             world.BranchIds[0]));
 
         Assert.True(result.IsSuccess, result.Error.Message);
         Assert.Equal(email, result.Value.Email);
+        Assert.Equal("+" + phone, result.Value.Phone);
         Assert.Equal(new[] { world.AdminRoleId }, result.Value.RoleIds);
         Assert.Equal(world.BranchIds, result.Value.BranchIds);
         Assert.Equal(world.BranchIds[0], result.Value.DefaultBranchId);
@@ -151,11 +153,13 @@ public sealed class UserManagementApplicationTests : IClassFixture<BusinessOsApi
         using var scope = CreateAuthenticatedScope(world.TenantId, world.AdminUserIds[0]);
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
-        var result = await sender.Send(new UpdateUserCommand(world.AdminUserIds[0], "Renamed User", "255700000001"));
+        // Local Tanzanian form must be normalized to E.164 before storage.
+        var localPhone = "0" + TestPhones.Next()[3..];
+        var result = await sender.Send(new UpdateUserCommand(world.AdminUserIds[0], "Renamed User", localPhone));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Renamed User", result.Value.FullName);
-        Assert.Equal("255700000001", result.Value.Phone);
+        Assert.Equal("+255" + localPhone[1..], result.Value.Phone);
     }
 
     [Fact]
@@ -353,7 +357,8 @@ public sealed class UserManagementApplicationTests : IClassFixture<BusinessOsApi
         Assert.True(created.IsSuccess, created.Error.Message);
         var userId = created.Value.Id;
 
-        Assert.True((await sender.Send(new UpdateUserCommand(userId, "Audited 2", "255700000002"))).IsSuccess);
+        Assert.True((await sender.Send(
+            new UpdateUserCommand(userId, "Audited 2", TestPhones.Next()))).IsSuccess);
         Assert.True((await sender.Send(new SetUserRolesCommand(userId, Array.Empty<Guid>()))).IsSuccess);
         Assert.True((await sender.Send(new SetUserBranchesCommand(userId, world.BranchIds, world.BranchIds[0]))).IsSuccess);
         Assert.True((await sender.Send(new SetUserStatusCommand(userId, IsActive: false))).IsSuccess);

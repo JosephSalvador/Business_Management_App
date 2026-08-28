@@ -71,6 +71,15 @@ public static class ReferenceDataEndpoints
             .RequirePermission(PermissionNames.UnitsManage)
             .WithName("UpdateUnit");
 
+        var taxCategories = api.MapGroup("/tax-categories")
+            .WithApiVersionSet(versionSet)
+            .WithTags("Tax Categories")
+            .RequireAuthorization()
+            .RequireRateLimiting("global");
+        taxCategories.MapGet("/", ListTaxCategoriesAsync)
+            .RequirePermission(PermissionNames.ProductsView)
+            .WithName("ListTaxCategories");
+
         return app;
     }
 
@@ -145,4 +154,9 @@ public static class ReferenceDataEndpoints
         ISender sender,
         CancellationToken cancellationToken)
         => (await sender.Send(command with { Id = id }, cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ListTaxCategoriesAsync(
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new ListTaxCategoriesQuery(), cancellationToken)).ToApiResult();
 }

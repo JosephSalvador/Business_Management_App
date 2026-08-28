@@ -23,6 +23,9 @@ public sealed class TenantRepository : ITenantRepository
     public Task<Tenant?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => _db.Tenants.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
+    public Task<Tenant?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+        => _db.Tenants.FirstOrDefaultAsync(t => t.Name == name, cancellationToken);
+
     public Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default)
         => _db.Tenants.AddAsync(tenant, cancellationToken).AsTask();
 }
@@ -88,6 +91,11 @@ public sealed class UserRepository : IUserRepository
         => _db.Users
             .Include(u => u.Roles)
             .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
+    public Task<User?> GetByPhoneAsync(string phone, CancellationToken cancellationToken = default)
+        => _db.Users
+            .Include(u => u.Roles)
+            .FirstOrDefaultAsync(u => u.Phone == phone, cancellationToken);
 
     public Task<User?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
         => _db.Users
@@ -272,6 +280,102 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
             .ExecuteDeleteAsync(cancellationToken);
 }
 
+public sealed class EmailVerificationCodeRepository : IEmailVerificationCodeRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public EmailVerificationCodeRepository(BusinessDbContext db) => _db = db;
+
+    public Task<EmailVerificationCode?> GetByCodeHashAsync(string codeHash, CancellationToken cancellationToken = default)
+        => _db.EmailVerificationCodes.FirstOrDefaultAsync(c => c.CodeHash == codeHash, cancellationToken);
+
+    public Task<EmailVerificationCode?> GetLatestForUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+        => _db.EmailVerificationCodes
+            .Where(c => c.TenantId == tenantId && c.UserId == userId)
+            .OrderByDescending(c => c.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task InvalidateAllForUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var codes = await _db.EmailVerificationCodes
+            .Where(c => c.TenantId == tenantId && c.UserId == userId && c.ConsumedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var code in codes)
+        {
+            code.TryConsume();
+        }
+    }
+
+    public Task AddAsync(EmailVerificationCode code, CancellationToken cancellationToken = default)
+        => _db.EmailVerificationCodes.AddAsync(code, cancellationToken).AsTask();
+}
+
+public sealed class PasswordResetCodeRepository : IPasswordResetCodeRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public PasswordResetCodeRepository(BusinessDbContext db) => _db = db;
+
+    public Task<PasswordResetCode?> GetLatestForUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+        => _db.PasswordResetCodes
+            .Where(c => c.TenantId == tenantId && c.UserId == userId)
+            .OrderByDescending(c => c.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task InvalidateAllForUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var codes = await _db.PasswordResetCodes
+            .Where(c => c.TenantId == tenantId && c.UserId == userId && c.ConsumedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var code in codes)
+        {
+            code.TryConsume();
+        }
+    }
+
+    public Task AddAsync(PasswordResetCode code, CancellationToken cancellationToken = default)
+        => _db.PasswordResetCodes.AddAsync(code, cancellationToken).AsTask();
+}
+
+public sealed class InvitationCodeRepository : IInvitationCodeRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public InvitationCodeRepository(BusinessDbContext db) => _db = db;
+
+    public Task<InvitationCode?> GetActiveByCodeHashAsync(
+        string codeHash,
+        CancellationToken cancellationToken = default)
+        => _db.InvitationCodes
+            .Where(c => c.CodeHash == codeHash && c.ConsumedAt == null)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<InvitationCode>> ListActiveForTenantAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+        => await _db.InvitationCodes
+            .Where(c => c.TenantId == tenantId && c.ConsumedAt == null)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public Task AddAsync(InvitationCode code, CancellationToken cancellationToken = default)
+        => _db.InvitationCodes.AddAsync(code, cancellationToken).AsTask();
+}
+
 public sealed class AuditLogRepository : IAuditLogRepository
 {
     private readonly BusinessDbContext _db;
@@ -367,9 +471,9 @@ public sealed class ProductRepository : IProductRepository
         {
             var term = filter.Search.Trim();
             filtered = filtered.Where(p =>
-                p.Name.Contains(term)
-                || (p.Sku != null && p.Sku.Contains(term))
-                || (p.Barcode != null && p.Barcode.Contains(term)));
+                EF.Functions.ILike(p.Name, $"%{term}%")
+                || (p.Sku != null && EF.Functions.ILike(p.Sku, $"%{term}%"))
+                || (p.Barcode != null && EF.Functions.ILike(p.Barcode, $"%{term}%")));
         }
 
         if (filter.CategoryId.HasValue)
@@ -521,6 +625,8 @@ public sealed class WarehouseRepository : IWarehouseRepository
         CancellationToken cancellationToken = default)
         => await ApplyFilter(_db.Warehouses, tenantId, search, branchId)
             .AsNoTracking()
+            .AsSplitQuery()
+            .Include(w => w.Locations)
             .OrderBy(w => w.Code)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -1110,6 +1216,13 @@ public sealed class TaxRuleRepository : ITaxRuleRepository
         => _db.TaxCategories
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<TaxCategory>> ListCategoriesAsync(
+        CancellationToken cancellationToken = default)
+        => await _db.TaxCategories
+            .AsNoTracking()
+            .OrderBy(c => c.Code)
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TaxCategory>> ListCategoriesByCodesAsync(
         IEnumerable<string> codes, CancellationToken cancellationToken = default)

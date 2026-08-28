@@ -303,6 +303,9 @@ public sealed class TaxEngineTests
             Guid tenantId, CancellationToken cancellationToken = default)
             => Task.FromResult(Regime);
 
+        public Task<IReadOnlyList<TaxCategory>> ListCategoriesAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<TaxCategory>>(Categories);
+
         public Task<TaxCategory?> GetCategoryByIdAsync(
             Guid id, CancellationToken cancellationToken = default)
             => Task.FromResult(Categories.FirstOrDefault(c => c.Id == id));

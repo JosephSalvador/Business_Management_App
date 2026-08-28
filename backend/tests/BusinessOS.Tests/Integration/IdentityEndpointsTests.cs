@@ -52,16 +52,20 @@ public sealed class IdentityEndpointsTests : IClassFixture<BusinessOsApiFactory>
     private async Task<(string AccessToken, string TenantId, string UserId)> RegisterAsync(string label)
     {
         var email = $"{label}-{Guid.NewGuid():N}@test.local";
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/register", new
-        {
-            email,
-            password = "Passw0rd!",
-            fullName = $"{label} Owner",
-            organizationName = $"{label} Org {Guid.NewGuid():N}",
-        });
+        var response = await TestRegistration.RegisterUnverifiedAsync(_client, label, email);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var doc = Body(await response.Content.ReadAsStringAsync());
-        return (GetProperty(doc, "accessToken"), GetProperty(doc, "user", "tenantId"), GetProperty(doc, "user", "id"));
+
+        var code = await TestRegistration.GetLatestVerificationCodeAsync(email);
+        var verify = await _client.PostAsJsonAsync("/api/v1/auth/verify-email", new { email, code });
+        Assert.Equal(HttpStatusCode.NoContent, verify.StatusCode);
+
+        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var doc = Body(await login.Content.ReadAsStringAsync());
+        return (
+            GetProperty(doc, "accessToken"),
+            GetProperty(doc, "user", "tenantId"),
+            GetProperty(doc, "user", "id"));
     }
 
     private async Task<string> RegisterLimitedUserAsync(string label, Guid tenantId, params string[] permissions)
@@ -78,10 +82,11 @@ public sealed class IdentityEndpointsTests : IClassFixture<BusinessOsApiFactory>
             .FirstAsync();
         var user = User.Create(Guid.NewGuid(), tenantId, $"{label}-{Guid.NewGuid():N}@test.local", hash, label, phone: null);
         user.AssignRole(role);
+        user.MarkEmailVerified();
         await db.Users.AddAsync(user);
         await db.SaveChangesAsync();
 
-        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email = user.Email, password = "Passw0rd!" });
+        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = user.Email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         return GetProperty(Body(await login.Content.ReadAsStringAsync()), "accessToken");
     }
@@ -145,7 +150,7 @@ public sealed class IdentityEndpointsTests : IClassFixture<BusinessOsApiFactory>
             email = $"cashier-{Guid.NewGuid():N}@test.local",
             password = "Passw0rd!",
             fullName = "Cashier",
-            phone = "255700000000",
+            phone = TestPhones.Next(),
             roleIds = new[] { adminRoleId },
             branchIds = new[] { branchId },
             defaultBranchId = branchId,
@@ -155,7 +160,7 @@ public sealed class IdentityEndpointsTests : IClassFixture<BusinessOsApiFactory>
         Assert.Equal("Cashier", GetProperty(createdDoc, "fullName"));
         var cashierId = GetProperty(createdDoc, "id");
 
-        var updated = await _client.PutAsJsonAsync($"/api/v1/users/{cashierId}", new { fullName = "Senior Cashier", phone = "255700000001" });
+        var updated = await _client.PutAsJsonAsync($"/api/v1/users/{cashierId}", new { fullName = "Senior Cashier", phone = TestPhones.Next() });
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         Assert.Equal("Senior Cashier", GetProperty(Body(await updated.Content.ReadAsStringAsync()), "fullName"));
 

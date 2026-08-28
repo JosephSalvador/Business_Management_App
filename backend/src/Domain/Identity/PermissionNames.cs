@@ -79,4 +79,22 @@ public static class PermissionNames
         PurchasingView, PurchasingManage,
         AuditView,
     };
+
+    /// <summary>
+    /// Permissions granted to the system Staff role: run the POS (create sales),
+    /// read products/stock and see sales history. Staff cannot manage the
+    /// business, users, roles, pricing or finances.
+    /// </summary>
+    public static IReadOnlyList<string> Staff { get; } = new[]
+    {
+        DashboardView,
+        SalesCreate, SalesView,
+        SalesReportsView,
+        ProductsView,
+        CategoriesView,
+        BrandsView,
+        UnitsView,
+        InventoryView,
+        WarehousesView,
+    };
 }

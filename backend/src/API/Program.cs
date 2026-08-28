@@ -82,6 +82,8 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddMemoryCache();
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -149,10 +151,10 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader()
             .AllowAnyMethod());
     }
-    else if (builder.Environment.IsDevelopment())
+    else
     {
         options.AddDefaultPolicy(policy => policy
-            .AllowAnyOrigin()
+            .WithOrigins("http://localhost:3000", "http://localhost:8080", "https://localhost:5001")
             .AllowAnyHeader()
             .AllowAnyMethod());
     }
@@ -187,6 +189,7 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseMiddleware<UserContextMiddleware>();
+app.UseMiddleware<TenantActiveMiddleware>();
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))

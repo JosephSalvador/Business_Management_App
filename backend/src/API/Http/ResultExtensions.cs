@@ -18,6 +18,7 @@ public static class ResultExtensions
             "Validation" => StatusCodes.Status400BadRequest,
             "Unauthorized" => StatusCodes.Status401Unauthorized,
             "Forbidden" => StatusCodes.Status403Forbidden,
+            "AccountNotVerified" => StatusCodes.Status403Forbidden,
             "NotFound" => StatusCodes.Status404NotFound,
             "Conflict" => StatusCodes.Status409Conflict,
             "TooManyRequests" => StatusCodes.Status429TooManyRequests,

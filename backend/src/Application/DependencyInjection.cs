@@ -20,6 +20,8 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         services.AddScoped<ITaxEngine, TaxService>();
+        services.AddScoped<Features.Auth.Services.EmailVerificationService>();
+        services.AddScoped<Features.Auth.Services.PasswordResetService>();
 
         return services;
     }

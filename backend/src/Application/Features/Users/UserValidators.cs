@@ -1,4 +1,5 @@
 using BusinessOS.Application.Features.Common;
+using BusinessOS.Domain.Identity;
 using FluentValidation;
 
 namespace BusinessOS.Application.Features.Users.Commands;
@@ -10,7 +11,8 @@ public sealed class CreateUserCommandValidator : AbstractValidator<CreateUserCom
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Password).PasswordPolicy();
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.Phone).MaximumLength(30);
+        RuleFor(x => x.Phone).Must(phone => phone is null || PhoneNumber.IsNormalizable(phone))
+            .WithMessage("The phone number must be valid, e.g. 0712345678 or +255712345678.");
         RuleFor(x => x.RoleIds).NotNull();
         RuleFor(x => x.BranchIds).NotNull();
         RuleFor(x => x.DefaultBranchId)
@@ -25,7 +27,8 @@ public sealed class UpdateUserCommandValidator : AbstractValidator<UpdateUserCom
     {
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.Phone).MaximumLength(30);
+        RuleFor(x => x.Phone).Must(phone => phone is null || PhoneNumber.IsNormalizable(phone))
+            .WithMessage("The phone number must be valid, e.g. 0712345678 or +255712345678.");
     }
 }
 

@@ -561,6 +561,9 @@ public sealed class CreateSaleCommandTests
 
         public Task<TaxRegime?> GetRegimeForTenantAsync(Guid tenantId, CancellationToken ct = default)
             => Task.FromResult<TaxRegime?>(null);
+        public Task<IReadOnlyList<TaxCategory>> ListCategoriesAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<TaxCategory>>(Array.Empty<TaxCategory>());
+
         public Task<TaxCategory?> GetCategoryByIdAsync(Guid id, CancellationToken ct = default)
             => Task.FromResult(Category?.Id == id ? Category : null);
         public Task<IReadOnlyList<TaxCategory>> ListCategoriesByCodesAsync(IEnumerable<string> codes, CancellationToken ct = default)

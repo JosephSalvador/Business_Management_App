@@ -24,6 +24,8 @@ public sealed class Tenant : AggregateRoot
     public string? Address { get; private set; }
     public string? TaxId { get; private set; }
     public string? DatabaseSchema { get; private set; }
+    public string? BusinessType { get; private set; }
+    public DateTime? OnboardingCompletedAt { get; private set; }
     public bool IsActive { get; private set; } = true;
 
     public static Tenant Create(
@@ -52,6 +54,37 @@ public sealed class Tenant : AggregateRoot
         ContactPhone = contactPhone;
         Address = address;
         TaxId = taxId;
+    }
+
+    /// <summary>
+    /// Finalises the guided setup: profile fields, business type and currency in one
+    /// mutation, stamping the completion timestamp that the workspace state is derived from.
+    /// </summary>
+    public void CompleteOnboarding(
+        string name,
+        string? businessType,
+        string countryCode,
+        string currency,
+        string? contactPhone,
+        string? taxId)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Organization name is required.", nameof(name));
+        }
+
+        if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
+        {
+            throw new ArgumentException("Currency must be an ISO 4217 code.", nameof(currency));
+        }
+
+        Name = name.Trim();
+        BusinessType = string.IsNullOrWhiteSpace(businessType) ? null : businessType.Trim();
+        ContactPhone = contactPhone?.Trim();
+        TaxId = taxId?.Trim();
+        UpdateCountryCode(countryCode);
+        Currency = currency.Trim().ToUpperInvariant();
+        OnboardingCompletedAt = DateTime.UtcNow;
     }
 
     public void Activate() => IsActive = true;

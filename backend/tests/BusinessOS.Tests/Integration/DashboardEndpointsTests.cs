@@ -49,20 +49,8 @@ public sealed class DashboardEndpointsTests : IClassFixture<BusinessOsApiFactory
         return current.ToString();
     }
 
-    private async Task<(string AccessToken, string TenantId)> RegisterAsync(string label)
-    {
-        var email = $"{label}-{Guid.NewGuid():N}@test.local";
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/register", new
-        {
-            email,
-            password = "Passw0rd!",
-            fullName = $"{label} Owner",
-            organizationName = $"{label} Org {Guid.NewGuid():N}",
-        });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var doc = Body(await response.Content.ReadAsStringAsync());
-        return (GetProperty(doc, "accessToken"), GetProperty(doc, "user", "tenantId"));
-    }
+    private Task<(string AccessToken, string TenantId)> RegisterAsync(string label)
+        => global::BusinessOS.Tests.Support.TestRegistration.RegisterVerifiedAsync(_client, label);
 
     private async Task<string> RegisterLimitedViewerAsync(
         string email, Guid tenantId, IReadOnlyList<string> permissions)
@@ -81,10 +69,11 @@ public sealed class DashboardEndpointsTests : IClassFixture<BusinessOsApiFactory
             .FirstAsync();
         var user = User.Create(Guid.NewGuid(), tenantId, email, hash, "Dashboard Viewer", phone: null);
         user.AssignRole(role);
+        user.MarkEmailVerified();
         await db.Users.AddAsync(user);
         await db.SaveChangesAsync();
 
-        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Passw0rd!" });
+        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         return GetProperty(Body(await login.Content.ReadAsStringAsync()), "accessToken");
     }

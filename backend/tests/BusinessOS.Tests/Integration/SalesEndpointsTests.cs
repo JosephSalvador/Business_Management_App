@@ -22,7 +22,7 @@ public sealed class SalesEndpointsTests : SalesTestBase
     private async Task<(string Token, Guid TenantId, Guid BranchId, string ProductId, string WarehouseId)>
         FixtureAsync(string label, decimal opening = 5m, decimal price = 100m, int productType = 0, Guid? taxCategoryId = null, bool setPrice = true)
     {
-        var (token, tenantId) = await RegisterAsync(label);
+        var (token, tenantId) = await RegisterVerifiedAsync(label);
         var unitId = await CreateUnitAsync(token, "Bottles");
         var productId = await CreateProductAsync(token, "Fanta 500ml", unitId, taxCategoryId, productType);
         var priceListId = await CreatePriceListAsync(token, "Default");

@@ -80,6 +80,19 @@ public sealed class DatabaseSeeder
                 _logger.LogInformation("Set default country code for the demo tenant.");
             }
 
+            if (!demoUser.EmailVerified)
+            {
+                demoUser.MarkEmailVerified();
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            if (demoTenant is not null && demoTenant.OnboardingCompletedAt is null)
+            {
+                var currency = string.IsNullOrWhiteSpace(demoTenant.Currency) ? "TZS" : demoTenant.Currency;
+                demoTenant.CompleteOnboarding(demoTenant.Name, businessType: null, Tenant.DefaultCountryCode, currency, contactPhone: null, taxId: null);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
             if (!await _db.Branches.AnyAsync(b => b.TenantId == demoUser.TenantId, cancellationToken))
             {
                 _db.Branches.Add(Branch.Create(
@@ -112,7 +125,11 @@ public sealed class DatabaseSeeder
             "System Administrator",
             phone: null);
         admin.AssignRole(adminRole);
+        admin.MarkEmailVerified();
         await _db.Users.AddAsync(admin, cancellationToken);
+
+        // The seeded workspace is fully usable without running guided setup.
+        tenant.CompleteOnboarding(tenant.Name, businessType: null, Tenant.DefaultCountryCode, tenant.Currency, contactPhone: null, taxId: null);
 
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Seeded demo tenant 'Acme Ltd' and administrator user.");

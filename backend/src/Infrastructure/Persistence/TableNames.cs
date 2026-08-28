@@ -40,6 +40,9 @@ public static class Tables
         public const string UserRoles = "UserRoles";
         public const string RolePermissions = "RolePermissions";
         public const string RefreshTokens = "RefreshTokens";
+        public const string EmailVerificationCodes = "EmailVerificationCodes";
+        public const string PasswordResetCodes = "PasswordResetCodes";
+        public const string InvitationCodes = "InvitationCodes";
     }
 
     public static class Catalog

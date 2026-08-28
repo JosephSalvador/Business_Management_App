@@ -1,5 +1,6 @@
 using BusinessOS.Application.Features.Users.Dtos;
 using BusinessOS.Application.Ports;
+using BusinessOS.Domain.Identity;
 using BusinessOS.Shared;
 using MediatR;
 
@@ -27,7 +28,22 @@ public sealed class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand
             return Error.NotFound("User not found.");
         }
 
-        user.UpdateProfile(command.FullName.Trim(), command.Phone?.Trim());
+        var phone = PhoneNumber.Normalize(command.Phone);
+        if (command.Phone is not null && phone is null)
+        {
+            return Error.Validation("Phone number is not valid.");
+        }
+
+        if (phone is not null)
+        {
+            var existing = await _users.GetByPhoneAsync(phone, cancellationToken);
+            if (existing is not null && existing.Id != user.Id)
+            {
+                return Error.Conflict("Phone number is already registered.");
+            }
+        }
+
+        user.UpdateProfile(command.FullName.Trim(), phone);
         return Result.Success(UserMappers.ToDto(user));
     }
 }

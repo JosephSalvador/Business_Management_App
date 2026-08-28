@@ -112,7 +112,17 @@ public sealed class User : AggregateRoot
             Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, FullName, Phone));
     }
 
-    public void MarkEmailVerified() => EmailVerified = true;
+    public void MarkEmailVerified()
+    {
+        if (EmailVerified)
+        {
+            return;
+        }
+
+        EmailVerified = true;
+        AddDomainEvent(new UserEmailVerifiedEvent(
+            Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, Email));
+    }
 
     public void Activate()
     {

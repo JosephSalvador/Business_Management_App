@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace BusinessOS.Application.Features.Auth.Commands;
 
-public sealed record LoginCommand(string Email, string Password) : IRequest<Result<AuthResponse>>;
+public sealed record LoginCommand(string Identifier, string Password) : IRequest<Result<AuthResponse>>;
 
 public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<AuthResponse>>
 {
@@ -41,8 +41,19 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<A
 
     public async Task<Result<AuthResponse>> Handle(LoginCommand command, CancellationToken cancellationToken)
     {
-        var normalizedEmail = command.Email.Trim().ToLowerInvariant();
-        var user = await _users.GetByEmailAsync(normalizedEmail, cancellationToken);
+        var identifier = command.Identifier.Trim();
+        User? user;
+        if (identifier.Contains('@'))
+        {
+            user = await _users.GetByEmailAsync(identifier.ToLowerInvariant(), cancellationToken);
+        }
+        else
+        {
+            var phone = PhoneNumber.Normalize(identifier);
+            user = phone is null
+                ? null
+                : await _users.GetByPhoneAsync(phone, cancellationToken);
+        }
 
         if (user is null)
         {
@@ -71,6 +82,11 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<A
         if (!user.IsActive)
         {
             return Error.Unauthorized("This account has been deactivated.");
+        }
+
+        if (!user.EmailVerified)
+        {
+            return Error.AccountNotVerified("Verify your email address before signing in.");
         }
 
         user.ResetFailedLogins();

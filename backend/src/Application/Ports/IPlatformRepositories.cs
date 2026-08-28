@@ -23,9 +23,35 @@ public interface IUnitOfWork
     Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
 }
 
+public interface IEmailVerificationCodeRepository
+{
+    Task<EmailVerificationCode?> GetByCodeHashAsync(string codeHash, CancellationToken cancellationToken = default);
+    Task<EmailVerificationCode?> GetLatestForUserAsync(
+        Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+    Task InvalidateAllForUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+    Task AddAsync(EmailVerificationCode code, CancellationToken cancellationToken = default);
+}
+
+public interface IPasswordResetCodeRepository
+{
+    Task<PasswordResetCode?> GetLatestForUserAsync(
+        Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+    Task InvalidateAllForUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+    Task AddAsync(PasswordResetCode code, CancellationToken cancellationToken = default);
+}
+
+public interface IInvitationCodeRepository
+{
+    Task<InvitationCode?> GetActiveByCodeHashAsync(string codeHash, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<InvitationCode>> ListActiveForTenantAsync(
+        Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddAsync(InvitationCode code, CancellationToken cancellationToken = default);
+}
+
 public interface ITenantRepository
 {
     Task<Tenant?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Tenant?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default);
 }
 
@@ -44,6 +70,7 @@ public interface IBranchRepository
 public interface IUserRepository
 {
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task<User?> GetByPhoneAsync(string phone, CancellationToken cancellationToken = default);
     Task<User?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<User?> GetByIdWithRolesAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<User>> ListAsync(
@@ -327,6 +354,7 @@ public interface ITaxRuleRepository
 {
     Task<TaxRegime?> GetRegimeForTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task<TaxCategory?> GetCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TaxCategory>> ListCategoriesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TaxCategory>> ListCategoriesByCodesAsync(
         IEnumerable<string> codes, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TaxRule>> ListEffectiveRulesAsync(

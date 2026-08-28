@@ -31,6 +31,16 @@ public static class OrganizationEndpoints
         organization.MapPut("/", UpdateOrganizationAsync)
             .RequirePermission(PermissionNames.OrganizationsManage)
             .WithName("UpdateOrganization");
+        organization.MapPost("/onboarding", CompleteOnboardingAsync)
+            .RequirePermission(PermissionNames.OrganizationsManage)
+            .WithName("CompleteOnboarding");
+
+        var workspaces = api.MapGroup("/workspaces")
+            .WithApiVersionSet(versionSet)
+            .RequireAuthorization()
+            .RequireRateLimiting("global")
+            .WithTags("Workspaces");
+        workspaces.MapGet("/mine", GetMyWorkspacesAsync).WithName("GetMyWorkspaces");
 
         var branches = api.MapGroup("/branches")
             .WithApiVersionSet(versionSet)
@@ -66,6 +76,17 @@ public static class OrganizationEndpoints
         ISender sender,
         CancellationToken cancellationToken)
         => (await sender.Send(command, cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CompleteOnboardingAsync(
+        CompleteOnboardingCommand command,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(command, cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> GetMyWorkspacesAsync(
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new GetMyWorkspacesQuery(), cancellationToken)).ToApiResult();
 
     private static async Task<IResult> ListBranchesAsync(
         int page,

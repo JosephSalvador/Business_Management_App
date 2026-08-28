@@ -10,6 +10,9 @@ public readonly record struct Error(string Code, string Message)
     public static Error Conflict(string message) => new("Conflict", message);
     public static Error NotFound(string message) => new("NotFound", message);
     public static Error Unauthorized(string message) => new("Unauthorized", message);
+    public static Error Forbidden(string message) => new("Forbidden", message);
+    public static Error AccountNotVerified(string message) => new("AccountNotVerified", message);
+    public static Error TooManyRequests(string message) => new("TooManyRequests", message);
     public static Error Internal(string message) => new("Internal", message);
 }
 

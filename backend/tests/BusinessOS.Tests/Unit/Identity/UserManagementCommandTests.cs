@@ -21,6 +21,7 @@ public sealed class UserManagementCommandTests
         public User? DeactivatedUser { get; private set; }
 
         public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default) => Task.FromResult(User);
+        public Task<User?> GetByPhoneAsync(string phone, CancellationToken ct = default) => Task.FromResult<User?>(null);
         public Task<User?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default) => Task.FromResult(User);
         public Task<User?> GetByIdWithRolesAsync(Guid tenantId, Guid id, CancellationToken ct = default) => Task.FromResult(User);
 

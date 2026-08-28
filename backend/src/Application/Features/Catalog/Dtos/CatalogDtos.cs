@@ -23,3 +23,8 @@ public sealed record UnitOfMeasureDto(
     string Abbreviation,
     DateTime CreatedAt,
     DateTime? UpdatedAt);
+
+public sealed record TaxCategoryDto(
+    Guid Id,
+    string Code,
+    string Name);

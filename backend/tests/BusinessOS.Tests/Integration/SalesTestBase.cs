@@ -45,20 +45,14 @@ public abstract class SalesTestBase : IClassFixture<BusinessOsApiFactory>, IAsyn
         return current.ToString();
     }
 
-    protected async Task<(string AccessToken, string TenantId)> RegisterAsync(string label)
-    {
-        var email = $"{label}-{Guid.NewGuid():N}@test.local";
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/register", new
-        {
-            email,
-            password = "Passw0rd!",
-            fullName = $"{label} Owner",
-            organizationName = $"{label} Org {Guid.NewGuid():N}",
-        });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var doc = Body(await response.Content.ReadAsStringAsync());
-        return (GetProperty(doc, "accessToken"), GetProperty(doc, "user", "tenantId"));
-    }
+    protected Task<(string AccessToken, string TenantId)> RegisterVerifiedAsync(string label)
+        => Support.TestRegistration.RegisterVerifiedAsync(_client, label);
+
+    protected Task<HttpResponseMessage> RegisterUnverifiedAsync(string label, string? email = null)
+        => Support.TestRegistration.RegisterUnverifiedAsync(_client, label, email);
+
+    protected Task<string> GetLatestVerificationCodeAsync(string email)
+        => Support.TestRegistration.GetLatestVerificationCodeAsync(email);
 
     protected async Task<string> RegisterViewerAsync(string email, Guid tenantId)
     {
@@ -74,10 +68,11 @@ public abstract class SalesTestBase : IClassFixture<BusinessOsApiFactory>, IAsyn
             .FirstAsync();
         var user = User.Create(Guid.NewGuid(), tenantId, email, hash, "Sales Viewer", phone: null);
         user.AssignRole(role);
+        user.MarkEmailVerified();
         await db.Users.AddAsync(user);
         await db.SaveChangesAsync();
 
-        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Passw0rd!" });
+        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         return GetProperty(Body(await login.Content.ReadAsStringAsync()), "accessToken");
     }

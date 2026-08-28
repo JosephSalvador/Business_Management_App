@@ -29,6 +29,9 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<EmailVerificationCode> EmailVerificationCodes => Set<EmailVerificationCode>();
+    public DbSet<PasswordResetCode> PasswordResetCodes => Set<PasswordResetCode>();
+    public DbSet<InvitationCode> InvitationCodes => Set<InvitationCode>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Brand> Brands => Set<Brand>();
@@ -103,6 +106,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(u => u.Phone).HasMaxLength(30);
             entity.Property(u => u.PasswordHash).IsRequired();
             entity.HasIndex(u => u.Email).IsUnique();
+            entity.HasIndex(u => u.Phone).IsUnique().HasFilter("\"Phone\" IS NOT NULL");
             entity.HasIndex(u => u.TenantId);
             entity.HasMany(u => u.Roles).WithMany().UsingEntity<object>(
                 Tables.Identity.UserRoles,
@@ -162,6 +166,32 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.HasIndex(t => t.TokenHash).IsUnique();
             entity.HasIndex(t => t.UserId);
             entity.HasIndex(t => t.FamilyId);
+        });
+
+        modelBuilder.Entity<EmailVerificationCode>(entity =>
+        {
+            entity.ToTable(Tables.Identity.EmailVerificationCodes, Schemas.Identity);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.CodeHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(c => c.CodeHash).IsUnique();
+            entity.HasIndex(c => new { c.TenantId, c.UserId });
+        });
+
+        modelBuilder.Entity<PasswordResetCode>(entity =>
+        {
+            entity.ToTable(Tables.Identity.PasswordResetCodes, Schemas.Identity);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.CodeHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(c => new { c.TenantId, c.UserId });
+        });
+
+        modelBuilder.Entity<InvitationCode>(entity =>
+        {
+            entity.ToTable(Tables.Identity.InvitationCodes, Schemas.Identity);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.CodeHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(c => c.CodeHash).IsUnique();
+            entity.HasIndex(c => c.TenantId);
         });
 
         modelBuilder.Entity<AuditLog>(entity =>
@@ -739,6 +769,10 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.HasIndex(j => j.TenantId);
                 entity.HasIndex(j => new { j.TenantId, j.EntryDate });
                 entity.HasIndex(j => new { j.SourceType, j.SourceId });
+                entity.HasMany(j => j.Lines)
+                    .WithOne()
+                    .HasForeignKey(l => l.JournalEntryId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<JournalEntryLine>(entity =>
@@ -747,10 +781,6 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.HasKey(l => l.Id);
                 entity.HasIndex(l => l.JournalEntryId);
                 entity.HasIndex(l => l.AccountId);
-                entity.HasOne<JournalEntry>()
-                    .WithMany()
-                    .HasForeignKey(l => l.JournalEntryId)
-                    .OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne<Account>()
                     .WithMany()
                     .HasForeignKey(l => l.AccountId)

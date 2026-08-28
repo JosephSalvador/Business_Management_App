@@ -12,6 +12,8 @@ public static class SecurityHeadersMiddleware
             headers["Referrer-Policy"] = "no-referrer";
             headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
             headers["X-XSS-Protection"] = "0";
+            headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+
             return Task.CompletedTask;
         });
 

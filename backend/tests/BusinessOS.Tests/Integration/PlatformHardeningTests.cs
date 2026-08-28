@@ -46,6 +46,7 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
             email,
             password = "Passw0rd!",
             fullName = "Hardening Tester",
+            phone = TestPhones.Next(),
             organizationName = $"Hardening Org {Guid.NewGuid():N}",
         });
         var body = await response.Content.ReadAsStringAsync();
@@ -61,7 +62,7 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
 
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {
-            email = "admin@acme.local",
+            identifier = "admin@acme.local",
             password = "Admin@12345",
         });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
@@ -104,7 +105,7 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
         Assert.Contains("Email", content);
         Assert.Contains("Password", content);
         Assert.Contains("FullName", content);
-        Assert.Contains("OrganizationName", content);
+        Assert.Contains("Phone", content);
     }
 
     [Fact]
@@ -114,14 +115,14 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
 
         for (var i = 0; i < 5; i++)
         {
-            var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Wrong-Pass" });
+            var response = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Wrong-Pass" });
             if (response.StatusCode != HttpStatusCode.Unauthorized)
             {
                 Assert.Fail($"Attempt {i}: {await response.Content.ReadAsStringAsync()}");
             }
         }
 
-        var locked = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Passw0rd!" });
+        var locked = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.Unauthorized, locked.StatusCode);
         var body = await locked.Content.ReadAsStringAsync();
         Assert.Contains("locked", body);
@@ -135,15 +136,17 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
     public async Task Revoke_InvalidatesRefreshToken()
     {
         var email = $"revoke-{Guid.NewGuid():N}@test.local";
-        var register = await _client.PostAsJsonAsync("/api/v1/auth/register", new
-        {
-            email,
-            password = "Passw0rd!",
-            fullName = "Revoke Tester",
-            organizationName = $"Revoke Org {Guid.NewGuid():N}",
-        });
-        var registerDoc = System.Text.Json.JsonDocument.Parse(await register.Content.ReadAsStringAsync());
-        var refreshToken = registerDoc.RootElement.GetProperty("refreshToken").GetString()!;
+        var register = await TestRegistration.RegisterUnverifiedAsync(_client, "revoke", email);
+        Assert.Equal(HttpStatusCode.OK, register.StatusCode);
+
+        var code = await TestRegistration.GetLatestVerificationCodeAsync(email);
+        var verify = await _client.PostAsJsonAsync("/api/v1/auth/verify-email", new { email, code });
+        Assert.Equal(HttpStatusCode.NoContent, verify.StatusCode);
+
+        var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var loginDoc = System.Text.Json.JsonDocument.Parse(await login.Content.ReadAsStringAsync()).RootElement;
+        var refreshToken = loginDoc.GetProperty("refreshToken").GetString()!;
 
         var revoke = await _client.PostAsJsonAsync("/api/v1/auth/revoke", new { refreshToken });
         Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
@@ -156,7 +159,7 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
     public async Task Audit_RecordsLoginFailures()
     {
         var email = await RegisterAsync();
-        await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Wrong-Pass" });
+        await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Wrong-Pass" });
 
         using var db = CreateDbContext();
         Assert.NotNull(await db.AuditLogs.FirstOrDefaultAsync(a => a.Action == "Auth.LoginFailed"));

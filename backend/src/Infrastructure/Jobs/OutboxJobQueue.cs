@@ -19,6 +19,7 @@ public sealed class OutboxJobQueue : IJobQueue
             Type = job.GetType().FullName ?? job.GetType().Name,
             Payload = JsonSerializer.Serialize(job, job.GetType()),
             OccurredAt = job.OccurredAt,
+            TenantId = job is ITenantScopedEvent tenantScoped ? tenantScoped.TenantId : null,
         };
 
         _db.OutboxMessages.Add(message);
