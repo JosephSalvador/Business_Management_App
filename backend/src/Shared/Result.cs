@@ -11,6 +11,9 @@ public readonly record struct Error(string Code, string Message)
     public static Error NotFound(string message) => new("NotFound", message);
     public static Error Unauthorized(string message) => new("Unauthorized", message);
     public static Error Forbidden(string message) => new("Forbidden", message);
+    public static Error ModuleDisabled(string message) => new("ModuleDisabled", message);
+    public static Error QuotaExceeded(string message) => new("QuotaExceeded", message);
+    public static Error BillingRequired(string message) => new("BillingRequired", message);
     public static Error AccountNotVerified(string message) => new("AccountNotVerified", message);
     public static Error TooManyRequests(string message) => new("TooManyRequests", message);
     public static Error Internal(string message) => new("Internal", message);

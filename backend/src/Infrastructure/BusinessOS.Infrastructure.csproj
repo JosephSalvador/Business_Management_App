@@ -28,4 +28,13 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      Exposes the TOTP primitives (base32, single-step code generation) to the test project.
+      They are internal because nothing outside this assembly should be deriving codes, but
+      the test vectors in RFC 6238 can only be verified against them directly.
+    -->
+    <InternalsVisibleTo Include="BusinessOS.Tests" />
+  </ItemGroup>
+
 </Project>

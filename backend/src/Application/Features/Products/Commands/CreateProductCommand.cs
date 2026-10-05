@@ -1,3 +1,4 @@
+using BusinessOS.Application.Features.Billing;
 using BusinessOS.Application.Features.Products.Dtos;
 using BusinessOS.Application.Features.Products.Queries;
 using BusinessOS.Application.Ports;
@@ -17,7 +18,8 @@ public sealed record CreateProductCommand(
     Guid UnitOfMeasureId,
     ProductType ProductType,
     ProductStatus Status = ProductStatus.Draft,
-    Guid? TaxCategoryId = null)
+    Guid? TaxCategoryId = null,
+    decimal? CostPrice = null)
     : IRequest<Result<ProductDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<ProductDto>>
@@ -28,6 +30,7 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
     private readonly IBrandRepository _brands;
     private readonly IUnitOfMeasureRepository _units;
     private readonly ITaxRuleRepository _taxRules;
+    private readonly SubscriptionEntitlementGuard _entitlementGuard;
 
     public CreateProductCommandHandler(
         ITenantContext tenantContext,
@@ -35,7 +38,8 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
         ICategoryRepository categories,
         IBrandRepository brands,
         IUnitOfMeasureRepository units,
-        ITaxRuleRepository taxRules)
+        ITaxRuleRepository taxRules,
+        SubscriptionEntitlementGuard entitlementGuard)
     {
         _tenantContext = tenantContext;
         _products = products;
@@ -43,11 +47,21 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
         _brands = brands;
         _units = units;
         _taxRules = taxRules;
+        _entitlementGuard = entitlementGuard;
     }
 
     public async Task<Result<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
+
+        var entitlement = await _entitlementGuard.GetEntitlementAsync(cancellationToken);
+        var currentProducts = await _products.CountAsync(
+            tenantId, new ProductListFilter(null, null, null, null, null), cancellationToken);
+        if (SubscriptionEntitlementGuard.EnsureWithinLimit(
+                entitlement.MaxProducts, currentProducts + 1, "products") is { } limitError)
+        {
+            return limitError;
+        }
 
         if (await ProductReferenceGuard.EnsureReferencesValidAsync(
                 _tenantContext, _categories, _brands, _units, _taxRules,
@@ -91,7 +105,8 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             command.UnitOfMeasureId,
             command.ProductType,
             command.Status,
-            command.TaxCategoryId);
+            command.TaxCategoryId,
+            command.CostPrice);
 
         await _products.AddAsync(product, cancellationToken);
         return Result.Success(ProductMappers.ToDto(product));

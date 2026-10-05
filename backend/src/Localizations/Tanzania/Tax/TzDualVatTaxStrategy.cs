@@ -25,27 +25,16 @@ public sealed class TzDualVatTaxStrategy : ITaxCalculationStrategy
         IReadOnlyList<TaxRule> effectiveRules,
         TaxCalculationContext context)
     {
-        var rule = SelectRule(effectiveRules, context);
-        if (rule is null)
-        {
-            return TaxMath.ZeroSnapshot(item, "NONE", rate: 0m);
-        }
-
         var gross = item.UnitPrice * item.Quantity;
-        var baseAmount = item.IsPriceTaxInclusive
-            ? TaxMath.ExtractInclusiveBase(gross, DefaultPercentageTaxStrategy.EmbeddedRate(effectiveRules))
-            : gross;
-        var baseRounded = TaxMath.RoundMoney(baseAmount);
-        var taxAmount = TaxMath.RoundMoney(baseAmount * rule.Rate);
 
         return new TaxLineSnapshot(
             item.ItemId,
-            rule.Code,
-            rule.Rate,
-            baseRounded,
-            taxAmount,
-            TaxMath.RoundMoney(baseRounded + taxAmount),
-            rule.Id);
+            "NONE",
+            0m,
+            TaxMath.RoundMoney(gross),
+            0m,
+            gross,
+            null);
     }
 
     internal static TaxRule? SelectRule(IReadOnlyList<TaxRule> effectiveRules, TaxCalculationContext context)

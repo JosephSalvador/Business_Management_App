@@ -42,12 +42,10 @@ public sealed class StockBalance : Entity
 
     public void Apply(decimal quantityDelta)
     {
-        var updated = Quantity + quantityDelta;
-        if (updated < 0)
-        {
-            throw new InvalidOperationException("Stock balance cannot be negative.");
-        }
-
-        Quantity = updated;
+        // The balance is a derived ledger figure and may legitimately go
+        // negative when sales outpace recorded intake — stock is advisory and
+        // sales never block (MVP). Commands that need strictness enforce it
+        // themselves (see AdjustStockCommand / TransferCommands).
+        Quantity += quantityDelta;
     }
 }

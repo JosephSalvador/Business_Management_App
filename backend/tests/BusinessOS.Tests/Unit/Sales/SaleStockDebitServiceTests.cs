@@ -61,7 +61,7 @@ public sealed class SaleStockDebitServiceTests
     }
 
     [Fact]
-    public async Task Debit_InsufficientStock_RejectsWholeSale()
+    public async Task Debit_OversellsStock_StillDebitsToNegativeBalance()
     {
         var stock = new FakeStockRepository();
         stock.Seed(TenantId, WarehouseId, LocationId, ProductId, null, 2m);
@@ -69,26 +69,30 @@ public sealed class SaleStockDebitServiceTests
 
         var result = await service.DebitAsync(Request(StockedLine(3m)), CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("Validation", result.Error.Code);
-        Assert.Empty(stock.Movements);
-        Assert.Equal(2m, stock.Balance(ProductId).Quantity);
+        Assert.True(result.IsSuccess);
+        var movement = Assert.Single(stock.Movements);
+        Assert.Equal(StockMovementType.Sale, movement.MovementType);
+        Assert.Equal(-3m, movement.Quantity);
+        Assert.Equal(-1m, stock.Balance(ProductId).Quantity);
     }
 
     [Fact]
-    public async Task Debit_MissingBalance_Rejects()
+    public async Task Debit_MissingBalance_CreatesBalanceAndDebits()
     {
         var stock = new FakeStockRepository();
         var service = new SaleStockDebitService(stock);
 
         var result = await service.DebitAsync(Request(StockedLine(3m)), CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Empty(stock.Movements);
+        Assert.True(result.IsSuccess);
+        var movement = Assert.Single(stock.Movements);
+        Assert.Equal(ProductId, movement.ProductId);
+        Assert.Equal(-3m, movement.Quantity);
+        Assert.Equal(-3m, stock.Balance(ProductId).Quantity);
     }
 
     [Fact]
-    public async Task Debit_MultiLineAtomicRejection_TouchesNothing()
+    public async Task Debit_MultiLine_OversellsAllLines_StillSucceeds()
     {
         var stock = new FakeStockRepository();
         stock.Seed(TenantId, WarehouseId, LocationId, ProductId, null, 100m);
@@ -99,10 +103,10 @@ public sealed class SaleStockDebitServiceTests
         var result = await service.DebitAsync(
             Request(StockedLine(3m), StockedLine(2m, productId: secondProduct)), CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Empty(stock.Movements);
-        Assert.Equal(100m, stock.Balance(ProductId).Quantity);
-        Assert.Equal(1m, stock.Balance(secondProduct).Quantity);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, stock.Movements.Count);
+        Assert.Equal(97m, stock.Balance(ProductId).Quantity);
+        Assert.Equal(-1m, stock.Balance(secondProduct).Quantity);
     }
 
     [Fact]
@@ -262,20 +266,27 @@ public sealed class SaleStockDebitServiceTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+        public Task<StockMovement?> FindAdjustmentByKeyAsync(
+            Guid tenantId, string key, CancellationToken cancellationToken = default)
+            => Task.FromResult(Movements.FirstOrDefault(
+                m => m.TenantId == tenantId
+                    && m.MovementType == StockMovementType.Adjustment
+                    && m.CorrelationId == key));
+
+        public Task<IReadOnlyList<StockBalanceView>> ListBalancesAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             string? search = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<StockBalance>>(Balances);
+            => Task.FromResult<IReadOnlyList<StockBalanceView>>(Array.Empty<StockBalanceView>());
 
         public Task<int> CountBalancesAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
             string? search = null, CancellationToken cancellationToken = default)
             => Task.FromResult(_byKey.Count);
 
-        public Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+        public Task<IReadOnlyList<StockMovementView>> ListMovementsAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<StockMovement>>(Movements);
+            => Task.FromResult<IReadOnlyList<StockMovementView>>(Array.Empty<StockMovementView>());
 
         public Task<int> CountMovementsAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
@@ -290,5 +301,21 @@ public sealed class SaleStockDebitServiceTests
                     && m.ReferenceId == referenceId
                     && (type == null || m.MovementType == type.Value))
                 .ToList());
+
+        public Task<IReadOnlyList<StockSummaryRow>> GetStockSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockSummaryRow>>(new List<StockSummaryRow>());
+
+        public Task<IReadOnlyList<StockMovementSummaryRow>> GetStockMovementSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockMovementSummaryRow>>(new List<StockMovementSummaryRow>());
+
+        public Task<IReadOnlyList<LowStockReportItem>> GetLowStockReportAsync(
+            Guid tenantId, decimal threshold, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<LowStockReportItem>>(new List<LowStockReportItem>());
+
+        public Task<IReadOnlyList<StockVelocityRow>> GetStockVelocityAsync(
+            Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockVelocityRow>>(new List<StockVelocityRow>());
     }
 }

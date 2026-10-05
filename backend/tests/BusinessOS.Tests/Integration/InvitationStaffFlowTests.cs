@@ -38,7 +38,14 @@ public sealed class InvitationStaffFlowTests : IClassFixture<BusinessOsApiFactor
         JsonElement current = doc;
         foreach (var part in path)
         {
-            current = current.GetProperty(part);
+            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index))
+            {
+                current = current[index];
+            }
+            else
+            {
+                current = current.GetProperty(part);
+            }
         }
 
         return current.ToString();
@@ -47,11 +54,24 @@ public sealed class InvitationStaffFlowTests : IClassFixture<BusinessOsApiFactor
     private void Authorize(string token) =>
         _client.DefaultRequestHeaders.Authorization = new("Bearer", token);
 
-    /// <summary>Registers + verifies an owner and returns (token, tenantId).</summary>
+    /// <summary>Registers + verifies an owner, completes onboarding, and returns (token, tenantId).</summary>
     private async Task<(string Token, string TenantId)> RegisterOwnerAsync(string label)
     {
         var (token, tenantId) = await TestRegistration.RegisterVerifiedAsync(_client, label);
         Authorize(token);
+
+        // Inviting staff is gated on a fully onboarded tenant (warehouse, price
+        // list, expense categories — see CompleteOnboardingCommand).
+        var complete = await _client.PostAsJsonAsync("/api/v1/organization/onboarding", new
+        {
+            name = $"Duka la {label} {Guid.NewGuid():N}",
+            businessType = "retail",
+            countryCode = "TZ",
+            currency = "TZS",
+            contactPhone = (string?)null,
+            taxId = (string?)null,
+        });
+        Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
         return (token, tenantId);
     }
 

@@ -19,6 +19,7 @@ internal static class ProductMappers
         product.Status,
         product.Variants.Select(ToVariantDto).OrderBy(v => v.Name).ToArray(),
         product.TaxCategoryId,
+        product.CostPrice,
         product.CreatedAt,
         product.UpdatedAt);
 

@@ -96,4 +96,24 @@ public sealed class SecurityOptions
     public int PasswordResetResendCooldownSeconds { get; set; } = 60;
     public int InvitationCodeTtlHours { get; set; } = 72;
     public int InvitationMaxAttempts { get; set; } = 5;
+    public int TwoFactorChallengeMinutes { get; set; } = 5;
+    public int TwoFactorDigits { get; set; } = 6;
+    public int TwoFactorStepSeconds { get; set; } = 30;
+    public int TwoFactorWindow { get; set; } = 1;
+    public int TwoFactorRecoveryCodeCount { get; set; } = 10;
+    public bool TwoFactorRequiredForOwners { get; set; } = true;
+
+    /// <summary>
+    /// Wrong codes tolerated per challenge before it is spent. Separate from
+    /// <see cref="MaxFailedLoginAttempts"/> so a stolen challenge token cannot be used to
+    /// iterate all 10^6 TOTP values inside the challenge lifetime.
+    /// </summary>
+    public int TwoFactorMaxAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// Key material for protecting second-factor secrets at rest. Falls back to the JWT
+    /// secret when empty, so existing deployments need no new configuration; set it
+    /// explicitly to keep MFA secrets independent of JWT rotation.
+    /// </summary>
+    public string TwoFactorEncryptionKey { get; set; } = string.Empty;
 }

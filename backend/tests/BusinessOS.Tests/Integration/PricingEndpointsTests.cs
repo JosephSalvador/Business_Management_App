@@ -34,7 +34,14 @@ public sealed class PricingEndpointsTests : IClassFixture<BusinessOsApiFactory>,
         JsonElement current = doc;
         foreach (var part in path)
         {
-            current = current.GetProperty(part);
+            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index))
+            {
+                current = current[index];
+            }
+            else
+            {
+                current = current.GetProperty(part);
+            }
         }
         return current.ToString();
     }
@@ -335,6 +342,67 @@ public sealed class PricingEndpointsTests : IClassFixture<BusinessOsApiFactory>,
         var simpleWithVariant = await _client.GetAsync(
             $"/api/v1/pricing/resolve?productId={simpleProductId}&variantId={variantId}&priceType=0&quantity=1");
         Assert.Equal(HttpStatusCode.BadRequest, simpleWithVariant.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResolvePrices_Many_LinesResolvedInOneCall()
+    {
+        var (token, tenantId) = await RegisterAsync("pricingresolve-many");
+        var branchId = await GetDefaultBranchIdAsync(Guid.Parse(tenantId));
+        var unitId = await CreateUnitAsync(token, "Bottles");
+        var pricedProductId = await CreateProductAsync(token, "Priced In Bulk", unitId);
+        var unpricedProductId = await CreateProductAsync(token, "Unpriced In Bulk", unitId);
+        var priceListId = await CreatePriceListAsync(token, "Default");
+
+        Authorize(token);
+        await _client.PutAsJsonAsync($"/api/v1/price-lists/{priceListId}/prices", new
+        {
+            prices = new object[]
+            {
+                new { productId = pricedProductId, priceType = 0, price = 100m, currency = "TZS", minQuantity = 1m },
+            },
+        });
+
+        Authorize(token);
+        var resolveMany = await _client.PostAsJsonAsync("/api/v1/pricing/resolve-many", new
+        {
+            lines = new[]
+            {
+                new { productId = pricedProductId, quantity = 1m },
+                new { productId = unpricedProductId, quantity = 1m },
+            },
+            branchId,
+            priceType = 0,
+        });
+        Assert.Equal(HttpStatusCode.OK, resolveMany.StatusCode);
+
+        var doc = Body(await resolveMany.Content.ReadAsStringAsync());
+        Assert.Equal(2, doc.GetArrayLength());
+
+        var priced = doc[0];
+        Assert.Equal(pricedProductId.ToString(), priced.GetProperty("productId").ToString());
+        Assert.Equal("100", priced.GetProperty("price").ToString());
+        Assert.Equal("TZS", priced.GetProperty("currency").ToString());
+
+        var unpriced = doc[1];
+        Assert.Equal(unpricedProductId.ToString(), unpriced.GetProperty("productId").ToString());
+        Assert.True(unpriced.TryGetProperty("price", out var price) && price.ValueKind == JsonValueKind.Null,
+            "an unresolvable line must report a null price");
+        Assert.False(string.IsNullOrEmpty(unpriced.GetProperty("errorMessage").ToString()));
+    }
+
+    [Fact]
+    public async Task ResolvePrices_EmptyBatchIsRejected()
+    {
+        var (token, _) = await RegisterAsync("pricingresolve-empty");
+        Authorize(token);
+
+        var resolveMany = await _client.PostAsJsonAsync("/api/v1/pricing/resolve-many", new
+        {
+            lines = Array.Empty<object>(),
+            priceType = 0,
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resolveMany.StatusCode);
     }
 
     [Fact]

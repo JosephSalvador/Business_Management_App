@@ -16,7 +16,8 @@ public sealed record UpdateProductCommand(
     Guid? CategoryId,
     Guid? BrandId,
     Guid UnitOfMeasureId,
-    Guid? TaxCategoryId = null)
+    Guid? TaxCategoryId = null,
+    decimal? CostPrice = null)
     : IRequest<Result<ProductDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, Result<ProductDto>>
@@ -101,7 +102,8 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             command.CategoryId,
             command.BrandId,
             command.UnitOfMeasureId,
-            command.TaxCategoryId);
+            command.TaxCategoryId,
+            command.CostPrice);
         product.UpdateIdentifiers(sku, barcode);
 
         return Result.Success(ProductMappers.ToDto(product));

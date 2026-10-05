@@ -52,6 +52,9 @@ public static class PricingEndpoints
         pricing.MapGet("/resolve", ResolvePriceAsync)
             .RequirePermission(PermissionNames.PricingView)
             .WithName("ResolvePrice");
+        pricing.MapPost("/resolve-many", ResolvePricesAsync)
+            .RequirePermission(PermissionNames.PricingView)
+            .WithName("ResolvePrices");
 
         return app;
     }
@@ -125,6 +128,20 @@ public static class PricingEndpoints
             new ResolvePriceQuery(
                 productId, variantId, branchId, priceType, quantity ?? 1m, onDate),
             cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ResolvePricesAsync(
+        ResolvePricesRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new ResolvePricesQuery(request.Lines, request.BranchId, request.PriceType, request.OnDate),
+            cancellationToken)).ToApiResult();
+
+    private sealed record ResolvePricesRequest(
+        IReadOnlyList<ResolvePriceLineDto> Lines,
+        Guid? BranchId,
+        PriceType PriceType,
+        DateTime? OnDate);
 
     private sealed record CreatePriceListRequest(
         string Name,

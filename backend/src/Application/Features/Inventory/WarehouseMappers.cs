@@ -1,5 +1,6 @@
 using BusinessOS.Application.Features.Inventory.Commands;
 using BusinessOS.Application.Features.Inventory.Dtos;
+using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Inventory;
 
 namespace BusinessOS.Application.Features.Inventory;
@@ -25,19 +26,53 @@ internal static class WarehouseMappers
     internal static StockLocationSpec ToSpec(StockLocationInput input)
         => new(input.Id ?? Guid.Empty, input.Code, input.Name);
 
-    internal static StockBalanceDto ToBalanceDto(StockBalance balance) => new(
+    internal static StockBalanceDto ToBalanceDto(StockBalanceView balance) => new(
         balance.WarehouseId,
+        balance.WarehouseName,
         balance.StockLocationId,
+        balance.StockLocationName,
         balance.ProductId,
+        balance.ProductName,
+        balance.Sku,
+        balance.Barcode,
         balance.VariantId,
+        balance.UnitOfMeasureName,
         balance.Quantity);
 
-    internal static StockMovementDto ToMovementDto(StockMovement movement) => new(
+    internal static StockBalanceDto ToBalanceDto(
+        StockBalance balance,
+        string warehouseName,
+        string stockLocationName,
+        string productName,
+        string? sku,
+        string? barcode,
+        string unitOfMeasureName) => new(
+        balance.WarehouseId,
+        warehouseName,
+        balance.StockLocationId,
+        stockLocationName,
+        balance.ProductId,
+        productName,
+        sku,
+        barcode,
+        balance.VariantId,
+        unitOfMeasureName,
+        balance.Quantity);
+
+    internal static StockMovementDto ToMovementDto(StockMovementView movement) => new(
         movement.Id,
-        movement.MovementType,
-        movement.Quantity,
+        movement.ProductId,
+        movement.ProductName,
+        movement.Sku,
+        movement.Barcode,
+        movement.WarehouseId,
+        movement.WarehouseName,
+        movement.StockLocationId,
+        movement.StockLocationName,
+        movement.Type,
+        movement.QuantityDelta,
         movement.Reason,
-        movement.OccurredAt,
+        movement.EffectiveAt,
         movement.CreatedBy,
         movement.CreatedAt);
 
@@ -45,7 +80,7 @@ internal static class WarehouseMappers
         Transfer transfer,
         string sourceWarehouseName,
         string destinationWarehouseName,
-        IReadOnlyList<TransferLineInput> lineInputs) => new(
+        IReadOnlyDictionary<Guid, string> productNames) => new(
         transfer.Id,
         transfer.SourceWarehouseId,
         sourceWarehouseName,
@@ -60,7 +95,12 @@ internal static class WarehouseMappers
         transfer.CompletedAt,
         transfer.CancelledAt,
         transfer.Lines.Select(l => new TransferLineDto(
-            l.Id, l.ProductId, string.Empty, l.VariantId, l.Quantity, l.BatchId)).ToList(),
+            l.Id,
+            l.ProductId,
+            productNames.TryGetValue(l.ProductId, out var name) ? name : string.Empty,
+            l.VariantId,
+            l.Quantity,
+            l.BatchId)).ToList(),
         transfer.CreatedAt);
 
     internal static StockCountDto ToStockCountDto(

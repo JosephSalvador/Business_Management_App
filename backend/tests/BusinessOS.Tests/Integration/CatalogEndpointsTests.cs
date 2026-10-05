@@ -34,7 +34,14 @@ public sealed class CatalogEndpointsTests : IClassFixture<BusinessOsApiFactory>,
         JsonElement current = doc;
         foreach (var part in path)
         {
-            current = current.GetProperty(part);
+            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index))
+            {
+                current = current[index];
+            }
+            else
+            {
+                current = current.GetProperty(part);
+            }
         }
         return current.ToString();
     }
@@ -420,7 +427,43 @@ public sealed class CatalogEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     }
 
     [Fact]
-    public async Task ProductMutations_WriteAuditRows()
+    public async Task QuickSaleProduct_GetOrCreate_IsIdempotentServiceActive()
+    {
+        var (token, tenantId) = await RegisterAsync("quicksale");
+        Authorize(token);
+
+        var first = await _client.PostAsync("/api/v1/products/quick-sale", null);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var firstDoc = Body(await first.Content.ReadAsStringAsync());
+        var quickSaleId = GetProperty(firstDoc, "id");
+        Assert.Equal("Bila Jina", GetProperty(firstDoc, "name"));
+        Assert.Equal("QS-BILA-JINA", GetProperty(firstDoc, "sku"));
+        Assert.Equal("1", GetProperty(firstDoc, "productType")); // Service
+        Assert.Equal("1", GetProperty(firstDoc, "status")); // Active
+
+        var again = await _client.PostAsync("/api/v1/products/quick-sale", null);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(quickSaleId, GetProperty(Body(await again.Content.ReadAsStringAsync()), "id"));
+
+        using var db = CreateDbContext();
+        Assert.Equal(1, await db.Products.CountAsync(p =>
+            p.TenantId == Guid.Parse(tenantId) && p.Sku == "QS-BILA-JINA"));
+
+        // The quick-sale product is a hidden system row: it must NOT surface in
+        // the normal product catalogue. Clients recover its id via the
+        // quick-sale endpoint or the reserved SKU lookup, never from a list.
+        var listed = await _client.GetAsync("/api/v1/products?page=1&pageSize=10");
+        Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
+        var listedIds = Body(await listed.Content.ReadAsStringAsync())
+            .GetProperty("items").EnumerateArray()
+            .Where(item => item.GetProperty("sku").ToString() == "QS-BILA-JINA")
+            .Select(item => item.GetProperty("id").ToString())
+            .ToList();
+        Assert.Empty(listedIds);
+    }
+
+    [Fact]
+    public async Task Product_Mutations_WriteAuditRows()
     {
         var (token, _) = await RegisterAsync("catalogaudit");
         var unitId = await CreateUnitAsync(token, "Bottles");

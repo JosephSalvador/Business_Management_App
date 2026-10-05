@@ -33,4 +33,27 @@ public sealed class HttpTenantContext : ITenantContext
     }
 
     public string? IpAddress => _accessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    public string? UserAgent
+    {
+        get
+        {
+            var value = _accessor.HttpContext?.Request.Headers.UserAgent.ToString();
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+    }
+
+    /// <summary>
+    /// Clients present their refresh token in <c>X-Refresh-Token</c> on authenticated calls
+    /// so the session list can highlight the current device. Absent on most requests, which
+    /// simply means "cannot tell" — never an authorisation input.
+    /// </summary>
+    public string? CurrentRefreshToken
+    {
+        get
+        {
+            var value = _accessor.HttpContext?.Request.Headers["X-Refresh-Token"].ToString();
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+    }
 }

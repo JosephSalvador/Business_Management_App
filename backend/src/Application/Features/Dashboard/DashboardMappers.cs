@@ -41,6 +41,7 @@ public static class DashboardMappers
 
     public static DashboardActivityDto ToActivityDto(IReadOnlyList<RecentActivityItem> items)
         => new(items.Select(item => new DashboardActivityItemDto(
-                item.Action, item.EntityType, item.EntityId, item.ActorUserId, item.ActorEmail, item.OccurredAt))
+                item.Action, item.EntityType, item.EntityId, item.EntityName,
+                item.Amount, item.Status, item.ActorEmail, item.OccurredAt))
             .ToList());
 }

@@ -28,7 +28,8 @@ public sealed class SaleLine : Entity
         decimal baseAmount,
         decimal taxAmount,
         decimal lineTotal,
-        int orderIndex)
+        int orderIndex,
+        decimal? unitCost)
     {
         ProductId = productId;
         VariantId = variantId;
@@ -47,6 +48,7 @@ public sealed class SaleLine : Entity
         TaxAmount = taxAmount;
         LineTotal = lineTotal;
         OrderIndex = orderIndex;
+        UnitCost = unitCost;
     }
 
     public Guid SaleId { get; private set; }
@@ -71,6 +73,7 @@ public sealed class SaleLine : Entity
     public decimal LineTotal { get; private set; }
 
     public int OrderIndex { get; private set; }
+    public decimal? UnitCost { get; private set; }
 
     /// <summary>
     /// Creates a line from the TaxEngine snapshot. <see cref="LineTotal"/> is the pre-discount
@@ -93,7 +96,8 @@ public sealed class SaleLine : Entity
         decimal baseAmount,
         decimal taxAmount,
         decimal lineTotal,
-        int orderIndex)
+        int orderIndex,
+        decimal? unitCost = null)
     {
         if (productId == Guid.Empty)
         {
@@ -172,7 +176,8 @@ public sealed class SaleLine : Entity
             baseAmount,
             taxAmount,
             lineTotal,
-            orderIndex);
+            orderIndex,
+            unitCost);
     }
 
     internal void AttachTo(Guid saleId) => SaleId = saleId;

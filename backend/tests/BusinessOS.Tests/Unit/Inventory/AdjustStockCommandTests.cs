@@ -97,6 +97,66 @@ public sealed class AdjustStockCommandTests
     }
 
     [Fact]
+    public async Task Handle_SameIdempotencyKey_ReplaysWithoutApplyingTwice()
+    {
+        var product = CreateProduct("Rice");
+        var (handler, stock, warehouse, location) = CreateHandler(product);
+        stock.SeedBalance(TenantId, warehouse.Id, location.Id, product.Id, null, 50m);
+        var key = Guid.NewGuid();
+
+        var first = await handler.Handle(
+            new AdjustStockCommand(warehouse.Id, null, product.Id, null, 10m, "Found extra", OnDate, IdempotencyKey: key),
+            CancellationToken.None);
+        var replay = await handler.Handle(
+            new AdjustStockCommand(warehouse.Id, null, product.Id, null, 10m, "Found extra", OnDate, IdempotencyKey: key),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(replay.IsSuccess);
+        Assert.Equal(60m, first.Value.Quantity);
+        Assert.Equal(60m, replay.Value.Quantity);
+        Assert.Single(stock.Movements);
+        Assert.Equal(key.ToString(), stock.Movements[0].CorrelationId);
+    }
+
+    [Fact]
+    public async Task Handle_DifferentIdempotencyKeys_ApplyEachAdjustment()
+    {
+        var product = CreateProduct("Rice");
+        var (handler, stock, warehouse, location) = CreateHandler(product);
+        stock.SeedBalance(TenantId, warehouse.Id, location.Id, product.Id, null, 50m);
+
+        var first = await handler.Handle(
+            new AdjustStockCommand(warehouse.Id, null, product.Id, null, 5m, "Extra", OnDate, IdempotencyKey: Guid.NewGuid()),
+            CancellationToken.None);
+        var second = await handler.Handle(
+            new AdjustStockCommand(warehouse.Id, null, product.Id, null, 5m, "Extra again", OnDate, IdempotencyKey: Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(60m, second.Value.Quantity);
+        Assert.Equal(2, stock.Movements.Count);
+    }
+
+    [Fact]
+    public async Task Handle_NoIdempotencyKey_AppliesNormally()
+    {
+        var product = CreateProduct("Rice");
+        var (handler, stock, warehouse, location) = CreateHandler(product);
+        stock.SeedBalance(TenantId, warehouse.Id, location.Id, product.Id, null, 50m);
+
+        var result = await handler.Handle(
+            new AdjustStockCommand(warehouse.Id, null, product.Id, null, 10m, "Found extra", OnDate),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(60m, result.Value.Quantity);
+        Assert.Single(stock.Movements);
+        Assert.Null(stock.Movements[0].CorrelationId);
+    }
+
+    [Fact]
     public async Task Handle_WarehouseNotFound_ReturnsNotFound()
     {
         var product = CreateProduct("Rice");
@@ -148,7 +208,8 @@ public sealed class AdjustStockCommandTests
         var productDict = products.ToDictionary(p => p.Id);
         var warehouses = new FakeWarehouseRepository(warehouse);
         var tenantCtx = new FakeTenantContext(TenantId, UserId);
-        var handler = new AdjustStockCommandHandler(tenantCtx, warehouses, new FakeProductRepository(productDict), stock);
+        var units = new FakeUnitOfMeasureRepository();
+        var handler = new AdjustStockCommandHandler(tenantCtx, warehouses, new FakeProductRepository(productDict), units, stock);
         return (handler, stock, warehouse, location);
     }
 
@@ -157,6 +218,8 @@ public sealed class AdjustStockCommandTests
         public Guid TenantId => tenantId;
         public Guid? UserId => userId;
         public string? IpAddress => "127.0.0.1";
+        public string? UserAgent => null;
+        public string? CurrentRefreshToken => null;
     }
 
     private sealed class FakeWarehouseRepository(Warehouse warehouse) : IWarehouseRepository
@@ -176,6 +239,22 @@ public sealed class AdjustStockCommandTests
             CancellationToken ct = default) => Task.FromResult(1);
 
         public Task AddAsync(Warehouse w, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class FakeUnitOfMeasureRepository : IUnitOfMeasureRepository
+    {
+        public Task<UnitOfMeasure?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default)
+        {
+            var uom = UnitOfMeasure.Create(tenantId, "Units", "pcs");
+            uom.Update("Units", "pcs");
+            return Task.FromResult<UnitOfMeasure?>(uom);
+        }
+        public Task<UnitOfMeasure?> GetByNameAsync(Guid tenantId, string name, CancellationToken ct = default)
+            => Task.FromResult<UnitOfMeasure?>(null);
+        public Task<IReadOnlyList<UnitOfMeasure>> ListAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<UnitOfMeasure>>(Array.Empty<UnitOfMeasure>());
+        public Task AddAsync(UnitOfMeasure unitOfMeasure, CancellationToken ct = default) => Task.CompletedTask;
+        public Task RemoveAsync(UnitOfMeasure unitOfMeasure, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class FakeProductRepository(Dictionary<Guid, Product> products) : IProductRepository
@@ -257,20 +336,27 @@ public sealed class AdjustStockCommandTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+        public Task<StockMovement?> FindAdjustmentByKeyAsync(
+            Guid tenantId, string key, CancellationToken cancellationToken = default)
+            => Task.FromResult(Movements.FirstOrDefault(
+                m => m.TenantId == tenantId
+                    && m.MovementType == StockMovementType.Adjustment
+                    && m.CorrelationId == key));
+
+        public Task<IReadOnlyList<StockBalanceView>> ListBalancesAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             string? search = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<StockBalance>>(_byKey.Values.ToList());
+            => Task.FromResult<IReadOnlyList<StockBalanceView>>(Array.Empty<StockBalanceView>());
 
         public Task<int> CountBalancesAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
             string? search = null, CancellationToken cancellationToken = default)
             => Task.FromResult(_byKey.Count);
 
-        public Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+        public Task<IReadOnlyList<StockMovementView>> ListMovementsAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<StockMovement>>(Movements);
+            => Task.FromResult<IReadOnlyList<StockMovementView>>(Array.Empty<StockMovementView>());
 
         public Task<int> CountMovementsAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
@@ -284,5 +370,21 @@ public sealed class AdjustStockCommandTests
                 .Where(m => m.ReferenceType == referenceType && m.ReferenceId == referenceId
                     && (type == null || m.MovementType == type.Value))
                 .ToList());
+
+        public Task<IReadOnlyList<StockSummaryRow>> GetStockSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockSummaryRow>>(new List<StockSummaryRow>());
+
+        public Task<IReadOnlyList<StockMovementSummaryRow>> GetStockMovementSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockMovementSummaryRow>>(new List<StockMovementSummaryRow>());
+
+        public Task<IReadOnlyList<LowStockReportItem>> GetLowStockReportAsync(
+            Guid tenantId, decimal threshold, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<LowStockReportItem>>(new List<LowStockReportItem>());
+
+        public Task<IReadOnlyList<StockVelocityRow>> GetStockVelocityAsync(
+            Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockVelocityRow>>(new List<StockVelocityRow>());
     }
 }

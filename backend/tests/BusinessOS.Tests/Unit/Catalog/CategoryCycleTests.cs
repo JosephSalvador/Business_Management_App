@@ -11,6 +11,8 @@ public sealed class CategoryCycleTests
         public Guid TenantId { get; init; }
         public Guid? UserId { get; init; }
         public string? IpAddress => null;
+        public string? UserAgent => null;
+        public string? CurrentRefreshToken => null;
     }
 
     private sealed class StubCategoryRepository : ICategoryRepository

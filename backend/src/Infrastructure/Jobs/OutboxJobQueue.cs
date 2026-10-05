@@ -23,6 +23,5 @@ public sealed class OutboxJobQueue : IJobQueue
         };
 
         _db.OutboxMessages.Add(message);
-        await _db.SaveChangesAsync(cancellationToken);
     }
 }

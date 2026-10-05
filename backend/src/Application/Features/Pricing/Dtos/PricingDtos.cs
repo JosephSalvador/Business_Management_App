@@ -47,3 +47,15 @@ public sealed record ResolvedPriceDto(
     Guid PriceListId,
     PriceType PriceType,
     decimal MinQuantity);
+
+public sealed record ResolvePriceLineDto(
+    Guid ProductId,
+    Guid? VariantId,
+    decimal Quantity);
+
+public sealed record ResolvedLineDto(
+    Guid ProductId,
+    Guid? VariantId,
+    decimal? Price,
+    string? Currency,
+    string? ErrorMessage);

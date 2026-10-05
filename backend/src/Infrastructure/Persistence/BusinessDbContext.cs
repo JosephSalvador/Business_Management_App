@@ -1,12 +1,16 @@
 using System.Text.Json;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Billing;
 using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Accounting;
+using BusinessOS.Domain.Crm;
+using BusinessOS.Domain.Finance;
+using BusinessOS.Domain.Invoicing;
 using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
@@ -29,6 +33,8 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<TwoFactorRecoveryCode> TwoFactorRecoveryCodes => Set<TwoFactorRecoveryCode>();
+    public DbSet<TwoFactorChallenge> TwoFactorChallenges => Set<TwoFactorChallenge>();
     public DbSet<EmailVerificationCode> EmailVerificationCodes => Set<EmailVerificationCode>();
     public DbSet<PasswordResetCode> PasswordResetCodes => Set<PasswordResetCode>();
     public DbSet<InvitationCode> InvitationCodes => Set<InvitationCode>();
@@ -58,6 +64,9 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
     public DbSet<SalePayment> SalePayments => Set<SalePayment>();
     public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
+    public DbSet<ReceiptLayout> ReceiptLayouts => Set<ReceiptLayout>();
+    public DbSet<ReceiptMetadata> ReceiptMetadataSet => Set<ReceiptMetadata>();
+    public DbSet<ReceiptPrintEvent> ReceiptPrintEvents => Set<ReceiptPrintEvent>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
     public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
@@ -67,6 +76,21 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
     public DbSet<TenantAccountMapping> TenantAccountMappings => Set<TenantAccountMapping>();
+    public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerCredit> CustomerCredits => Set<CustomerCredit>();
+    public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
+    public DbSet<MoneyAccount> MoneyAccounts => Set<MoneyAccount>();
+    public DbSet<MoneyAccountTransaction> MoneyAccountTransactions => Set<MoneyAccountTransaction>();
+    public DbSet<CashSession> CashSessions => Set<CashSession>();
+    public DbSet<Plan> Plans => Set<Plan>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<SubscriptionItem> SubscriptionItems => Set<SubscriptionItem>();
+    public DbSet<Voucher> Vouchers => Set<Voucher>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<CustomerInvoice> CustomerInvoices => Set<CustomerInvoice>();
+    public DbSet<CustomerInvoiceLine> CustomerInvoiceLines => Set<CustomerInvoiceLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -105,6 +129,8 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(u => u.FullName).IsRequired().HasMaxLength(200);
             entity.Property(u => u.Phone).HasMaxLength(30);
             entity.Property(u => u.PasswordHash).IsRequired();
+            entity.Property(u => u.TwoFactorSecret).HasMaxLength(512);
+            entity.Property(u => u.TwoFactorPendingSecret).HasMaxLength(512);
             entity.HasIndex(u => u.Email).IsUnique();
             entity.HasIndex(u => u.Phone).IsUnique().HasFilter("\"Phone\" IS NOT NULL");
             entity.HasIndex(u => u.TenantId);
@@ -166,6 +192,35 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.HasIndex(t => t.TokenHash).IsUnique();
             entity.HasIndex(t => t.UserId);
             entity.HasIndex(t => t.FamilyId);
+            entity.Property(t => t.DeviceLabel).HasMaxLength(120);
+            entity.Property(t => t.UserAgent).HasMaxLength(400);
+            entity.Property(t => t.IpAddress).HasMaxLength(45);
+        });
+
+        modelBuilder.Entity<TwoFactorRecoveryCode>(entity =>
+        {
+            entity.ToTable(Tables.Identity.TwoFactorRecoveryCodes, Schemas.Identity);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).ValueGeneratedOnAdd();
+            entity.Property(c => c.CodeHash).IsRequired().HasMaxLength(128);
+            // Unique per user so a generated batch can never collide with an existing code,
+            // which would otherwise make one code valid for two sign-ins.
+            entity.HasIndex(c => new { c.TenantId, c.UserId, c.CodeHash }).IsUnique();
+            entity.HasIndex(c => new { c.TenantId, c.UserId });
+            entity.HasOne<User>().WithMany().HasForeignKey(c => c.UserId);
+        });
+
+        modelBuilder.Entity<TwoFactorChallenge>(entity =>
+        {
+            entity.ToTable(Tables.Identity.TwoFactorChallenges, Schemas.Identity);
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).ValueGeneratedOnAdd();
+            entity.Property(c => c.TokenHash).IsRequired().HasMaxLength(128);
+            entity.HasIndex(c => c.TokenHash).IsUnique();
+            entity.HasIndex(c => c.UserId);
+            // Supports the periodic purge of spent and expired challenges.
+            entity.HasIndex(c => new { c.ExpiresAt, c.ConsumedAt });
+            entity.HasOne<User>().WithMany().HasForeignKey(c => c.UserId);
         });
 
         modelBuilder.Entity<EmailVerificationCode>(entity =>
@@ -246,6 +301,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(p => p.Barcode).HasMaxLength(64);
             entity.Property(p => p.ProductType).IsRequired();
             entity.Property(p => p.Status).IsRequired().HasDefaultValue(ProductStatus.Draft);
+            entity.Property(p => p.CostPrice).HasColumnType("decimal(18,4)");
             entity.HasIndex(p => p.TenantId);
             entity.HasIndex(p => new { p.TenantId, p.Sku })
                 .IsUnique()
@@ -631,6 +687,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(l => l.Sku).HasMaxLength(64);
             entity.Property(l => l.Barcode).HasMaxLength(64);
             entity.Property(l => l.UnitOfMeasureName).HasMaxLength(100);
+            entity.Property(l => l.UnitCost).HasColumnType("decimal(18,4)");
             entity.Property(l => l.TaxCode).IsRequired().HasMaxLength(50);
             entity.Property(l => l.AppliedRate).HasColumnType("decimal(18,4)");
             entity.HasOne<Product>()
@@ -667,6 +724,61 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.HasOne<Tenant>()
                 .WithMany()
                 .HasForeignKey(n => n.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReceiptLayout>(entity =>
+        {
+            entity.ToTable(Tables.Sales.ReceiptLayouts, Schemas.Sales);
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.LayoutId).IsRequired().HasMaxLength(100);
+            entity.Property(r => r.PaperWidth).IsRequired().HasMaxLength(20);
+            entity.Property(r => r.PaperHeight).HasMaxLength(20);
+            entity.Property(r => r.Sections).HasColumnType("jsonb").IsRequired();
+            entity.Property(r => r.Styling).HasColumnType("jsonb");
+            entity.HasIndex(r => new { r.TenantId, r.LayoutId, r.Version }).IsUnique();
+            entity.HasIndex(r => new { r.TenantId, r.LayoutId, r.IsActive })
+                .HasFilter("\"IsActive\" = true");
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(r => r.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReceiptMetadata>(entity =>
+        {
+            entity.ToTable(Tables.Sales.ReceiptMetadata, Schemas.Sales);
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.BusinessIdentitySnapshot).IsRequired().HasColumnType("jsonb");
+            entity.Property(r => r.FiscalHash).HasMaxLength(512);
+            entity.Property(r => r.FiscalSignatureAlgorithm).HasMaxLength(50);
+            entity.Property(r => r.CanonicalPayloadHash).HasMaxLength(512);
+            entity.HasIndex(r => r.SaleId).IsUnique();
+            entity.HasOne<Sale>()
+                .WithMany()
+                .HasForeignKey(r => r.SaleId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ReceiptLayout>()
+                .WithMany()
+                .HasForeignKey(r => r.LayoutVersionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReceiptPrintEvent>(entity =>
+        {
+            entity.ToTable(Tables.Sales.ReceiptPrintEvents, Schemas.Sales);
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.DeviceId).HasMaxLength(100);
+            entity.Property(r => r.Notes).HasColumnType("text");
+            entity.HasIndex(r => new { r.SaleId, r.PrintedAt });
+            entity.HasIndex(r => new { r.TenantId, r.PrintedAt });
+            entity.HasOne<Sale>()
+                .WithMany()
+                .HasForeignKey(r => r.SaleId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(r => r.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -799,6 +911,200 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                     .WithMany()
                     .HasForeignKey(m => m.AccountId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Expense>(entity =>
+            {
+                entity.ToTable(Tables.Accounting.Expenses, Schemas.Accounting);
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.Amount).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(e => e.PaymentMethod).HasMaxLength(100);
+                entity.Property(e => e.Reference).HasMaxLength(200);
+                entity.HasIndex(e => e.TenantId);
+                entity.HasIndex(e => new { e.TenantId, e.ExpenseDate });
+                entity.HasOne<ExpenseCategory>()
+                    .WithMany()
+                    .HasForeignKey(e => e.CategoryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ExpenseCategory>(entity =>
+            {
+                entity.ToTable(Tables.Accounting.ExpenseCategories, Schemas.Accounting);
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(50);
+                entity.HasIndex(c => c.TenantId);
+                entity.HasIndex(c => new { c.TenantId, c.Name }).IsUnique();
+            });
+
+            modelBuilder.Entity<Customer>(entity =>
+            {
+                entity.ToTable(Tables.Crm.Customers, Schemas.Crm);
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Name).IsRequired().HasMaxLength(200);
+                entity.Property(c => c.ContactName).HasMaxLength(200);
+                entity.Property(c => c.Email).HasMaxLength(320);
+                entity.Property(c => c.Phone).HasMaxLength(30);
+                entity.Property(c => c.Address).HasColumnType("text");
+                entity.Property(c => c.Tin).HasMaxLength(64);
+                entity.HasIndex(c => c.TenantId);
+                entity.HasIndex(c => new { c.TenantId, c.Name });
+            });
+
+            modelBuilder.Entity<CustomerCredit>(entity =>
+            {
+                entity.ToTable(Tables.Crm.CustomerCredits, Schemas.Crm);
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.Balance).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(c => c.CreditLimit).IsRequired().HasColumnType("decimal(18,2)");
+                entity.HasIndex(c => c.TenantId);
+                entity.HasIndex(c => new { c.TenantId, c.CustomerId }).IsUnique();
+            });
+
+            modelBuilder.Entity<CreditTransaction>(entity =>
+            {
+                entity.ToTable(Tables.Crm.CreditTransactions, Schemas.Crm);
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.Type).IsRequired();
+                entity.Property(t => t.Amount).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(t => t.BalanceAfter).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(t => t.Description).IsRequired().HasMaxLength(500);
+                entity.HasIndex(t => t.TenantId);
+                entity.HasIndex(t => new { t.TenantId, t.CustomerId });
+            });
+
+            modelBuilder.Entity<MoneyAccount>(entity =>
+            {
+                entity.ToTable(Tables.Finance.MoneyAccounts, Schemas.Finance);
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.Name).IsRequired().HasMaxLength(200);
+                entity.Property(a => a.Type).IsRequired();
+                entity.Property(a => a.Reference).HasMaxLength(200);
+                entity.Property(a => a.Balance).IsRequired().HasColumnType("decimal(18,2)");
+                entity.HasIndex(a => a.TenantId);
+                entity.HasIndex(a => new { a.TenantId, a.Name });
+            });
+
+            modelBuilder.Entity<MoneyAccountTransaction>(entity =>
+            {
+                entity.ToTable(Tables.Finance.MoneyAccountTransactions, Schemas.Finance);
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.Type).IsRequired();
+                entity.Property(t => t.Amount).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(t => t.BalanceAfter).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(t => t.Description).IsRequired().HasMaxLength(500);
+                entity.Property(t => t.Reference).HasMaxLength(200);
+                entity.HasIndex(t => t.TenantId);
+                entity.HasIndex(t => new { t.TenantId, t.AccountId });
+            });
+
+            modelBuilder.Entity<CashSession>(entity =>
+            {
+                entity.ToTable(Tables.Finance.CashSessions, Schemas.Finance);
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.OpeningCash).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(s => s.ClosingCash).HasColumnType("decimal(18,2)");
+                entity.Property(s => s.ExpectedCash).HasColumnType("decimal(18,2)");
+                entity.Property(s => s.Variance).HasColumnType("decimal(18,2)");
+                entity.Property(s => s.Status).IsRequired();
+                entity.HasIndex(s => s.TenantId);
+                entity.HasIndex(s => new { s.TenantId, s.AccountId });
+            });
+
+            modelBuilder.Entity<Plan>(entity =>
+            {
+                entity.ToTable(Tables.Billing.Plans, Schemas.Billing);
+                entity.HasKey(p => p.Id);
+                entity.Property(p => p.Code).IsRequired().HasMaxLength(50);
+                entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+                entity.Property(p => p.MonthlyPrice).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(p => p.Currency).IsRequired().HasMaxLength(3);
+                entity.Property(p => p.FeatureKeys).HasColumnType("jsonb");
+                entity.HasIndex(p => p.Code).IsUnique();
+            });
+
+            modelBuilder.Entity<Subscription>(entity =>
+            {
+                entity.ToTable(Tables.Billing.Subscriptions, Schemas.Billing);
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.PlanCode).IsRequired().HasMaxLength(50);
+                entity.Property(s => s.Status).IsRequired();
+                entity.Property(s => s.TrialEndedAtUtc).IsRequired();
+                entity.HasIndex(s => s.TenantId).IsUnique();
+            });
+
+            modelBuilder.Entity<SubscriptionItem>(entity =>
+            {
+                entity.ToTable(Tables.Billing.SubscriptionItems, Schemas.Billing);
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.PlanCode).IsRequired().HasMaxLength(50);
+                entity.HasIndex(s => s.TenantId);
+                entity.HasIndex(s => new { s.TenantId, s.PlanCode }).IsUnique();
+            });
+
+            modelBuilder.Entity<Voucher>(entity =>
+            {
+                entity.ToTable(Tables.Billing.Vouchers, Schemas.Billing);
+                entity.HasKey(v => v.Id);
+                entity.Property(v => v.Code).IsRequired().HasMaxLength(50);
+                entity.Property(v => v.ValueDays).IsRequired();
+                entity.Property(v => v.Status).IsRequired();
+                entity.HasIndex(v => v.Code).IsUnique();
+                entity.HasIndex(v => v.RedeemedByTenantId);
+                entity.HasIndex(v => v.ExpiresAtUtc);
+            });
+
+            modelBuilder.Entity<Invoice>(entity =>
+            {
+                entity.ToTable(Tables.Billing.Invoices, Schemas.Billing);
+                entity.HasKey(i => i.Id);
+                entity.Property(i => i.Number).IsRequired().HasMaxLength(50);
+                entity.Property(i => i.Description).IsRequired().HasMaxLength(500);
+                entity.Property(i => i.Amount).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(i => i.Currency).IsRequired().HasMaxLength(3);
+                entity.Property(i => i.Status).IsRequired();
+                entity.Property(i => i.Reference).HasMaxLength(100);
+                entity.HasIndex(i => i.TenantId);
+                entity.HasIndex(i => new { i.TenantId, i.Status });
+                entity.HasIndex(i => i.Number).IsUnique();
+            });
+
+            modelBuilder.Entity<CustomerInvoice>(entity =>
+            {
+                entity.ToTable(Tables.Invoicing.CustomerInvoices, Schemas.Invoicing);
+                entity.HasKey(i => i.Id);
+                entity.Property(i => i.Number).IsRequired().HasMaxLength(50);
+                entity.Property(i => i.CustomerName).HasMaxLength(200);
+                entity.Property(i => i.Currency).IsRequired().HasMaxLength(3);
+                entity.Property(i => i.Status).IsRequired();
+                entity.Property(i => i.Subtotal).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(i => i.TaxAmount).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(i => i.TotalAmount).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(i => i.AmountPaid).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(i => i.PaymentMethod).HasMaxLength(50);
+                entity.Property(i => i.PaymentReference).HasMaxLength(100);
+                entity.Property(i => i.Notes).HasColumnType("text");
+                entity.HasIndex(i => i.TenantId);
+                entity.HasIndex(i => new { i.TenantId, i.Status });
+                entity.HasIndex(i => new { i.TenantId, i.Number }).IsUnique();
+                entity.HasMany(i => i.Lines)
+                    .WithOne()
+                    .HasForeignKey(l => l.CustomerInvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CustomerInvoiceLine>(entity =>
+            {
+                entity.ToTable(Tables.Invoicing.CustomerInvoiceLines, Schemas.Invoicing);
+                entity.HasKey(l => l.Id);
+                entity.Property(l => l.Description).IsRequired().HasMaxLength(500);
+                entity.Property(l => l.Quantity).IsRequired().HasColumnType("decimal(18,4)");
+                entity.Property(l => l.UnitPrice).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(l => l.TaxRatePercent).IsRequired().HasColumnType("decimal(9,4)");
+                entity.Property(l => l.LineTotal).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(l => l.TaxAmount).IsRequired().HasColumnType("decimal(18,2)");
+                entity.HasIndex(l => l.CustomerInvoiceId);
             });
     }
 

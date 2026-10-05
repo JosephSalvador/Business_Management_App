@@ -74,7 +74,7 @@ public sealed class DashboardMappersTests
     {
         var items = new List<RecentActivityItem>
         {
-            new("CreateProductCommand", "Command", "abc", Guid.NewGuid(), "owner@test.local", DateTime.UtcNow),
+            new("CreateProductCommand", "Command", "abc", "Mchele", 0m, null, "owner@test.local", DateTime.UtcNow),
         };
 
         var dto = DashboardMappers.ToActivityDto(items);

@@ -212,6 +212,7 @@ public static class InventoryEndpoints
 
     private static async Task<IResult> AdjustStockAsync(
         AdjustStockRequest request,
+        HttpRequest httpRequest,
         ISender sender,
         CancellationToken cancellationToken)
         => (await sender.Send(
@@ -222,8 +223,21 @@ public static class InventoryEndpoints
                 request.VariantId,
                 request.QuantityDelta,
                 request.Reason,
-                request.EffectiveAt),
+                request.EffectiveAt,
+                BatchId: request.BatchId,
+                IdempotencyKey: ReadIdempotencyKey(httpRequest, request.ClientAdjustmentId)),
             cancellationToken)).ToApiResult();
+
+    private static Guid? ReadIdempotencyKey(HttpRequest httpRequest, Guid? fallback)
+    {
+        if (httpRequest.Headers.TryGetValue("Idempotency-Key", out var value)
+            && Guid.TryParse(value.ToString(), out var keyId))
+        {
+            return keyId;
+        }
+
+        return fallback;
+    }
 
     private static async Task<IResult> CreateTransferAsync(
         CreateTransferRequest request,
@@ -372,7 +386,8 @@ public static class InventoryEndpoints
         decimal QuantityDelta,
         string Reason,
         DateTime EffectiveAt,
-        Guid? BatchId = null);
+        Guid? BatchId = null,
+        Guid? ClientAdjustmentId = null);
 
     private sealed record CreateTransferRequest(
         Guid SourceWarehouseId,

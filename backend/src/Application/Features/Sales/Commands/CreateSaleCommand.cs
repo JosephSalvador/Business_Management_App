@@ -1,8 +1,10 @@
+using BusinessOS.Application.Features.Receipts.Services;
 using BusinessOS.Application.Features.Sales.Dtos;
 using BusinessOS.Application.Ports;
 using BusinessOS.Application.Sales;
 using BusinessOS.Application.Tax;
 using BusinessOS.Domain.Catalog;
+using BusinessOS.Domain.Crm;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Sales;
@@ -25,7 +27,8 @@ public sealed record CreateSaleCommand(
     string? CustomerPhone,
     string? CustomerTin,
     IReadOnlyList<CreateSaleLineInput> Lines,
-    IReadOnlyList<CreateSalePaymentInput> Payments)
+    IReadOnlyList<CreateSalePaymentInput> Payments,
+    Guid? CustomerId = null)
     : IRequest<Result<SaleDto>>, IRequiresTenantAdvisoryLock;
 
 /// <summary>
@@ -50,6 +53,8 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
     private readonly ISaleRepository _sales;
     private readonly INumberSequenceRepository _numberSequences;
     private readonly SaleStockDebitService _stockDebit;
+    private readonly ICustomerCreditRepository _credits;
+    private readonly IReceiptMetadataService _receiptMetadata;
 
     public CreateSaleCommandHandler(
         ITenantContext tenantContext,
@@ -62,7 +67,9 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         ITaxEngine taxEngine,
         ISaleRepository sales,
         INumberSequenceRepository numberSequences,
-        SaleStockDebitService stockDebit)
+        SaleStockDebitService stockDebit,
+        ICustomerCreditRepository credits,
+        IReceiptMetadataService receiptMetadata)
     {
         _tenantContext = tenantContext;
         _branches = branches;
@@ -75,6 +82,8 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         _sales = sales;
         _numberSequences = numberSequences;
         _stockDebit = stockDebit;
+        _credits = credits;
+        _receiptMetadata = receiptMetadata;
     }
 
     public async Task<Result<SaleDto>> Handle(CreateSaleCommand command, CancellationToken cancellationToken)
@@ -172,7 +181,7 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             }
 
             var price = await ResolvePriceAsync(
-                tenantId, priceList.Id, branch.Id, product, input, onDate, cancellationToken);
+                tenantId, priceList, branch.Id, product, input, onDate, cancellationToken);
             if (price is null)
             {
                 return Error.Validation($"No price could be resolved for '{product.Name}'.");
@@ -227,7 +236,7 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             saleLines.Add(SaleLine.Create(
                 product.Id,
                 input.VariantId,
-                product.Name,
+                input.ProductName ?? product.Name,
                 variant?.Sku ?? product.Sku,
                 variant?.Barcode ?? product.Barcode,
                 product.UnitOfMeasureId,
@@ -241,7 +250,8 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
                 snapshot.BaseAmount,
                 snapshot.TaxAmount,
                 snapshot.LineTotal,
-                orderIndex: i));
+                orderIndex: i,
+                unitCost: product.CostPrice));
 
             discountTotal += input.DiscountAmount;
         }
@@ -254,9 +264,17 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             .Select((p, i) => SalePayment.Create(p.Method, p.Amount, p.Provider, p.PhoneNumber, p.Reference, i))
             .ToList();
         var amountPaid = payments.Sum(p => p.Amount);
-        if (amountPaid != totalAmount)
+        var hasCreditPayment = payments.Any(p => p.Method == PaymentMethod.Credit);
+        if (amountPaid < totalAmount && !hasCreditPayment)
         {
             return Error.Validation("Payments must fully cover the sale total.");
+        }
+
+        if (hasCreditPayment
+            && amountPaid < totalAmount
+            && (!command.CustomerId.HasValue || command.CustomerId.Value == Guid.Empty))
+        {
+            return Error.Validation("A credit sale needs a customer.");
         }
 
         var number = await _numberSequences.AllocateAsync(tenantId, "Sale", onDate, cancellationToken);
@@ -275,7 +293,7 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             priceList.Id,
             isPriceTaxInclusive: true,
             command.IsElectronicPayment,
-            customerId: null,
+            command.CustomerId,
             command.CustomerName,
             command.CustomerTin,
             command.IsVatRegistered,
@@ -284,7 +302,7 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             taxAmount,
             totalAmount,
             amountPaid,
-            amountPaid - totalAmount,
+            Math.Max(0m, amountPaid - totalAmount),
             saleLines,
             payments,
             buyerMobile: command.CustomerPhone);
@@ -306,32 +324,93 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         }
 
         await _sales.AddAsync(sale, cancellationToken);
+
+        // Capture receipt metadata (business identity snapshot + layout version).
+        // This is done inside the sale transaction so that the metadata is always
+        // consistent with the sale, even if the business settings change later.
+        try
+        {
+            await _receiptMetadata.CaptureMetadataAsync(sale, cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            // If no default layout is seeded, continue without metadata.
+            // The receipt preview will fall back to the current business name.
+            // This allows sales to proceed even before the layout is seeded.
+        }
+
+        var outstanding = totalAmount - amountPaid;
+        if (hasCreditPayment && outstanding > 0m)
+        {
+            // The customer-id guard above guarantees a non-empty id here.
+            var credit = await _credits.GetByCustomerIdAsync(tenantId, command.CustomerId!.Value, cancellationToken);
+            var creditCreated = credit is null;
+            if (credit is null)
+            {
+                credit = CustomerCredit.Create(tenantId, command.CustomerId.Value);
+                await _credits.AddAsync(credit, cancellationToken);
+            }
+
+            credit.RecordSale(outstanding);
+            if (!creditCreated)
+            {
+                await _credits.UpdateAsync(credit, cancellationToken);
+            }
+
+            await _credits.AddTransactionAsync(CreditTransaction.Create(
+                tenantId,
+                command.CustomerId.Value,
+                CreditTransactionType.Sale,
+                outstanding,
+                credit.Balance,
+                $"Credit - Sale {sale.Number}",
+                sale.Id), cancellationToken);
+        }
+
         return Result.Success(SalesMappers.ToDto(sale));
     }
 
-    private async Task<ResolvedPrice?> ResolvePriceAsync(
-        Guid tenantId,
-        Guid priceListId,
-        Guid branchId,
-        Product product,
-        CreateSaleLineInput input,
-        DateTime onDate,
-        CancellationToken cancellationToken)
+/// <summary>
+/// Resolves the selling price for a line. When the line carries an explicit
+/// <see cref="CreateSaleLineInput.UnitPrice"/> override (e.g. the POS "Bila
+/// Jina" quick-sale flow) that amount is used as-is; otherwise the price list
+/// is consulted. The server stays the final authority: overrides are values
+/// the caller is allowed to fix, not discounted catalogue prices.
+/// </summary>
+private async Task<ResolvedPrice?> ResolvePriceAsync(
+    Guid tenantId,
+    PriceList priceList,
+    Guid branchId,
+    Product product,
+    CreateSaleLineInput input,
+    DateTime onDate,
+    CancellationToken cancellationToken)
+{
+    if (input.UnitPrice.HasValue)
     {
-        var candidates = await _priceLists.ResolvePricesAsync(
-            tenantId,
-            priceListId,
-            product.Id,
-            input.VariantId,
-            branchId,
-            PriceType.Retail,
-            input.Quantity,
-            onDate,
-            cancellationToken);
-
-        return PriceResolver.Resolve(
-            candidates, product.Id, input.VariantId, branchId, PriceType.Retail, input.Quantity, onDate);
+        return new ResolvedPrice(
+            ProductPriceId: Guid.Empty,
+            PriceListId: priceList.Id,
+            Price: Round(input.UnitPrice.Value),
+            Currency: priceList.Currency,
+            PriceType: PriceType.Retail,
+            MinQuantity: input.Quantity);
     }
+
+    var candidates = await _priceLists.ResolvePricesAsync(
+        tenantId,
+        priceList.Id,
+        product.Id,
+        input.VariantId,
+        branchId,
+        PriceType.Retail,
+        input.Quantity,
+        onDate,
+        cancellationToken);
+
+    return PriceResolver.Resolve(
+        candidates, product.Id, input.VariantId, branchId, PriceType.Retail, input.Quantity, onDate);
+}
 
     private async Task<string> ResolveTaxCategoryCodeAsync(
         Product product, CancellationToken cancellationToken)

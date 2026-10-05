@@ -1,4 +1,5 @@
 using BusinessOS.Application.Features.Auth.Dtos;
+using BusinessOS.Application.Features.Auth.Services;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Identity;
@@ -9,37 +10,34 @@ using Microsoft.Extensions.Options;
 
 namespace BusinessOS.Application.Features.Auth.Commands;
 
-public sealed record LoginCommand(string Identifier, string Password) : IRequest<Result<AuthResponse>>;
+public sealed record LoginCommand(string Identifier, string Password) : IRequest<Result<LoginResponse>>;
 
-public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<AuthResponse>>
+public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginResponse>>
 {
     private readonly IUserRepository _users;
-    private readonly IRoleRepository _roles;
-    private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAuditLogRepository _auditLogs;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly ITokenService _tokenService;
+    private readonly TwoFactorChallengeService _twoFactor;
+    private readonly AuthSessionIssuer _sessions;
     private readonly SecurityOptions _security;
 
     public LoginCommandHandler(
         IUserRepository users,
-        IRoleRepository roles,
-        IRefreshTokenRepository refreshTokens,
         IAuditLogRepository auditLogs,
         IPasswordHasher passwordHasher,
-        ITokenService tokenService,
+        TwoFactorChallengeService twoFactor,
+        AuthSessionIssuer sessions,
         IOptions<SecurityOptions> security)
     {
         _users = users;
-        _roles = roles;
-        _refreshTokens = refreshTokens;
         _auditLogs = auditLogs;
         _passwordHasher = passwordHasher;
-        _tokenService = tokenService;
+        _twoFactor = twoFactor;
+        _sessions = sessions;
         _security = security.Value;
     }
 
-    public async Task<Result<AuthResponse>> Handle(LoginCommand command, CancellationToken cancellationToken)
+    public async Task<Result<LoginResponse>> Handle(LoginCommand command, CancellationToken cancellationToken)
     {
         var identifier = command.Identifier.Trim();
         User? user;
@@ -86,53 +84,36 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<A
 
         if (!user.EmailVerified)
         {
-            return Error.AccountNotVerified("Verify your email address before signing in.");
+            // Include the account email so clients can resume verification even
+            // when the user signed in with a phone number instead of the email.
+            var details = new Dictionary<string, string[]>
+            {
+                ["email"] = new[] { user.Email },
+            };
+            return Error.AccountNotVerified("Verify your email address before signing in.")
+                with { Details = details };
         }
 
         user.ResetFailedLogins();
 
-        var permissions = await GetPermissionsAsync(user, cancellationToken);
-        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.TenantId, user.Email, permissions);
-        var rawRefreshToken = _tokenService.GenerateRefreshToken();
-
-        await _refreshTokens.AddAsync(RefreshToken.Create(
-            user.Id,
-            user.TenantId,
-            _tokenService.HashRefreshToken(rawRefreshToken),
-            DateTime.UtcNow.AddDays(AuthConstants.RefreshTokenDays)),
-            cancellationToken);
-
-        await _auditLogs.AddAsync(AuditLog.Create(
-            user.TenantId,
-            user.Id,
-            "Auth.Login",
-            "User",
-            user.Id.ToString()),
-            cancellationToken);
-
-        var response = new AuthResponse(
-            accessToken,
-            rawRefreshToken,
-            DateTime.UtcNow.AddMinutes(AuthConstants.AccessTokenMinutes),
-            new UserDto(user.Id, user.TenantId, user.Email, user.FullName, user.Phone, user.IsActive, user.EmailVerified, permissions));
-
-        return Result.Success(response);
-    }
-
-    private async Task<IReadOnlyList<string>> GetPermissionsAsync(User user, CancellationToken cancellationToken)
-    {
-        var roleIds = user.Roles.Select(r => r.Id).ToArray();
-        if (roleIds.Length == 0)
+        // A password check is not yet a session when a second factor is pending: hand back a
+        // challenge and mint nothing. The client must come back with a TOTP or recovery code,
+        // which is then exchanged for tokens by VerifyTwoFactorCommand.
+        if (user.TwoFactorEnabled)
         {
-            return Array.Empty<string>();
+            var challenge = await _twoFactor.IssueAsync(user, cancellationToken);
+
+            await _auditLogs.AddAsync(AuditLog.Create(
+                user.TenantId,
+                user.Id,
+                "Auth.TwoFactorChallengeIssued",
+                "User",
+                user.Id.ToString()),
+                cancellationToken);
+
+            return Result.Success(LoginResponse.TwoFactorRequired(challenge, user.Email));
         }
 
-        var permissions = new List<string>();
-        foreach (var roleId in roleIds)
-        {
-            permissions.AddRange(await _roles.GetPermissionsAsync(user.TenantId, roleId, cancellationToken));
-        }
-
-        return permissions.Distinct().ToArray();
+        return Result.Success(LoginResponse.Authenticated(await _sessions.IssueAsync(user, cancellationToken)));
     }
 }

@@ -35,3 +35,20 @@ public sealed record GeneralLedgerAccountDto(
 
 public sealed record GeneralLedgerDto(
     IReadOnlyList<GeneralLedgerAccountDto> Accounts, decimal TotalDebit, decimal TotalCredit);
+
+public sealed record ExpenseDto(
+    Guid Id, Guid TenantId, Guid? CategoryId, string Description, decimal Amount,
+    DateTime ExpenseDate, string? PaymentMethod, string? Reference, string? Notes,
+    DateTime CreatedAt, string? CategoryName = null);
+
+public sealed record PagedExpenses(
+    IReadOnlyList<ExpenseDto> Items, int Total);
+
+public sealed record ExpenseCategoryDto(
+    Guid Id, Guid TenantId, string Name, DateTime CreatedAt);
+
+public sealed record ExpenseSummaryDto(
+    decimal Total, IReadOnlyList<ExpenseCategoryTotalDto> ByCategory);
+
+public sealed record ExpenseCategoryTotalDto(
+    Guid? CategoryId, string? CategoryName, decimal Total);

@@ -67,7 +67,8 @@ public static class SalesEndpoints
             request.Customer?.Phone,
             request.Customer?.Tin,
             request.Lines,
-            request.Payments);
+            request.Payments,
+            request.CustomerId);
 
         return (await sender.Send(command, cancellationToken)).ToApiResult();
     }
@@ -110,6 +111,7 @@ public static class SalesEndpoints
         DateTime EffectiveAt,
         bool IsElectronicPayment,
         bool? IsVatRegistered,
+        Guid? CustomerId,
         CreateSaleCustomerRequest? Customer,
         IReadOnlyList<CreateSaleLineInput> Lines,
         IReadOnlyList<CreateSalePaymentInput> Payments);

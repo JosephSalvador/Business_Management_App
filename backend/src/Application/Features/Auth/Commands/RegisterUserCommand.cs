@@ -2,6 +2,7 @@ using BusinessOS.Application.Features.Auth.Dtos;
 using BusinessOS.Application.Features.Auth.Services;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Billing;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared;
@@ -26,6 +27,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
     private readonly IPermissionRepository _permissions;
     private readonly IUserRepository _users;
     private readonly IAuditLogRepository _auditLogs;
+    private readonly ISubscriptionRepository _subscriptions;
     private readonly IPasswordHasher _passwordHasher;
     private readonly EmailVerificationService _verification;
     private readonly IOptions<PaymentsOptions> _paymentsOptions;
@@ -37,6 +39,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         IPermissionRepository permissions,
         IUserRepository users,
         IAuditLogRepository auditLogs,
+        ISubscriptionRepository subscriptions,
         IPasswordHasher passwordHasher,
         EmailVerificationService verification,
         IOptions<PaymentsOptions> paymentsOptions)
@@ -47,6 +50,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         _permissions = permissions;
         _users = users;
         _auditLogs = auditLogs;
+        _subscriptions = subscriptions;
         _passwordHasher = passwordHasher;
         _verification = verification;
         _paymentsOptions = paymentsOptions;
@@ -102,6 +106,23 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         adminRole.Grant(allPermissions);
         await _roles.AddAsync(adminRole, cancellationToken);
 
+        var staffPermissions = await _permissions.ResolveByNamesAsync(PermissionNames.Staff, cancellationToken);
+        var staffRole = Role.Create(
+            tenant.Id,
+            SystemRoles.Staff,
+            isSystem: true,
+            description: "Fanyakazi — catalogue, stock na POS");
+        staffRole.Grant(staffPermissions);
+        await _roles.AddAsync(staffRole, cancellationToken);
+
+        foreach (var template in RoleTemplates.Starter)
+        {
+            var role = Role.Create(tenant.Id, template.Name, description: template.Description);
+            var permissions = await _permissions.ResolveByNamesAsync(template.PermissionNames, cancellationToken);
+            role.Grant(permissions);
+            await _roles.AddAsync(role, cancellationToken);
+        }
+
         var user = User.Create(
             Guid.NewGuid(),
             tenant.Id,
@@ -111,6 +132,10 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
             phone);
         user.AssignRole(adminRole);
         await _users.AddAsync(user, cancellationToken);
+
+        // Free 14-day Pro trial starts at registration (M13 monetization).
+        await _subscriptions.AddAsync(
+            Subscription.StartTrial(tenant.Id), cancellationToken);
 
         // No session is issued until the email address is verified.
         await _verification.IssueAsync(user, cancellationToken);

@@ -81,6 +81,38 @@ public static class AccountingEndpoints
             .RequirePermission(PermissionNames.AccountingView)
             .WithName("GetGeneralLedger");
 
+        // ── Expenses ──────────────────────────────────────────────
+        var expenses = api.MapGroup("/expenses")
+            .WithApiVersionSet(versionSet)
+            .WithTags("Expenses")
+            .RequireAuthorization()
+            .RequireRateLimiting("global");
+
+        expenses.MapGet("/", ListExpensesAsync)
+            .RequirePermission(PermissionNames.ExpensesView)
+            .WithName("ListExpenses");
+        expenses.MapGet("/{id:guid}", GetExpenseAsync)
+            .RequirePermission(PermissionNames.ExpensesView)
+            .WithName("GetExpense");
+        expenses.MapPost("/", CreateExpenseAsync)
+            .RequirePermission(PermissionNames.ExpensesCreate)
+            .WithName("CreateExpense");
+        expenses.MapPut("/{id:guid}", UpdateExpenseAsync)
+            .RequirePermission(PermissionNames.ExpensesUpdate)
+            .WithName("UpdateExpense");
+        expenses.MapDelete("/{id:guid}", DeleteExpenseAsync)
+            .RequirePermission(PermissionNames.ExpensesDelete)
+            .WithName("DeleteExpense");
+        expenses.MapGet("/categories", ListExpenseCategoriesAsync)
+            .RequirePermission(PermissionNames.ExpensesView)
+            .WithName("ListExpenseCategories");
+        expenses.MapPost("/categories", CreateExpenseCategoryAsync)
+            .RequirePermission(PermissionNames.ExpensesCreate)
+            .WithName("CreateExpenseCategory");
+        expenses.MapGet("/summary", GetExpenseSummaryAsync)
+            .RequirePermission(PermissionNames.ExpensesView)
+            .WithName("GetExpenseSummary");
+
         return app;
     }
 
@@ -166,6 +198,74 @@ public static class AccountingEndpoints
             new GeneralLedgerQuery(fromDate, toDate, accountId),
             cancellationToken)).ToApiResult();
 
+    // ── Expense handlers ─────────────────────────────────────────
+    private static async Task<IResult> ListExpensesAsync(
+        int? page,
+        int? pageSize,
+        DateTime? fromDate,
+        DateTime? toDate,
+        string? search,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new ListExpensesQuery(page ?? 1, pageSize ?? 20, fromDate, toDate, search),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> GetExpenseAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new GetExpenseQuery(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CreateExpenseAsync(
+        CreateExpenseRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new CreateExpenseCommand(
+                request.Description, request.Amount, request.ExpenseDate,
+                request.CategoryId, request.PaymentMethod, request.Reference, request.Notes),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> UpdateExpenseAsync(
+        Guid id,
+        UpdateExpenseRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new UpdateExpenseCommand(
+                id, request.Description, request.Amount, request.ExpenseDate,
+                request.CategoryId, request.PaymentMethod, request.Reference, request.Notes),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> DeleteExpenseAsync(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new DeleteExpenseCommand(id), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ListExpenseCategoriesAsync(
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new ListExpenseCategoriesQuery(), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CreateExpenseCategoryAsync(
+        CreateExpenseCategoryRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new CreateExpenseCategoryCommand(request.Name),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> GetExpenseSummaryAsync(
+        DateTime? fromDate,
+        DateTime? toDate,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new GetExpenseSummaryQuery(fromDate, toDate),
+            cancellationToken)).ToApiResult();
+
     // ── Request DTOs ───────────────────────────────────────────────
     private sealed record CreateAccountRequest(
         string Code, string Name, AccountType Type);
@@ -182,4 +282,14 @@ public static class AccountingEndpoints
 
     private sealed record CreateTenantAccountMappingRequest(
         string MappingKey, Guid AccountId);
+
+    private sealed record CreateExpenseRequest(
+        string Description, decimal Amount, DateTime ExpenseDate,
+        Guid? CategoryId, string? PaymentMethod, string? Reference, string? Notes);
+
+    private sealed record CreateExpenseCategoryRequest(string Name);
+
+    private sealed record UpdateExpenseRequest(
+        string Description, decimal Amount, DateTime ExpenseDate,
+        Guid? CategoryId, string? PaymentMethod, string? Reference, string? Notes);
 }

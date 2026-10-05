@@ -19,6 +19,9 @@ public static class ResultExtensions
             "Unauthorized" => StatusCodes.Status401Unauthorized,
             "Forbidden" => StatusCodes.Status403Forbidden,
             "AccountNotVerified" => StatusCodes.Status403Forbidden,
+            "ModuleDisabled" => StatusCodes.Status403Forbidden,
+            "QuotaExceeded" => StatusCodes.Status403Forbidden,
+            "BillingRequired" => StatusCodes.Status402PaymentRequired,
             "NotFound" => StatusCodes.Status404NotFound,
             "Conflict" => StatusCodes.Status409Conflict,
             "TooManyRequests" => StatusCodes.Status429TooManyRequests,
@@ -43,6 +46,14 @@ public static class ResultExtensions
                 Detail = error.Message,
                 Status = status,
             };
+        }
+
+        if (error.Details is not null)
+        {
+            foreach (var (key, values) in error.Details)
+            {
+                details.Extensions[key] = values.Length == 1 ? values[0] : values;
+            }
         }
 
         details.Extensions["code"] = error.Code;

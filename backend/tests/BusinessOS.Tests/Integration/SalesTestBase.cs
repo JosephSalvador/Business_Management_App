@@ -39,7 +39,14 @@ public abstract class SalesTestBase : IClassFixture<BusinessOsApiFactory>, IAsyn
         JsonElement current = doc;
         foreach (var part in path)
         {
-            current = current.GetProperty(part);
+            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index))
+            {
+                current = current[index];
+            }
+            else
+            {
+                current = current.GetProperty(part);
+            }
         }
 
         return current.ToString();

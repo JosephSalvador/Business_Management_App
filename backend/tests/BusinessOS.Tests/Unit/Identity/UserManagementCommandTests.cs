@@ -12,6 +12,8 @@ public sealed class UserManagementCommandTests
         public Guid TenantId { get; init; }
         public Guid? UserId { get; init; }
         public string? IpAddress => null;
+        public string? UserAgent => null;
+        public string? CurrentRefreshToken => null;
     }
 
     private sealed class StubUserRepository : IUserRepository
@@ -81,6 +83,8 @@ public sealed class UserManagementCommandTests
             return Task.CompletedTask;
         }
         public Task<int> DeleteExpiredAsync(DateTime cutoff, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<IReadOnlyList<RefreshToken>> ListActiveByUserAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<RefreshToken>>(Array.Empty<RefreshToken>());
     }
 
     private static (User User, Role AdminRole, Role CashierRole) CreateWorld(Guid tenantId, out Guid adminUserId)

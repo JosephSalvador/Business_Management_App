@@ -19,7 +19,8 @@ public sealed class Product : AggregateRoot
         Guid unitOfMeasureId,
         ProductType productType,
         ProductStatus status,
-        Guid? taxCategoryId)
+        Guid? taxCategoryId,
+        decimal? costPrice)
         : base(id)
     {
         TenantId = tenantId;
@@ -33,6 +34,7 @@ public sealed class Product : AggregateRoot
         ProductType = productType;
         Status = status;
         TaxCategoryId = taxCategoryId;
+        CostPrice = costPrice;
     }
 
     public Guid TenantId { get; private set; }
@@ -46,6 +48,7 @@ public sealed class Product : AggregateRoot
     public ProductType ProductType { get; private set; }
     public ProductStatus Status { get; private set; }
     public Guid? TaxCategoryId { get; private set; }
+    public decimal? CostPrice { get; private set; }
 
     public bool HasVariants => _variants.Count > 0;
     public IReadOnlyCollection<ProductVariant> Variants => _variants.AsReadOnly();
@@ -61,7 +64,8 @@ public sealed class Product : AggregateRoot
         Guid unitOfMeasureId,
         ProductType productType,
         ProductStatus status = ProductStatus.Draft,
-        Guid? taxCategoryId = null)
+        Guid? taxCategoryId = null,
+        decimal? costPrice = null)
     {
         var product = new Product(
             Guid.NewGuid(),
@@ -75,7 +79,8 @@ public sealed class Product : AggregateRoot
             unitOfMeasureId,
             productType,
             status,
-            taxCategoryId);
+            taxCategoryId,
+            costPrice);
 
         product.AddDomainEvent(new ProductCreatedEvent(
             Guid.NewGuid(), DateTime.UtcNow, product.Id, tenantId, product.Name, product.Sku));
@@ -89,7 +94,8 @@ public sealed class Product : AggregateRoot
         Guid? categoryId,
         Guid? brandId,
         Guid unitOfMeasureId,
-        Guid? taxCategoryId = null)
+        Guid? taxCategoryId = null,
+        decimal? costPrice = null)
     {
         Name = name.Trim();
         Description = description;
@@ -97,6 +103,7 @@ public sealed class Product : AggregateRoot
         BrandId = brandId;
         UnitOfMeasureId = unitOfMeasureId;
         TaxCategoryId = taxCategoryId;
+        CostPrice = costPrice;
 
         AddDomainEvent(new ProductUpdatedEvent(Guid.NewGuid(), DateTime.UtcNow, Id, TenantId, Name));
     }

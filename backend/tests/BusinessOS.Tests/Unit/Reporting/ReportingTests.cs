@@ -16,6 +16,8 @@ internal sealed class StubTenantContext(Guid tenantId) : ITenantContext
     public Guid TenantId => tenantId;
     public Guid? UserId => Guid.NewGuid();
     public string? IpAddress => "127.0.0.1";
+    public string? UserAgent => null;
+    public string? CurrentRefreshToken => null;
 }
 
 internal sealed class StubReportRepository : IReportRepository
@@ -48,6 +50,30 @@ internal sealed class StubReportRepository : IReportRepository
     public Task<IReadOnlyList<TopProductRow>> GetTopProductsAsync(
         Guid tenantId, DateTime from, DateTime to, int limit, Guid? branchId, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<TopProductRow>>(_topProducts.Take(limit).ToList());
+
+    public Task<IReadOnlyList<SalesTrendPoint>> GetSalesTrendAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<SalesTrendPoint>>(new List<SalesTrendPoint>());
+
+    public Task<IReadOnlyList<SalesByPaymentMethodRow>> GetSalesByPaymentMethodAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<SalesByPaymentMethodRow>>(new List<SalesByPaymentMethodRow>());
+
+    public Task<IReadOnlyList<SalesByCategoryRow>> GetSalesByCategoryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<SalesByCategoryRow>>(new List<SalesByCategoryRow>());
+
+    public Task<IReadOnlyList<SalesByStaffRow>> GetSalesByStaffAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<SalesByStaffRow>>(new List<SalesByStaffRow>());
+
+    public Task<IReadOnlyList<SalesByCustomerRow>> GetSalesByCustomerAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<SalesByCustomerRow>>(new List<SalesByCustomerRow>());
+
+    public Task<decimal> GetCogsAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+        => Task.FromResult<decimal>(0m);
 }
 
 internal sealed class StubCsvExportService : ICsvExportService

@@ -101,8 +101,16 @@ public sealed class RegisterStaffCommandHandler : IRequestHandler<RegisterStaffC
             });
         }
 
-        // Resolve the system Staff role, creating it (with its limited
-        // permission set) the first time any staff member joins.
+        if (tenant.OnboardingCompletedAt is null)
+        {
+            return Error.Validation(new Dictionary<string, string[]>
+            {
+                ["InvitationCode"] = new[] { "This business has not completed setup yet." },
+            });
+        }
+
+        // New tenants receive Staff during registration. The fallback keeps the
+        // invitation flow compatible with tenants created before starter roles.
         var staffRole = await _roles.GetByNameAsync(tenant.Id, SystemRoles.Staff, cancellationToken);
         if (staffRole is null)
         {

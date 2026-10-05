@@ -159,6 +159,8 @@ public sealed class VoidSaleCommandTests
         public Guid TenantId { get; init; }
         public Guid? UserId { get; init; }
         public string? IpAddress => null;
+        public string? UserAgent => null;
+        public string? CurrentRefreshToken => null;
     }
 
     private sealed class StubSaleRepository : ISaleRepository
@@ -210,17 +212,23 @@ public sealed class VoidSaleCommandTests
             Movements.Add(movement);
             return Task.CompletedTask;
         }
-        public Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+        public Task<StockMovement?> FindAdjustmentByKeyAsync(
+            Guid tenantId, string key, CancellationToken ct = default)
+            => Task.FromResult(Movements.FirstOrDefault(
+                m => m.TenantId == tenantId
+                    && m.MovementType == StockMovementType.Adjustment
+                    && m.CorrelationId == key));
+        public Task<IReadOnlyList<StockBalanceView>> ListBalancesAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             string? search = null, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<StockBalance>>(Balance is null ? Array.Empty<StockBalance>() : new[] { Balance });
+            => Task.FromResult<IReadOnlyList<StockBalanceView>>(Array.Empty<StockBalanceView>());
         public Task<int> CountBalancesAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null, string? search = null, CancellationToken ct = default)
             => Task.FromResult(Balance is null ? 0 : 1);
-        public Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+        public Task<IReadOnlyList<StockMovementView>> ListMovementsAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<StockMovement>>(Movements);
+            => Task.FromResult<IReadOnlyList<StockMovementView>>(Array.Empty<StockMovementView>());
         public Task<int> CountMovementsAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken ct = default)
@@ -233,6 +241,22 @@ public sealed class VoidSaleCommandTests
                     && m.ReferenceId == referenceId
                     && (type == null || m.MovementType == type.Value))
                 .ToList());
+
+        public Task<IReadOnlyList<StockSummaryRow>> GetStockSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockSummaryRow>>(new List<StockSummaryRow>());
+
+        public Task<IReadOnlyList<StockMovementSummaryRow>> GetStockMovementSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockMovementSummaryRow>>(new List<StockMovementSummaryRow>());
+
+        public Task<IReadOnlyList<LowStockReportItem>> GetLowStockReportAsync(
+            Guid tenantId, decimal threshold, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<LowStockReportItem>>(new List<LowStockReportItem>());
+
+        public Task<IReadOnlyList<StockVelocityRow>> GetStockVelocityAsync(
+            Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockVelocityRow>>(new List<StockVelocityRow>());
     }
 }
 

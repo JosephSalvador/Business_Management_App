@@ -15,7 +15,10 @@ public sealed record AdjustStockCommand(
     decimal QuantityDelta,
     string Reason,
     DateTime EffectiveAt,
-    Guid? BatchId = null)
+    decimal? UnitCost = null,
+    StockReasonType? ReasonType = null,
+    Guid? BatchId = null,
+    Guid? IdempotencyKey = null)
     : IRequest<Result<StockBalanceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class AdjustStockCommandHandler
@@ -24,17 +27,20 @@ public sealed class AdjustStockCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IWarehouseRepository _warehouses;
     private readonly IProductRepository _products;
+    private readonly IUnitOfMeasureRepository _unitsOfMeasure;
     private readonly IStockRepository _stock;
 
     public AdjustStockCommandHandler(
         ITenantContext tenantContext,
         IWarehouseRepository warehouses,
         IProductRepository products,
+        IUnitOfMeasureRepository unitsOfMeasure,
         IStockRepository stock)
     {
         _tenantContext = tenantContext;
         _warehouses = warehouses;
         _products = products;
+        _unitsOfMeasure = unitsOfMeasure;
         _stock = stock;
     }
 
@@ -61,6 +67,8 @@ public sealed class AdjustStockCommandHandler
             return Error.NotFound("Product not found.");
         }
 
+        var unitOfMeasure = await _unitsOfMeasure.GetByIdAsync(tenantId, product.UnitOfMeasureId, cancellationToken);
+
         if (product.ProductType != ProductType.Product)
         {
             return Error.Validation("Only stocked products can have stock adjustments.");
@@ -76,6 +84,32 @@ public sealed class AdjustStockCommandHandler
         else if (command.VariantId.HasValue)
         {
             return Error.Validation("This product has no variants.");
+        }
+
+        // Idempotent replay: the tenant advisory lock serializes stock commands,
+        // so re-submitting the same client id is either a retry after a dropped
+        // response (dedupe — never apply twice) or a brand-new request. The key is
+        // stored on the adjustment ledger row's CorrelationId.
+        var idempotencyKey = command.IdempotencyKey?.ToString();
+        if (idempotencyKey is not null)
+        {
+            var alreadyApplied = await _stock.FindAdjustmentByKeyAsync(
+                tenantId, idempotencyKey, cancellationToken);
+            if (alreadyApplied is not null)
+            {
+                var current = await _stock.GetBalanceWithLockAsync(
+                    tenantId, warehouse.Id, location.Id, product.Id, command.VariantId, cancellationToken);
+                current ??= await _stock.GetOrCreateBalanceAsync(
+                    tenantId, warehouse.Id, location.Id, product.Id, command.VariantId, cancellationToken);
+                return Result.Success(WarehouseMappers.ToBalanceDto(
+                    current,
+                    warehouse.Name,
+                    location.Name,
+                    product.Name,
+                    product.Sku,
+                    product.Barcode,
+                    unitOfMeasure?.Name ?? string.Empty));
+            }
         }
 
         var balance = await _stock.GetBalanceWithLockAsync(
@@ -112,6 +146,7 @@ public sealed class AdjustStockCommandHandler
             product.UnitOfMeasureId,
             command.EffectiveAt,
             reason: command.Reason,
+            correlationId: idempotencyKey,
             batchId: command.BatchId,
             createdBy: _tenantContext.UserId);
 
@@ -119,7 +154,14 @@ public sealed class AdjustStockCommandHandler
 
         balance.Apply(command.QuantityDelta);
 
-        return Result.Success(WarehouseMappers.ToBalanceDto(balance));
+        return Result.Success(WarehouseMappers.ToBalanceDto(
+            balance,
+            warehouse.Name,
+            location.Name,
+            product.Name,
+            product.Sku,
+            product.Barcode,
+            unitOfMeasure?.Name ?? string.Empty));
     }
 
     private static StockLocation? ResolveLocation(Warehouse warehouse, Guid? stockLocationId)

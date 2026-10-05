@@ -57,8 +57,37 @@ builder.Services
     .Configure<SmsOptions>(builder.Configuration.GetSection(SmsOptions.SectionName))
     .Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName))
     .Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName))
-    .Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"))
-    .AddOptions<SecurityOptions>().Validate(s => s.MaxFailedLoginAttempts > 0, "MaxFailedLoginAttempts must be > 0.").ValidateOnStart();
+    .Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+
+builder.Services
+    .AddOptions<JwtOptions>()
+    .Validate(
+        j => !string.IsNullOrWhiteSpace(j.Secret)
+            && System.Text.Encoding.UTF8.GetByteCount(j.Secret) >= 32,
+        "Jwt:Secret must be set and at least 32 bytes for HMAC-SHA256.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<SecurityOptions>()
+    .Validate(s => s.MaxFailedLoginAttempts > 0, "MaxFailedLoginAttempts must be > 0.")
+    .Validate(s => s.LockoutDurationMinutes > 0, "LockoutDurationMinutes must be > 0.")
+    .Validate(
+        s => s.TwoFactorChallengeMinutes is > 0 and <= 60,
+        "TwoFactorChallengeMinutes must be between 1 and 60.")
+    .Validate(
+        s => s.TwoFactorStepSeconds is >= 15 and <= 120,
+        "TwoFactorStepSeconds must be between 15 and 120 (RFC 6238 recommends 30).")
+    .Validate(
+        s => s.TwoFactorDigits is 6 or 8,
+        "TwoFactorDigits must be 6 or 8; other widths are not supported by the client UI.")
+    .Validate(
+        s => s.TwoFactorWindow is >= 0 and <= 5,
+        "TwoFactorWindow must be between 0 and 5 steps; wider windows weaken replay resistance.")
+    .Validate(s => s.TwoFactorMaxAttempts > 0, "TwoFactorMaxAttempts must be > 0.")
+    .Validate(
+        s => s.TwoFactorRecoveryCodeCount is >= 1 and <= 20,
+        "TwoFactorRecoveryCodeCount must be between 1 and 20.")
+    .ValidateOnStart();
 
 builder.Services.AddScoped<RequestContext>();
 
@@ -190,6 +219,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseMiddleware<UserContextMiddleware>();
 app.UseMiddleware<TenantActiveMiddleware>();
+app.UseMiddleware<SubscriptionAccessMiddleware>();
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
@@ -210,9 +240,18 @@ app.MapInventoryEndpoints();
 app.MapPricingEndpoints();
 app.MapDashboardEndpoints();
 app.MapSalesEndpoints();
+app.MapReceiptEndpoints();
 app.MapPurchasingEndpoints();
 app.MapAccountingEndpoints();
 app.MapReportingEndpoints();
+app.MapCustomerEndpoints();
+app.MapCreditEndpoints();
+app.MapFinanceEndpoints();
+app.MapFeatureFlagEndpoints();
+app.MapBillingEndpoints();
+app.MapCapabilitiesEndpoints();
+app.MapInvoiceEndpoints();
+app.MapTenantProvisioningEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
 {
@@ -220,6 +259,17 @@ if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironmen
     var db = scope.ServiceProvider.GetRequiredService<BusinessDbContext>();
     await db.Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>().SeedAsync();
+}
+else if (app.Environment.IsEnvironment("LocalPreProduction"))
+{
+    // Pending migrations are applied here so preprod stays operable offline.
+    // Only platform-level bootstrap data is seeded: the demo tenant and its known
+    // dev credentials are never created outside Development/Testing.
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<BusinessDbContext>();
+    await db.Database.MigrateAsync();
+    await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>()
+        .SeedAsync(createDemoTenant: false);
 }
 
 await app.RunAsync();

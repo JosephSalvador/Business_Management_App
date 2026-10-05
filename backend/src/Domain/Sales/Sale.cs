@@ -147,7 +147,8 @@ public sealed class Sale : AggregateRoot
     /// lines) and must reconcile exactly with the lines and payments:
     /// Subtotal = Σ Round(unitPrice × quantity); DiscountAmount = Σ line discount;
     /// TaxAmount = Σ line tax; TotalAmount = Σ (lineTotal − discount) = Subtotal − DiscountAmount;
-    /// AmountPaid = Σ payments; Change = AmountPaid − TotalAmount; full payment required.
+    /// AmountPaid = Σ payments; Change = AmountPaid − TotalAmount (≥ 0; a cash tender may
+    /// overpay so the cashier can give change, but underpayment is never allowed).
     /// </summary>
     public static Sale Create(
         Guid tenantId,
@@ -382,14 +383,23 @@ public sealed class Sale : AggregateRoot
         }
 
         var computedPaid = payments.Sum(p => p.Amount);
+        var hasCreditPayment = payments.Any(p => p.Method == PaymentMethod.Credit);
 
+        // A cash tender may overpay the total so the seller can give change
+        // (Change = amountPaid - total). A CREDIT tender may underpay — the
+        // unpaid balance becomes the customer's ledger debt — and gets no
+        // change, so Change is floored at zero. All other methods pay in full.
+        var expectedChange = hasCreditPayment
+            ? Math.Max(0m, amountPaid - totalAmount)
+            : amountPaid - totalAmount;
         if (amountPaid != computedPaid
-            || change != amountPaid - totalAmount
+            || change != expectedChange
             || change < 0
-            || amountPaid != totalAmount)
+            || (amountPaid < totalAmount && !hasCreditPayment))
         {
             throw new InvalidOperationException(
-                "Sale payments must fully cover the total (programmer error).");
+                "Sale payments must fully cover (or over-cover) the total, "
+                + "except credit tenders which may leave a ledger balance (programmer error).");
         }
     }
 

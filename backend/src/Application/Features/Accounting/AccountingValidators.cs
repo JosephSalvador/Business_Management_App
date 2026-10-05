@@ -71,3 +71,60 @@ public sealed class CreateTenantAccountMappingCommandValidator : AbstractValidat
         RuleFor(x => x.AccountId).NotEmpty();
     }
 }
+
+public sealed class CreateExpenseCommandValidator : AbstractValidator<CreateExpenseCommand>
+{
+    public CreateExpenseCommandValidator()
+    {
+        RuleFor(x => x.Description).NotEmpty().MaximumLength(500);
+        RuleFor(x => x.Amount).GreaterThan(0);
+        RuleFor(x => x.ExpenseDate).NotEmpty();
+        RuleFor(x => x.CategoryId).NotEmpty()
+            .WithMessage("Gharama lazima iwe na kundi. Tafadhali chagua kundi la gharama.");
+        RuleFor(x => x.PaymentMethod).MaximumLength(100).When(x => x.PaymentMethod != null);
+        RuleFor(x => x.Reference).MaximumLength(200).When(x => x.Reference != null);
+    }
+}
+
+public sealed class UpdateExpenseCommandValidator : AbstractValidator<UpdateExpenseCommand>
+{
+    public UpdateExpenseCommandValidator()
+    {
+        RuleFor(x => x.ExpenseId).NotEmpty();
+        RuleFor(x => x.Description).NotEmpty().MaximumLength(500);
+        RuleFor(x => x.Amount).GreaterThan(0);
+        RuleFor(x => x.ExpenseDate).NotEmpty();
+        RuleFor(x => x.CategoryId).NotEmpty()
+            .WithMessage("Gharama lazima iwe na kundi. Tafadhali chagua kundi la gharama.");
+        RuleFor(x => x.PaymentMethod).MaximumLength(100).When(x => x.PaymentMethod != null);
+        RuleFor(x => x.Reference).MaximumLength(200).When(x => x.Reference != null);
+    }
+}
+
+public sealed class ListExpensesQueryValidator : AbstractValidator<ListExpensesQuery>
+{
+    public ListExpensesQueryValidator()
+    {
+        RuleFor(x => x.Page).GreaterThan(0);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+        RuleFor(x => x.FromDate).LessThanOrEqualTo(x => x.ToDate).When(x => x.FromDate.HasValue && x.ToDate.HasValue);
+    }
+}
+
+public sealed class CreateExpenseCategoryCommandValidator : AbstractValidator<CreateExpenseCategoryCommand>
+{
+    public CreateExpenseCategoryCommandValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(50);
+    }
+}
+
+public sealed class GetExpenseSummaryQueryValidator : AbstractValidator<GetExpenseSummaryQuery>
+{
+    public GetExpenseSummaryQueryValidator()
+    {
+        RuleFor(x => x.FromDate)
+            .LessThanOrEqualTo(x => x.ToDate)
+            .When(x => x.FromDate.HasValue && x.ToDate.HasValue);
+    }
+}

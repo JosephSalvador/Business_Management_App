@@ -72,15 +72,18 @@ public sealed class GetTransferQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly ITransferRepository _transfers;
     private readonly IWarehouseRepository _warehouses;
+    private readonly IProductRepository _products;
 
     public GetTransferQueryHandler(
         ITenantContext tenantContext,
         ITransferRepository transfers,
-        IWarehouseRepository warehouses)
+        IWarehouseRepository warehouses,
+        IProductRepository products)
     {
         _tenantContext = tenantContext;
         _transfers = transfers;
         _warehouses = warehouses;
+        _products = products;
     }
 
     public async Task<Result<TransferDto>> Handle(
@@ -96,12 +99,23 @@ public sealed class GetTransferQueryHandler
         var srcWh = await _warehouses.GetByIdAsync(tenantId, transfer.SourceWarehouseId, cancellationToken);
         var dstWh = await _warehouses.GetByIdAsync(tenantId, transfer.DestinationWarehouseId, cancellationToken);
 
+        var productNames = new Dictionary<Guid, string>();
+        foreach (var line in transfer.Lines)
+        {
+            if (productNames.ContainsKey(line.ProductId))
+            {
+                continue;
+            }
+
+            var product = await _products.GetByIdAsync(tenantId, line.ProductId, cancellationToken);
+            productNames[line.ProductId] = product?.Name ?? string.Empty;
+        }
+
         return Result.Success(WarehouseMappers.ToTransferDto(
             transfer,
             srcWh?.Name ?? "Unknown",
             dstWh?.Name ?? "Unknown",
-            transfer.Lines.Select(l => new TransferLineInput(
-                l.ProductId, l.VariantId, l.Quantity, l.BatchId)).ToList()));
+            productNames));
     }
 }
 

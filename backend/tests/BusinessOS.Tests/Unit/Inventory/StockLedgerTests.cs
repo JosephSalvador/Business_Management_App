@@ -210,13 +210,14 @@ public sealed class StockLedgerTests
     }
 
     [Fact]
-    public void Balance_Apply_NegativeBeyondZero_Throws()
+    public void Balance_Apply_AllowsNegative_StockIsAdvisory()
     {
         var balance = StockBalance.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), variantId: null);
         balance.Apply(10m);
 
-        Assert.Throws<InvalidOperationException>(() => balance.Apply(-11m));
-        Assert.Equal(10m, balance.Quantity);
+        balance.Apply(-11m);
+
+        Assert.Equal(-1m, balance.Quantity);
     }
 }

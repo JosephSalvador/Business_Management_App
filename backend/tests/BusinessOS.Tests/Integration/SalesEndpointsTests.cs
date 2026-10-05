@@ -91,31 +91,117 @@ public sealed class SalesEndpointsTests : SalesTestBase
     }
 
     [Fact]
-    public async Task CreateSale_InsufficientStock_RollsBackFully_AndSequenceDoesNotAdvance()
+    public async Task CreateSale_QuickSaleLine_UsesClientFixedPrice_NoStockTouched()
     {
-        var (token, tenantId, branchId, productId, warehouseId) = await FixtureAsync("sale-insufficient", opening: 1m);
+        var (token, tenantId, branchId, productId, warehouseId) =
+            await FixtureAsync("quick-sale-line", opening: 0m, price: 0m, productType: 1, setPrice: false);
 
-        var rejected = await PostSaleAsync(
+        var response = await PostSaleAsync(token, SaleBody(
+            branchId,
+            Guid.NewGuid(),
+            lines:
+            [
+                new { productId, quantity = 1m, unitPrice = 250m },
+            ],
+            payments:
+            [
+                new { method = 0, amount = 250m, provider = (string?)null, phoneNumber = (string?)null, reference = (string?)null },
+            ],
+            warehouseId: warehouseId));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var doc = Body(await response.Content.ReadAsStringAsync());
+        Assert.Equal("250", doc.GetProperty("lines")[0].GetProperty("unitPrice").ToString());
+        Assert.Equal(250m, decimal.Parse(GetProperty(doc, "subtotal"), CultureInfo.InvariantCulture));
+        Assert.Equal(250m, decimal.Parse(GetProperty(doc, "totalAmount"), CultureInfo.InvariantCulture));
+        Assert.Equal(250m, decimal.Parse(GetProperty(doc, "amountPaid"), CultureInfo.InvariantCulture));
+
+        using var db = CreateDbContext();
+        Assert.Equal(0, await db.StockMovements.CountAsync(m =>
+            m.TenantId == tenantId && m.MovementType == BusinessOS.Domain.Inventory.StockMovementType.Sale));
+    }
+
+    private async Task<string> CreateCustomerAsync(string token, string name)
+    {
+        Authorize(token);
+        var response = await _client.PostAsJsonAsync("/api/v1/customers", new { name });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return GetProperty(Body(await response.Content.ReadAsStringAsync()), "id");
+    }
+
+    [Fact]
+    public async Task CreateSale_CreditTenderUnderpays_PostsTheBalanceToTheCustomerLedger()
+    {
+        var (token, tenantId, branchId, productId, warehouseId) = await FixtureAsync("sale-credit");
+        var customerId = await CreateCustomerAsync(token, "Credit Customer");
+
+        var body = new
+        {
+            branchId,
+            warehouseId,
+            priceListId = (string?)null,
+            clientSaleId = Guid.NewGuid(),
+            source = 0,
+            effectiveAt = "2026-08-15T12:00:00Z",
+            isElectronicPayment = false,
+            isVatRegistered = (bool?)null,
+            customerId,
+            customer = new { name = "Credit Customer", phone = (string?)null, tin = (string?)null },
+            lines = new[] { new { productId, quantity = 1m, discountAmount = 0m } },
+            payments = new[]
+            {
+                new { method = 4, amount = 0m, provider = (string?)null, phoneNumber = (string?)null, reference = (string?)null },
+            },
+        };
+
+        Authorize(token);
+        var response = await _client.PostAsJsonAsync("/api/v1/sales", body);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var doc = Body(await response.Content.ReadAsStringAsync());
+        Assert.Equal(100.00m, decimal.Parse(GetProperty(doc, "totalAmount"), CultureInfo.InvariantCulture));
+        Assert.Equal(0m, decimal.Parse(GetProperty(doc, "amountPaid"), CultureInfo.InvariantCulture));
+        Assert.Equal(0m, decimal.Parse(GetProperty(doc, "change"), CultureInfo.InvariantCulture));
+        var saleId = GetProperty(doc, "id");
+
+        var credit = await _client.GetAsync($"/api/v1/customers/{customerId}/credit");
+        Assert.Equal(HttpStatusCode.OK, credit.StatusCode);
+        Assert.Equal(100m, decimal.Parse(GetProperty(Body(await credit.Content.ReadAsStringAsync()), "balance"), CultureInfo.InvariantCulture));
+
+        var txs = await _client.GetAsync($"/api/v1/customers/{customerId}/credit/transactions?page=1&pageSize=10");
+        Assert.Equal(HttpStatusCode.OK, txs.StatusCode);
+        var tx = Assert.Single(Body(await txs.Content.ReadAsStringAsync()).EnumerateArray());
+        Assert.Equal("0", GetProperty(tx, "type"));
+        Assert.Equal(100m, decimal.Parse(GetProperty(tx, "amount"), CultureInfo.InvariantCulture));
+        Assert.Equal(saleId, GetProperty(tx, "relatedSaleId"));
+
+        using var db = CreateDbContext();
+        Assert.Equal(1, await db.CreditTransactions.CountAsync(
+            t => t.TenantId == tenantId && t.CustomerId == Guid.Parse(customerId) && t.Type == BusinessOS.Domain.Crm.CreditTransactionType.Sale));
+    }
+
+    [Fact]
+    public async Task CreateSale_OversellsStock_RecordsSaleWithNegativeBalance()
+    {
+        var (token, tenantId, branchId, productId, warehouseId) = await FixtureAsync("sale-oversell", opening: 1m);
+
+        var sale = await PostSaleAsync(
             token, SaleBody(branchId, Guid.NewGuid(), productId, 100m, quantity: 2m, amountPaid: 200m, warehouseId: warehouseId));
-        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
-        var errorDoc = Body(await rejected.Content.ReadAsStringAsync());
-        Assert.Equal("Validation", GetProperty(errorDoc, "code"));
-        Assert.Contains("Insufficient stock", errorDoc.ToString());
+        Assert.Equal(HttpStatusCode.OK, sale.StatusCode);
+        Assert.Equal("S-2026-000001", GetProperty(Body(await sale.Content.ReadAsStringAsync()), "number"));
 
         using (var db = CreateDbContext())
         {
-            Assert.Equal(0, await db.Sales.CountAsync(s => s.TenantId == tenantId));
-            Assert.Equal(0, await db.StockMovements.CountAsync(
+            Assert.Equal(1, await db.Sales.CountAsync(s => s.TenantId == tenantId));
+            Assert.Equal(1, await db.StockMovements.CountAsync(
                 m => m.TenantId == tenantId && m.MovementType == BusinessOS.Domain.Inventory.StockMovementType.Sale));
-            Assert.Equal(1m, (await db.StockBalances.Where(b => b.TenantId == tenantId).SingleAsync()).Quantity);
-            Assert.Equal(0, await db.OutboxMessages.CountAsync(
+            Assert.Equal(-1m, (await db.StockBalances.Where(b => b.TenantId == tenantId).SingleAsync()).Quantity);
+            Assert.Equal(1, await db.OutboxMessages.CountAsync(
                 o => o.TenantId == tenantId && o.Type == "BusinessOS.Domain.Events.SaleCompletedEvent"));
         }
 
-        var retry = await PostSaleAsync(
+        var next = await PostSaleAsync(
             token, SaleBody(branchId, Guid.NewGuid(), productId, 100m, warehouseId: warehouseId));
-        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
-        Assert.Equal("S-2026-000001", GetProperty(Body(await retry.Content.ReadAsStringAsync()), "number"));
+        Assert.Equal(HttpStatusCode.OK, next.StatusCode);
+        Assert.Equal("S-2026-000002", GetProperty(Body(await next.Content.ReadAsStringAsync()), "number"));
     }
 
     [Fact]

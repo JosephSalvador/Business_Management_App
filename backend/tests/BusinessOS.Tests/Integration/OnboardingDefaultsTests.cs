@@ -9,8 +9,8 @@ namespace BusinessOS.Tests.Integration;
 
 /// <summary>
 /// M3 coverage: onboarding must leave a fresh tenant ready for its first sale
-/// (default warehouse + default price list), tax categories must be readable,
-/// and product search must be case-insensitive.
+/// (default warehouse + default price list + default expense categories), tax
+/// categories must be readable, and product search must be case-insensitive.
 /// </summary>
 public sealed class OnboardingDefaultsTests : IClassFixture<BusinessOsApiFactory>, IAsyncLifetime
 {
@@ -38,7 +38,14 @@ public sealed class OnboardingDefaultsTests : IClassFixture<BusinessOsApiFactory
         JsonElement current = doc;
         foreach (var part in path)
         {
-            current = current.GetProperty(part);
+            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index))
+            {
+                current = current[index];
+            }
+            else
+            {
+                current = current.GetProperty(part);
+            }
         }
 
         return current.ToString();
@@ -108,6 +115,10 @@ public sealed class OnboardingDefaultsTests : IClassFixture<BusinessOsApiFactory
         var priceLists = Body(await (await _client.GetAsync("/api/v1/price-lists"))
             .Content.ReadAsStringAsync());
         Assert.Equal(1, priceLists.GetArrayLength());
+
+        var categories = Body(await (await _client.GetAsync("/api/v1/expenses/categories"))
+            .Content.ReadAsStringAsync());
+        Assert.Equal(6, categories.GetArrayLength());
     }
 
     [Fact]
@@ -140,6 +151,29 @@ public sealed class OnboardingDefaultsTests : IClassFixture<BusinessOsApiFactory
         var priceLists = Body(await (await _client.GetAsync("/api/v1/price-lists"))
             .Content.ReadAsStringAsync());
         Assert.Equal(1, priceLists.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_CreatesDefaultExpenseCategories()
+    {
+        await RegisterLoginOnboardAsync("ExpCatDefaults");
+
+        var response = await _client.GetAsync("/api/v1/expenses/categories");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var categories = Body(await response.Content.ReadAsStringAsync());
+        var names = categories.EnumerateArray()
+            .Select(c => c.GetProperty("name").GetString())
+            .ToArray();
+        Assert.Contains("Utilities", names);
+        Assert.Contains("Transport", names);
+        Assert.Contains("Rent", names);
+        Assert.Contains("Supplies", names);
+        Assert.Contains("Petty Cash", names);
+        Assert.Contains("Other", names);
+        foreach (var category in categories.EnumerateArray())
+        {
+            Assert.False(string.IsNullOrEmpty(category.GetProperty("id").GetString()));
+        }
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using BusinessOS.Application.Features.Receipts.Services;
 using BusinessOS.Application.Accounting;
 using BusinessOS.Application.Ports;
 using BusinessOS.Application.Sales;
@@ -8,6 +9,7 @@ using BusinessOS.Infrastructure.Persistence;
 using BusinessOS.Infrastructure.Repositories;
 using BusinessOS.Infrastructure.Persistence.Repositories;
 using BusinessOS.Infrastructure.Security;
+using BusinessOS.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,6 +37,8 @@ public static class DependencyInjection
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<ITwoFactorRecoveryCodeRepository, TwoFactorRecoveryCodeRepository>();
+        services.AddScoped<ITwoFactorChallengeRepository, TwoFactorChallengeRepository>();
         services.AddScoped<IEmailVerificationCodeRepository, EmailVerificationCodeRepository>();
         services.AddScoped<IPasswordResetCodeRepository, PasswordResetCodeRepository>();
         services.AddScoped<IInvitationCodeRepository, InvitationCodeRepository>();
@@ -62,10 +66,25 @@ public static class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IJournalEntryRepository, JournalEntryRepository>();
         services.AddScoped<ITenantAccountMappingRepository, TenantAccountMappingRepository>();
+        services.AddScoped<IExpenseRepository, ExpenseRepository>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<ICustomerCreditRepository, CustomerCreditRepository>();
+        services.AddScoped<IMoneyAccountRepository, MoneyAccountRepository>();
+        services.AddScoped<ICashSessionRepository, CashSessionRepository>();
+        services.AddScoped<IReceiptLayoutRepository, ReceiptLayoutRepository>();
+        services.AddScoped<IReceiptMetadataRepository, ReceiptMetadataRepository>();
+        services.AddScoped<IReceiptPrintEventRepository, ReceiptPrintEventRepository>();
+        services.AddScoped<IPlanRepository, PlanRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<ISubscriptionItemRepository, SubscriptionItemRepository>();
+        services.AddScoped<IVoucherRepository, VoucherRepository>();
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<ICustomerInvoiceRepository, CustomerInvoiceRepository>();
         services.AddScoped<IAccountMappingService, AccountMappingService>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddSingleton<ICsvExportService, CsvExportService>();
         services.AddScoped<SaleStockDebitService>();
+        services.AddScoped<IReceiptMetadataService, ReceiptMetadataService>();
 
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<ITenantContext, HttpTenantContext>();
@@ -89,6 +108,11 @@ public static class DependencyInjection
         services.AddSingleton(jwtOptions);
         services.AddSingleton<ITokenService, JwtTokenService>();
 
+        services.AddSingleton<ITotpService, TotpService>();
+        services.AddScoped<ISecretProtector>(sp => new AesSecretProtector(
+            sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SecurityOptions>>().Value,
+            jwtOptions));
+
         var redisConnection = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redisConnection))
         {
@@ -101,7 +125,7 @@ public static class DependencyInjection
         }
         else
         {
-            services.AddScoped<ICacheService, InMemoryCacheService>();
+            services.AddSingleton<ICacheService, InMemoryCacheService>();
         }
 
         return services;

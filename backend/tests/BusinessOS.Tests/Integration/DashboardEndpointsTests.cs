@@ -323,6 +323,9 @@ public sealed class DashboardEndpointsTests : IClassFixture<BusinessOsApiFactory
         await CreateProductAsync(token, "Activity Product", unitId);
 
         Authorize(token);
+
+        // Product creation is the newest meaningful action for the tenant; it is
+        // audited by AuditBehavior (entity type "Command") with the actor's email.
         var response = await _client.GetAsync("/api/v1/dashboard/recent-activity?limit=10");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var items = Body(await response.Content.ReadAsStringAsync()).GetProperty("items");
@@ -330,7 +333,6 @@ public sealed class DashboardEndpointsTests : IClassFixture<BusinessOsApiFactory
 
         Assert.Equal("CreateProductCommand", GetProperty(items, "0", "action"));
         Assert.Equal("Command", GetProperty(items, "0", "entityType"));
-        Assert.NotNull(GetProperty(items, "0", "actorEmail"));
         Assert.True(!string.IsNullOrWhiteSpace(GetProperty(items, "0", "actorEmail")));
     }
 

@@ -25,6 +25,10 @@ public sealed class CompleteOnboardingCommandHandler
     public const string DefaultWarehouseName = "Main Store";
     public const string DefaultWarehouseCode = "MAINSTORE";
     public const string DefaultPriceListName = "Retail Prices";
+    public static readonly string[] DefaultExpenseCategoryNames =
+    [
+        "Utilities", "Transport", "Rent", "Supplies", "Petty Cash", "Other"
+    ];
 
     private readonly ITenantContext _tenantContext;
     private readonly ITenantRepository _tenants;
@@ -32,6 +36,7 @@ public sealed class CompleteOnboardingCommandHandler
     private readonly IBranchRepository _branches;
     private readonly IWarehouseRepository _warehouses;
     private readonly IPriceListRepository _priceLists;
+    private readonly IExpenseRepository _expenses;
 
     public CompleteOnboardingCommandHandler(
         ITenantContext tenantContext,
@@ -39,7 +44,8 @@ public sealed class CompleteOnboardingCommandHandler
         IUserRepository users,
         IBranchRepository branches,
         IWarehouseRepository warehouses,
-        IPriceListRepository priceLists)
+        IPriceListRepository priceLists,
+        IExpenseRepository expenses)
     {
         _tenantContext = tenantContext;
         _tenants = tenants;
@@ -47,6 +53,7 @@ public sealed class CompleteOnboardingCommandHandler
         _branches = branches;
         _warehouses = warehouses;
         _priceLists = priceLists;
+        _expenses = expenses;
     }
 
     public async Task<Result<WorkspaceDto>> Handle(
@@ -68,6 +75,7 @@ public sealed class CompleteOnboardingCommandHandler
 
         await EnsureDefaultWarehouseAsync(tenant, cancellationToken);
         await EnsureDefaultPriceListAsync(tenant, cancellationToken);
+        await EnsureDefaultExpenseCategoriesAsync(tenant, cancellationToken);
 
         var roles = Array.Empty<string>();
         var userId = _tenantContext.UserId;
@@ -131,5 +139,28 @@ public sealed class CompleteOnboardingCommandHandler
         await _priceLists.AddAsync(
             PriceList.Create(tenant.Id, DefaultPriceListName, tenant.Currency, isDefault: true),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Expenses are expected to be categorized; new users get a starter set of
+    /// common outlays they can rename or delete before recording any. Idempotent:
+    /// only creates categories whose name is not already taken.
+    /// </summary>
+    private async Task EnsureDefaultExpenseCategoriesAsync(
+        Domain.Tenants.Tenant tenant, CancellationToken cancellationToken)
+    {
+        foreach (var name in DefaultExpenseCategoryNames)
+        {
+            var existing = await _expenses.GetCategoryByNameAsync(
+                tenant.Id, name, cancellationToken);
+            if (existing is not null)
+            {
+                continue;
+            }
+
+            await _expenses.AddCategoryAsync(
+                Domain.Accounting.ExpenseCategory.Create(tenant.Id, name),
+                cancellationToken);
+        }
     }
 }

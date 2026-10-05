@@ -34,6 +34,9 @@ public static class CatalogEndpoints
         products.MapPost("/", CreateProductAsync)
             .RequirePermission(PermissionNames.ProductsCreate)
             .WithName("CreateProduct");
+        products.MapPost("/quick-sale", EnsureQuickSaleProductAsync)
+            .RequirePermission(PermissionNames.SalesCreate)
+            .WithName("EnsureQuickSaleProduct");
         products.MapPut("/{id:guid}", UpdateProductAsync)
             .RequirePermission(PermissionNames.ProductsUpdate)
             .WithName("UpdateProduct");
@@ -78,6 +81,11 @@ public static class CatalogEndpoints
         ISender sender,
         CancellationToken cancellationToken)
         => (await sender.Send(command, cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> EnsureQuickSaleProductAsync(
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new EnsureQuickSaleProductCommand(), cancellationToken)).ToApiResult();
 
     private static async Task<IResult> UpdateProductAsync(
         Guid id,

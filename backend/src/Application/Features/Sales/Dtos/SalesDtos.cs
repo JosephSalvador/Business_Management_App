@@ -2,12 +2,16 @@ using BusinessOS.Domain.Sales;
 
 namespace BusinessOS.Application.Features.Sales.Dtos;
 
-/// <summary>One item the client wants to sell. Prices are re-resolved server-side.</summary>
+/// <summary>One item the client wants to sell. Prices are re-resolved server-side.
+/// <see cref="ProductName"/> overrides the shown name on the line (quick-sale flow);
+/// it is never trusted for pricing, stock or identity — the product id stays authoritative.</summary>
 public sealed record CreateSaleLineInput(
     Guid ProductId,
     Guid? VariantId,
     decimal Quantity,
-    decimal DiscountAmount = 0m);
+    decimal DiscountAmount = 0m,
+    decimal? UnitPrice = null,
+    string? ProductName = null);
 
 /// <summary>One tender row. Payments are data only in this slice — no gateway calls.</summary>
 public sealed record CreateSalePaymentInput(
@@ -41,7 +45,8 @@ public sealed record SaleLineDto(
     decimal BaseAmount,
     decimal TaxAmount,
     decimal LineTotal,
-    int OrderIndex);
+    int OrderIndex,
+    decimal? UnitCost);
 
 public sealed record SalePaymentDto(
     Guid Id,

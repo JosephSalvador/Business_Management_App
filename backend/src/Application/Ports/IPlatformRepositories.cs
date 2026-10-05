@@ -1,9 +1,13 @@
 using BusinessOS.Domain.Accounting;
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Billing;
 using BusinessOS.Domain.Catalog;
+using BusinessOS.Domain.Crm;
 using BusinessOS.Domain.Features;
+using BusinessOS.Domain.Finance;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
+using BusinessOS.Domain.Invoicing;
 using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
@@ -53,6 +57,7 @@ public interface ITenantRepository
     Task<Tenant?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Tenant?> GetByNameAsync(string name, CancellationToken cancellationToken = default);
     Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Tenant tenant, CancellationToken cancellationToken = default);
 }
 
 public interface IBranchRepository
@@ -109,6 +114,48 @@ public interface IRefreshTokenRepository
     Task RevokeFamilyAsync(Guid familyId, Guid revokedByTokenId, CancellationToken cancellationToken = default);
     Task RevokeAllForUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
     Task<int> DeleteExpiredAsync(DateTime cutoff, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Active (unrevoked, unexpired) token rows for a user, newest first. One row per
+    /// rotated token in a family, so callers group by <c>FamilyId</c> to get sessions.
+    /// </summary>
+    Task<IReadOnlyList<RefreshToken>> ListActiveByUserAsync(
+        Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Single-use second-factor recovery codes. Only hashes are persisted.</summary>
+public interface ITwoFactorRecoveryCodeRepository
+{
+    Task AddRangeAsync(IEnumerable<TwoFactorRecoveryCode> codes, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TwoFactorRecoveryCode>> ListForUserAsync(
+        Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+    Task RemoveAllForUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks one unused code as used in a single conditional statement. Returns the number
+    /// of rows affected; 0 means the code was already spent, so a replay cannot re-enter.
+    /// </summary>
+    Task<int> TryConsumeAsync(
+        Guid tenantId, Guid userId, string codeHash, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Pending second-factor steps. Tracked (not projected) because consumption is a
+/// read-modify-write; a projection would let two concurrent verifies both see the same
+/// challenge as usable and both mint a token family.
+/// </summary>
+public interface ITwoFactorChallengeRepository
+{
+    Task AddAsync(TwoFactorChallenge challenge, CancellationToken cancellationToken = default);
+
+    /// <summary>Loads a challenge by the SHA-256 hash of the raw token, tracked for update.</summary>
+    Task<TwoFactorChallenge?> GetByHashAsync(string tokenHash, CancellationToken cancellationToken = default);
+
+    /// <summary>Consumes a challenge only if it is still usable, atomically. Returns the
+    /// number of rows affected: 0 means a concurrent request already spent it.</summary>
+    Task<int> TryConsumeAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<int> DeleteExpiredAsync(DateTime cutoff, CancellationToken cancellationToken = default);
 }
 
 public interface IAuditLogRepository
@@ -119,6 +166,9 @@ public interface IAuditLogRepository
 public interface IFeatureFlagRepository
 {
     Task<FeatureFlag?> GetAsync(Guid tenantId, string key, CancellationToken cancellationToken = default);
+    Task AddAsync(FeatureFlag flag, CancellationToken cancellationToken = default);
+    Task UpdateAsync(FeatureFlag flag, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FeatureFlag>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }
 
 public sealed record ProductListFilter(
@@ -209,7 +259,12 @@ public interface IStockRepository
         Guid? variantId,
         CancellationToken cancellationToken = default);
     Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+    /// <summary>Finds the adjustment ledger row posted for a client idempotency key, if any.</summary>
+    Task<StockMovement?> FindAdjustmentByKeyAsync(
+        Guid tenantId,
+        string key,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockBalanceView>> ListBalancesAsync(
         Guid tenantId,
         int page,
         int pageSize,
@@ -223,7 +278,7 @@ public interface IStockRepository
         Guid? productId = null,
         string? search = null,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+    Task<IReadOnlyList<StockMovementView>> ListMovementsAsync(
         Guid tenantId,
         int page,
         int pageSize,
@@ -243,6 +298,14 @@ public interface IStockRepository
         Guid referenceId,
         StockMovementType? type = null,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockSummaryRow>> GetStockSummaryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockMovementSummaryRow>> GetStockMovementSummaryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LowStockReportItem>> GetLowStockReportAsync(
+        Guid tenantId, decimal threshold, Guid? warehouseId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StockVelocityRow>> GetStockVelocityAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default);
 }
 
 public interface IPriceListRepository
@@ -325,11 +388,44 @@ public sealed record DashboardSnapshot(
 
 public sealed record LowStockItem(Guid ProductId, string ProductName, string? Sku, decimal OnHand);
 
+public sealed record StockBalanceView(
+    Guid WarehouseId,
+    string WarehouseName,
+    Guid StockLocationId,
+    string StockLocationName,
+    Guid ProductId,
+    string ProductName,
+    string? Sku,
+    string? Barcode,
+    Guid? VariantId,
+    string UnitOfMeasureName,
+    decimal Quantity);
+
+public sealed record StockMovementView(
+    Guid Id,
+    Guid ProductId,
+    string ProductName,
+    string? Sku,
+    string? Barcode,
+    Guid WarehouseId,
+    string WarehouseName,
+    Guid StockLocationId,
+    string StockLocationName,
+    Guid? VariantId,
+    StockMovementType Type,
+    decimal QuantityDelta,
+    string? Reason,
+    DateTime EffectiveAt,
+    Guid? CreatedBy,
+    DateTime CreatedAt);
+
 public sealed record RecentActivityItem(
     string Action,
     string EntityType,
     string? EntityId,
-    Guid? ActorUserId,
+    string? EntityName,
+    decimal? Amount,
+    string? Status,
     string? ActorEmail,
     DateTime OccurredAt);
 
@@ -444,6 +540,9 @@ public interface IPurchaseOrderRepository
     Task<PurchaseOrder?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PurchaseOrder>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    // Note: IPurchasingRepository may not exist as a separate interface.
+    // If purchase order listing is done through a different interface, add there.
+    // The PurchasesSummaryQuery uses IPurchasingRepository with ListPurchaseOrdersAsync.
 }
 
 public interface ISupplierBillRepository
@@ -497,6 +596,19 @@ public sealed record TopProductRow(
     Guid ProductId, string ProductName, string? Sku,
     decimal TotalQuantity, decimal TotalRevenue, decimal TotalTax, int Rank);
 
+public sealed record SalesTrendPoint(string Label, int SaleCount, decimal Revenue, decimal Tax);
+
+public sealed record SalesByPaymentMethodRow(string PaymentMethod, decimal Amount, int Count);
+public sealed record SalesByCategoryRow(string CategoryName, decimal Amount, decimal Quantity);
+public sealed record SalesByStaffRow(Guid StaffId, string StaffName, int SaleCount, decimal Revenue);
+public sealed record SalesByCustomerRow(Guid? CustomerId, string CustomerName, int SaleCount, decimal Revenue);
+public sealed record StockSummaryRow(Guid ProductId, string ProductName, string? Sku, decimal Opening, decimal Purchased, decimal Sold, decimal Adjusted, decimal Closing);
+public sealed record StockMovementSummaryRow(string MovementType, int Count, decimal TotalQuantity);
+public sealed record LowStockReportItem(Guid ProductId, string ProductName, string? Sku, decimal OnHand, string WarehouseName);
+public sealed record StockVelocityRow(Guid ProductId, string ProductName, string? Sku, decimal Sold, decimal OnHand, decimal VelocityPerDay);
+public sealed record ExpenseTrendPoint(string Label, decimal Amount);
+public sealed record ExpenseByPaymentMethodRow(string PaymentMethod, decimal Amount);
+
 public interface IReportRepository
 {
     Task<IReadOnlyList<TaxSummaryLine>> GetTaxSummaryAsync(
@@ -506,4 +618,206 @@ public interface IReportRepository
         Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TopProductRow>> GetTopProductsAsync(
         Guid tenantId, DateTime from, DateTime to, int limit, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesTrendPoint>> GetSalesTrendAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesByPaymentMethodRow>> GetSalesByPaymentMethodAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesByCategoryRow>> GetSalesByCategoryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesByStaffRow>> GetSalesByStaffAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesByCustomerRow>> GetSalesByCustomerAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? branchId, CancellationToken cancellationToken = default);
+    Task<decimal> GetCogsAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default);
+}
+
+public sealed record ExpenseSummary(
+    decimal Total, IReadOnlyList<ExpenseCategoryTotal> ByCategory);
+
+public sealed record ExpenseCategoryTotal(
+    Guid? CategoryId, string? CategoryName, decimal Total);
+
+public interface IExpenseRepository
+{
+    Task AddAsync(Expense expense, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Expense expense, CancellationToken cancellationToken = default);
+    Task RemoveAsync(Expense expense, CancellationToken cancellationToken = default);
+    Task<Expense?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Expense>> ListAsync(
+        Guid tenantId, int page, int pageSize, DateTime? fromDate = null, DateTime? toDate = null,
+        string? search = null, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(
+        Guid tenantId, DateTime? fromDate = null, DateTime? toDate = null,
+        string? search = null, CancellationToken cancellationToken = default);
+    Task<ExpenseSummary> GetSummaryAsync(
+        Guid tenantId, DateTime fromDate, DateTime toDate, CancellationToken cancellationToken = default);
+
+    Task AddCategoryAsync(ExpenseCategory category, CancellationToken cancellationToken = default);
+    Task<ExpenseCategory?> GetCategoryByIdAsync(
+        Guid tenantId, Guid categoryId, CancellationToken cancellationToken = default);
+    Task<ExpenseCategory?> GetCategoryByNameAsync(
+        Guid tenantId, string name, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ExpenseCategory>> ListCategoriesAsync(
+        Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ExpenseTrendPoint>> GetExpenseTrendAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ExpenseByPaymentMethodRow>> GetExpenseByPaymentMethodAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default);
+}
+
+public interface ICustomerRepository
+{
+    Task AddAsync(Customer customer, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Customer customer, CancellationToken cancellationToken = default);
+    Task<Customer?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Customer>> ListAsync(
+        Guid tenantId, int page, int pageSize, string? search = null, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(Guid tenantId, string? search = null, CancellationToken cancellationToken = default);
+}
+
+public interface ICustomerCreditRepository
+{
+    Task AddAsync(CustomerCredit credit, CancellationToken cancellationToken = default);
+    Task UpdateAsync(CustomerCredit credit, CancellationToken cancellationToken = default);
+    Task<CustomerCredit?> GetByCustomerIdAsync(Guid tenantId, Guid customerId, CancellationToken cancellationToken = default);
+    Task AddTransactionAsync(CreditTransaction transaction, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CreditTransaction>> ListTransactionsAsync(
+        Guid tenantId, Guid customerId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CustomerCredit>> ListOutstandingAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface IMoneyAccountRepository
+{
+    Task AddAsync(MoneyAccount account, CancellationToken cancellationToken = default);
+    Task UpdateAsync(MoneyAccount account, CancellationToken cancellationToken = default);
+    Task<MoneyAccount?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MoneyAccount>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddTransactionAsync(MoneyAccountTransaction transaction, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MoneyAccountTransaction>> ListTransactionsAsync(
+        Guid tenantId, Guid accountId, int page, int pageSize, CancellationToken cancellationToken = default);
+}
+
+public interface ICashSessionRepository
+{
+    Task AddAsync(CashSession session, CancellationToken cancellationToken = default);
+    Task UpdateAsync(CashSession session, CancellationToken cancellationToken = default);
+    Task<CashSession?> GetOpenSessionAsync(Guid tenantId, Guid accountId, CancellationToken cancellationToken = default);
+    Task<CashSession?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CashSession>> ListAsync(Guid tenantId, Guid? accountId, int page, int pageSize, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Receipt layout persistence. Layouts are reusable JSON definitions that describe receipt
+/// structure. Multiple versions can exist per layout identifier; only one is active at a time.
+/// </summary>
+public interface IReceiptLayoutRepository
+{
+    Task AddAsync(ReceiptLayout layout, CancellationToken cancellationToken = default);
+    Task UpdateAsync(ReceiptLayout layout, CancellationToken cancellationToken = default);
+    Task<ReceiptLayout?> GetActiveAsync(Guid tenantId, string layoutId, CancellationToken cancellationToken = default);
+    Task<ReceiptLayout?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ReceiptLayout>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<bool> HasActiveLayoutAsync(Guid tenantId, string layoutId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Receipt metadata persistence. Written once per sale at finalization time; immutable afterwards.
+/// </summary>
+public interface IReceiptMetadataRepository
+{
+    Task AddAsync(ReceiptMetadata metadata, CancellationToken cancellationToken = default);
+    Task<ReceiptMetadata?> GetBySaleIdAsync(Guid saleId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Receipt print event persistence. Write-once audit trail — events are never updated or deleted.
+/// </summary>
+public interface IReceiptPrintEventRepository
+{
+    Task AddAsync(ReceiptPrintEvent printEvent, CancellationToken cancellationToken = default);
+    Task<int> CountBySaleIdAsync(Guid saleId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ReceiptPrintEvent>> ListBySaleIdAsync(Guid saleId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Global plan catalog. Plans are platform-level (like tax regimes) and seeded once.
+/// </summary>
+public interface IPlanRepository
+{
+    Task<Plan?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Plan>> ListActiveAsync(CancellationToken cancellationToken = default);
+    Task AddAsync(Plan plan, CancellationToken cancellationToken = default);
+}
+
+/// <summary>One active subscription per tenant.</summary>
+public interface ISubscriptionRepository
+{
+    Task<Subscription?> GetForTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddAsync(Subscription subscription, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Subscription subscription, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Add-on packages (e.g. invoice-manager) attached to the tenant's base plan.</summary>
+public interface ISubscriptionItemRepository
+{
+    Task<IReadOnlyList<SubscriptionItem>> ListForTenantAsync(
+        Guid tenantId, CancellationToken cancellationToken = default);
+    Task<SubscriptionItem?> GetForTenantByPlanAsync(
+        Guid tenantId, string planCode, CancellationToken cancellationToken = default);
+    Task AddAsync(SubscriptionItem item, CancellationToken cancellationToken = default);
+    Task RemoveAsync(SubscriptionItem item, CancellationToken cancellationToken = default);
+}
+
+public interface IVoucherRepository
+{
+    Task<Voucher?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
+    Task AddAsync(Voucher voucher, CancellationToken cancellationToken = default);
+}
+
+public sealed record DebtView(
+    Guid InvoiceId,
+    string InvoiceNumber,
+    Guid TenantId,
+    string TenantName,
+    decimal Amount,
+    string Currency,
+    DateTime IssuedAtUtc,
+    string? Reference);
+
+public interface IInvoiceRepository
+{
+    Task<Invoice?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Platform-scoped lookup for the owner billing desk (any tenant).</summary>
+    Task<Invoice?> GetByIdAnyTenantAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Invoice?> GetOpenAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Invoice>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    /// <summary>Open invoices across tenants for the owner debt desk.</summary>
+    Task<IReadOnlyList<DebtView>> ListDebtsAsync(CancellationToken cancellationToken = default);
+    /// <summary>Advances the tenant's invoice numbering (scope <c>Invoice</c>, prefix <c>INV</c>).</summary>
+    Task<string> AllocateNumberAsync(Guid tenantId, DateTime date, CancellationToken cancellationToken = default);
+    Task AddAsync(Invoice invoice, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Invoice invoice, CancellationToken cancellationToken = default);
+}
+
+public sealed record CustomerInvoiceListFilter(
+    CustomerInvoiceStatus? Status,
+    Guid? CustomerId,
+    string? Search);
+
+public interface ICustomerInvoiceRepository
+{
+    Task<CustomerInvoice?> GetByIdAsync(
+        Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<CustomerInvoice?> GetByNumberAsync(
+        Guid tenantId, string number, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CustomerInvoice>> ListAsync(
+        Guid tenantId, int page, int pageSize, CustomerInvoiceListFilter filter,
+        CancellationToken cancellationToken = default);
+    Task<int> CountAsync(
+        Guid tenantId, CustomerInvoiceListFilter filter, CancellationToken cancellationToken = default);
+    Task<string> AllocateNumberAsync(
+        Guid tenantId, DateTime date, CancellationToken cancellationToken = default);
+    Task AddAsync(CustomerInvoice invoice, CancellationToken cancellationToken = default);
+    Task UpdateAsync(CustomerInvoice invoice, CancellationToken cancellationToken = default);
 }

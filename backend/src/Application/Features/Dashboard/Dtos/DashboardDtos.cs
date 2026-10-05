@@ -48,7 +48,9 @@ public sealed record DashboardActivityItemDto(
     string Action,
     string EntityType,
     string? EntityId,
-    Guid? ActorUserId,
+    string? EntityName,
+    decimal? Amount,
+    string? Status,
     string? ActorEmail,
     DateTime OccurredAt);
 

@@ -1,3 +1,4 @@
+using BusinessOS.Application.Features.Billing;
 using BusinessOS.Application.Features.Users.Dtos;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Identity;
@@ -13,7 +14,7 @@ public sealed record CreateUserCommand(
     string? Phone,
     IReadOnlyList<Guid>? RoleIds,
     IReadOnlyList<Guid>? BranchIds,
-    Guid? DefaultBranchId) : IRequest<Result<IdentityUserDto>>;
+    Guid? DefaultBranchId) : IRequest<Result<IdentityUserDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Result<IdentityUserDto>>
 {
@@ -22,19 +23,22 @@ public sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand
     private readonly IRoleRepository _roles;
     private readonly IBranchRepository _branches;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly SubscriptionEntitlementGuard _entitlementGuard;
 
     public CreateUserCommandHandler(
         ITenantContext tenantContext,
         IUserRepository users,
         IRoleRepository roles,
         IBranchRepository branches,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        SubscriptionEntitlementGuard entitlementGuard)
     {
         _tenantContext = tenantContext;
         _users = users;
         _roles = roles;
         _branches = branches;
         _passwordHasher = passwordHasher;
+        _entitlementGuard = entitlementGuard;
     }
 
     public async Task<Result<IdentityUserDto>> Handle(
@@ -46,6 +50,14 @@ public sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand
         if (command.Phone is not null && phone is null)
         {
             return Error.Validation("Phone number is not valid.");
+        }
+
+        var entitlement = await _entitlementGuard.GetEntitlementAsync(cancellationToken);
+        var currentUsers = await _users.CountAsync(tenantId, cancellationToken);
+        if (SubscriptionEntitlementGuard.EnsureWithinLimit(
+                entitlement.MaxUsers, currentUsers + 1, "users") is { } limitError)
+        {
+            return limitError;
         }
 
         if (await _users.GetByEmailAsync(email, cancellationToken) is not null)

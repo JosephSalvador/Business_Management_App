@@ -78,6 +78,8 @@ public sealed class CreateTransferCommandHandler
             }
         }
 
+        var productNames = new Dictionary<Guid, string>();
+
         foreach (var line in command.Lines)
         {
             var product = await _products.GetByIdAsync(tenantId, line.ProductId, cancellationToken);
@@ -85,6 +87,8 @@ public sealed class CreateTransferCommandHandler
             {
                 return Error.NotFound($"Product {line.ProductId} not found.");
             }
+
+            productNames[line.ProductId] = product.Name;
 
             if (product.ProductType != ProductType.Product)
             {
@@ -124,7 +128,7 @@ public sealed class CreateTransferCommandHandler
             transfer,
             sourceWarehouse.Name,
             destWarehouse.Name,
-            command.Lines));
+            productNames));
     }
 }
 
@@ -183,6 +187,7 @@ public sealed class CompleteTransferCommandHandler
             ?? throw new InvalidOperationException("Destination warehouse has no locations.");
 
         var completedAt = DateTime.UtcNow;
+        var productNames = new Dictionary<Guid, string>();
 
         foreach (var line in transfer.Lines)
         {
@@ -211,6 +216,7 @@ public sealed class CompleteTransferCommandHandler
 
             var product = await _products.GetByIdAsync(tenantId, line.ProductId, cancellationToken);
             var uomId = product?.UnitOfMeasureId ?? Guid.Empty;
+            productNames[line.ProductId] = product?.Name ?? string.Empty;
 
             var sourceMovement = StockMovement.Record(
                 tenantId,
@@ -258,8 +264,7 @@ public sealed class CompleteTransferCommandHandler
             transfer,
             sourceWarehouse?.Name ?? "Unknown",
             destWarehouse?.Name ?? "Unknown",
-            transfer.Lines.Select(l => new TransferLineInput(
-                l.ProductId, l.VariantId, l.Quantity, l.BatchId)).ToList()));
+            productNames));
     }
 }
 
@@ -273,15 +278,18 @@ public sealed class CancelTransferCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly ITransferRepository _transfers;
     private readonly IWarehouseRepository _warehouses;
+    private readonly IProductRepository _products;
 
     public CancelTransferCommandHandler(
         ITenantContext tenantContext,
         ITransferRepository transfers,
-        IWarehouseRepository warehouses)
+        IWarehouseRepository warehouses,
+        IProductRepository products)
     {
         _tenantContext = tenantContext;
         _transfers = transfers;
         _warehouses = warehouses;
+        _products = products;
     }
 
     public async Task<Result<TransferDto>> Handle(
@@ -306,11 +314,22 @@ public sealed class CancelTransferCommandHandler
         var sourceWarehouse = await _warehouses.GetByIdAsync(tenantId, transfer.SourceWarehouseId, cancellationToken);
         var destWarehouse = await _warehouses.GetByIdAsync(tenantId, transfer.DestinationWarehouseId, cancellationToken);
 
+        var productNames = new Dictionary<Guid, string>();
+        foreach (var line in transfer.Lines)
+        {
+            if (productNames.ContainsKey(line.ProductId))
+            {
+                continue;
+            }
+
+            var product = await _products.GetByIdAsync(tenantId, line.ProductId, cancellationToken);
+            productNames[line.ProductId] = product?.Name ?? string.Empty;
+        }
+
         return Result.Success(WarehouseMappers.ToTransferDto(
             transfer,
             sourceWarehouse?.Name ?? "Unknown",
             destWarehouse?.Name ?? "Unknown",
-            transfer.Lines.Select(l => new TransferLineInput(
-                l.ProductId, l.VariantId, l.Quantity, l.BatchId)).ToList()));
+            productNames));
     }
 }

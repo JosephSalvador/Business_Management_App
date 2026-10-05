@@ -22,15 +22,18 @@ public sealed record InvitationDto(string Code, DateTime ExpiresAtUtc);
 public sealed class IssueInvitationCommandHandler : IRequestHandler<IssueInvitationCommand, Result<InvitationDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly ITenantRepository _tenants;
     private readonly IInvitationCodeRepository _codes;
     private readonly SecurityOptions _security;
 
     public IssueInvitationCommandHandler(
         ITenantContext tenantContext,
+        ITenantRepository tenants,
         IInvitationCodeRepository codes,
         IOptions<SecurityOptions> security)
     {
         _tenantContext = tenantContext;
+        _tenants = tenants;
         _codes = codes;
         _security = security.Value;
     }
@@ -38,6 +41,12 @@ public sealed class IssueInvitationCommandHandler : IRequestHandler<IssueInvitat
     public async Task<Result<InvitationDto>> Handle(
         IssueInvitationCommand command, CancellationToken cancellationToken)
     {
+        var tenant = await _tenants.GetByIdAsync(_tenantContext.TenantId, cancellationToken);
+        if (tenant is null || tenant.OnboardingCompletedAt is null)
+        {
+            return Error.Validation("Complete business setup before inviting staff.");
+        }
+
         const int codeLength = 8;
         var codeChars = new char[codeLength];
         for (var i = 0; i < codeLength; i++)

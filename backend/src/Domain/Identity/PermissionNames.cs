@@ -58,7 +58,28 @@ public static class PermissionNames
     public const string PurchasingView = "Purchasing.View";
     public const string PurchasingManage = "Purchasing.Manage";
 
+    public const string CustomersView = "Customers.View";
+    public const string CustomersCreate = "Customers.Create";
+    public const string CustomersUpdate = "Customers.Update";
+    public const string CustomersDelete = "Customers.Delete";
+
+    public const string ExpensesView = "Expenses.View";
+    public const string ExpensesCreate = "Expenses.Create";
+    public const string ExpensesUpdate = "Expenses.Update";
+    public const string ExpensesDelete = "Expenses.Delete";
+
     public const string AuditView = "Audit.View";
+
+    public const string ReceiptsView = "Receipts.View";
+    public const string ReceiptsPrint = "Receipts.Print";
+    public const string ReceiptsManageLayouts = "Receipts.ManageLayouts";
+
+    public const string BillingView = "Billing.View";
+    public const string BillingManage = "Billing.Manage";
+
+    public const string InvoicesView = "Invoices.View";
+    public const string InvoicesCreate = "Invoices.Create";
+    public const string InvoicesManage = "Invoices.Manage";
 
     public static IReadOnlyList<string> All { get; } = new[]
     {
@@ -77,7 +98,12 @@ public static class PermissionNames
         PricingView, PricingManage,
         AccountingView, AccountingCreate, AccountingApprove,
         PurchasingView, PurchasingManage,
+        CustomersView, CustomersCreate, CustomersUpdate, CustomersDelete,
+        ExpensesView, ExpensesCreate, ExpensesUpdate, ExpensesDelete,
         AuditView,
+        ReceiptsView, ReceiptsPrint, ReceiptsManageLayouts,
+        BillingView, BillingManage,
+        InvoicesView, InvoicesCreate, InvoicesManage,
     };
 
     /// <summary>
@@ -94,7 +120,8 @@ public static class PermissionNames
         CategoriesView,
         BrandsView,
         UnitsView,
-        InventoryView,
+        InventoryView, InventoryManage,
         WarehousesView,
+        ReceiptsView, ReceiptsPrint,
     };
 }

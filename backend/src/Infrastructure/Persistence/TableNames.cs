@@ -17,6 +17,10 @@ public static class Schemas
     public const string Sales = "public";
     public const string Purchasing = "public";
     public const string Accounting = "public";
+    public const string Crm = "public";
+    public const string Finance = "public";
+    public const string Billing = "public";
+    public const string Invoicing = "public";
 }
 
 /// <summary>
@@ -40,6 +44,8 @@ public static class Tables
         public const string UserRoles = "UserRoles";
         public const string RolePermissions = "RolePermissions";
         public const string RefreshTokens = "RefreshTokens";
+        public const string TwoFactorRecoveryCodes = "TwoFactorRecoveryCodes";
+        public const string TwoFactorChallenges = "TwoFactorChallenges";
         public const string EmailVerificationCodes = "EmailVerificationCodes";
         public const string PasswordResetCodes = "PasswordResetCodes";
         public const string InvitationCodes = "InvitationCodes";
@@ -89,6 +95,9 @@ public static class Tables
         public const string SaleLines = "SaleLines";
         public const string SalePayments = "SalePayments";
         public const string NumberSequences = "NumberSequences";
+        public const string ReceiptLayouts = "ReceiptLayouts";
+        public const string ReceiptMetadata = "ReceiptMetadata";
+        public const string ReceiptPrintEvents = "ReceiptPrintEvents";
     }
 
     public static class Purchasing
@@ -106,5 +115,36 @@ public static class Tables
         public const string JournalEntries = "JournalEntries";
         public const string JournalEntryLines = "JournalEntryLines";
         public const string TenantAccountMappings = "TenantAccountMappings";
+        public const string Expenses = "Expenses";
+        public const string ExpenseCategories = "ExpenseCategories";
+    }
+
+    public static class Crm
+    {
+        public const string Customers = "Customers";
+        public const string CustomerCredits = "CustomerCredits";
+        public const string CreditTransactions = "CreditTransactions";
+    }
+
+    public static class Finance
+    {
+        public const string MoneyAccounts = "MoneyAccounts";
+        public const string MoneyAccountTransactions = "MoneyAccountTransactions";
+        public const string CashSessions = "CashSessions";
+    }
+
+    public static class Billing
+    {
+        public const string Plans = "Plans";
+        public const string Subscriptions = "Subscriptions";
+        public const string SubscriptionItems = "SubscriptionItems";
+        public const string Vouchers = "Vouchers";
+        public const string Invoices = "Invoices";
+    }
+
+    public static class Invoicing
+    {
+        public const string CustomerInvoices = "CustomerInvoices";
+        public const string CustomerInvoiceLines = "CustomerInvoiceLines";
     }
 }

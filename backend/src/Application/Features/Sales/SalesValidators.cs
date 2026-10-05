@@ -1,6 +1,7 @@
 using BusinessOS.Application.Features.Sales.Commands;
 using BusinessOS.Application.Features.Sales.Dtos;
 using BusinessOS.Application.Features.Sales.Queries;
+using BusinessOS.Domain.Sales;
 using FluentValidation;
 
 namespace BusinessOS.Application.Features.Sales;
@@ -26,17 +27,30 @@ public sealed class CreateSaleCommandValidator : AbstractValidator<CreateSaleCom
             line.RuleFor(l => l.ProductId).NotEmpty();
             line.RuleFor(l => l.Quantity).GreaterThanOrEqualTo(1);
             line.RuleFor(l => l.DiscountAmount).GreaterThanOrEqualTo(0);
+            line.RuleFor(l => l.UnitPrice).GreaterThan(0m);
         });
 
         RuleForEach(x => x.Payments).ChildRules(payment =>
         {
             payment.RuleFor(p => p.Method).IsInEnum();
-            payment.RuleFor(p => p.Amount).GreaterThan(0);
+            // A credit tender may be zero (bill you later) or a partial upfront;
+            // every other method must pay a positive amount.
+            payment.RuleFor(p => p.Amount).GreaterThan(0)
+                .When(p => p.Method != PaymentMethod.Credit);
+            payment.RuleFor(p => p.Amount).GreaterThanOrEqualTo(0)
+                .When(p => p.Method == PaymentMethod.Credit);
         });
 
         RuleFor(x => x.CustomerName).MaximumLength(200);
         RuleFor(x => x.CustomerPhone).MaximumLength(30);
         RuleFor(x => x.CustomerTin).MaximumLength(50);
+
+        // The unpaid balance of a credit sale is posted to the customer's
+        // ledger, so a customer must be identified up front.
+        RuleFor(x => x.CustomerId)
+            .NotEmpty()
+            .WithMessage("A credit sale needs a customer.")
+            .When(x => x.Payments != null && x.Payments.Any(p => p.Method == PaymentMethod.Credit));
     }
 }
 

@@ -15,6 +15,28 @@ public interface ITokenService
     string HashRefreshToken(string token);
 }
 
+/// <summary>
+/// RFC 6238 time-based one-time passwords. The secret is base32 text as produced by
+/// <see cref="GenerateSecret"/>; verification tolerates a symmetric window of steps to
+/// absorb device clock drift.
+/// </summary>
+public interface ITotpService
+{
+    string GenerateSecret();
+    string GetProvisioningUri(string secret, string accountLabel, string issuer);
+    bool VerifyCode(string secret, string code, DateTimeOffset now, int stepSeconds, int digits, int window);
+}
+
+/// <summary>
+/// Symmetric encryption for short-lived platform secrets (second-factor shared secrets).
+/// Distinct from <see cref="IPasswordHasher"/>, which is deliberately one-way.
+/// </summary>
+public interface ISecretProtector
+{
+    string Protect(string plaintext);
+    string Unprotect(string protectedValue);
+}
+
 public interface ICacheService
 {
     Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);
@@ -37,4 +59,17 @@ public interface ITenantContext
     Guid TenantId { get; }
     Guid? UserId { get; }
     string? IpAddress { get; }
+
+    /// <summary>
+    /// Raw client user-agent. Present so login can label a session for the device list;
+    /// never logged or returned verbatim.
+    /// </summary>
+    string? UserAgent { get; }
+
+    /// <summary>
+    /// The refresh token the current request was authenticated with, when the caller
+    /// presented one. Used only to mark "this device" in the session list — never for
+    /// authorisation.
+    /// </summary>
+    string? CurrentRefreshToken { get; }
 }

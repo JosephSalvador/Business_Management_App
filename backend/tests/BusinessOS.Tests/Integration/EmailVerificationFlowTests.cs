@@ -39,10 +39,59 @@ public sealed class EmailVerificationFlowTests : IClassFixture<BusinessOsApiFact
         JsonElement current = doc;
         foreach (var part in path)
         {
-            current = current.GetProperty(part);
+            if (current.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index))
+            {
+                current = current[index];
+            }
+            else
+            {
+                current = current.GetProperty(part);
+            }
         }
 
         return current.ToString();
+    }
+
+    [Fact]
+    public async Task Register_CreatesSystemAndEditableStarterRoles()
+    {
+        var email = $"starter-roles-{Guid.NewGuid():N}@test.local";
+        await TestRegistration.RegisterUnverifiedAsync(_client, "StarterRoles", email);
+
+        using var db = TestRegistration.CreateDbContext();
+        var tenantId = await db.Users
+            .Where(user => user.Email == email)
+            .Select(user => user.TenantId)
+            .SingleAsync();
+        var roles = await db.Roles
+            .Include(role => role.Permissions)
+            .Where(role => role.TenantId == tenantId)
+            .OrderBy(role => role.Name)
+            .ToListAsync();
+
+        Assert.Equal(
+            new[] { "Accountant", "Administrator", "Cashier", "Inventory Officer", "Manager", "Staff" },
+            roles.Select(role => role.Name));
+        Assert.All(
+            roles.Where(role => role.Name is "Manager" or "Cashier" or "Inventory Officer" or "Accountant"),
+            role => Assert.False(role.IsSystem));
+        Assert.All(
+            roles.Where(role => role.Name is SystemRoles.Administrator or SystemRoles.Staff),
+            role => Assert.True(role.IsSystem));
+
+        var rolesByName = roles.ToDictionary(role => role.Name);
+        Assert.Equal(
+            PermissionNames.All.OrderBy(name => name),
+            rolesByName[SystemRoles.Administrator].Permissions.Select(permission => permission.Name).OrderBy(name => name));
+        Assert.Equal(
+            PermissionNames.Staff.OrderBy(name => name),
+            rolesByName[SystemRoles.Staff].Permissions.Select(permission => permission.Name).OrderBy(name => name));
+        foreach (var template in RoleTemplates.Starter)
+        {
+            Assert.Equal(
+                template.PermissionNames.OrderBy(name => name),
+                rolesByName[template.Name].Permissions.Select(permission => permission.Name).OrderBy(name => name));
+        }
     }
 
     [Fact]
@@ -56,6 +105,7 @@ public sealed class EmailVerificationFlowTests : IClassFixture<BusinessOsApiFact
 
         var problem = Body(await login.Content.ReadAsStringAsync());
         Assert.Equal("AccountNotVerified", GetProperty(problem, "code"));
+        Assert.Equal(email, GetProperty(problem, "email"));
     }
 
     [Fact]

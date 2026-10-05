@@ -15,9 +15,9 @@ public sealed record StockDebitLine(
 
 /// <summary>
 /// Atomic stock debit for a completed sale. Service lines (<see cref="StockDebitLine.DebitsStock"/>
-/// false) are skipped. All stocked lines are checked under a row lock before any balance is
-/// touched, so an insufficient line rejects the whole sale with no movements written — the
-/// offline-sync availability strategy re-checks availability at sync time.
+/// false) are skipped. Every stocked line is debited under a row lock. Stock is advisory — sales
+/// are never blocked by low or missing stock; the signed balance may go negative so the seller can
+/// see they sold more than they have recorded, while the ledger stays truthful.
 /// </summary>
 public sealed record StockDebitRequest(
     Guid TenantId,
@@ -31,10 +31,9 @@ public sealed record StockDebitRequest(
 
 /// <summary>
 /// Reusable stock-debit path used by the sale command: locks each balance row
-/// (<c>GetBalanceWithLockAsync</c>), verifies enough stock for every stocked line, then writes a
-/// <see cref="StockMovementType.Sale"/> ledger row (negative delta, reference = sale id) and
-/// debits the balance. Whole-sale rejection returns a <c>Validation</c> failure before anything
-/// is written.
+/// (<c>GetBalanceWithLockAsync</c>), creates the balance if it has never been recorded, then
+/// writes a <see cref="StockMovementType.Sale"/> ledger row (negative delta, reference = sale id)
+/// and debits the balance. Stock never blocks a sale — an oversold balance simply goes negative.
 /// </summary>
 public sealed class SaleStockDebitService
 {
@@ -63,11 +62,13 @@ public sealed class SaleStockDebitService
                 line.ProductId,
                 line.VariantId,
                 cancellationToken);
-
-            if (balance is null || balance.Quantity < line.Quantity)
-            {
-                return Result.Failure(Error.Validation($"Insufficient stock for '{line.ProductName}'."));
-            }
+            balance ??= await _stock.GetOrCreateBalanceAsync(
+                request.TenantId,
+                request.WarehouseId,
+                request.StockLocationId,
+                line.ProductId,
+                line.VariantId,
+                cancellationToken);
 
             locked.Add((line, balance));
         }

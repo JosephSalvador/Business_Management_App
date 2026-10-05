@@ -77,3 +77,18 @@ public sealed class ResolvePriceQueryValidator : AbstractValidator<ResolvePriceQ
         RuleFor(x => x.Quantity).GreaterThanOrEqualTo(1);
     }
 }
+
+public sealed class ResolvePricesQueryValidator : AbstractValidator<ResolvePricesQuery>
+{
+    public ResolvePricesQueryValidator()
+    {
+        RuleFor(x => x.Lines).NotNull().NotEmpty();
+        RuleFor(x => x.Lines.Count).LessThanOrEqualTo(100);
+        RuleFor(x => x.PriceType).IsInEnum();
+        RuleForEach(x => x.Lines).ChildRules(line =>
+        {
+            line.RuleFor(l => l.ProductId).NotEmpty();
+            line.RuleFor(l => l.Quantity).GreaterThanOrEqualTo(1);
+        });
+    }
+}

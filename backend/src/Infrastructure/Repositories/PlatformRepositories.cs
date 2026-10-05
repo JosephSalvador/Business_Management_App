@@ -1,10 +1,15 @@
+using BusinessOS.Application.Features.Products.Commands;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Accounting;
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Billing;
 using BusinessOS.Domain.Catalog;
+using BusinessOS.Domain.Crm;
 using BusinessOS.Domain.Features;
+using BusinessOS.Domain.Finance;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
+using BusinessOS.Domain.Invoicing;
 using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
@@ -28,6 +33,12 @@ public sealed class TenantRepository : ITenantRepository
 
     public Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default)
         => _db.Tenants.AddAsync(tenant, cancellationToken).AsTask();
+
+    public Task UpdateAsync(Tenant tenant, CancellationToken cancellationToken = default)
+    {
+        _db.Tenants.Update(tenant);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class BranchRepository : IBranchRepository
@@ -241,6 +252,15 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     public Task AddAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
         => _db.RefreshTokens.AddAsync(refreshToken, cancellationToken).AsTask();
 
+    public async Task<IReadOnlyList<RefreshToken>> ListActiveByUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+        => await _db.RefreshTokens
+            .AsNoTracking()
+            .Where(t => t.TenantId == tenantId && t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync(cancellationToken);
+
     public async Task RevokeFamilyAsync(
         Guid familyId,
         Guid revokedByTokenId,
@@ -277,6 +297,90 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     public Task<int> DeleteExpiredAsync(DateTime cutoff, CancellationToken cancellationToken = default)
         => _db.RefreshTokens
             .Where(t => t.RevokedAt != null || t.ExpiresAt < cutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+}
+
+/// <summary>
+/// Recovery codes are stored and consumed by hash. There is deliberately no tracked
+/// update path: spending a code is the conditional <see cref="TryConsumeAsync"/> update
+/// only, which is what makes a concurrent replay of the same code impossible.
+/// </summary>
+public sealed class TwoFactorRecoveryCodeRepository : ITwoFactorRecoveryCodeRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public TwoFactorRecoveryCodeRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddRangeAsync(
+        IEnumerable<TwoFactorRecoveryCode> codes,
+        CancellationToken cancellationToken = default)
+        => _db.TwoFactorRecoveryCodes.AddRangeAsync(codes, cancellationToken);
+
+    public async Task<IReadOnlyList<TwoFactorRecoveryCode>> ListForUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+        => await _db.TwoFactorRecoveryCodes
+            .Where(c => c.TenantId == tenantId && c.UserId == userId)
+            .OrderBy(c => c.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task RemoveAllForUserAsync(
+        Guid tenantId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var codes = await _db.TwoFactorRecoveryCodes
+            .Where(c => c.TenantId == tenantId && c.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+        _db.TwoFactorRecoveryCodes.RemoveRange(codes);
+    }
+
+    public Task<int> TryConsumeAsync(
+        Guid tenantId,
+        Guid userId,
+        string codeHash,
+        CancellationToken cancellationToken = default)
+        => _db.TwoFactorRecoveryCodes
+            .Where(c => c.TenantId == tenantId
+                && c.UserId == userId
+                && c.CodeHash == codeHash
+                && c.UsedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(c => c.UsedAt, DateTime.UtcNow),
+                cancellationToken);
+}
+
+/// <summary>
+/// Pending second-factor steps. Consumption is a conditional <c>UPDATE ... WHERE
+/// ConsumedAt IS NULL</c> rather than a tracked read-modify-write, so two simultaneous
+/// verifies of the same challenge cannot both succeed.
+/// </summary>
+public sealed class TwoFactorChallengeRepository : ITwoFactorChallengeRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public TwoFactorChallengeRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(TwoFactorChallenge challenge, CancellationToken cancellationToken = default)
+        => _db.TwoFactorChallenges.AddAsync(challenge, cancellationToken).AsTask();
+
+    public Task<TwoFactorChallenge?> GetByHashAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default)
+        => _db.TwoFactorChallenges.FirstOrDefaultAsync(c => c.TokenHash == tokenHash, cancellationToken);
+
+    public Task<int> TryConsumeAsync(Guid id, CancellationToken cancellationToken = default)
+        => _db.TwoFactorChallenges
+            .Where(c => c.Id == id && c.ConsumedAt == null && c.ExpiresAt > DateTime.UtcNow)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(c => c.ConsumedAt, DateTime.UtcNow),
+                cancellationToken);
+
+    public Task<int> DeleteExpiredAsync(DateTime cutoff, CancellationToken cancellationToken = default)
+        => _db.TwoFactorChallenges
+            .Where(c => c.ExpiresAt < cutoff || (c.ConsumedAt != null && c.ConsumedAt < cutoff))
             .ExecuteDeleteAsync(cancellationToken);
 }
 
@@ -394,6 +498,21 @@ public sealed class FeatureFlagRepository : IFeatureFlagRepository
 
     public Task<FeatureFlag?> GetAsync(Guid tenantId, string key, CancellationToken cancellationToken = default)
         => _db.FeatureFlags.FirstOrDefaultAsync(f => f.TenantId == tenantId && f.Key == key, cancellationToken);
+
+    public Task AddAsync(FeatureFlag flag, CancellationToken cancellationToken = default)
+        => _db.FeatureFlags.AddAsync(flag, cancellationToken).AsTask();
+
+    public Task UpdateAsync(FeatureFlag flag, CancellationToken cancellationToken = default)
+    {
+        _db.FeatureFlags.Update(flag);
+        return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyList<FeatureFlag>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.FeatureFlags
+            .Where(f => f.TenantId == tenantId)
+            .OrderBy(f => f.Key)
+            .ToListAsync(cancellationToken);
 }
 
 public sealed class ProductRepository : IProductRepository
@@ -466,6 +585,13 @@ public sealed class ProductRepository : IProductRepository
         ProductListFilter filter)
     {
         var filtered = query.Where(p => p.TenantId == tenantId);
+
+        // The anonymous quick-sale product is a system row, never a sellable
+        // catalogue item: exclude it from every product listing (M11 S3). The
+        // null check keeps products without an SKU in the list (SQL NULL is not
+        // equal to anything).
+        filtered = filtered.Where(p =>
+            p.Sku == null || p.Sku != EnsureQuickSaleProductCommandHandler.QuickSaleSku);
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
@@ -725,7 +851,17 @@ public sealed class StockRepository : IStockRepository
     public Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken = default)
         => _db.StockMovements.AddAsync(movement, cancellationToken).AsTask();
 
-    public async Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+    public Task<StockMovement?> FindAdjustmentByKeyAsync(
+        Guid tenantId,
+        string key,
+        CancellationToken cancellationToken = default)
+        => _db.StockMovements.FirstOrDefaultAsync(
+            m => m.TenantId == tenantId
+                && m.MovementType == StockMovementType.Adjustment
+                && m.CorrelationId == key,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<StockBalanceView>> ListBalancesAsync(
         Guid tenantId,
         int page,
         int pageSize,
@@ -733,14 +869,57 @@ public sealed class StockRepository : IStockRepository
         Guid? productId = null,
         string? search = null,
         CancellationToken cancellationToken = default)
-        => await ApplyBalanceFilter(_db, tenantId, warehouseId, productId, search)
-            .AsNoTracking()
-            .OrderBy(b => b.WarehouseId)
-            .ThenBy(b => b.StockLocationId)
-            .ThenBy(b => b.ProductId)
+    {
+        var rows =
+            from b in _db.StockBalances
+            join p in _db.Products on b.ProductId equals p.Id
+            join w in _db.Warehouses on b.WarehouseId equals w.Id
+            join l in _db.StockLocations on b.StockLocationId equals l.Id
+            join u in _db.UnitsOfMeasure on p.UnitOfMeasureId equals u.Id
+            where b.TenantId == tenantId
+            select new { b, p, w, l, u };
+
+        if (warehouseId.HasValue)
+        {
+            rows = rows.Where(x => x.b.WarehouseId == warehouseId.Value);
+        }
+
+        if (productId.HasValue)
+        {
+            rows = rows.Where(x => x.b.ProductId == productId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            rows = rows.Where(x => x.p.Name.Contains(term)
+                || (x.p.Sku != null && x.p.Sku.Contains(term))
+                || (x.p.Barcode != null && x.p.Barcode.Contains(term)));
+        }
+
+        var items = await rows
+            .OrderBy(x => x.p.Name)
+            .ThenBy(x => x.w.Name)
+            .ThenBy(x => x.l.Name)
+            .ThenBy(x => x.b.VariantId)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
+
+        return items.Select(x => new StockBalanceView(
+            x.b.WarehouseId,
+            x.w.Name,
+            x.b.StockLocationId,
+            x.l.Name,
+            x.b.ProductId,
+            x.p.Name,
+            x.p.Sku,
+            x.p.Barcode,
+            x.b.VariantId,
+            x.u.Name,
+            x.b.Quantity)).ToList();
+    }
 
     public Task<int> CountBalancesAsync(
         Guid tenantId,
@@ -750,7 +929,7 @@ public sealed class StockRepository : IStockRepository
         CancellationToken cancellationToken = default)
         => ApplyBalanceFilter(_db, tenantId, warehouseId, productId, search).CountAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+    public async Task<IReadOnlyList<StockMovementView>> ListMovementsAsync(
         Guid tenantId,
         int page,
         int pageSize,
@@ -758,12 +937,55 @@ public sealed class StockRepository : IStockRepository
         Guid? productId = null,
         StockMovementType? type = null,
         CancellationToken cancellationToken = default)
-        => await ApplyMovementFilter(_db, tenantId, warehouseId, productId, type)
-            .AsNoTracking()
-            .OrderByDescending(m => m.OccurredAt)
+    {
+        var rows =
+            from m in _db.StockMovements
+            join p in _db.Products on m.ProductId equals p.Id
+            join w in _db.Warehouses on m.WarehouseId equals w.Id
+            join l in _db.StockLocations on m.StockLocationId equals l.Id
+            where m.TenantId == tenantId
+            select new { m, p, w, l };
+
+        if (warehouseId.HasValue)
+        {
+            rows = rows.Where(x => x.m.WarehouseId == warehouseId.Value);
+        }
+
+        if (productId.HasValue)
+        {
+            rows = rows.Where(x => x.m.ProductId == productId.Value);
+        }
+
+        if (type.HasValue)
+        {
+            rows = rows.Where(x => x.m.MovementType == type.Value);
+        }
+
+        var items = await rows
+            .OrderByDescending(x => x.m.OccurredAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
+
+        return items.Select(x => new StockMovementView(
+            x.m.Id,
+            x.m.ProductId,
+            x.p.Name,
+            x.p.Sku,
+            x.p.Barcode,
+            x.m.WarehouseId,
+            x.w.Name,
+            x.m.StockLocationId,
+            x.l.Name,
+            x.m.VariantId,
+            x.m.MovementType,
+            x.m.Quantity,
+            x.m.Reason,
+            x.m.OccurredAt,
+            x.m.CreatedBy,
+            x.m.CreatedAt)).ToList();
+    }
 
     public Task<int> CountMovementsAsync(
         Guid tenantId,
@@ -787,6 +1009,102 @@ public sealed class StockRepository : IStockRepository
             .AsNoTracking()
             .OrderBy(m => m.OccurredAt)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<StockSummaryRow>> GetStockSummaryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+    {
+        var balances = await _db.StockBalances
+            .Where(b => b.TenantId == tenantId && (!warehouseId.HasValue || b.WarehouseId == warehouseId.Value))
+            .ToListAsync(cancellationToken);
+
+        var movements = await _db.StockMovements
+            .Where(m => m.TenantId == tenantId && m.OccurredAt >= from && m.OccurredAt <= to
+                && (!warehouseId.HasValue || m.WarehouseId == warehouseId.Value))
+            .ToListAsync(cancellationToken);
+
+        var productIds = balances.Select(b => b.ProductId).Distinct().ToList();
+        var products = await _db.Products
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
+
+        return balances.Select(b => {
+            var productMovements = movements.Where(m => m.ProductId == b.ProductId).ToList();
+            var sold = productMovements.Where(m => m.MovementType == StockMovementType.Sale).Sum(m => Math.Abs(m.Quantity));
+            var purchased = productMovements.Where(m => m.MovementType == StockMovementType.TransferIn || m.MovementType == StockMovementType.OpeningStock).Sum(m => m.Quantity);
+            var adjusted = productMovements.Where(m => m.MovementType == StockMovementType.Adjustment).Sum(m => m.Quantity);
+            var opening = b.Quantity - purchased + sold - adjusted;
+
+            return new StockSummaryRow(
+                b.ProductId, products.GetValueOrDefault(b.ProductId, "Unknown"), null,
+                Math.Max(0, opening), purchased, sold, adjusted, b.Quantity);
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyList<StockMovementSummaryRow>> GetStockMovementSummaryAsync(
+        Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+    {
+        return await _db.StockMovements
+            .Where(m => m.TenantId == tenantId && m.OccurredAt >= from && m.OccurredAt <= to
+                && (!warehouseId.HasValue || m.WarehouseId == warehouseId.Value))
+            .GroupBy(m => m.MovementType.ToString())
+            .Select(g => new StockMovementSummaryRow(
+                g.Key, g.Count(), g.Sum(m => Math.Abs(m.Quantity))))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LowStockReportItem>> GetLowStockReportAsync(
+        Guid tenantId, decimal threshold, Guid? warehouseId, CancellationToken cancellationToken = default)
+    {
+        var balances = await _db.StockBalances
+            .Where(b => b.TenantId == tenantId && b.Quantity <= threshold && b.Quantity >= 0
+                && (!warehouseId.HasValue || b.WarehouseId == warehouseId.Value))
+            .ToListAsync(cancellationToken);
+
+        var productIds = balances.Select(b => b.ProductId).Distinct().ToList();
+        var warehouseIds = balances.Select(b => b.WarehouseId).Distinct().ToList();
+        var products = await _db.Products
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
+        var warehouses = await _db.Warehouses
+            .Where(w => warehouseIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, w => w.Name, cancellationToken);
+
+        return balances
+            .Select(b => new LowStockReportItem(
+                b.ProductId, products.GetValueOrDefault(b.ProductId, "Unknown"), null,
+                b.Quantity, warehouses.GetValueOrDefault(b.WarehouseId, "Unknown")))
+            .OrderBy(x => x.OnHand)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<StockVelocityRow>> GetStockVelocityAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+    {
+        var days = Math.Max(1, (to - from).Days);
+        var sales = await _db.Sales
+            .Where(s => s.TenantId == tenantId && s.SaleDate >= from && s.SaleDate <= to && s.Status != SaleStatus.Voided)
+            .SelectMany(s => s.Lines)
+            .GroupBy(l => l.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                ProductName = g.First().ProductName,
+                Sku = g.First().Sku,
+                Sold = g.Sum(l => l.Quantity),
+            })
+            .OrderByDescending(x => x.Sold)
+            .ToListAsync(cancellationToken);
+
+        var productIds = sales.Select(s => s.ProductId).ToList();
+        var balances = await _db.StockBalances
+            .Where(b => b.TenantId == tenantId && productIds.Contains(b.ProductId))
+            .ToDictionaryAsync(b => b.ProductId, b => b.Quantity, cancellationToken);
+
+        return sales.Select(s => new StockVelocityRow(
+            s.ProductId, s.ProductName, s.Sku,
+            s.Sold, balances.GetValueOrDefault(s.ProductId, 0),
+            Math.Round(s.Sold / days, 2))).ToList();
+    }
 
     private static IQueryable<StockBalance> ApplyBalanceFilter(
         BusinessDbContext db,
@@ -1133,8 +1451,16 @@ public sealed class DashboardRepository : IDashboardRepository
     public async Task<IReadOnlyList<RecentActivityItem>> ListRecentActivityAsync(
         Guid tenantId, int limit, CancellationToken cancellationToken = default)
     {
+        var meaningfulTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Sale", "Product", "Customer", "Expense", "Purchase", "StockMovement", "User", "PriceList",
+
+            // Generic audit rows written by AuditBehavior for every mutation command.
+            "Command"
+        };
+
         var logs = await _db.AuditLogs
-            .Where(a => a.TenantId == tenantId)
+            .Where(a => a.TenantId == tenantId && meaningfulTypes.Contains(a.EntityType))
             .OrderByDescending(a => a.CreatedAt)
             .ThenByDescending(a => a.Id)
             .Take(limit)
@@ -1150,15 +1476,123 @@ public sealed class DashboardRepository : IDashboardRepository
             .Where(u => actorIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, cancellationToken);
 
+        var entityLookups = await BuildEntityLookupsAsync(tenantId, logs, cancellationToken);
+
         return logs
-            .Select(l => new RecentActivityItem(
-                l.Action,
-                l.EntityType,
-                l.EntityId,
-                l.UserId,
-                l.UserId.HasValue && actors.ContainsKey(l.UserId.Value) ? actors[l.UserId.Value].Email : null,
-                l.CreatedAt))
+            .Select(l =>
+            {
+                var lookup = entityLookups.TryGetValue((l.EntityType, l.EntityId ?? string.Empty), out var found)
+                    ? found : default;
+                return new RecentActivityItem(
+                    l.Action,
+                    l.EntityType,
+                    l.EntityId,
+                    lookup.Name,
+                    lookup.Amount,
+                    lookup.Status,
+                    l.UserId.HasValue && actors.ContainsKey(l.UserId.Value) ? actors[l.UserId.Value].Email : null,
+                    l.CreatedAt);
+            })
             .ToList();
+    }
+
+    private async Task<Dictionary<(string, string), (string? Name, decimal? Amount, string? Status)>>
+        BuildEntityLookupsAsync(
+            Guid tenantId,
+            List<Domain.Audit.AuditLog> logs,
+            CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<(string, string), (string?, decimal?, string?)>();
+
+        var saleIds = logs
+            .Where(l => l.EntityType.Equals("Sale", StringComparison.OrdinalIgnoreCase) && l.EntityId != null)
+            .Select(l => l.EntityId!)
+            .ToList();
+        if (saleIds.Count > 0)
+        {
+            var parsed = saleIds.Where(s => Guid.TryParse(s, out _)).Select(s => Guid.Parse(s)).ToList();
+            var sales = await _db.Sales
+                .Where(s => s.TenantId == tenantId && parsed.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, cancellationToken);
+            foreach (var sid in parsed)
+            {
+                if (sales.TryGetValue(sid, out var sale))
+                {
+                    var status = sale.Status == Domain.Sales.SaleStatus.Voided ? "Voided" : sale.AmountPaid >= sale.TotalAmount ? "Paid" : "Pending";
+                    result[("Sale", sid.ToString())] = ($"Risiti #{sale.Number}", sale.TotalAmount, status);
+                }
+            }
+        }
+
+        var productIds = logs
+            .Where(l => l.EntityType.Equals("Product", StringComparison.OrdinalIgnoreCase) && l.EntityId != null)
+            .Select(l => l.EntityId!)
+            .ToList();
+        if (productIds.Count > 0)
+        {
+            var parsed = productIds.Where(s => Guid.TryParse(s, out _)).Select(s => Guid.Parse(s)).ToList();
+            var products = await _db.Products
+                .Where(p => p.TenantId == tenantId && parsed.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, cancellationToken);
+            foreach (var pid in parsed)
+            {
+                if (products.TryGetValue(pid, out var product))
+                    result[("Product", pid.ToString())] = (product.Name, null, null);
+            }
+        }
+
+        var customerIds = logs
+            .Where(l => l.EntityType.Equals("Customer", StringComparison.OrdinalIgnoreCase) && l.EntityId != null)
+            .Select(l => l.EntityId!)
+            .ToList();
+        if (customerIds.Count > 0)
+        {
+            var parsed = customerIds.Where(s => Guid.TryParse(s, out _)).Select(s => Guid.Parse(s)).ToList();
+            var customers = await _db.Customers
+                .Where(c => c.TenantId == tenantId && parsed.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, cancellationToken);
+            foreach (var cid in parsed)
+            {
+                if (customers.TryGetValue(cid, out var customer))
+                    result[("Customer", cid.ToString())] = (customer.Name, null, null);
+            }
+        }
+
+        var expenseIds = logs
+            .Where(l => l.EntityType.Equals("Expense", StringComparison.OrdinalIgnoreCase) && l.EntityId != null)
+            .Select(l => l.EntityId!)
+            .ToList();
+        if (expenseIds.Count > 0)
+        {
+            var parsed = expenseIds.Where(s => Guid.TryParse(s, out _)).Select(s => Guid.Parse(s)).ToList();
+            var expenses = await _db.Expenses
+                .Where(e => e.TenantId == tenantId && parsed.Contains(e.Id))
+                .ToDictionaryAsync(e => e.Id, cancellationToken);
+            foreach (var eid in parsed)
+            {
+                if (expenses.TryGetValue(eid, out var expense))
+                    result[("Expense", eid.ToString())] = (expense.Description ?? "Gharama", expense.Amount, null);
+            }
+        }
+
+        var purchaseIds = logs
+            .Where(l => l.EntityType.Equals("Purchase", StringComparison.OrdinalIgnoreCase) && l.EntityId != null)
+            .Select(l => l.EntityId!)
+            .ToList();
+        if (purchaseIds.Count > 0)
+        {
+            var parsed = purchaseIds.Where(s => Guid.TryParse(s, out _)).Select(s => Guid.Parse(s)).ToList();
+            var purchases = await _db.PurchaseOrders
+                .Where(p => p.TenantId == tenantId && parsed.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, cancellationToken);
+            foreach (var pid in parsed)
+            {
+                if (purchases.TryGetValue(pid, out var purchase))
+                    result[("Purchase", pid.ToString())] = (purchase.Reference ?? $"Ununuzi", purchase.TotalAmount, null);
+            }
+        }
+
+        return result;
     }
 
     private async Task<DashboardPricingSnapshot> BuildPricingSnapshotAsync(
@@ -1341,7 +1775,19 @@ public sealed class NumberSequenceRepository : INumberSequenceRepository
 
         if (sequence is null)
         {
-            sequence = NumberSequence.CreateSaleSequence(tenantId);
+            // "Sale" keeps the POS receipt format; every other scope gets its own
+            // dedicated prefix (e.g. scope "Invoice" → prefix "INV", scope
+            // "CustomerInvoice" → prefix "CINV").
+            var prefix = scope switch
+            {
+                "Sale" => null,
+                "CustomerInvoice" => "CINV",
+                _ => scope[..Math.Min(3, scope.Length)],
+            };
+
+            sequence = prefix is null
+                ? NumberSequence.CreateSaleSequence(tenantId)
+                : NumberSequence.Create(tenantId, scope, prefix, "{prefix}-{year}-{sequence:000000}");
             _db.NumberSequences.Add(sequence);
         }
 
@@ -1649,4 +2095,667 @@ public sealed class TenantAccountMappingRepository : ITenantAccountMappingReposi
 
     public Task<TenantAccountMapping?> GetByMappingKeyAsync(Guid tenantId, string mappingKey, CancellationToken cancellationToken = default)
         => _db.TenantAccountMappings.FirstOrDefaultAsync(m => m.TenantId == tenantId && m.MappingKey == mappingKey, cancellationToken);
+}
+
+public sealed class ExpenseRepository : IExpenseRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public ExpenseRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(Expense expense, CancellationToken cancellationToken = default)
+        => _db.Expenses.AddAsync(expense, cancellationToken).AsTask();
+
+    public Task UpdateAsync(Expense expense, CancellationToken cancellationToken = default)
+    {
+        _db.Expenses.Update(expense);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(Expense expense, CancellationToken cancellationToken = default)
+    {
+        _db.Expenses.Remove(expense);
+        return Task.CompletedTask;
+    }
+
+    public Task<Expense?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Expenses.FirstOrDefaultAsync(e => e.TenantId == tenantId && e.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<Expense>> ListAsync(
+        Guid tenantId, int page, int pageSize,
+        DateTime? fromDate = null, DateTime? toDate = null,
+        string? search = null, CancellationToken cancellationToken = default)
+    {
+        IQueryable<Expense> query = _db.Expenses.Where(e => e.TenantId == tenantId);
+
+        if (fromDate.HasValue)
+            query = query.Where(e => e.ExpenseDate >= fromDate.Value);
+        if (toDate.HasValue)
+            query = query.Where(e => e.ExpenseDate <= toDate.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(e => e.Description.Contains(search));
+
+        return await query
+            .OrderByDescending(e => e.ExpenseDate)
+            .ThenByDescending(e => e.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountAsync(
+        Guid tenantId, DateTime? fromDate = null, DateTime? toDate = null,
+        string? search = null, CancellationToken cancellationToken = default)
+    {
+        IQueryable<Expense> query = _db.Expenses.Where(e => e.TenantId == tenantId);
+
+        if (fromDate.HasValue)
+            query = query.Where(e => e.ExpenseDate >= fromDate.Value);
+        if (toDate.HasValue)
+            query = query.Where(e => e.ExpenseDate <= toDate.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(e => e.Description.Contains(search));
+
+        return await query.CountAsync(cancellationToken);
+    }
+
+    public async Task<ExpenseSummary> GetSummaryAsync(
+        Guid tenantId, DateTime fromDate, DateTime toDate, CancellationToken cancellationToken = default)
+    {
+        IQueryable<Expense> query = _db.Expenses.Where(e =>
+            e.TenantId == tenantId && e.ExpenseDate >= fromDate && e.ExpenseDate <= toDate);
+
+        var total = await query.SumAsync(e => (decimal?)e.Amount, cancellationToken) ?? 0m;
+
+        var byCategory = await query
+            .GroupBy(e => e.CategoryId)
+            .Select(g => new { CategoryId = g.Key, Total = g.Sum(e => e.Amount) })
+            .ToListAsync(cancellationToken);
+
+        var categoryNames = (await ListCategoriesAsync(tenantId, cancellationToken))
+            .ToDictionary(c => c.Id, c => c.Name);
+
+        return new ExpenseSummary(
+            total,
+            byCategory
+                .OrderByDescending(g => g.Total)
+                .Select(g => new ExpenseCategoryTotal(
+                    g.CategoryId,
+                    g.CategoryId is null || !categoryNames.TryGetValue(g.CategoryId.Value, out var name)
+                        ? null
+                        : name,
+                    g.Total))
+                .ToList());
+    }
+
+    public Task AddCategoryAsync(ExpenseCategory category, CancellationToken cancellationToken = default)
+        => _db.ExpenseCategories.AddAsync(category, cancellationToken).AsTask();
+
+    public Task<ExpenseCategory?> GetCategoryByIdAsync(
+        Guid tenantId, Guid categoryId, CancellationToken cancellationToken = default)
+        => _db.ExpenseCategories.FirstOrDefaultAsync(
+            c => c.TenantId == tenantId && c.Id == categoryId, cancellationToken);
+
+    public Task<ExpenseCategory?> GetCategoryByNameAsync(
+        Guid tenantId, string name, CancellationToken cancellationToken = default)
+        => _db.ExpenseCategories.FirstOrDefaultAsync(
+            c => c.TenantId == tenantId && c.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<ExpenseCategory>> ListCategoriesAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.ExpenseCategories
+            .Where(c => c.TenantId == tenantId)
+            .OrderBy(c => c.Name)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ExpenseTrendPoint>> GetExpenseTrendAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+    {
+        var expenses = await _db.Expenses
+            .Where(e => e.TenantId == tenantId && e.ExpenseDate >= from && e.ExpenseDate <= to)
+            .ToListAsync(cancellationToken);
+
+        return expenses
+            .GroupBy(e => e.ExpenseDate.Date)
+            .Select(g => new ExpenseTrendPoint(
+                g.Key.ToString("yyyy-MM-dd"), g.Sum(e => e.Amount)))
+            .OrderBy(x => x.Label)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ExpenseByPaymentMethodRow>> GetExpenseByPaymentMethodAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+    {
+        return await _db.Expenses
+            .Where(e => e.TenantId == tenantId && e.ExpenseDate >= from && e.ExpenseDate <= to)
+            .GroupBy(e => e.PaymentMethod ?? "Other")
+            .Select(g => new ExpenseByPaymentMethodRow(
+                g.Key, g.Sum(e => e.Amount)))
+            .OrderByDescending(x => x.Amount)
+            .ToListAsync(cancellationToken);
+    }
+}
+
+public sealed class CustomerRepository : ICustomerRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public CustomerRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(Customer customer, CancellationToken cancellationToken = default)
+        => _db.Customers.AddAsync(customer, cancellationToken).AsTask();
+
+    public Task UpdateAsync(Customer customer, CancellationToken cancellationToken = default)
+    {
+        _db.Customers.Update(customer);
+        return Task.CompletedTask;
+    }
+
+    public Task<Customer?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Customers.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<Customer>> ListAsync(
+        Guid tenantId, int page, int pageSize, string? search = null, CancellationToken cancellationToken = default)
+    {
+        IQueryable<Customer> query = _db.Customers.Where(c => c.TenantId == tenantId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(c => c.Name.Contains(search) || (c.Phone != null && c.Phone.Contains(search)));
+
+        return await query
+            .OrderBy(c => c.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountAsync(Guid tenantId, string? search = null, CancellationToken cancellationToken = default)
+    {
+        IQueryable<Customer> query = _db.Customers.Where(c => c.TenantId == tenantId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(c => c.Name.Contains(search) || (c.Phone != null && c.Phone.Contains(search)));
+
+        return await query.CountAsync(cancellationToken);
+    }
+}
+
+public sealed class CustomerCreditRepository : ICustomerCreditRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public CustomerCreditRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(CustomerCredit credit, CancellationToken cancellationToken = default)
+        => _db.CustomerCredits.AddAsync(credit, cancellationToken).AsTask();
+
+    public Task UpdateAsync(CustomerCredit credit, CancellationToken cancellationToken = default)
+    {
+        _db.CustomerCredits.Update(credit);
+        return Task.CompletedTask;
+    }
+
+    public Task<CustomerCredit?> GetByCustomerIdAsync(Guid tenantId, Guid customerId, CancellationToken cancellationToken = default)
+        => _db.CustomerCredits.FirstOrDefaultAsync(cc => cc.TenantId == tenantId && cc.CustomerId == customerId, cancellationToken);
+
+    public Task AddTransactionAsync(CreditTransaction transaction, CancellationToken cancellationToken = default)
+        => _db.CreditTransactions.AddAsync(transaction, cancellationToken).AsTask();
+
+    public async Task<IReadOnlyList<CreditTransaction>> ListTransactionsAsync(
+        Guid tenantId, Guid customerId, int page, int pageSize, CancellationToken cancellationToken = default)
+        => await _db.CreditTransactions
+            .Where(ct => ct.TenantId == tenantId && ct.CustomerId == customerId)
+            .OrderByDescending(ct => ct.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<CustomerCredit>> ListOutstandingAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.CustomerCredits
+            .Where(cc => cc.TenantId == tenantId && cc.Balance > 0)
+            .OrderByDescending(cc => cc.Balance)
+            .ToListAsync(cancellationToken);
+}
+
+public sealed class MoneyAccountRepository : IMoneyAccountRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public MoneyAccountRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(MoneyAccount account, CancellationToken cancellationToken = default)
+        => _db.MoneyAccounts.AddAsync(account, cancellationToken).AsTask();
+
+    public Task UpdateAsync(MoneyAccount account, CancellationToken cancellationToken = default)
+    {
+        _db.MoneyAccounts.Update(account);
+        return Task.CompletedTask;
+    }
+
+    public Task<MoneyAccount?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.MoneyAccounts.FirstOrDefaultAsync(a => a.TenantId == tenantId && a.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<MoneyAccount>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.MoneyAccounts
+            .Where(a => a.TenantId == tenantId && a.IsActive)
+            .OrderBy(a => a.Name)
+            .ToListAsync(cancellationToken);
+
+    public Task AddTransactionAsync(MoneyAccountTransaction transaction, CancellationToken cancellationToken = default)
+        => _db.MoneyAccountTransactions.AddAsync(transaction, cancellationToken).AsTask();
+
+    public async Task<IReadOnlyList<MoneyAccountTransaction>> ListTransactionsAsync(
+        Guid tenantId, Guid accountId, int page, int pageSize, CancellationToken cancellationToken = default)
+        => await _db.MoneyAccountTransactions
+            .Where(t => t.TenantId == tenantId && t.AccountId == accountId)
+            .OrderByDescending(t => t.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+}
+
+public sealed class CashSessionRepository : ICashSessionRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public CashSessionRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(CashSession session, CancellationToken cancellationToken = default)
+        => _db.CashSessions.AddAsync(session, cancellationToken).AsTask();
+
+    public Task UpdateAsync(CashSession session, CancellationToken cancellationToken = default)
+    {
+        _db.CashSessions.Update(session);
+        return Task.CompletedTask;
+    }
+
+    public Task<CashSession?> GetOpenSessionAsync(Guid tenantId, Guid accountId, CancellationToken cancellationToken = default)
+        => _db.CashSessions.FirstOrDefaultAsync(
+            s => s.TenantId == tenantId && s.AccountId == accountId && s.Status == CashSessionStatus.Open,
+            cancellationToken);
+
+    public Task<CashSession?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.CashSessions.FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<CashSession>> ListAsync(
+        Guid tenantId, Guid? accountId, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        IQueryable<CashSession> query = _db.CashSessions.Where(s => s.TenantId == tenantId);
+        if (accountId.HasValue)
+            query = query.Where(s => s.AccountId == accountId.Value);
+
+        return await query
+            .OrderByDescending(s => s.OpenedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+}
+
+public sealed class ReceiptLayoutRepository : IReceiptLayoutRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public ReceiptLayoutRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(ReceiptLayout layout, CancellationToken cancellationToken = default)
+        => _db.ReceiptLayouts.AddAsync(layout, cancellationToken).AsTask();
+
+    public Task UpdateAsync(ReceiptLayout layout, CancellationToken cancellationToken = default)
+    {
+        _db.ReceiptLayouts.Update(layout);
+        return Task.CompletedTask;
+    }
+
+    public async Task<ReceiptLayout?> GetActiveAsync(
+        Guid tenantId, string layoutId, CancellationToken cancellationToken = default)
+        => await _db.ReceiptLayouts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                r => r.TenantId == tenantId && r.LayoutId == layoutId && r.IsActive,
+                cancellationToken);
+
+    public async Task<ReceiptLayout?> GetByIdAsync(
+        Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => await _db.ReceiptLayouts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.TenantId == tenantId && r.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<ReceiptLayout>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.ReceiptLayouts
+            .AsNoTracking()
+            .Where(r => r.TenantId == tenantId)
+            .OrderBy(r => r.LayoutId)
+            .ThenByDescending(r => r.Version)
+            .ToListAsync(cancellationToken);
+
+    public async Task<bool> HasActiveLayoutAsync(
+        Guid tenantId, string layoutId, CancellationToken cancellationToken = default)
+        => await _db.ReceiptLayouts
+            .AsNoTracking()
+            .AnyAsync(r => r.TenantId == tenantId && r.LayoutId == layoutId && r.IsActive, cancellationToken);
+}
+
+public sealed class ReceiptMetadataRepository : IReceiptMetadataRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public ReceiptMetadataRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(ReceiptMetadata metadata, CancellationToken cancellationToken = default)
+        => _db.ReceiptMetadataSet.AddAsync(metadata, cancellationToken).AsTask();
+
+    public async Task<ReceiptMetadata?> GetBySaleIdAsync(
+        Guid saleId, CancellationToken cancellationToken = default)
+        => await _db.ReceiptMetadataSet
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.SaleId == saleId, cancellationToken);
+}
+
+public sealed class ReceiptPrintEventRepository : IReceiptPrintEventRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public ReceiptPrintEventRepository(BusinessDbContext db) => _db = db;
+
+    public Task AddAsync(ReceiptPrintEvent printEvent, CancellationToken cancellationToken = default)
+        => _db.ReceiptPrintEvents.AddAsync(printEvent, cancellationToken).AsTask();
+
+    public async Task<int> CountBySaleIdAsync(
+        Guid saleId, CancellationToken cancellationToken = default)
+        => await _db.ReceiptPrintEvents
+            .AsNoTracking()
+            .CountAsync(r => r.SaleId == saleId, cancellationToken);
+
+    public async Task<IReadOnlyList<ReceiptPrintEvent>> ListBySaleIdAsync(
+        Guid saleId, CancellationToken cancellationToken = default)
+        => await _db.ReceiptPrintEvents
+            .AsNoTracking()
+            .Where(r => r.SaleId == saleId)
+            .OrderBy(r => r.PrintedAt)
+            .ToListAsync(cancellationToken);
+}
+
+public sealed class PlanRepository : IPlanRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public PlanRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<Plan?> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        var normalized = code.Trim().ToLowerInvariant();
+        return await _db.Plans.FirstOrDefaultAsync(
+            p => p.Code.ToLower() == normalized, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Plan>> ListActiveAsync(CancellationToken cancellationToken = default)
+        => await _db.Plans
+            .AsNoTracking()
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.MonthlyPrice)
+            .ToListAsync(cancellationToken);
+
+    public Task AddAsync(Plan plan, CancellationToken cancellationToken = default)
+        => _db.Plans.AddAsync(plan, cancellationToken).AsTask();
+}
+
+public sealed class SubscriptionRepository : ISubscriptionRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public SubscriptionRepository(BusinessDbContext db) => _db = db;
+
+    public Task<Subscription?> GetForTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var pending = _db.Subscriptions.Local
+            .FirstOrDefault(s => s.TenantId == tenantId);
+        if (pending is not null)
+        {
+            return Task.FromResult<Subscription?>(pending);
+        }
+
+        return _db.Subscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
+    }
+
+    public Task AddAsync(Subscription subscription, CancellationToken cancellationToken = default)
+        => _db.Subscriptions.AddAsync(subscription, cancellationToken).AsTask();
+
+    public Task UpdateAsync(Subscription subscription, CancellationToken cancellationToken = default)
+    {
+        _db.Subscriptions.Update(subscription);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class SubscriptionItemRepository : ISubscriptionItemRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public SubscriptionItemRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<SubscriptionItem>> ListForTenantAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.SubscriptionItems
+            .Where(item => item.TenantId == tenantId)
+            .OrderBy(item => item.PlanCode)
+            .ToListAsync(cancellationToken);
+
+    public Task<SubscriptionItem?> GetForTenantByPlanAsync(
+        Guid tenantId, string planCode, CancellationToken cancellationToken = default)
+        => _db.SubscriptionItems.FirstOrDefaultAsync(
+            item => item.TenantId == tenantId && item.PlanCode == planCode,
+            cancellationToken);
+
+    public Task AddAsync(SubscriptionItem item, CancellationToken cancellationToken = default)
+        => _db.SubscriptionItems.AddAsync(item, cancellationToken).AsTask();
+
+    public Task RemoveAsync(SubscriptionItem item, CancellationToken cancellationToken = default)
+    {
+        _db.SubscriptionItems.Remove(item);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class VoucherRepository : IVoucherRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public VoucherRepository(BusinessDbContext db) => _db = db;
+
+    public Task<Voucher?> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
+        => _db.Vouchers.FirstOrDefaultAsync(v => v.Code == code, cancellationToken);
+
+    public Task AddAsync(Voucher voucher, CancellationToken cancellationToken = default)
+        => _db.Vouchers.AddAsync(voucher, cancellationToken).AsTask();
+}
+
+public sealed class InvoiceRepository : IInvoiceRepository
+{
+    private readonly BusinessDbContext _db;
+    private readonly INumberSequenceRepository _numberSequences;
+
+    public InvoiceRepository(BusinessDbContext db, INumberSequenceRepository numberSequences)
+    {
+        _db = db;
+        _numberSequences = numberSequences;
+    }
+
+    public Task<Invoice?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Invoices.FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Id == id, cancellationToken);
+
+    public Task<Invoice?> GetByIdAnyTenantAsync(Guid id, CancellationToken cancellationToken = default)
+        => _db.Invoices.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+
+    public async Task<Invoice?> GetOpenAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var pendingOpen = _db.Invoices.Local
+            .FirstOrDefault(i => i.TenantId == tenantId && i.Status == InvoiceStatus.Open);
+        if (pendingOpen is not null)
+        {
+            return pendingOpen;
+        }
+
+        // Exclude invoices already tracked for this tenant (e.g. just marked paid in the
+        // same command) so the database's pre-save row cannot surface as still open.
+        var localIds = _db.Invoices.Local
+            .Where(i => i.TenantId == tenantId)
+            .Select(i => i.Id)
+            .ToList();
+
+        if (localIds.Count == 0)
+        {
+            return await _db.Invoices
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    i => i.TenantId == tenantId && i.Status == InvoiceStatus.Open,
+                    cancellationToken);
+        }
+
+        return await _db.Invoices
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                i => i.TenantId == tenantId
+                    && i.Status == InvoiceStatus.Open
+                    && !localIds.Contains(i.Id),
+                cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Invoice>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.Invoices
+            .AsNoTracking()
+            .Where(i => i.TenantId == tenantId)
+            .OrderByDescending(i => i.IssuedAtUtc)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<DebtView>> ListDebtsAsync(CancellationToken cancellationToken = default)
+        => await _db.Invoices
+            .AsNoTracking()
+            .Where(i => i.Status == InvoiceStatus.Open)
+            .Join(
+                _db.Tenants,
+                invoice => invoice.TenantId,
+                tenant => tenant.Id,
+                (invoice, tenant) => new DebtView(
+                    invoice.Id,
+                    invoice.Number,
+                    invoice.TenantId,
+                    tenant.Name,
+                    invoice.Amount,
+                    invoice.Currency,
+                    invoice.IssuedAtUtc,
+                    invoice.Reference))
+            .OrderBy(d => d.IssuedAtUtc)
+            .ToListAsync(cancellationToken);
+
+    public Task<string> AllocateNumberAsync(Guid tenantId, DateTime date, CancellationToken cancellationToken = default)
+        => _numberSequences.AllocateAsync(tenantId, "Invoice", date, cancellationToken);
+
+    public Task AddAsync(Invoice invoice, CancellationToken cancellationToken = default)
+        => _db.Invoices.AddAsync(invoice, cancellationToken).AsTask();
+
+    public Task UpdateAsync(Invoice invoice, CancellationToken cancellationToken = default)
+    {
+        _db.Invoices.Update(invoice);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class CustomerInvoiceRepository : ICustomerInvoiceRepository
+{
+    private readonly BusinessDbContext _db;
+    private readonly INumberSequenceRepository _numberSequences;
+
+    public CustomerInvoiceRepository(BusinessDbContext db, INumberSequenceRepository numberSequences)
+    {
+        _db = db;
+        _numberSequences = numberSequences;
+    }
+
+    public Task AddAsync(CustomerInvoice invoice, CancellationToken cancellationToken = default)
+        => _db.CustomerInvoices.AddAsync(invoice, cancellationToken).AsTask();
+
+    public Task UpdateAsync(CustomerInvoice invoice, CancellationToken cancellationToken = default)
+    {
+        _db.CustomerInvoices.Update(invoice);
+        return Task.CompletedTask;
+    }
+
+    public Task<CustomerInvoice?> GetByIdAsync(
+        Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.CustomerInvoices
+            .Include(i => i.Lines)
+            .FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Id == id, cancellationToken);
+
+    public Task<CustomerInvoice?> GetByNumberAsync(
+        Guid tenantId, string number, CancellationToken cancellationToken = default)
+        => _db.CustomerInvoices
+            .Include(i => i.Lines)
+            .FirstOrDefaultAsync(
+                i => i.TenantId == tenantId && i.Number == number, cancellationToken);
+
+    public async Task<IReadOnlyList<CustomerInvoice>> ListAsync(
+        Guid tenantId, int page, int pageSize, CustomerInvoiceListFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.CustomerInvoices
+            .AsNoTracking()
+            .Where(i => i.TenantId == tenantId);
+
+        if (filter.Status is { } status)
+        {
+            query = query.Where(i => i.Status == status);
+        }
+
+        if (filter.CustomerId is { } customerId)
+        {
+            query = query.Where(i => i.CustomerId == customerId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim();
+            query = query.Where(i =>
+                EF.Functions.ILike(i.Number, $"%{search}%") ||
+                EF.Functions.ILike(i.CustomerName!, $"%{search}%"));
+        }
+
+        return await query
+            .OrderByDescending(i => i.IssueDate)
+            .ThenByDescending(i => i.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountAsync(
+        Guid tenantId, CustomerInvoiceListFilter filter, CancellationToken cancellationToken = default)
+    {
+        var query = _db.CustomerInvoices.Where(i => i.TenantId == tenantId);
+
+        if (filter.Status is { } status)
+        {
+            query = query.Where(i => i.Status == status);
+        }
+
+        if (filter.CustomerId is { } customerId)
+        {
+            query = query.Where(i => i.CustomerId == customerId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim();
+            query = query.Where(i =>
+                EF.Functions.ILike(i.Number, $"%{search}%") ||
+                EF.Functions.ILike(i.CustomerName!, $"%{search}%"));
+        }
+
+        return await query.CountAsync(cancellationToken);
+    }
+
+    public Task<string> AllocateNumberAsync(
+        Guid tenantId, DateTime date, CancellationToken cancellationToken = default)
+        => _numberSequences.AllocateAsync(tenantId, "CustomerInvoice", date, cancellationToken);
 }

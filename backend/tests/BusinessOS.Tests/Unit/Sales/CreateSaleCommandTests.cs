@@ -2,6 +2,7 @@ using BusinessOS.Application.Features.Sales;
 using BusinessOS.Application.Features.Sales.Commands;
 using BusinessOS.Application.Features.Sales.Dtos;
 using BusinessOS.Application.Features.Sales.Queries;
+using BusinessOS.Application.Features.Receipts.Services;
 using BusinessOS.Application.Ports;
 using BusinessOS.Application.Sales;
 using BusinessOS.Application.Tax;
@@ -9,6 +10,7 @@ using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Sales;
+using BusinessOS.Domain.Crm;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared;
 
@@ -131,7 +133,7 @@ public sealed class CreateSaleCommandTests
     }
 
     [Fact]
-    public async Task InsufficientStock_RejectsWithNoMovementsOrNumber()
+    public async Task InsufficientStock_StillCompletesSale_WithNegativeBalance()
     {
         var world = BuildWorld();
         world.Stock.Balance!.Apply(-100m);
@@ -139,11 +141,12 @@ public sealed class CreateSaleCommandTests
 
         var result = await handler.Handle(world.Command(), CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("Validation", result.Error.Code);
-        Assert.Contains("Insufficient stock", result.Error.Message);
-        Assert.Null(world.Sales.Added);
-        Assert.Empty(world.Stock.Movements);
+        Assert.True(result.IsSuccess, result.Error.Message);
+        Assert.Single(world.Stock.Movements);
+        Assert.Equal(StockMovementType.Sale, world.Stock.Movements[0].MovementType);
+        Assert.Equal(-1m, world.Stock.Balance!.Quantity);
+        Assert.NotNull(world.Sales.Added);
+        Assert.Equal(1, world.NumberSequences.AllocationCount);
     }
 
     [Fact]
@@ -279,6 +282,73 @@ public sealed class CreateSaleCommandTests
     }
 
     [Fact]
+    public async Task UnitPriceOverride_IsUsedInsteadOfThePriceList()
+    {
+        var world = BuildWorld();
+        var handler = world.CreateHandler();
+
+        var result = await handler.Handle(
+            world.Command() with
+            {
+                Lines = [new CreateSaleLineInput(world.Product.Id, null, 1m, UnitPrice: 250m)],
+                Payments = [new CreateSalePaymentInput(PaymentMethod.Cash, 250m)],
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Error.Message);
+        Assert.Equal(250m, result.Value.Lines[0].UnitPrice);
+        Assert.Equal(250m, result.Value.Subtotal);
+        Assert.Equal(250m, result.Value.TotalAmount);
+        Assert.Equal(250m, result.Value.AmountPaid);
+        Assert.Single(result.Value.Payments);
+    }
+
+    [Fact]
+    public async Task QuickSaleProductName_OverridesTheCatalogueNameOnTheLine()
+    {
+        var world = BuildWorld();
+        var handler = world.CreateHandler();
+
+        var result = await handler.Handle(
+            world.Command() with
+            {
+                // A quick-sale line: client-fixed price plus the name the
+                // cashier typed (e.g. "Dagaa wa kuchoma"), which must land on
+                // the receipt instead of the hidden product's catalogue name.
+                Lines =
+                [
+                    new CreateSaleLineInput(
+                        world.Product.Id, null, 1m,
+                        UnitPrice: 150m, ProductName: "Dagaa wa kuchoma"),
+                ],
+                Payments = [new CreateSalePaymentInput(PaymentMethod.Cash, 150m)],
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Error.Message);
+        Assert.Equal(150m, result.Value.Lines[0].UnitPrice);
+        Assert.Equal("Dagaa wa kuchoma", result.Value.Lines[0].ProductName);
+
+        // The persisted line carries the override too — the receipt renderer
+        // reads from the domain line, not just the DTO.
+        Assert.NotNull(world.Sales.Added);
+        Assert.Equal("Dagaa wa kuchoma", world.Sales.Added!.Lines.Single().ProductName);
+    }
+
+    [Fact]
+    public async Task NoProductNameProvided_FallsBackToCatalogueName()
+    {
+        var world = BuildWorld();
+        var handler = world.CreateHandler();
+
+        var result = await handler.Handle(world.Command(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Error.Message);
+        Assert.Equal("Coca Cola 500ml", result.Value.Lines[0].ProductName);
+        Assert.Equal("Coca Cola 500ml", world.Sales.Added!.Lines.Single().ProductName);
+    }
+
+    [Fact]
     public async Task DiscountAboveGross_IsRejected()
     {
         var world = BuildWorld();
@@ -321,6 +391,84 @@ public sealed class CreateSaleCommandTests
     }
 
     [Fact]
+    public async Task CreditUnderpayment_WithoutCustomer_IsRejected()
+    {
+        var world = BuildWorld();
+        var handler = world.CreateHandler();
+
+        var result = await handler.Handle(
+            world.Command() with
+            {
+                Payments = [new CreateSalePaymentInput(PaymentMethod.Credit, 0m)],
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Validation", result.Error.Code);
+        Assert.Contains("customer", result.Error.Message);
+        Assert.Null(world.Sales.Added);
+        Assert.Empty(world.Credits.Transactions);
+    }
+
+    [Fact]
+    public async Task CreditUnderpayment_PostsTheBalanceToTheCustomerLedger()
+    {
+        var world = BuildWorld();
+        var customerId = new Guid("33333333-3333-3333-3333-333333333333");
+        var handler = world.CreateHandler();
+
+        var result = await handler.Handle(
+            world.Command() with
+            {
+                CustomerId = customerId,
+                CustomerName = "Neema Shop",
+                Payments = [new CreateSalePaymentInput(PaymentMethod.Credit, 0m)],
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Error.Message);
+        var dto = result.Value;
+        Assert.Equal(0m, dto.AmountPaid);
+        Assert.Equal(0m, dto.Change);
+
+        Assert.NotNull(world.Sales.Added);
+        Assert.NotNull(world.Credits.Added);
+        Assert.Equal(customerId, world.Credits.Added!.CustomerId);
+        Assert.Equal(100m, world.Credits.Added.Balance);
+
+        var tx = Assert.Single(world.Credits.Transactions);
+        Assert.Equal(CreditTransactionType.Sale, tx.Type);
+        Assert.Equal(100m, tx.Amount);
+        Assert.Equal(world.Sales.Added!.Id, tx.RelatedSaleId);
+    }
+
+    [Fact]
+    public async Task CreditBalance_WithPartialCashUpfront_PostsOnlyTheShortfall()
+    {
+        var world = BuildWorld();
+        var customerId = new Guid("33333333-3333-3333-3333-333333333333");
+        var handler = world.CreateHandler();
+
+        var result = await handler.Handle(
+            world.Command() with
+            {
+                CustomerId = customerId,
+                Payments =
+                [
+                    new CreateSalePaymentInput(PaymentMethod.Cash, 40m),
+                    new CreateSalePaymentInput(PaymentMethod.Credit, 0m),
+                ],
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Error.Message);
+        Assert.Equal(40m, result.Value.AmountPaid);
+        Assert.Equal(0m, result.Value.Change);
+        Assert.Equal(60m, world.Credits.Added!.Balance);
+        Assert.Equal(60m, Assert.Single(world.Credits.Transactions).Amount);
+    }
+
+    [Fact]
     public async Task NoCashier_ReturnsUnauthorized()
     {
         var world = BuildWorld();
@@ -349,6 +497,7 @@ public sealed class CreateSaleCommandTests
         public required StubStockRepository Stock { get; init; }
         public required StubSaleRepository Sales { get; init; }
         public required StubNumberSequenceRepository NumberSequences { get; init; }
+        public required StubCustomerCreditRepository Credits { get; init; }
 
         public CreateSaleCommand Command() => new(
             BranchId: Branch.Id,
@@ -376,7 +525,9 @@ public sealed class CreateSaleCommandTests
             new StubTaxEngine(),
             Sales,
             NumberSequences,
-            new SaleStockDebitService(Stock));
+            new SaleStockDebitService(Stock),
+            Credits,
+            new StubReceiptMetadataService());
     }
 
     private static World BuildWorld()
@@ -419,6 +570,7 @@ public sealed class CreateSaleCommandTests
             Stock = new StubStockRepository { Balance = balance },
             Sales = new StubSaleRepository(),
             NumberSequences = new StubNumberSequenceRepository(),
+            Credits = new StubCustomerCreditRepository(),
         };
     }
 
@@ -444,6 +596,8 @@ public sealed class CreateSaleCommandTests
         public Guid TenantId { get; init; }
         public Guid? UserId { get; init; }
         public string? IpAddress => null;
+        public string? UserAgent => null;
+        public string? CurrentRefreshToken => null;
     }
 
     private sealed class StubBranchRepository : IBranchRepository
@@ -593,17 +747,29 @@ public sealed class CreateSaleCommandTests
             Movements.Add(movement);
             return Task.CompletedTask;
         }
-        public Task<IReadOnlyList<StockBalance>> ListBalancesAsync(
+        public Task<StockMovement?> FindAdjustmentByKeyAsync(
+            Guid tenantId, string key, CancellationToken ct = default)
+            => Task.FromResult(Movements.FirstOrDefault(
+                m => m.TenantId == tenantId
+                    && m.MovementType == StockMovementType.Adjustment
+                    && m.CorrelationId == key));
+        public Task<IReadOnlyList<StockBalanceView>> ListBalancesAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             string? search = null, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<StockBalance>>(Balance is null ? Array.Empty<StockBalance>() : new[] { Balance });
+            => Task.FromResult<IReadOnlyList<StockBalanceView>>(Balance is null
+                ? Array.Empty<StockBalanceView>()
+                : new[] { new StockBalanceView(
+                    Balance.WarehouseId, string.Empty,
+                    Balance.StockLocationId, string.Empty,
+                    Balance.ProductId, string.Empty, null, null,
+                    Balance.VariantId, string.Empty, Balance.Quantity) });
         public Task<int> CountBalancesAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null, string? search = null, CancellationToken ct = default)
             => Task.FromResult(Balance is null ? 0 : 1);
-        public Task<IReadOnlyList<StockMovement>> ListMovementsAsync(
+        public Task<IReadOnlyList<StockMovementView>> ListMovementsAsync(
             Guid tenantId, int page, int pageSize, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<StockMovement>>(Movements);
+            => Task.FromResult<IReadOnlyList<StockMovementView>>(Array.Empty<StockMovementView>());
         public Task<int> CountMovementsAsync(
             Guid tenantId, Guid? warehouseId = null, Guid? productId = null,
             StockMovementType? type = null, CancellationToken ct = default)
@@ -616,6 +782,22 @@ public sealed class CreateSaleCommandTests
                     && m.ReferenceId == referenceId
                     && (type == null || m.MovementType == type.Value))
                 .ToList());
+
+        public Task<IReadOnlyList<StockSummaryRow>> GetStockSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockSummaryRow>>(new List<StockSummaryRow>());
+
+        public Task<IReadOnlyList<StockMovementSummaryRow>> GetStockMovementSummaryAsync(
+            Guid tenantId, DateTime from, DateTime to, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockMovementSummaryRow>>(new List<StockMovementSummaryRow>());
+
+        public Task<IReadOnlyList<LowStockReportItem>> GetLowStockReportAsync(
+            Guid tenantId, decimal threshold, Guid? warehouseId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<LowStockReportItem>>(new List<LowStockReportItem>());
+
+        public Task<IReadOnlyList<StockVelocityRow>> GetStockVelocityAsync(
+            Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<StockVelocityRow>>(new List<StockVelocityRow>());
     }
 
     private sealed class StubSaleRepository : ISaleRepository
@@ -652,6 +834,33 @@ public sealed class CreateSaleCommandTests
         }
     }
 
+    private sealed class StubCustomerCreditRepository : ICustomerCreditRepository
+    {
+        public CustomerCredit? Existing { get; set; }
+        public CustomerCredit? Added { get; private set; }
+        public List<CreditTransaction> Transactions { get; } = new();
+
+        public Task AddAsync(CustomerCredit credit, CancellationToken ct = default)
+        {
+            Added ??= credit;
+            return Task.CompletedTask;
+        }
+        public Task UpdateAsync(CustomerCredit credit, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<CustomerCredit?> GetByCustomerIdAsync(Guid tenantId, Guid customerId, CancellationToken ct = default)
+            => Task.FromResult(Existing?.CustomerId == customerId ? Existing : null);
+        public Task AddTransactionAsync(CreditTransaction transaction, CancellationToken ct = default)
+        {
+            Transactions.Add(transaction);
+            return Task.CompletedTask;
+        }
+        public Task<IReadOnlyList<CreditTransaction>> ListTransactionsAsync(
+            Guid tenantId, Guid customerId, int page, int pageSize, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<CreditTransaction>>(Transactions);
+        public Task<IReadOnlyList<CustomerCredit>> ListOutstandingAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<CustomerCredit>>(
+                Added is null ? Array.Empty<CustomerCredit>() : new[] { Added });
+    }
+
     private sealed class StubTaxEngine : ITaxEngine
     {
         public Task<TaxCalculationResult> CalculateAsync(TaxCalculationContext context, CancellationToken ct = default)
@@ -674,6 +883,14 @@ public sealed class CreateSaleCommandTests
 
         private static decimal Round(decimal value)
             => Math.Round(value, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private sealed class StubReceiptMetadataService : IReceiptMetadataService
+    {
+        public Task<ReceiptMetadata> CaptureMetadataAsync(Sale sale, CancellationToken ct = default)
+            => Task.FromResult(ReceiptMetadata.Create(sale.Id, Guid.NewGuid(), BusinessIdentitySnapshot.Create("Head Office", null, null, null, null)));
+        public Task<BusinessIdentitySnapshot> GetBusinessIdentityAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(BusinessIdentitySnapshot.Create("Head Office", null, null, null, null));
     }
 }
 
@@ -746,6 +963,38 @@ public sealed class CreateSaleCommandValidatorTests
     {
         var validator = new CreateSaleCommandValidator();
         var command = Valid() with { Lines = [new CreateSaleLineInput(Guid.NewGuid(), null, 1m, DiscountAmount: -1m)] };
+        Assert.False(validator.Validate(command).IsValid);
+    }
+
+    [Fact]
+    public void ZeroAmountCreditPayment_RequiresACustomer_Passes()
+    {
+        var validator = new CreateSaleCommandValidator();
+        var command = Valid() with
+        {
+            CustomerId = Guid.NewGuid(),
+            Payments = [new CreateSalePaymentInput(PaymentMethod.Credit, 0m)],
+        };
+        Assert.True(validator.Validate(command).IsValid);
+    }
+
+    [Fact]
+    public void CreditPayment_WithoutCustomer_IsRejected()
+    {
+        var validator = new CreateSaleCommandValidator();
+        var command = Valid() with
+        {
+            CustomerId = null,
+            Payments = [new CreateSalePaymentInput(PaymentMethod.Credit, 0m)],
+        };
+        Assert.False(validator.Validate(command).IsValid);
+    }
+
+    [Fact]
+    public void ZeroAmountCashPayment_IsRejected()
+    {
+        var validator = new CreateSaleCommandValidator();
+        var command = Valid() with { Payments = [new CreateSalePaymentInput(PaymentMethod.Cash, 0m)] };
         Assert.False(validator.Validate(command).IsValid);
     }
 }

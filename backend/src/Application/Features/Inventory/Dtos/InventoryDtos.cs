@@ -26,13 +26,27 @@ public sealed record StockLocationInput(Guid? Id, string Code, string Name);
 
 public sealed record StockBalanceDto(
     Guid WarehouseId,
+    string WarehouseName,
     Guid StockLocationId,
+    string StockLocationName,
     Guid ProductId,
+    string ProductName,
+    string? Sku,
+    string? Barcode,
     Guid? VariantId,
+    string UnitOfMeasureName,
     decimal Quantity);
 
 public sealed record StockMovementDto(
     Guid Id,
+    Guid ProductId,
+    string ProductName,
+    string? Sku,
+    string? Barcode,
+    Guid WarehouseId,
+    string WarehouseName,
+    Guid StockLocationId,
+    string StockLocationName,
     StockMovementType Type,
     decimal QuantityDelta,
     string? Reason,

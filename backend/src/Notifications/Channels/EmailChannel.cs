@@ -44,12 +44,15 @@ public sealed class EmailChannel
                 client.Credentials = new NetworkCredential(_options.Username, _options.Password);
             }
 
+            // Bodies are plain Swahili text (verification / password-reset codes),
+            // not HTML. Sending them as plain text keeps them readable in mail
+            // clients (and MailHog) instead of base64-encoded HTML.
             using var mail = new MailMessage
             {
                 From = new MailAddress(from),
                 Subject = message.Subject,
                 Body = message.HtmlBody,
-                IsBodyHtml = true,
+                IsBodyHtml = false,
             };
             mail.To.Add(message.To);
 

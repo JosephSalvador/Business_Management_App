@@ -10,7 +10,10 @@ public sealed class RefreshToken : Entity
         Guid tenantId,
         string tokenHash,
         DateTime expiresAt,
-        Guid familyId)
+        Guid familyId,
+        string? deviceLabel,
+        string? ipAddress,
+        string? userAgent)
         : base(id)
     {
         UserId = userId;
@@ -18,6 +21,9 @@ public sealed class RefreshToken : Entity
         TokenHash = tokenHash;
         ExpiresAt = expiresAt;
         FamilyId = familyId;
+        DeviceLabel = deviceLabel;
+        IpAddress = ipAddress;
+        UserAgent = userAgent;
     }
 
     public Guid UserId { get; private set; }
@@ -28,10 +34,28 @@ public sealed class RefreshToken : Entity
     public Guid? ReplacedByTokenId { get; private set; }
     public Guid FamilyId { get; private set; }
 
+    /// <summary>Human-readable device name shown on the sessions page.</summary>
+    public string? DeviceLabel { get; private set; }
+
+    public string? IpAddress { get; private set; }
+    public string? UserAgent { get; private set; }
+
+    /// <summary>Start of the rotation family this token belongs to — the session's login time.</summary>
+    public DateTime CreatedAtUtc => CreatedAt;
+
     public bool IsActive => RevokedAt is null && ExpiresAt > DateTime.UtcNow;
 
-    public static RefreshToken Create(Guid userId, Guid tenantId, string tokenHash, DateTime expiresAt)
-        => new(Guid.NewGuid(), userId, tenantId, tokenHash, expiresAt, Guid.NewGuid());
+    public static RefreshToken Create(
+        Guid userId,
+        Guid tenantId,
+        string tokenHash,
+        DateTime expiresAt,
+        string? deviceLabel = null,
+        string? ipAddress = null,
+        string? userAgent = null)
+        => new(
+            Guid.NewGuid(), userId, tenantId, tokenHash, expiresAt, Guid.NewGuid(),
+            deviceLabel, ipAddress, userAgent);
 
     public void Revoke(Guid? replacedByTokenId = null)
     {

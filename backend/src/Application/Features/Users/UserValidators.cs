@@ -68,3 +68,22 @@ public sealed class SetUserBranchesCommandValidator : AbstractValidator<SetUserB
             .WithMessage("Default branch must be among the assigned branches.");
     }
 }
+
+public sealed class UpdateMyProfileCommandValidator : AbstractValidator<UpdateMyProfileCommand>
+{
+    public UpdateMyProfileCommandValidator()
+    {
+        RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.Phone).Must(phone => phone is null || PhoneNumber.IsNormalizable(phone))
+            .WithMessage("The phone number must be valid, e.g. 0712345678 or +255712345678.");
+    }
+}
+
+public sealed class ChangeMyPasswordCommandValidator : AbstractValidator<ChangeMyPasswordCommand>
+{
+    public ChangeMyPasswordCommandValidator()
+    {
+        RuleFor(x => x.CurrentPassword).NotEmpty();
+        RuleFor(x => x.NewPassword).PasswordPolicy();
+    }
+}

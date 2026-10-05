@@ -17,6 +17,8 @@ internal sealed class StubTenantContext(Guid tenantId) : ITenantContext
     public Guid TenantId => tenantId;
     public Guid? UserId => Guid.NewGuid();
     public string? IpAddress => "127.0.0.1";
+    public string? UserAgent => null;
+    public string? CurrentRefreshToken => null;
 }
 
 internal sealed class StubAccountRepository : IAccountRepository

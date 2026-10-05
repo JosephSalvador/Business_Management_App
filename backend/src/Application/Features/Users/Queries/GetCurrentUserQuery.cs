@@ -5,25 +5,28 @@ using MediatR;
 
 namespace BusinessOS.Application.Features.Users.Queries;
 
-public sealed record GetCurrentUserQuery : IRequest<Result<UserDto>>;
+public sealed record GetCurrentUserQuery : IRequest<Result<CurrentUserDto>>;
 
-public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, Result<UserDto>>
+public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, Result<CurrentUserDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IUserRepository _users;
     private readonly IRoleRepository _roles;
+    private readonly ITenantRepository _tenants;
 
     public GetCurrentUserQueryHandler(
         ITenantContext tenantContext,
         IUserRepository users,
-        IRoleRepository roles)
+        IRoleRepository roles,
+        ITenantRepository tenants)
     {
         _tenantContext = tenantContext;
         _users = users;
         _roles = roles;
+        _tenants = tenants;
     }
 
-    public async Task<Result<UserDto>> Handle(GetCurrentUserQuery request, CancellationToken cancellationToken)
+    public async Task<Result<CurrentUserDto>> Handle(GetCurrentUserQuery request, CancellationToken cancellationToken)
     {
         if (_tenantContext.UserId is null)
         {
@@ -42,7 +45,12 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
             permissions.AddRange(await _roles.GetPermissionsAsync(_tenantContext.TenantId, roleId, cancellationToken));
         }
 
-        var result = new UserDto(
+        var tenant = await _tenants.GetByIdAsync(_tenantContext.TenantId, cancellationToken);
+        var tenantName = tenant?.Name ?? string.Empty;
+
+        var roleNames = user.Roles.Select(r => r.Name).ToList();
+
+        var result = new CurrentUserDto(
             user.Id,
             user.TenantId,
             user.Email,
@@ -50,7 +58,12 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
             user.Phone,
             user.IsActive,
             user.EmailVerified,
-            permissions.Distinct().ToArray());
+            permissions.Distinct().ToArray(),
+            tenantName,
+            roleNames)
+        {
+            TwoFactorEnabled = user.TwoFactorEnabled,
+        };
 
         return Result.Success(result);
     }

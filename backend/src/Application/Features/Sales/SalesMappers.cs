@@ -56,7 +56,8 @@ internal static class SalesMappers
         line.BaseAmount,
         line.TaxAmount,
         line.LineTotal,
-        line.OrderIndex);
+        line.OrderIndex,
+        line.UnitCost);
 
     internal static SalePaymentDto ToPaymentDto(SalePayment payment) => new(
         payment.Id,

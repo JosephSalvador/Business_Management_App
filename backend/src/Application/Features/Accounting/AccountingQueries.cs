@@ -1,3 +1,4 @@
+using BusinessOS.Application.Features.Accounting.Commands;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Accounting;
 using BusinessOS.Shared;
@@ -268,9 +269,148 @@ public sealed class GetTenantAccountMappingQueryHandler
     {
         var tenantId = _tenantContext.TenantId;
         var mapping = await _mappings.GetByMappingKeyAsync(tenantId, query.MappingKey, cancellationToken);
-        if (mapping is null) return Result.Success<TenantAccountMappingDto?>(null);
+        // Resource-identifying GET driven by a path key: a missing mapping is "not found".
+        if (mapping is null) return Error.NotFound("Tenant account mapping not found.");
 
         return Result.Success<TenantAccountMappingDto?>(new TenantAccountMappingDto(
             mapping.Id, mapping.TenantId, mapping.MappingKey, mapping.AccountId, mapping.CreatedAt));
+    }
+}
+
+// ── List Expenses ───────────────────────────────────────────────
+public sealed record ListExpensesQuery(
+    int Page, int PageSize, DateTime? FromDate, DateTime? ToDate, string? Search)
+    : IRequest<Result<PagedExpenses>>, IRequiresTenantAdvisoryLock;
+
+public sealed class ListExpensesQueryHandler
+    : IRequestHandler<ListExpensesQuery, Result<PagedExpenses>>
+{
+    private readonly ITenantContext _tenantContext;
+    private readonly IExpenseRepository _expenses;
+
+    public ListExpensesQueryHandler(ITenantContext tenantContext, IExpenseRepository expenses)
+    {
+        _tenantContext = tenantContext;
+        _expenses = expenses;
+    }
+
+    public async Task<Result<PagedExpenses>> Handle(
+        ListExpensesQuery query, CancellationToken cancellationToken)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var items = await _expenses.ListAsync(
+            tenantId, query.Page, query.PageSize,
+            query.FromDate, query.ToDate, query.Search, cancellationToken);
+        var total = await _expenses.CountAsync(
+            tenantId, query.FromDate, query.ToDate, query.Search, cancellationToken);
+
+        var categoryNames = (await _expenses.ListCategoriesAsync(tenantId, cancellationToken))
+            .ToDictionary(c => c.Id, c => c.Name);
+
+        var dtos = items
+            .Select(e => AccountingMappers.ToDto(
+                e,
+                e.CategoryId is not null && categoryNames.TryGetValue(e.CategoryId.Value, out var name)
+                    ? name
+                    : null))
+            .ToList();
+        return Result.Success(new PagedExpenses(dtos, total));
+    }
+}
+
+// ── Get Expense ─────────────────────────────────────────────────
+public sealed record GetExpenseQuery(Guid ExpenseId)
+    : IRequest<Result<ExpenseDto>>, IRequiresTenantAdvisoryLock;
+
+public sealed class GetExpenseQueryHandler
+    : IRequestHandler<GetExpenseQuery, Result<ExpenseDto>>
+{
+    private readonly ITenantContext _tenantContext;
+    private readonly IExpenseRepository _expenses;
+
+    public GetExpenseQueryHandler(ITenantContext tenantContext, IExpenseRepository expenses)
+    {
+        _tenantContext = tenantContext;
+        _expenses = expenses;
+    }
+
+    public async Task<Result<ExpenseDto>> Handle(
+        GetExpenseQuery query, CancellationToken cancellationToken)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var expense = await _expenses.GetByIdAsync(tenantId, query.ExpenseId, cancellationToken);
+        if (expense is null) return Error.NotFound("Expense not found.");
+
+        string? categoryName = null;
+        if (expense.CategoryId is not null)
+        {
+            var category = await _expenses.GetCategoryByIdAsync(
+                tenantId, expense.CategoryId.Value, cancellationToken);
+            categoryName = category?.Name;
+        }
+
+        return Result.Success(AccountingMappers.ToDto(expense, categoryName));
+    }
+}
+
+// ── List Expense Categories ─────────────────────────────────────
+public sealed record ListExpenseCategoriesQuery()
+    : IRequest<Result<IReadOnlyList<ExpenseCategoryDto>>>, IRequiresTenantAdvisoryLock;
+
+public sealed class ListExpenseCategoriesQueryHandler
+    : IRequestHandler<ListExpenseCategoriesQuery, Result<IReadOnlyList<ExpenseCategoryDto>>>
+{
+    private readonly ITenantContext _tenantContext;
+    private readonly IExpenseRepository _expenses;
+
+    public ListExpenseCategoriesQueryHandler(ITenantContext tenantContext, IExpenseRepository expenses)
+    {
+        _tenantContext = tenantContext;
+        _expenses = expenses;
+    }
+
+    public async Task<Result<IReadOnlyList<ExpenseCategoryDto>>> Handle(
+        ListExpenseCategoriesQuery query, CancellationToken cancellationToken)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var categories = await _expenses.ListCategoriesAsync(tenantId, cancellationToken);
+        return Result.Success<IReadOnlyList<ExpenseCategoryDto>>(
+            categories.Select(AccountingMappers.ToDto).ToList());
+    }
+}
+
+// ── Expense Summary ─────────────────────────────────────────────
+public sealed record GetExpenseSummaryQuery(DateTime? FromDate, DateTime? ToDate)
+    : IRequest<Result<ExpenseSummaryDto>>, IRequiresTenantAdvisoryLock;
+
+public sealed class GetExpenseSummaryQueryHandler
+    : IRequestHandler<GetExpenseSummaryQuery, Result<ExpenseSummaryDto>>
+{
+    private readonly ITenantContext _tenantContext;
+    private readonly IExpenseRepository _expenses;
+
+    public GetExpenseSummaryQueryHandler(ITenantContext tenantContext, IExpenseRepository expenses)
+    {
+        _tenantContext = tenantContext;
+        _expenses = expenses;
+    }
+
+    public async Task<Result<ExpenseSummaryDto>> Handle(
+        GetExpenseSummaryQuery query, CancellationToken cancellationToken)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var now = DateTime.UtcNow;
+        var from = query.FromDate ?? new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = query.ToDate ?? new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc)
+            .AddMonths(1)
+            .AddTicks(-1);
+        if (query.FromDate.HasValue && query.ToDate.HasValue && query.FromDate > query.ToDate)
+        {
+            return Error.Validation("FromDate must be before or equal to ToDate.");
+        }
+
+        var summary = await _expenses.GetSummaryAsync(tenantId, from, to, cancellationToken);
+        return Result.Success(AccountingMappers.ToDto(summary));
     }
 }

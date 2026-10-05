@@ -14,6 +14,7 @@ public sealed record RecordOpeningStockCommand(
     decimal Quantity,
     Guid UnitOfMeasureId,
     DateTime EffectiveAt,
+    decimal? UnitCost = null,
     string? ReferenceType = null,
     Guid? ReferenceId = null,
     string? Reason = null,
@@ -67,7 +68,8 @@ public sealed class RecordOpeningStockCommandHandler
             return Error.NotFound("Product not found.");
         }
 
-        if (await _unitsOfMeasure.GetByIdAsync(tenantId, command.UnitOfMeasureId, cancellationToken) is null)
+        var unitOfMeasure = await _unitsOfMeasure.GetByIdAsync(tenantId, command.UnitOfMeasureId, cancellationToken);
+        if (unitOfMeasure is null)
         {
             return Error.Validation("The unit of measure does not exist in this tenant.");
         }
@@ -115,7 +117,14 @@ public sealed class RecordOpeningStockCommandHandler
             tenantId, warehouse.Id, location.Id, product.Id, command.VariantId, cancellationToken);
         balance.Apply(command.Quantity);
 
-        return Result.Success(WarehouseMappers.ToBalanceDto(balance));
+        return Result.Success(WarehouseMappers.ToBalanceDto(
+            balance,
+            warehouse.Name,
+            location.Name,
+            product.Name,
+            product.Sku,
+            product.Barcode,
+            unitOfMeasure.Name));
     }
 
     private static StockLocation? ResolveLocation(Warehouse warehouse, Guid? stockLocationId)

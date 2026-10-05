@@ -154,6 +154,8 @@ public sealed class SalesQueriesTests
         public Guid TenantId { get; init; }
         public Guid? UserId => null;
         public string? IpAddress => null;
+        public string? UserAgent => null;
+        public string? CurrentRefreshToken => null;
     }
 
     private sealed class StubSaleRepository : ISaleRepository
