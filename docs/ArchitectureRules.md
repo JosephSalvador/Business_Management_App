@@ -20,6 +20,90 @@
 - Everything configurable: tax rules, numbering sequences, currencies, units, dynamic fields, UI strings.
 - API-first: a REST endpoint exists before the UI screen.
 
+## Client architecture rule
+
+**One Flutter codebase, all platforms.** This is locked (2026-08-31).
+
+- All client code lives in `frontend/jolinx_app/`.
+- Platform-specific code lives in `android/`, `ios/`, `linux/`, `macos/`, `windows/`, `web/`.
+- Shared code (auth, API, models, state, validation, localization, theme, components, navigation,
+  error handling, permissions, business workflows, offline storage, synchronization, testing)
+  lives in `lib/`.
+- **Never create separate projects** for web, desktop, or mobile. One project, one codebase.
+- Platform-specific implementations (receipt printer, camera, file system, OS APIs) go behind
+  common Dart interfaces in `lib/core/platform/`.
+- One codebase ≠ one UI. Each platform adapts to its device.
+
+## Progressive complexity rule
+
+**The system must hide complexity, not capability.** Users never need to understand how the
+system works internally to accomplish a business task.
+
+- No database language in UI. Use business actions: "Add stock" (not "Adjustment Transaction"),
+  "Fix stock" (not "Stock Reconciliation"), "Stock history" (not "Stock Movement"), "Store"
+  (not "Warehouse Location").
+- Small businesses get a simple interface. Growing businesses progressively unlock more
+  capability. Advanced businesses can access deeper controls without changing the platform.
+- Smart defaults do most of the work. Default warehouse, default price, default unit. The
+  user confirms, not configures.
+- "Do" and "Manage" are separated by role. Cashiers see Sell/Add stock/Record expense.
+  Owners see Products/Prices/Warehouses/Staff/Reports/Settings.
+- Negative stock informs, never blocks. Show "Stock is now -4. You can correct later."
+  Sales always succeed; stock is advisory.
+- **Purchase vs Expense — strict separation.** Two distinct business events, never blurred:
+  - **Purchase** = "Nimenunua bidhaa" — acquiring inventory from a supplier. Increases stock,
+    affects supplier balance/payable, may affect inventory cost.
+  - **Expense** = "Nimetumia pesa" — money spent to operate the business (rent, transport,
+    internet, airtime, staff lunch, government fees). Money out only, no stock increase.
+  - Users enter through the correct action immediately. No generic "Money Out" button that
+    forces a secondary choice. The system handles accounting consequences underneath.
+
+## Business data integrity rule
+
+**Every number must have a story.** The system collects information at the moment the user
+has it, so reports are trustworthy later.
+
+**Enforcement model — not everything blocked at the same strength:**
+
+| Area                        | Enforcement                       | Why                                                 |
+| --------------------------- | --------------------------------- | --------------------------------------------------- |
+| Product cost price          | Required                          | Margin and stock valuation depend on it             |
+| Purchase source/supplier    | Required                          | Establishes where stock came from                   |
+| Purchase unit cost          | Required                          | Needed for inventory valuation                      |
+| Purchase quantity           | Required                          | Obvious transaction requirement                     |
+| Money Account               | Required                          | Prevents unexplained money                          |
+| Expense category            | Required                          | Makes reports meaningful                            |
+| Opening stock cost          | Required                          | Establishes inventory value                         |
+| Sale void reason            | Required                          | Protects audit trail                                |
+| Customer on cash sale       | Optional                          | Don't create unnecessary friction                   |
+| Supplier for every purchase | Allow "Walk-in Supplier"          | Small shops may buy without formal supplier records |
+| Stock adjustment            | Requires reason                   | Not every stock change is a purchase                |
+| Selling price               | Required before selling           | But allow different price lists                     |
+
+**Stock increases are guided, not blindly blocked.** The user picks a reason:
+
+> "Unaongeza stock kwa sababu gani?"
+>
+> 🛒 Nimenunua (Purchase → requires supplier + cost)
+> ↩️ Return (Customer return)
+> 🏭 Production
+> 🔄 Transfer (Internal)
+> 📦 Opening Stock (requires cost)
+> 🛠️ Adjustment (requires reason)
+
+The system enforces different fields based on the reason.
+
+**UX principle — never say "You can't."**
+
+Instead of: "Cannot save. Cost price is required."
+
+Use: "Bei ya kununua inahitajika. Tutaweza kukokotoa thamani ya stock na faida yako kwa usahihi."
+     `Bei ya kununua: TZS ______`
+
+**Collect at the moment, not later.** When they receive goods, they know the cost NOW.
+When they spend money, they know the category NOW. When they void a sale, they know the
+reason NOW. Don't wait until Reports to discover the data is missing.
+
 ## Database schema strategy
 
 - All tables live in the `public` schema during Platform and Foundation phases to keep migration
@@ -78,3 +162,36 @@ the core tax engine is agnostic and the database decides which plug-in applies.
 - Responsive UI verified
 - Offline mode + sync verified
 - Error handling verified
+
+## Business Data Integrity
+
+**Every number must have a story.** This rule enforces that the business can always explain its numbers.
+
+### Enforcement model
+
+| Data point | Level | Rule |
+|---|---|---|
+| Product cost price | Required | Every physical product (goods) must have a cost price. Services exclude cost price. |
+| Sale line unit cost | Snapshot | Cost price is copied onto each SaleLine at sale time from `Product.CostPrice`. Immutable after sale. |
+| COGS | Derived | `SUM(SaleLine.UnitCost × Quantity)` — never approximated from POs alone. |
+| Stock increase reason | Required | Every stock increase (adjustment or opening) requires a reason type from the enum. |
+| Stock unit cost | Optional | Cost per unit can be provided on stock adjustments and opening stock. |
+| Expense category | Required | Every expense must have a category. Default categories are seeded per tenant. |
+| Sale void reason | Required | Voided sales must include a reason string. |
+
+### Stock reason types
+
+When stock increases, the user picks a reason from: **Purchase**, **Return**, **Opening Stock**, **Adjustment**, **Transfer**, **Production**.
+
+### Product cost price flow
+
+1. **Product creation**: Cost price is required for goods, forbidden for services.
+2. **Sale time**: `Product.CostPrice` is snapshot onto `SaleLine.UnitCost` — immutable after sale.
+3. **COGS calculation**: `SUM(SaleLine.UnitCost × Quantity)` — uses snapshotted values.
+4. **Reporting**: Gross profit = Revenue - COGS (using snapshotted cost).
+
+### UX principles
+
+- Never say "You can't" — guide the user to the right action.
+- Collect cost information at the moment the user has it (product creation, stock receipt).
+- If a number can't be explained, surface it as a warning, not a blocker.

@@ -198,6 +198,9 @@ endpoints; create Drift `sales`/`sale_items` tables + `SyncQueueItems` flush wor
 keeps computing display VAT for offline UX, but the **server response is authoritative** and is
 written back to the device.
 
+Receipt rendering (preview, share, text/PDF/thermal print, reprint watermark, print audit,
+Swahili labels) is specified separately in `specs/receipts.md`.
+
 ## API (backend)
 
 All authenticated (`Bearer`), versioned `/api/v1`, rate-limited by the `global` policy,

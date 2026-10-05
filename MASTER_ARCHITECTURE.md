@@ -75,7 +75,18 @@ Rules:
 ├── docs/                         ← engineering handbook + ADRs
 ├── memory/                       ← project memory (read before tasks)
 ├── changelog/                    ← CHANGELOG.md
-├── mobile/ (or app root)         ← Flutter client (business_management_system)
+├── frontend/                     ← Flutter client (one codebase, multiple platforms)
+│   └── jolinx_app/
+│       ├── lib/
+│       │   ├── core/             shared: auth, API client, models, state, validation, offline
+│       │   ├── features/         feature modules (sales, products, inventory, etc.)
+│       │   └── presentation/     pages, widgets, theme, localization
+│       ├── android/              Android-specific
+│       ├── ios/                  iOS-specific
+│       ├── linux/                Linux desktop
+│       ├── macos/                macOS desktop
+│       ├── windows/              Windows desktop
+│       └── web/                  Web-specific
 └── backend/
     ├── BusinessOS.slnx           ← includes tests project
     ├── src/
@@ -239,3 +250,48 @@ error handling verified.
 - Cloud SaaS (default): Api + Workers behind TLS; tenant-isolated data.
 - Self-hosted/on-premises: Docker Compose/Helm; customers keep their data.
 - Offline desktop: Flutter desktop + local SQLite, optional sync to a company server.
+
+## 19. Client architecture (Flutter — locked 2026-08-31)
+
+**One Flutter codebase targets all platforms.** This is a deliberate solo-developer
+optimization: one language (Dart), one UI framework, one state management, one navigation
+system, one testing approach, one deployment pipeline.
+
+```
+                    JOLINX BUSINESS OS
+                           │
+                    .NET 10 Backend
+                           │
+                    PostgreSQL
+                           │
+                    REST API / Events
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+     Flutter            Flutter            Flutter
+       Web              Desktop             Mobile
+        │                  │                  │
+     Browser        Windows/Linux/       Android/iOS
+                     macOS
+```
+
+**Shared across platforms:** authentication, API client, models, state management,
+validation, localization, theme, components, navigation concepts, error handling,
+permissions, business workflows, offline storage, synchronization, testing utilities.
+
+**Platform-specific behind common interfaces:** receipt printer, USB, Bluetooth, barcode
+scanner, camera, file system, OS APIs. Each has a platform implementation behind a Dart
+interface (e.g. `ReceiptPrinter.print(receipt)`).
+
+**One codebase ≠ one UI.** Each platform adapts to its device:
+- Desktop POS: keyboard, barcode scanner, mouse, receipt printer
+- Mobile: touch, camera, mobile money, small screen
+- Web: information density, management workflows
+
+**All platforms are first-class.** The backend doesn't care what device the tenant uses.
+Tenant configurations determine which platforms are available, not the technology.
+
+**Offline-first:** Local-first where workflow requires it + cloud synchronization. Device
+writes go to Drift outbox, flush over idempotent REST endpoints. Backend applies server-wins
+on conflict (v1).

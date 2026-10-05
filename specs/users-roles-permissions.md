@@ -40,6 +40,10 @@ permissions and branch-scoped access without revisiting the authorization model.
 - Deleting a role leaves its users intact but removes those grants (they lose that role).
 - The **permission catalog** is seeded (`PermissionNames.All`); the slice manages
   *assignment* of existing permissions to roles, not the catalog itself.
+- New businesses receive ready-to-use roles at registration: protected `Administrator` and
+  `Staff` system roles, plus editable `Manager`, `Cashier`, `Inventory Officer`, and
+  `Accountant` starter roles. The starter roles are tenant-owned defaults: a client may rename,
+  change, or delete them, and deleted roles are never re-created for an existing tenant.
 - A user may be assigned to **zero or more branches**; **at most one default branch**.
   The default branch id must be among the assigned branches (or null).
 - Branch assignments require the branch to exist in the tenant (checked per assignment).
@@ -184,6 +188,9 @@ None in this slice.
 - User delete = **soft delete** (deactivate + revoke sessions), consistent with branch
   deactivation; hard delete deferred with guardrails.
 - Permission catalog stays seeded; this slice manages role↔permission assignment only.
+- Default role setup is intentionally hybrid: the owner is assigned only `Administrator`, while
+  the remaining role presets remove permission-matrix work for new clients without preventing
+  custom roles.
 - `Idempotency-Key` remains deferred platform-wide (no endpoint implements it yet).
 
 ## Future improvements (Slice 2b and later)

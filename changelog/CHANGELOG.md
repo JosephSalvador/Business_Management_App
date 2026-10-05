@@ -1,5 +1,80 @@
 # Changelog
 
+## Unreleased
+
+- **Modules:** subscription entitlements now drive the UI, not just the API. Effective
+  features are `(base plan keys ∪ add-on package keys) ∩ enabled tenant feature flags`, so a
+  package can never widen a tenant past the flags it was provisioned for. Both the `More`
+  menu and the primary tabs are capability-gated: locked tabs show a lock badge, route to
+  billing when the session may manage it or to a dedicated `/module-locked` screen
+  otherwise, and render a placeholder rather than the real page. POS and inventory are debt
+  backstops, so a tenant in arrears keeps taking money.
+- **Modules — 403 vs 402:** a healthy plan with a module switched off is refused with
+  `ModuleDisabled` (403, "upgrade"), while a tenant in debt is refused with
+  `BillingRequired` (402, "pay"). The two are deliberately distinct answers; collapsing
+  them was rejected. Both carry a `module` extension so the client can explain itself.
+- **Packages:** the first add-on, `invoice-manager`, ships end to end. It is a
+  `SubscriptionItem`, never a base plan, so `invoicing.enabled` cannot leak into Free or
+  Pro. Activation and removal are available from the billing page to `Billing.Manage`
+  sessions and take effect on the next capabilities read.
+- **Capabilities + offline:** `GET /api/v1/capabilities` reports the plan's keys, active
+  packages, quotas, and a `validOfflineUntil` window (`min(nextDue + 7d, now + 30d)`). The
+  client caches it per tenant and trusts it only until that instant — including for
+  full-access tenants — then falls back to the backstop set instead of either unlocking
+  unpaid modules or locking out the cashier. A stale-cache banner explains the reduced
+  state instead of failing silently.
+- **Invoicing:** customer invoicing is now a real module (list, detail, create, partial
+  payments, void) behind `Invoices.View/Create/Manage`, with status
+  `Unpaid → PartiallyPaid → Paid` plus terminal `Void`, overpayment rejection, and
+  server-recomputed totals. It is independent of subscription billing: an overdue
+  subscription invoice does not block healthy customer invoices. The list endpoint returns
+  a summary shape and the detail endpoint the full document, which is why the client has
+  separate `CustomerInvoiceSummary` / `CustomerInvoice` models.
+- **Sync:** a queued offline sale refused because its module is disabled now fails
+  terminally instead of retrying forever, and one refused for billing reasons is released
+  unattempted — no attempt is burned, so it simply goes through after payment.
+- **POS:** checkout stays reachable regardless of capabilities. The existing
+  `offlineWindowOpen()` control is an authentication window, not a plan check, and is
+  unchanged.
+- **Fix:** the committed generated localizations were badly out of date (363 ARB keys
+  missing, 295 of them referenced from `lib/`), so the app could not compile. Localizations
+  were regenerated from the ARB sources, which remain the only place to edit them.
+- **Fix:** login no longer fetches the subscription and the capabilities separately —
+  capabilities carry a superset of that data, so the subscription endpoint is now only a
+  fallback.
+
+- **Receipts:** the on-screen ticket and the thermal slip are now one artifact
+  (`specs/receipts.md`). `Thermal80mmRenderer` was rewritten around a 42-column width
+  invariant with a Jolinx-style ticket: centered business header (branch, address, phone,
+  **email**, tax no.), meta block with **cashier and customer**, a 4-column item table that
+  now prints the **unit price**, `Subtotal` / `Discount (n%)` / `GRAND
+  TOTAL` rows (VAT/tax is deferred — no tax row and no derived percentage), payment block
+  with **transaction id** (first tender reference), fiscal
+  `Verification:` and a QR block that only print when there is content, and a policy footer.
+- **Receipts API:** `ReceiptPreviewDto` gains `email`, `branchName`, `cashierName`,
+  `customerName`, `currency` and `payments[].reference`, projected by
+  `GetReceiptPreviewQuery` (branch/user display names, customer, tenant currency, tender
+  reference) — no more `Business` / `Walk-in` placeholders.
+- **Receipts UI:** new provider-free `ReceiptTicketCard` replaces the raw monospace text on
+  `ReceiptPreviewPage` and `SaleSuccessPage`; the **RobotoMono** font is finally registered
+  (it was silently falling back to a proportional font and misaligning every column).
+- **Receipts localization:** receipt labels follow the app locale (`ReceiptLanguage.en/sw`)
+  through `ReceiptLabels`, so screen, copied text, PDF and thermal print all speak the same
+  language.
+- **Receipts reprint + audit:** the previously dead reprint watermark is wired — pages render
+  `*** REPRINT ***` once `printCount > 0` (plus a same-session counter) and fire-and-forget
+  `POST /receipts/{saleId}/print` after every successful print (`Original` then `Reprint`).
+  `SaleSuccessPage` now uses the real workspace name instead of the hard-coded `Business`.
+- **Receipts cleanup:** the legacy `sales/domain/receipt.dart` text builder is deleted;
+  `ReceiptPrinterService.saleToReceipt` is the single offline/just-closed path to a ticket
+  (it also fixes `isVoided` being hard-coded to `false`), and the QR payload now carries the
+  tenant currency.
+- **Roles:** new tenant registration now provisions protected `Administrator` and `Staff` roles
+  together with editable `Manager`, `Cashier`, `Inventory Officer`, and `Accountant` starter
+  roles. The owner receives only `Administrator`; starter roles can be adjusted or deleted.
+- **Roles UI:** starter roles are identified as editable defaults, system-role permission edits
+  show a lockout warning, and the permission picker is grouped by business area.
+
 ## v0.7.0 — 2026-08-16 — Slice 6: Sales POS backend
 
 - **Domain:** `Sale` aggregate (`SaleLine`, `SalePayment`, `SaleStatus`/`SaleSource`/

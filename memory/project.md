@@ -143,9 +143,11 @@
   the follow-up.
 - **Phase 1 slice 6 (Sales POS backend), in progress (tasks 004–013 done 2026-08-16):** the
   active slice (6a core + 6b application/API/events + 6c tests/docs). See
-  `tasks/sales-pos/TASKS.md`. **Localization strategy (locked):** core never references a
-  country; selection is data-driven via `TaxRule.CalculationStrategyKey` (`Simple` fallback in
-  `DefaultPercentageTaxStrategy`; `TZ_DUAL_VAT` in `Localizations/Tanzania/Tax/TzDualVatTaxStrategy`).
+  `tasks/sales-pos/TASKS.md`. **Tax/VAT strategy (DEFERRED to future addon):** core sales
+  flow works without tax calculation; tax engine is a stub returning NONE/0. Country-specific
+  tax rules (TRA dual-VAT etc.) will be implemented later as an addon for users who need it.
+  Current: `DefaultPercentageTaxStrategy` (simple fallback); `TzDualVatTaxStrategy` exists but
+  Calculate is a stub. No tax-rules read API exposed to client.
   Done: 004 `Products.TaxCategoryId` + `Tenants.CountryCode` (+ migration `AddProductTaxCategory`/
   `AddTenantCountryCode`, `ProductReferenceGuard`, `ITaxRuleRepository` EF impl + DI); 005
   `UpdateOrganizationCommand` requires `CountryCode` (`^[A-Z]{2}$`, tenant default `TZ`);
@@ -333,17 +335,50 @@
    printer stack in M4), SalesHistoryPage, SaleDetailPage. Router /pos /pos/success /sales +
    receipt/detail param routes; home tab 0 = POS; logout resets cart/checkout/history.
    posBranchIdProvider fetches first branch via GET /branches (WorkspaceDto has no BranchId).
-   User-approved design decision: shelf prices are tax-inclusive server-side and there is no
-   tax-rules read API, so the cart shows Jumla only with hint "Bei zinajumuisha kodi." and the
-   exact Subtotal/VAT split appears solely on the success screen/receipt from server truth.
+   User-approved design decision: shelf prices are tax-inclusive server-side; tax calculation
+   is deferred to a future addon (no tax-rules read API), so the cart shows Jumla only with
+   hint "Bei zinajumuisha kodi." and the exact Subtotal/VAT split appears solely on the
+   success screen/receipt from server truth (when tax addon is enabled).
    flutter analyze clean; 77/77 tests green. Real-API E2E (/tmp/opencode/m4_e2e.sh) verified
    the full journey incl. oversell → 400 whole-sale reject, same-key replay returns ORIGINAL
    sale with exactly one DB row, API restart + fresh login persistence, stock 50→48 stable.
    Debt: no void/refund UI; receipt unit prices omit TSh symbol; offline POS deferred to M8.
 
-## coding.md — see `docs/CodingStandards.md`
+- **Mx Unverified-login UX fix (backend + Flutter), done 2026-08-29:** logging in with an
+  unverified account no longer shows the misleading "Hauna ruhusa ya kitendo hiki" (403)
+  banner; it now routes back to the verify-email screen. Backend `LoginCommand.cs` attaches the
+  account `email` to the `AccountNotVerified` error (via `with { Details }` — `Error` is a
+  readonly record struct, so object-initializer syntax is invalid); `ResultExtensions.cs`
+  serializes `error.Details` into ProblemDetails `Extensions` for the non-validation path.
+  Flutter `error_mapper.dart` maps a 403 with `code == 'AccountNotVerified'` to
+  `AccountNotVerifiedException(message, email:)` (non-`AccountNotVerified` 403 still →
+  `ForbiddenException`); `auth_controller.dart` `login()` catches it, recovers the email
+  (error email else `_emailFromIdentifier`), and sets `AuthNeedsVerification(email)` so the
+  router's `journeyRedirect` sends the user to `/verify-email` (fallback rethrown only when the
+  email is unresolvable). Tests: 3 new journey tests (routes back w/ email, phone→email
+  recovery, unresolvable rethrows) + 2 new repository tests (typed mapping w/ email, plain 403
+  still Forbidden) in `auth_controller_journey_test.dart`/`auth_repository_test.dart`
+  (`FakeAuthRepository` gained a scriptable `login` override). Backend
+  `Login_BeforeVerification_Returns403AccountNotVerified` integration test now asserts the
+  `email` property. Verified: `flutter analyze` clean (only 3 pre-existing warnings), auth tests
+  17/17 green, backend builds `--warnaserror` clean, integration test passes, `dotnet format`
+  (pre-existing-only violations, none in changed files).
 
-## accounting_plan.md — Slice 9 (IMPLEMENTED)
+- **Mx Products-page endless spinner bugfix, done 2026-08-29:** `ProductsPage` was a
+  `ConsumerStatefulWidget` but never triggered the initial `load()` in `initState`, so the
+  Bidhaa tab stayed in `ProductsLoading` forever (endless spinner) for a fresh MVP user.
+  Added `initState` + `Future.microtask(() => ref.read(productsControllerProvider.notifier).load())`,
+  matching the existing `StockPage` pattern. Mauzo/Stock/Reports empties were correct
+  (no-products state); only the products list never loaded. `flutter analyze` clean; 16/16
+  products tests green.
+- **Mx Add-product form endless spinner bugfix, done 2026-08-29:** the `ProductFormPage`
+  (`/products/new`) `ref.watch`es `catalogControllerProvider` but nothing triggered
+  `CatalogController.load()` outside business setup — so a user landing on the form later
+  stayed in `CatalogLoading` forever. Added `initState` + `Future.microtask` that calls
+  `load()` only while the catalog is still `CatalogLoading` (guards against unnecessary
+  reloads on the edit path). `flutter analyze` clean; 16/16 products tests green.
+
+## coding.md — see `docs/CodingStandards.md`## accounting_plan.md — Slice 9 (IMPLEMENTED)
 
 - **Spec:** `specs/accounting.md` · **Tasks:** `tasks/accounting/TASKS.md` (26 tasks, all done).
 - **Key architectural decisions:**
@@ -352,6 +387,13 @@
   3. **Reversing entries** — Voiding a Posted JE creates a NEW mirroring JE (flipped debits/credits).
   4. **CurrentBalance** — Updated synchronously on JE post via account mapping service.
 - **Status:** Implemented. 14 unit tests passing. Integration tests blocked on Postgres.
+
+## jolinx_vision.md — see `docs/Jolinx-Vision.md`
+
+- Jolinx is a **Business Operating System**, not just a POS.
+- Core identity: "Every sale creates a trace. Every shilling has a story."
+- Priority: Cash & Money Accountability → Credit → Owner Mode → Stock Story → AI
+- See `docs/Jolinx-Vision.md` for full roadmap, feature status, and architectural principles.
 
 ## api.md — see `docs/APIStandards.md`
 
@@ -366,11 +408,132 @@
 - Mobile-first, one-hand usable, works on cheap Android, offline-first.
 - Swahili + English localization first-class. Large tap targets for POS.
 - Guided onboarding < 10 min. Every screen earns its place.
+- **Progressive complexity:** the system becomes more powerful as the business grows,
+  without becoming more complicated for the person using it. Small shops see
+  Sell/Stock/Money/Customers/Reports. Larger businesses unlock Warehouses/Transfers/Staff.
+  Same platform, different cognitive load.
+- **Hide complexity, not capability.** Users never need to understand how the system works
+  internally to accomplish a business task. No database language in UI (no "Stock Movement",
+  "Adjustment Transaction", "Correlation ID", "Idempotency"). Use business actions: "Add stock",
+  "Fix stock", "Stock history".
+- **Do vs Manage separation.** Everyday workers see Do (Sell, Add stock, Record expense).
+  Owners/manager see Manage (Products, Prices, Warehouses, Staff, Reports, Settings).
+- **Smart defaults.** The system remembers how the business operates. Default warehouse,
+  default price, default unit, default payment method. The user confirms, not configures.
+- **One question at a time.** Don't present giant forms. Ask "What are you adding?" then
+  "How many?" then "Where?". Advanced details (supplier, batch, expiry) are opt-in.
+- **Inform, don't block.** Negative stock shows "Stock is now -4. You can correct later."
+  Never "Insufficient stock" / "Sale blocked". Sales always succeed; stock is advisory.
+- **Dashboard answers questions.** "How is the business doing?" → revenue, low stock, credit.
+  "What needs my attention?" → out-of-stock, overdue credit. Not raw data dumps.
+- **Purchase vs Expense — strict distinction.** Two different business events, never blurred:
+  - **Purchase** = "Nimenunua bidhaa" — acquiring inventory from a supplier. Impacts:
+    Stock ↑, Money ↓ / Payable ↑, Supplier balance. Affects inventory cost.
+    Flow: Supplier → Purchase Order → Products + quantities → Receive → Stock increases.
+  - **Expense** = "Nimetumia pesa" — money spent to operate the business. Impacts:
+    Money ↓ only. Does NOT increase stock. Examples: rent, transport, internet, airtime,
+    staff lunch, government fees, office supplies.
+  - User enters through the correct business action immediately. No generic "Money Out"
+    button that forces a secondary choice.
+  - Edge case (later): transport to bring stock can be an additional cost on the Purchase;
+    don't force separate Expense + Purchase. Deferred — MVP keeps them separate.
+- **Product cost price enforcement.** Every physical product (goods) must have a cost price
+  set at creation. The cost price is snapshot onto each SaleLine at sale time. COGS is
+  calculated as `SUM(SaleLine.UnitCost × Quantity)`. Services cannot have a cost price.
+- **Guided stock increases.** Every stock increase (adjustment or opening) requires a reason
+  type: Purchase, Return, Opening Stock, Adjustment, Transfer, Production. Cost per unit
+  can optionally be provided at stock entry time.
+- **Expense category enforcement.** Every expense must have a category. Default categories
+  (Rent, Utilities, Transport, Salaries, Supplies, Marketing, Maintenance, Insurance,
+  Taxes, Other) are seeded per tenant.
+- **Reports philosophy: dashboard, not PDF list.** The owner should open Reports and understand
+  what happened in the business in 10–20 seconds. Reports home is a dashboard with KPIs
+  (Sales, Gross Profit, Expenses, Cash/Money), trend charts, and business snapshot (top
+  products, money movement). Not a list of report names.
+- **Global filter system.** One filter bar at the top: Period (Today/Yesterday/This Week/
+  This Month/Last Month/Custom), Location, Staff, Category, Payment Method. Report updates
+  automatically. Small shops select "This Month" and they're done. Larger businesses can
+  drill "This Month → Branch: Kariakoo → Staff: John."
+- **Drill-down architecture: Dashboard → Metric → Category → Transaction → Source.** Every
+  number is clickable. Sales TZS 845,000 → tap → Cash/Mobile/Credit breakdown → tap M-Pesa
+  → individual transactions → tap receipt → actual sale. This is what makes it feel
+  professional vs basic POS.
+- **Reports named by business question, not accounting term.** "Sales Performance" not
+  "Revenue Recognition Analysis." "Stock Overview" not "Inventory Position Report."
+  "Expenses" not "Operating Expenditure Analysis." Sophisticated calculations happen
+  underneath; user sees business language.
+- **Reports tell a story.** Not just numbers. "Sales ↑ 14.2% compared with February.
+  Best day: Saturday — TZS 2,140,000. Best category: Building Materials."
+- **Charts vs Tables.** Charts for trends/comparisons/proportions. Tables for transactions/
+  stock/customers/detailed movements. Don't force everything into colorful graphs.
+  Stock report = professional table with Opening/Purchased/Sold/Adjusted/Closing columns.
+- **"Where did my money go?" report.** Starting Balance → Money In (Sales, Customer Payments)
+  → Money Out (Purchases, Expenses, Supplier Payments) → Current Balance. Every number
+  clickable. Business memory represented visually.
+- **Progressive complexity for reports.** Small business: Sales/Stock/Money/Expenses/Purchases.
+  Medium: +Branch/Staff/Customers/Suppliers/Categories/Profit. Large: +Branch Comparison/
+  Staff Performance/Inventory Valuation/Receivables Aging/Payables Aging/Profitability/
+  Consolidated Reports. Same system, different depth.
+- **Export is secondary.** PDF/Excel/CSV/Print available but report itself is useful inside
+  Jolinx. User shouldn't need to export to understand their business.
+- **Future: AI "Explain this report."** "Your sales increased 14% but gross profit only 5%.
+  Main reason: average product margin decreased. Cement contributed most sales increase but
+  has lower margins." AI interprets business memory, doesn't replace the report.
+- **Reports foundation MVP (6 reports):** 1) Business Overview ⭐, 2) Sales, 3) Stock,
+  4) Money, 5) Purchases, 6) Expenses. All share global date/location/filter + drill-down.
+  Foundation supports future: customers, suppliers, profit, branches, AI, exports.
+- **Underlying data model.** All reports derive from same business events:
+  Sale → stock ↓ + money ↑ + customer balance.
+  Purchase → stock ↑ + supplier balance/money ↓.
+  Expense → money ↓.
+  Payment → money movement + balance update.
 
 ## branding.md
 
-- Product name: **Business OS**. Flutter package: `business_management_system`.
+- Product name: **Business OS**. Flutter package: `jolinx_app`.
 - Goal tone: trustworthy, simple, local. (Full brand guide deferred.)
+
+## tech_stack.md — FINAL (locked 2026-08-31)
+
+**Architecture decision: One Flutter codebase, everywhere.**
+
+- **Backend:** .NET 10 (ASP.NET Core, modular monolith)
+- **Database:** PostgreSQL
+- **Client:** Flutter / Dart
+- **Targets:** Web + Desktop (Windows/Linux/macOS) + Mobile (Android/iOS)
+- **Languages:** Dart + C# only
+
+**Dropped:**
+- React (separate web frontend)
+- Tauri (separate desktop frontend)
+
+**Rationale:**
+Solo developer optimizing for maintenance complexity, not "best technology per platform."
+One codebase = shared auth, API client, models, state management, validation, localization,
+theme, components, navigation, error handling, permissions, business workflows, offline
+storage, synchronization, testing utilities.
+
+**Build order:**
+1. Stage 1 — Core (backend + Flutter architecture + auth)
+2. Stage 2 — Primary client (Desktop + Android — POS/offline nature)
+3. Stage 3 — Web (management/browser experience)
+4. Stage 4 — iOS (another target, not another project)
+
+**Platform adaptation:**
+One codebase ≠ one UI. Each platform adapts to its device:
+- Desktop POS: keyboard, barcode scanner, mouse, receipt printer
+- Mobile: touch, camera, mobile money, small screen
+- Web: information density, management workflows
+
+**Offline-first:**
+Local-first where workflow requires it + cloud synchronization.
+Backend doesn't care what device the tenant prefers.
+
+**Documentation updated:**
+- `memory/project.md` — tech_stack.md section
+- `MASTER_ARCHITECTURE.md` — repository layout (section 4) + client architecture (section 19)
+- `docs/ArchitectureRules.md` — client architecture rule
+- `docs/TechStack.md` — languages section + rationale
 
 ## known_issues.md
 
@@ -379,6 +542,743 @@
 - Integration tests need real Postgres on `localhost:5432` → CI runs unit tests only.
 - Success `Result<T>` endpoints return **200**, not 201 (platform `ToApiResult` convention) —
   documented in the Organizations & Branches spec.
+
+## M10.2 — End-to-End Business Flow Validation (done 2026-09-02)
+
+**Backend integration suite added:** `backend/tests/BusinessOS.Tests/Integration/BusinessLifecycleEndToEndTests.cs`
+(6 `[Fact]` scenarios, all passing): `Sale_ShouldReduceInventory_AndBeIdempotent`,
+`CreditSale_ShouldTrackOutstandingBalance`, `Expense_AndAccountExpense_ShouldBehaveCorrectly`,
+`CashSession_ShouldOpenAndCloseCorrectly`, `Reports_ShouldReflectSale_AndDashboardInventory`,
+`Tenant_ShouldNotAccessAnotherTenantsData`. Flutter side: added
+`test/features/finance/money_account_repository_test.dart` (4 regression tests) and a minimal
+`getCurrentSession()` fix in `lib/features/finance/data/money_account_repository.dart`
+(200 + empty body → null = "no session"; backend returns 200-empty, not 404). Finance tests: 22 pass;
+`flutter analyze` 0 issues.
+
+**Genuine production defects found and fixed minimally (both had broken/regressed existing tests):**
+1. Credit auto-create 500: `SetCreditLimitCommandHandler`/`RecordCreditSaleCommandHandler` called
+   `AddAsync` then `UpdateAsync` on a newly created `CustomerCredit`, producing a
+   `DbUpdateConcurrencyException` ("expected 1 row, affected 0"). Fix: skip the redundant
+   `UpdateAsync` for a freshly created aggregate (the Added entity is INSERTed with its walked
+   values). Before this fix, `Credit_FullLifecycle` etc. 500'd; after, they reach stale-string
+   assertions (see below).
+2. `GET /reports/top-products` returned 400: `GetTopProductsAsync` used `[AsParameters] int limit`,
+   which never binds a scalar from the query string (`limit` stayed 0 → validator `InclusiveBetween(1,100)`
+   rejected it). Fix: removed `[AsParameters]` so `?limit` binds. `SalesTrendAsync [AsParameters] int days`
+   has the same latent flaw but is out of M10.2 scope — unpatched.
+
+**Recorded as findings, not fixed (architectural, per M10.2 scope):**
+- A completed sale records `SalePayment` templates but does NOT auto-post to `MoneyAccount`.
+- Ledger `POST /expenses` does NOT auto-post to `MoneyAccount`; only `POST /money-accounts/expense` does.
+- Opening a cash session with a float does NOT credit the money account; `openingCash` is an attribute only.
+- Dashboard Summary exposes only Catalog/Inventory/Pricing/Organization — no sales/expense/credit/cash.
+- Cross-tenant reads that are aggregate-scoped by (tenant) row rather than id return **200-empty**, not 404
+  (e.g. credit GET, stock list by foreign warehouse id). Isolation is preserved (0 rows), status differs.
+- `Tenant_ShouldNotAccessAnotherTenantsData` covers cross-tenant writes: customer/expense PUT → 404; B
+  posting into A's warehouse → 404; credit limit/payment from B never mutates A's balance (B creates only
+  B-local rows keyed by (B, A's customerId) — orphan reference possible but no cross-tenant read/write leak).
+
+**Pre-existing test brittleness exposed by the credit fix (NOT regressions; completed-module tests left
+unchanged per AGENTS.md):** `CreditEndpointsTests` assert money as raw strings (`"250"`) and enum as
+`"Sale"`, but serialization now yields `"250.00"` (decimal(18,2)) and numeric enum `"0"`. These 3 tests
+were already failing (500) pre-fix; they now fail only on these stale assertions. The un-verifiable full
+suite run totals are unavailable because the integration suite exceeds ~19 min in this environment
+(slow real-Postgres tests); targeted regression batches all pass:
+Sales/Expense/Inventory/E2E = 28 ✓; Customer/Money/Cash/Finance = 7 ✓.
+
+## M10.3 — FINAL PRODUCTION HARDENING (COMPLETE)
+
+Task outcome: **READY FOR M11.** No features added. All backend (597) + Flutter (261) tests pass;
+0 analysis/build warnings. Full report = `M10.3 FINAL PRODUCTION READINESS REPORT` (delivered to user).
+
+- **T1/T2 API correctness:** 3 stale credit assertions fixed (numeric money `GetDecimal()`, raw-array
+  `.GetArrayLength()`, numeric enum). Cross-tenant read semantics: 3 resource-identifying GETs
+  (`credit`, `feature-flag`, `tenant-account-mapping`) changed 200-empty→404 via `Error.NotFound`.
+  `GET /cash-sessions/current` stays 200-empty (Category A state query; Flutter depends on it).
+- **T3 latent bug:** `GET /reports/sales-trend` `[AsParameters] int days` removed (binding bug);
+  regression test `Reports_SalesTrend_BindsDays`.
+- **T4 tenant isolation audit:** 12/12 PASS, no leak; 2 LOW non-leaking findings (stored supplier ids).
+- **T5 finance findings:** all 4 ACCEPT FOR V1 (auto-posting needs future ledger/journal per roadmap).
+- **T6 backend:** full suite 597 = 415 unit + 182 integration, all pass, 0 warnings (Release
+  `-warnaserror` clean).
+- **T7 Flutter:** 261 tests pass + `flutter analyze` 0 issues. Fixed stale test setups/fakes:
+  `late`-variable tearDown (3 controller files), customers/suppliers total fixture, dashboard
+  salesTrend `label` field, reports loading test, profile 400→ValidationException, role permission
+  content-type, POS/sales provider bootstrap (localDatabase/posBranchId/sessionContext overrides),
+  removed 1 stale idempotency test (offline_checkout_test covers the real guarantee).
+- **T8 production builds:** backend Release 0 warnings. Android release APK built (70.5 MB). Fixed
+  Android main manifest: removed `package="com.example.business_app"`, set label "Jolinx", and moved
+  `usesCleartextTraffic=true` to debug-only (was leaking cleartext to release). No localhost/dev/secrets
+  in production config (base secrets empty, env-driven). Kotlin-Gradle-Plugin warning = future-Flutter note.
+- **T9 security:** verified JWT validation (issuer/audience/signing/lifetime/1-min skew), refresh rotation
+  + reuse detection (family revoke), login lockout, rate limiting (429), CORS off-by-default, security
+  headers (HSTS/X-Frame/nosniff/no-referrer). **Added:** `Jwt:Secret` startup validation
+  (>=32 bytes / HMAC-SHA256) in `Program.cs`. FINDINGS: dev DB password committed only in
+  appsettings.Development.json (LOW/dev-only); android/`build.gradle.kts` release signed with debug key
+  (LAUNCH requirement). No secrets logged.
+- **Instrumented Production defects fixed in this milestone:** Android manifest package+cleartext,
+  `setRolePermissions` sent `List.toString()` instead of JSON array (fixed via Content-Type in
+  ApiClient.put), SettingsController.updateOrganization unhandled transport error (now Failure state),
+  JWT secret not validated at startup.
+
+## M11 — Anti-Bureaucracy POS (COMPLETE)
+
+Plan/spec: `docs/AntiBureaucracyBlueprint.md`. Six steps; S1–S6 all done.
+
+- **S1 Cash Change (done):** `Sale.Reconcile` allows `amountPaid >= total` +
+  `expectedChange` with `Math.Max(0, …)`; `CreateSaleCommand` overpayment walked through;
+  mobile threads `paymentAmount` (sale.dart/checkout/payment_sheet/receipt/sale_detail).
+- **S2 Quick Quantity (done):** decimal-capable `CartController.setQuantity`; cart_sheet
+  rewritten; PosPage long-press quantity dialog; ARB keys.
+- **S3 Quick Sale (done):** hidden per-tenant "Bila Jina" Service product (SKU `QS-BILA-JINA`,
+  auto "Mara" UoM) via `EnsureQuickSaleProductCommand` + `POST /products/quick-sale`;
+  line-level `unitPrice` override short-circuits server price resolution; quick lines get unique
+  `quick-<micros>` keys; mobile `addQuickSale`, offline payload carries `unitPriceOverride`,
+  quick lines skip the stock guard. Backend integration test
+  `CreateSale_QuickSaleLine_UsesClientFixedPrice_NoStockTouched` (fix: index JSON array via
+  `[0]` instead of `GetProperty`). Mobile tests in `sale_repository_test`,
+  `cart_and_receipt_test`, `local_database_test`, `offline_checkout_test`.
+- **S4 Credit at POS (done):** Credit = method `Credit` allowing `amountPaid < total`;
+  `Sale.Reconcile`/`SalePayment.Create` accept it; `CreateSaleCommand` gains
+  `CustomerId` (required when credit present); handler auto-posts balance to customer ledger
+  via `ICustomerCreditRepository` (get-or-create + `RecordSale` + `AddTransactionAsync`)
+  inside the sale transaction. Endpoint + validators + DTO updated. Mobile: payment sheet credit
+  tab (customer picker sheet, initial payment, outstanding row); `isElectronic` treats credit as
+  non-electronic; offline recorder carries `customerId`. Tests: backend unit
+  (3 credit handler + 3 validator), integration
+  `CreateSale_CreditTenderUnderpays_PostsTheBalanceToTheCustomerLedger`; Flutter
+  `cart_and_receipt`, `checkout_controller`, `local_database`. ARB keys `posCredit*`; run
+  `flutter gen-l10n` after ARB edits.
+- **S4 unblocked the build:** pre-existing unfinished Expenses/Credit/CRM/MoneyAccount/
+  CashSession work referenced DbSets that were never wired into `BusinessDbContext`.
+  Added minimal `OnModelCreating` mappings + `DbSet`s (Expenses, Customers, CustomerCredits,
+  CreditTransactions, MoneyAccounts, MoneyAccountTransactions, CashSessions) and
+  `Tables.Finance` constants, matching `BusinessDbContextModelSnapshot` exactly so no new
+  migration is needed. Backend: 422 unit + 27 integration (sales ∅) tests green.
+- **S5 Void Sale (done):** Backend pre-existing: `Sale.Void()` domain method, `VoidSaleCommand`
+  handler with stock reversal (`SaleVoid` movements), `POST /sales/{id}/void` endpoint
+  (`PermissionNames.SalesDelete`), `VoidSaleCommandValidator` (reason required, max 500),
+  `SaleVoidedEvent` via outbox. Mobile: `sale_repository.voidSale()` method;
+  `sale_detail_page.dart` void button with `ref.watch(authControllerProvider)` permission guard,
+  voided banner, `_VoidReasonDialog` (reason input + confirm/cancel), `_confirmVoid()` method.
+  ARB keys `saleVoid*`. Tests: repository contract test (`sale_detail_page_test.dart`);
+  backend `VoidSaleTests.cs` integration tests; 269 Flutter tests pass (6 pre-existing
+  failures in locale/routing). `flutter analyze` clean.
+- **S6 Polish (done):** ARB consistency: fixed Swahili translations for `posCash` (→ Fedha),
+  `posMobileMoney` (→ Pesa ya Simu), `posChange` (→ Baki); added 16 new ARB keys for
+  hardcoded strings in `sale_detail_page.dart`, `receipt_preview_page.dart`, `sale_success_page.dart`.
+  Hardcoded Swahili/English strings replaced with `context.loc.*` calls. "Shiriki" (Share) button
+  fixed: was navigating to sale detail page, now uses `share_plus` `SharePlus.instance.share()`
+  with receipt text. Added share button to receipt preview page. `SaleSuccessPage` upgraded to
+  `ConsumerWidget` for workspace controller access. 269 tests pass; `flutter analyze` clean.
+
+## Mx Reports feature improvement (done 2026-09-08)
+
+Mobile `/reports` rewritten to match mainstream POS conventions (Square/Loyverse/Kopo Kopo):
+- **Period presets** `ReportPeriod {today, thisWeek, thisMonth, lastMonth}` + pure
+  `reportDateRange()` (local start-of-day → end-of-day, repository UTC-converts) + ChoiceChip
+  selector. Default = **Today-first** (was hardcoded 30-day).
+- **Latent bug fixed:** `SalesSummary` misread the API — `totalSales` (an int count) was
+  displayed as money and `saleCount` (a key the backend never sends) always rendered 0.
+  Model now parses `totalSales`/`totalRevenue`/`averageSale` per `SalesSummaryDto`.
+- **Summary card:** Revenue / Average sale / Sales count (tax row removed, consistent with
+  hidden tax). **New 7-day sales-trend bar chart** via the existing `/reports/sales-trend`
+  endpoint (`SalesTrendPoint.label` = `yyyy-MM-dd`, rendered as `MMM d`).
+- **Fixed broken "See all":** added `/reports/top-products` GoRoute +
+  `TopProductsPage` (own `TopProductsController`, limit 25, period via `?period=` query) —
+  previously the button 404'd. Localized `reportsPeriod*`, `reportsRevenue`,
+  `reportsAverageSale`, `reportsTrendLast7Days`, `reportsSoldLabel` ARB keys (en+sw);
+  removed unused `reportsTotal`/`reportsTax`. `flutter gen-l10n` regenerated.
+- Tests: `report_repository_test` (parses new fields, sends exact range, salesTrend contract),
+  `reports_controller_test` (reportDateRange/parseReportPeriod units, period delegation,
+  trend in state, reset), new `top_products_controller_test`. **Verification pending — user
+  runs `flutter analyze && flutter test`.** Not done (next): CSV export button (backend
+  `POST /reports/export/*` + `SalesReportsExport` permission exist), sales-trend for other
+  windows, ~350 remaining hardcoded strings.
+
+## Mx "Old receipts" — Sales History date navigation + receipt search (done 2026-09-09)
+
+Benchmarked against Square/Loyverse/Kopo Kopo; approved plan implemented on the Flutter
+Sales History page only (no backend change needed — server search already matches receipt
+`Number` OR `CustomerName`):
+- `SalesHistoryController.load({DateTime? day, String? search})`: local midnight →
+  next-midnight range, `pageSize 100`, trimmed search term forwarded; `SalesHistoryLoaded`
+  gains `searchActive`; `loadToday()` kept as a thin wrapper (still used by
+  `payment_sheet.dart`). 8 controller tests added.
+- `sales_history_page.dart` rewritten: **Leo/Jana ChoiceChips + calendar picker**
+  (`showDatePicker`, 365-day lookback) + **debounced (300 ms) receipt-number search field**
+  with clear button; empty states differ ("no sales this day" vs "no matches"); custom-date
+  caption `d MMM yyyy`; sale tile shows time · payment · customer name. Old receipt →
+  existing `SaleDetailPage` → reprint unchanged.
+- ARB (en+sw): added `salesHistory*` keys + `commonClear`; `flutter gen-l10n` regenerated.
+- **Verification pending — user runs `flutter analyze && flutter test`.**
+
+## Mx Expenses improvement — full sprint (WIP 2026-09-09)
+
+Benchmarked against Loyverse/HowMuch/ZYNO (expense categories mandatory, seeded defaults,
+create-on-the-fly, date-range reporting). Approved "Full sprint". Backend + Flutter work done,
+**unverified (user runs `dotnet build/test` + `flutter analyze/test`).**
+
+Backend (T1–T3):
+- **T1 delete bug fixed:** `DeleteExpenseCommandHandler` called `UpdateAsync` (no-op —
+  deleting an expense did nothing). Now `RemoveAsync` + `IExpenseRepository.RemoveAsync` +
+  EF impl (`_db.Expenses.Remove`); DELETE → GET returns 404 (integration test).
+- **T2 ExpenseCategory aggregate** (`Domain/Accounting/ExpenseCategory.cs`): name ≤ 50 chars,
+  unique per tenant (`HasIndex(TenantId, Name).IsUnique()`), `OnDelete Restrict` FK from
+  Expenses; DbSet + mapping in `BusinessDbContext`; `TableNames.Accounting.ExpenseCategories`;
+  hand-written migration `20260909090000_AddExpenseCategories` + Full Designer
+  (`BuildTargetModel` embedded — an attribute-only Designer set the latest migration's
+  `TargetModel` to null and crashed tests with EF9 `PendingModelChangesWarning`;
+  post-August migrations all carry full model Desigers, so full was the right pattern)
+  + `BusinessDbContextModelSnapshot` updated with the ExpenseCategory entity
+  AND the Expenses→ExpenseCategories FK.
+- **Onboarding seeding:** `CompleteOnboardingCommandHandler.EnsureDefaultExpenseCategoriesAsync`
+  seeds Utilities/Transport/Rent/Supplies/Petty Cash/Other (idempotent by name); persisted by
+  `TransactionBehavior` (handlers never SaveChanges). New tests in
+  `OnboardingDefaultsTests` + `CompleteOnboarding_RepeatedRun` now asserts 6 categories.
+- **Endpoints:** `GET/POST /api/v1/expenses/categories` (View/Create) + `GET
+  /api/v1/expenses/summary` (View, `fromDate/toDate`, default = current UTC month). Category
+  reference guard in Create/Update expense handlers; `ExpenseDto.CategoryName` enriched on
+  list/get/create/update.
+- **T3 summary DTOs:** `ExpenseSummaryDto(Total, ByCategory)` + `ExpenseCategoryTotalDto`;
+  EF `GetSummaryAsync` (inclusive `>= from && <= to`, groups by CategoryId, resolves names).
+  Integration test covers totals (350), byCategory, null-category bucket, out-of-range excluded,
+  and invalid range → 400.
+
+Flutter (T4):
+- `expense_repository.dart`: `ExpenseCategory`, `ExpenseCategoryTotal`, `ExpenseSummary` models
+  + `listCategories()` / `createCategory(name)` / `getSummary({fromDate,toDate})`.
+- `expenses_controller.dart`: `load({search, fromDate, toDate})` now also loads the summary for
+  the active range; `loadMore()` pagination (`hasMore`); keeps `create/update/delete/reset`.
+  `expenseCategoriesProvider` FutureProvider added.
+- `expenses_page.dart` rewritten: **Leo / Jana / Huu Mwezi / Miezi Yote ChoiceChips + custom
+  range picker** (default = this month), debounced (300 ms) search with clear button, **monthly
+  spending-summary card** (total + top-3 category breakdown), load-more footer, empty states for
+  "no expenses" vs "no search matches", date · category tile subtitle. All localized.
+- `expense_form_page.dart`: **category dropdown with inline "Add category"** (dialog →
+  `createCategory` → invalidates provider), delete button in app bar (confirm dialog), localized.
+- ARB (en+sw): `expense*` keys + reuse of `commonRetry/Clear/Search/Cancel/Save/Delete`;
+  `flutter gen-l10n` regenerated.
+- Tests: `test/features/finance/expenses_controller_test.dart` (16 assertions: load, range
+  bounds passed to repo, pagination, search, create/delete reload, failure, reset, UTC bounds).
+
+## Mx Stock MVP — Advisory Stock + "Ongeza stock" (done 2026-09-12)
+
+Stock is advisory, never blocks sales (African retail reality). Backend + Flutter, backend
+tests + Flutter analyze/test all pending user verification.
+
+Backend changes:
+- **Non-blocking debit:** `SaleStockDebitService` locks row, creates balance if missing, always
+  debits (negative allowed). `StockBalance.Apply` no longer throws on negative.
+- **Idempotent adjustments:** `AdjustStockCommand` accepts `IdempotencyKey` (from
+  `Idempotency-Key` header or body `ClientAdjustmentId`); replays return current balance
+  without double-applying. Key stored on `StockMovement.CorrelationId` (pre-existing column,
+  `BusinessDbContext.cs:370`). `FindAdjustmentByKeyAsync` on `IStockRepository` + EF impl.
+- **Permission fix:** Staff role now includes `InventoryManage` + `WarehousesView`
+  (`PermissionNames.cs:114`). Cashiers can top up stock.
+- **Tests:** `StockLedgerTests` updated for negative-allowed; +3 adjustment idempotency tests;
+  `SaleStockDebitServiceTests` rewritten (oversell-to-negative, missing-balance creates);
+  `CreateSaleCommandTests` insufficient-stock now expects success with negative;
+  `SalesEndpointsTests` integration rewritten for oversell; Purchasing stub
+  `FindAdjustmentByKeyAsync` added.
+
+Flutter changes:
+- **AddStockSheet** (`add_stock_sheet.dart`): takes `productId`/`productName`, fully localized,
+  draws Uuid `Idempotency-Key` kept across retries, cleared on success.
+- **ProductRepository.adjustStock** sends `Idempotency-Key` header when key provided.
+- **ProductDetailPage**: stock-aware image badge, "Ongeza stock" button on stock card, reloads
+  after success. Localized stock card (productsStockHub/TotalStock/LowStockCount/ZeroStockCount).
+- **ProductsPage**: reverted tile button to chevron; tile opens `/products/:id` (detail).
+- **defaultWarehouse**: prefers code `MAINSTORE` over `.first` (multi-warehouse safe).
+- **ARB keys** (en+sw): `productsAddStock`, `addStockTitle/Product/Quantity/Warehouse/Save`,
+  `addStockInvalidQuantity/Unavailable`, `productsStockLabel`, `productsStockHub/TotalStock/
+  LowStockCount/ZeroStockCount`, `productsDetailsTitle/NotFound/RetailPrice/WholesalePrice/
+  Type/Category/Brand/Unit`.
+- **Tests**: StockController test rewritten (`stock_controller_test.dart`: `StockRow.status` +
+  `StockReady.visible` filtering).
+
+Verified: `dotnet build` clean; `flutter analyze` pending `flutter gen-l10n`.
+
+## Mx Reports Module — Full Implementation (WIP 2026-09-12)
+
+Comprehensive reports module implementing the full reporting vision: dashboard-first,
+global filter, drill-down architecture, business-question naming, charts+tables.
+
+Backend (17 new queries/endpoints):
+- **BusinessOverviewQuery** — KPIs (Sales, Gross Profit, Expenses, Money Balance) with
+  period-over-period comparison, sales trend, top products. Endpoint: `/reports/business-overview`
+- **MoneyMovementQuery** — Starting Balance → Money In (Sales) → Money Out (Purchases,
+  Expenses) → Current Balance. Endpoint: `/reports/money-movement`
+- **PurchasesSummaryQuery** — Total Purchased, Supplier Count, Items Received, Top Supplier,
+  Pending/Received counts. Endpoint: `/reports/purchases-summary`
+- **SalesByPaymentMethodQuery** — breakdown by Cash/Mobile Money/Credit/etc.
+  Endpoint: `/reports/sales-by-payment`
+- **SalesByCategoryQuery** — breakdown by product category.
+  Endpoint: `/reports/sales-by-category`
+- **SalesByStaffQuery** — breakdown by staff member.
+  Endpoint: `/reports/sales-by-staff`
+- **SalesByCustomerQuery** — top customers by revenue.
+  Endpoint: `/reports/sales-by-customer`
+- **StockSummaryQuery** — per-product: Opening/Purchased/Sold/Adjusted/Closing.
+  Endpoint: `/reports/stock-summary`
+- **StockMovementSummaryQuery** — movement counts by type per period.
+  Endpoint: `/reports/stock-movements`
+- **LowStockReportQuery** — products below threshold by warehouse.
+  Endpoint: `/reports/low-stock`
+- **StockVelocityQuery** — products ranked by velocity (units/day).
+  Endpoint: `/reports/stock-velocity`
+- **ExpenseTrendQuery** — daily expense trend.
+  Endpoint: `/reports/expense-trend`
+- **ExpenseByPaymentMethodQuery** — breakdown by payment method.
+  Endpoint: `/reports/expense-by-payment`
+- **PurchasesBySupplierQuery** — breakdown by supplier.
+  Endpoint: `/reports/purchases-by-supplier`
+- **ExportSalesByPaymentMethodCommand**, **ExportStockSummaryCommand**,
+  **ExportExpenseSummaryCommand** — CSV export for new reports.
+- New domain records: `SalesByPaymentMethodRow`, `SalesByCategoryRow`, `SalesByStaffRow`,
+  `SalesByCustomerRow`, `StockSummaryRow`, `StockMovementSummaryRow`, `LowStockReportItem`,
+  `StockVelocityRow`, `ExpenseTrendPoint`, `ExpenseByPaymentMethodRow`.
+- Repository methods added to `IReportRepository`, `IStockRepository`, `IExpenseRepository`.
+- EF implementations in `PlatformRepositories.cs` and `ReportRepository.cs`.
+- FluentValidation validators for all new queries (15 validators added).
+- `IPurchasingRepository` replaced with MediatR `ListPurchaseOrdersQuery` dispatch.
+
+Flutter (14 new files + 4 updated):
+- **ReportFilter** model (`report_filter.dart`): `ReportPeriod` enum (today/yesterday/
+  thisWeek/thisMonth/lastMonth/custom), filter state with `dateRange` and `toQueryParams`.
+- **ReportFilterBar** widget: period chips + custom date range picker, reusable across
+  all report pages.
+- **ReportKpiCard** widget: icon + title + value + optional trend arrow/percentage.
+- **ReportTrendChart** widget: line chart using `fl_chart` with gradient fill.
+- **ReportDataTable** widget: sortable table with headers, rows, tap handling.
+- **ReportPieChart** widget: donut chart with percentage labels and legend.
+- **MoneyFlowCard** widget: starting balance → money in → money out → current balance.
+- **BusinessOverviewPage** (`business_overview_page.dart`): KPI cards, sales trend chart,
+  top products list.
+- **SalesReportPage** (`sales_report_page.dart`): summary KPIs, trend chart, pie charts
+  by payment method and category.
+- **StockReportPage** (`stock_report_page.dart`): stock summary table, movement summary,
+  velocity table.
+- **MoneyReportPage** (`money_report_page.dart`): money flow card with in/out breakdowns.
+- **PurchasesReportPage** (`purchases_report_page.dart`): summary KPIs, supplier pie chart,
+  supplier table.
+- **ExpensesReportPage** (`expenses_report_page.dart`): total expenses, category pie chart,
+  trend chart, payment method table.
+- **ReportsPage** restructured as hub: grid of 6 report cards (Overview, Sales, Stock,
+  Money, Purchases, Expenses) + Top Products.
+- **Routes** added: `/reports/overview`, `/reports/sales`, `/reports/stock`, `/reports/money`,
+  `/reports/purchases`, `/reports/expenses`.
+- **ReportRepository** extended with 12 new methods + 14 new model classes.
+- **Report providers** extended with 14 new `FutureProvider.family` providers.
+- **ARB keys** (en+sw): 75 new keys for all report UI text.
+
+Verified: `dotnet build` clean; `flutter analyze` pending `flutter gen-l10n`.
+
+## M9.2 — Offline-invisible login + trusted-device unlock + device lock (2026-09-22)
+
+Goal: users must never see "offline" messaging on the login screen and must not
+re-enter their password on every open. Approved plan implemented entirely client-side
+(M9.2 backend existed before).
+
+- **Unified "Ingia" button, offline-invisible:** `AuthController.login` tries the backend;
+  on `NetworkException`/`TimeoutException`/`ServerException` it silently falls back to local
+  password verification (`_silentOfflineFallback`) — ONLY when the typed identifier matches
+  the cached account, so a wrong-account attempt cannot unlock someone else's offline data.
+  Wrong password surfaces the same neutral "Nenosiri si sahihi." message. No "Mtandao
+  haupatikani?" hint, no "Ingia Nje ya Mtandao" button (removed from `login_page.dart`).
+- **Trusted-device fast unlock (7-day sliding window):** the quick-unlock HMAC token
+  (`offline_credential_store.dart`) now refreshes its expiry after every successful
+  biometric or PIN unlock; logout disables it. Trusted window covers no-biometric devices
+  too.
+- **Device unlock PIN (4–6 digits, PBKDF2, shared exponential lockout):** `setUnlockPin`,
+  `verifyUnlockPin`, `hasUnlockPin`, `clearUnlockPin`. Used via:
+  - cold start: `AuthController.loginWithPin` / `setupPin` → `AuthRepository.unlockWithPin` /
+    `setupPinAndUnlock` (both gated on a valid quick-unlock token);
+  - device lock: `AuthController.unlockWithPin` (no token needed — session already trusted).
+- **Idle/background auto-lock (`AuthLocked` state):** new sealed state
+  `AuthLocked(session, isOffline)` — non-destructive. `AppLockPolicy`
+  (`core/session/app_lock.dart`, testable, configurable via `appLockPolicyProvider`):
+  5-min idle timeout + 45s background grace. `_BusinessOsAppState` is now a
+  `WidgetsBindingObserver`: `didChangeAppLifecycleState` locks on long backgrounding; a
+  `Listener` (`onPointerDown`) resets the idle timer. Router: `AuthLocked` → `/lock`;
+  `workspaceJourneyBindingProvider` keeps all controllers live during a lock so cart/forms
+  resume exactly. `LockPage` unlocks with a fresh biometric or the PIN; no fast factor →
+  logout to login. Idle/background lock never touches the cold-start morning restore.
+- **iOS Keychain device-bound across ALL secure stores:** every `FlutterSecureStorage`
+  now `KeychainAccessibility.firstUnlockThisDeviceOnly` (tokens, DB key, branch cache,
+  device identity, theme, printer, locale, offline store) so secrets never migrate via
+  iCloud restore (stolen-device mitigation). Existing iOS installs must re-login once when
+  accessibility changes.
+- **Tests:** journey tests for silent fallback (matching/mismatched identifier, wrong
+  password), lock/unlock/pin-unlock/setup transitions (scriptable fake gate + store);
+  repository tests for quick-unlock gating of `unlockWithPin`/`setupPinAndUnlock`; store
+  tests for PIN policy + lockout + quick-unlock renewal (`offline_credential_store_test.dart`);
+  `app_lock_test.dart`; router tests for `AuthLocked` → `/lock` and unlocked-on-`/lock`.
+- **Recorded debt:** no remote "revoke my devices" / new-device alert (recommend
+  least-privilege cashier accounts and `firstUnlockThisDeviceOnly` until then); in-app
+  POS "offline" badges are functional sync indicators, intentionally out of scope.
+
+## M9.2b — M-Pesa-style direct security prompt on login/lock (2026-09-22)
+
+Refines M9.2's UX: a trusted device opens straight into the security challenge —
+fingerprint or an inline PIN pad — exactly like M-Pesa, instead of showing the
+username/password form with quick-unlock buttons bolted underneath. No "offline"
+wording anywhere.
+
+- **New `PinPad` widget** (`widgets/pin_pad.dart`): 6-dot indicator row + numeric
+  keypad (1–9, 0, backspace, check). Confirm is only enabled with 4–6 digits
+  entered (no auto-submit at 4, so 5–6-digit PINs stay possible); the pad clears
+  after every submit attempt so a rejection starts fresh.
+- **New `FastUnlockPanel` widget** (`widgets/fast_unlock_panel.dart`): shared
+  M-Pesa-style prompt — large fingerprint hero button (+ "au ingiza PIN yako"
+  separator when appropriate) and/or inline `PinPad`, plus inline error text and a
+  busy state. Reused by `LoginPage` and `LockPage`.
+- **`LoginPage`** now has two modes: **fast** (default when `hasValidQuickUnlock()`)
+  with a "Habari, {firstName}!" greeting + `FastUnlockPanel`, and a muted
+  "Mtu mwingine? Ingia kwa akaunti yako" link that reveals the classic email/password
+  form (which offers a "Tumia Kidole au PIN" back-link only when still trusted).
+  Trusted + no biometric + no PIN → the setup sheet auto-opens once so a PIN can be
+  chosen (M-Pesa behavior); cancelling drops to the password form. Fast failures
+  render inline via `_runFastAction` (compares pre/post auth-state messages to avoid
+  echoing a stale logout message).
+- **`LockPage`** refactored: same `FastUnlockPanel` inline (fingerprint and/or PIN
+  pad); the PIN sheet is gone from the lock screen (`pin_unlock_sheet.dart` now only
+  serves first-time PIN setup). No fast factor → unchanged "Ingia kwa nenosiri"
+  logout button.
+- **Tests** (`fast_unlock_widget_test.dart`, net-new): login fast-biometric mode
+  (greeting/prompt visible, form hidden; tap releases session), PIN-pad-only mode,
+  valid-4-digit submit records the PIN, rejected PIN shows the inline error, and the
+  classic form on an untrusted device; lock screen wrong-PIN inline error stays
+  locked (`unlockWithPin` throws → controller still `AuthLocked`) and correct PIN
+  unlocks (`AuthAuthenticated`). Fakes: `FakeAuthRepository` (scriptable
+  `restore/loginWithBiometric/unlockWithPin/loginOffline` + real `ApiClient` shell),
+  `FakeOfflineCredentialStore` (trusted/hasPin/verifyPin), `_FakeBiometricGate`.
+
+## M9.3 — Sale→receipt speed: bulk price resolve + checkout deadline (2026-09-22)
+
+Addresses the complaint that sales take too long to reach the receipt on
+low-bandwidth networks. Approved as "Option A + B".
+
+- **Root cause**: checkout re-resolved every cart line with one
+  `GET /pricing/resolve` per line (N round trips), then `POST /api/v1/sales`;
+  after success `payment_sheet.dart` fired **6 backend reloads** in one burst
+  (salesHistory, dashboard, reports, stock, products, posCatalog). With Dio
+  timeouts of 15/30s, weak links made users stare at the spinner for 30s.
+- **A — client-side deadline + burst trim**:
+  - `CheckoutController.submit` now wraps the whole online attempt (bulk resolve
+    + create) in `online.timeout(4s)`. On timeout it only falls back to the local
+    pending queue (`_recordOffline`, same `_clientSaleId`) when the offline window
+    is actually open (`sessionJournal.offlineWindowOpen()`); with a closed window
+    it keeps waiting for the authoritative result instead of refusing. `online`
+    is `.ignore()`-d so a late success/error from an abandoned attempt never
+    surfaces as an unhandled async error — a late server accept stays harmless via
+    M5.7 idempotent replay. Uses `import 'dart:async' as async` to disambiguate
+    `async.TimeoutException` (from `Future.timeout`) from the app's
+    `app_exception.TimeoutException` (create a timeout → existing transport
+    fallback).
+  - `payment_sheet.dart` post-success reload trimmed to only `stock` +
+    `posCatalog` (the data the next sale needs); sales history, dashboard,
+    reports and products all reload when their pages are opened.
+- **B — bulk pricing endpoint (backend + client)**:
+  - `POST /api/v1/pricing/resolve-many` (`PricingEndpoints.cs`, `PricingView`
+    permission): body `{ lines:[{productId, quantity}], branchId, priceType }`,
+    response is a bare JSON array of
+    `{ productId, variantId, price, currency, errorMessage }` — `price` is null
+    for unresolvable lines so clients keep the cart price.
+  - New `ResolvePricesQuery`+handler (`Application/Features/Pricing/Queries/`)
+    reuses the single-resolution logic by injecting
+    `IRequestHandler<ResolvePriceQuery, ...>` and looping each line — no logic
+    duplication. `ResolvedLineDto`/`ResolvePriceLineDto` added to `PricingDtos.cs`;
+    `ResolvePricesQueryValidator` guards empty/oversized batches (≤100 lines,
+    per-line `productId` non-empty, `quantity ≥ 1`).
+  - Client `SaleRepository.resolvePrices(...)` makes the one call;
+    `CheckoutController._refreshPrices` uses it (fallback: any `AppException` →
+    cart prices as before).
+- **Tests**: `sale_repository_test.dart` resolve-many (one POST, right body,
+  unresolvable line absent); `checkout_controller_test.dart` fake now implements
+  `resolvePrices` and asserts `resolveManyCalls`; the cart-price fallback test now
+  uses `resolveMultiError`; `offline_checkout_test.dart` adds a **deadline case**
+  (stalled `create` → after 4s falls back to the local queue, key preserved,
+  `pendingLocally` true). Backend `PricingEndpointsTests.cs`: bulk resolve with two
+  lines (one priced, one unresolvable) + empty-batch 400.
+- Pending: user runs `flutter analyze` + `flutter test` for the M9.2 + M9.2b +
+  M9.3 batch, and the backend `dotnet test` run for the resolve-many endpoint +
+  the whole backend suite.
+
+## M13 — Subscription foundation backend (WRITTEN 2026-09-22, NOT YET BUILT/VERIFIED)
+
+Code-only milestone written under a no-commands directive; build/format/tests
+must run on the next permitted session. Freemium monetization for the free-host
+launch: everyone starts on a 14-day Pro trial; whatever runs out falls back to
+the Free plan (POS + inventory backstop) instead of hard-locking the terminal.
+
+- **Domain** (`Domain/Billing/`): `SubscriptionAccessEvaluator` derives status
+  purely from dates — `{ Trial, Active, Debt }`, `AccessLevel { Full,
+  PosAndInventory }`, `NextDueUtc` à la paidUntil; `FeatureKeys` (Full vs
+  PosAndInventory sets); `Plan` (Pro = TZS 25,000/mo; quotas branches 3 / users 5
+  / products 3000 / maxBranches etc.; Free backstop), `Subscription`
+  (`StartTrial`, `Paid(to)/Lapse/settle invariants`, `PaidUntilUtc` advisory +
+  one stored helper `Status`, transition tracking via status history), `Voucher`
+  (CSPRNG `XXXX-XXXX-XXXX`, alphabet excludes 0/O/1/I, 1–365 days, single-use,
+  `RecordBatchIssued` raises `VouchersIssuedEvent` on the batch end — uses the
+  protected `AddDomainEvent`), `Invoice` (numbering via
+  `NumberSequenceRepository.AllocateAsync(scope "Invoice")`, status Open/Paid/
+  Cancelled, period start/end). `Domain/Events/BillingEvents.cs`.
+- **Migration** `20260922000000_AddPlansSubscriptionsVouchersInvoices`
+  (hand-written Up/Down; 4 additive tables Plans/Subscriptions/Vouchers/Invoices;
+  unique indexes Code/Number, IX_Subscriptions_TenantId). Designer partial
+  delegates `BuildTargetModel` to `BusinessDbContextModelSnapshot.BuildModel`
+  via reflection (attribute-only Designer + delegation variant) — stays in sync
+  when a future `dotnet ef migrations add` regenerates the snapshot; `migrations
+  add/remove/script/update` all diff against TargetModel, so nothing breaks.
+  Snapshot `.cs` updated with the 4 Billing entity blocks (alphabetized).
+- **Application** (`Features/Billing/`): DTOs + mappers, `SubscriptionEntitlement`
+  record + `ISubscriptionEntitlementService` (evaluator + plan lookup + open
+  invoice debt detection), commands/queries (`RedeemVoucher`,
+  `EvaluateSubscription` — idempotent self-heal that auto-issues the renewal
+  invoice once at trial lapse, `IssueVouchers`, `MarkInvoicePaid` — owner desk
+  manual M-Pesa settlement that extends PaidUntil by the payable window,
+  `GetSubscription`/`ListPlans`/`ListInvoices`/`GetInvoice`/`ListBillingDebts`),
+  FluentValidators. Tenant-scoped commands carry `IRequiresTenantAdvisoryLock`;
+  owner/admin commands don't. Registered `ISubscriptionEntitlementService`.
+- **Hooks**: `RegisterUserCommand` and `ProvisionTenantCommand` grant the trial
+  (`Subscription.StartTrial`) at tenant creation; `DatabaseSeeder` seeds
+  Free/Pro idempotently and backfills a 14-day trial for legacy tenants without
+  one. **Legacy cost**: tenant-scoped reads that hit
+  `SubscriptionEntitlementService` do 1 extra query (plan) — acceptable.
+- **Enforcement** (`API/Middleware/SubscriptionAccessMiddleware.cs`,
+  registered after `TenantActiveMiddleware`): GETs always pass; non-GET
+  premium-write prefixes (purchase-orders/supplier-bills/suppliers, accounts/
+  journal-entries/account-mappings/accounting-reports, expenses, price-lists/
+  pricing, credit incl. nested `/customers/{id}/credit` via `Contains("/credit")`,
+  money-accounts/cash-sessions) return 402 when entitlement is Debt. Entitlement
+  cached 30s (`IMemoryCache`, key `billing:entitlement:{tenantId}`) so the
+  mid-flight 402 doesn't add a DB hit per request.
+- **Endpoints** (`API/Endpoints/BillingEndpoints.cs`, wired in Program.cs);
+  Billing.View on tenant routes, Billing.Manage on `/admin/billing/*`. Enums
+  serialize as numbers (no JsonStringEnumConverter anywhere) — Flutter maps raw
+  ints.
+- **Tests written (unrun)**: unit — evaluator date matrix, subscription state
+  machine, voucher code format/unambiguity, invoice period math; integration
+  `BillingEndpointsTests` — auth guard, register→Pro-trial full access,
+  plans catalog, trial lapse→Debt + invoice issued exactly once, 402 premium
+  write while stock backstop + reads pass, redeem voucher extends + settles open
+  invoice (via `/admin/billing/vouchers/issue`), unknown/bad voucher rejected.
+- **Deferred (next task)**: Flutter billing page + client feature gating; the
+  M-Pesa manual voucher is the first monetization channel (Flutterwave later).
+- **Pricing note**: legacy `BusinessProposal`/`BusinessPlan` docs still quote USD
+  Starter/Growth/Pro — the MVP product is a single Pro plan at TZS 25,000/mo.
+
+## M13.1 — Entitlement enforcement + Flutter billing client (WRITTEN 2026-09-25, NOT YET BUILT/VERIFIED)
+
+Second code-only pass under the same no-commands directive. No schema change (no
+new migration); the entitlement cache, middleware and Flutter client now line up
+with the M13 domain.
+
+- **Backend fixes**:
+  - `GET /api/v1/billing/subscription` is permission-free (the only unmapped
+    billing read); plans/invoices/evaluate/redeem keep `Billing.View`; owner desk
+    stays on `/api/v1/admin/billing/*` behind `Billing.Manage`.
+  - Debt: reads never blocked, POS + inventory writes allowed, other premium
+    writes → `402 BillingRequired`; a disabled module on a write → `403
+    ModuleDisabled` (extensions: `code`, `featureKey`). GET/HEAD/OPTIONS
+    short-circuit **before** entitlement access, so reads never populate the cache.
+  - `ModuleRouteMap` also maps `price-lists` + `pricing`; quota guards on branch,
+    user and product creation; those three commands now implement
+    `IRequiresTenantAdvisoryLock` so the count check can't race.
+  - `SetFeatureFlagCommandHandler` only called `flag.Enable(config)` when
+    `IsEnabled && Config is not null` — a config payload with `IsEnabled=false`
+    used to enable the flag.
+  - **Feature-flag cache invalidation**: new `FeatureFlagChangedEvent`
+    (`Domain/Events/FeatureFlagEvents.cs`) raised by `FeatureFlag.Create(enabled)`,
+    `Enable`, `Disable`; handled by `SubscriptionEntitlementCacheInvalidationHandler`
+    (registered in `Application/DependencyInjection.cs`). Dispatch is post-commit via
+    `TransactionBehavior`, so toggling a flag can no longer leave a 30s stale
+    entitlement. The seeder writes flags with plain `_db.SaveChangesAsync`, so
+    seeding adds no outbox noise.
+  - **Self-heal in one round trip** (evaluate/redeem with no subscription row):
+    `SubscriptionRepository.GetForTenantAsync` checks `_db.Subscriptions.Local`
+    first; `InvoiceRepository.GetOpenAsync` returns a pending local open invoice
+    and otherwise excludes tracked local invoice ids from the DB query — the
+    just-marked-paid invoice can't surface as open before the save.
+- **Flutter client**: `features/billing/` (domain, repository, providers,
+  controller, billing page, invoice PDF share via `pdf` + `share_plus`),
+  `/billing` route + home tile (permission-checked), debt lock on premium tiles,
+  mutation redirects, entitlement-aware product price fields, EN/SW strings.
+  `ApiClient` maps `402` → `PaymentRequiredException` and fires a **single-flight**
+  `onPaymentRequired` callback (providers wiring refreshes the entitlement, which
+  re-evaluates route redirects). Finance routes gate on `finance.enabled`
+  (`BillingFeatureKeys.finance` + `financeFeatureAccessProvider`); price editing
+  uses `AccessLevel.Full` (`fullBillingAccessProvider`) — there is no client
+  `pricing.enabled` key. `ProductFormPage` catches `PaymentRequiredException` to
+  show the localized lock message and refreshes the entitlement.
+  `router.dart` now exposes the pure `premiumRouteRedirect` (same pattern as
+  `journeyRedirect`) for unit tests.
+- **Tests written (unrun)**: backend integration — trial self-heal via evaluate,
+  paid self-heal via redeem, finance flag toggle invalidates the entitlement cache
+  (403 → allowed); unit — `SubscriptionEntitlementGuard` at-limit/above-limit/null
+  quota boundaries. Flutter — `billing_domain_test`, `billing_repository_test`,
+  `billing_controller_test` (single-flight load/refresh, provider fallback),
+  `api_client_test` 402 mapping + single-flight notification,
+  `app_router_test` premium redirect matrix.
+- **Known edge (not fixed)**: product metadata and product prices are two
+  requests; a `402` on the price write (entitlement dropped mid-save) leaves the
+  metadata saved. Closing it needs one transactional backend endpoint — deferred.
+- **Pending verification** (user-run): `dotnet build`, `dotnet test
+  backend/tests/BusinessOS.Tests`, `flutter gen-l10n`, `dart format --set-exit-if-changed`,
+  `flutter analyze`, `flutter test`.
+
+## M7 — Receipt redesign: one ticket for screen, text, PDF and thermal (2026-09-25, CODE WRITTEN — PENDING USER-VERIFIED COMMANDS)
+
+Approved plan: `docs/plans/2026-09-25-receipt-redesign-plan.md`. Spec: `specs/receipts.md`
+(new — the receipts module shipped without one). Written under a no-commands directive, so
+nothing was built, formatted, analyzed or tested by the assistant; the user runs the
+commands. Key decisions:
+
+- **Architecture:** `lib/features/receipts/domain/receipt_renderer.dart`
+  (`Thermal80mmRenderer`) is the single source of truth for receipt layout. Every emitted
+  line is padded/truncated to exactly **42 columns** (`_fit`), so `buildEscPosBytes` prints
+  text **verbatim left-aligned** and adds only bold + the QR raster — any ESC/POS center
+  command would double-shift a header the renderer already centered (and printer
+  trailing-space handling is untrustworthy). Deviations from the plan, deliberate:
+  `isReceiptLabel`/`isTotal`/`isFooter` centering dropped; footer left-aligned; bold rules
+  = watermarks, business name (first content line), `---` **and** `===` separators, item
+  header (`Qty`/`Kiasi`), `GRAND TOTAL`/`TOTAL`/`JUMLA`.
+- **Shared formatting:** new `lib/features/receipts/domain/receipt_format.dart`
+  (`receiptMoney`, `receiptMoneyNegative`, `receiptMoneyBare`, `receiptQuantity`,
+  `receiptDate` = `dd-MMM-yyyy hh:mm a`, `receiptDiscountPercent`, `receiptTaxPercent`,
+  `receiptCurrency`, `receiptWholeAmount`, `receiptLineWidth` = 42) is imported by the
+  renderer, the QR builder and the on-screen widget — no duplicated business formatting.
+- **Currency:** the tenant ISO code prints as-is (`TZS 23.75`) with 2 decimals always; the
+  `currencySymbol` TSh-mapping helper was **removed** from `money.dart` (now
+  `formatMoney(..., alwaysDecimals:)`); the QR payload keeps a whole-number total.
+- **Backend (`ReceiptPreviewDto` extension):** `Email`, `BranchName`, `CashierName`,
+  `CustomerName`, `Currency` + `ReceiptPaymentDto.Reference`, projected by
+  `GetReceiptPreviewQuery` (also injects `IUserRepository`/`IBranchRepository`);
+  `BuildQrPayload` now takes `currency` and formats the date/total with
+  `CultureInfo.InvariantCulture`. No migration, no new permissions, no domain changes.
+- **Widget:** `lib/features/receipts/presentation/widgets/receipt_ticket_card.dart` —
+  stateless, provider-free UI twin of the renderer, now used by `ReceiptPreviewPage` and
+  `SaleSuccessPage` (which also stops printing the placeholder `businessName: 'Business'`).
+  `pubspec.yaml` finally registers **RobotoMono** (assets existed; it was silently falling
+  back and misaligning every column).
+- **Localization:** `ReceiptLabels` (EN/SW) + `receiptLanguageForCode`;
+  `thermalRendererProvider` and `receiptPrinterServiceProvider` both watch the locale.
+- **Reprint + audit (was dead code):** pages render `*** REPRINT ***` from
+  `printCount > 0` plus a same-session counter, and fire-and-forget
+  `ReceiptRepository.recordPrint` after a successful print (`Original` → `Reprint`),
+  swallowing offline failures. **Deviation:** `SaleSuccessPage` tracks its own session
+  counter for audit type *and* watermark, where the plan assumed it always records
+  `Original` and never watermarks — keeping the two pages identical.
+- **Cleanup:** deleted `lib/features/sales/domain/receipt.dart` (legacy second builder);
+  `ReceiptPrinterService.saleToReceipt` is the only `SaleDto` → ticket path (also fixes
+  `isVoided` hard-coded `false`) and gained `isReprint` threading. `receipt_qr.dart`
+  `currencySymbol(...)` → `receiptCurrency(...)` (compile fix after the helper removal).
+- **Tests written:** `receipt_preview_test.dart` (model round-trip incl. old JSON, every
+  renderer section, EN+SW, QR branches, 42-column width invariant),
+  `receipt_ticket_card_test.dart` (widget incl. QR present/absent, reprint, Swahili),
+  `cart_and_receipt_test.dart` legacy group → `saleToReceipt + Thermal80mmRenderer`
+  (Swahili, `Kodi (VAT 18.4%)` computed from the fixture), backend
+  `ReceiptEndpointsTests.cs` (identity fields + payment reference).
+- **Pending verification** (user-run): `flutter analyze`, `flutter test`,
+  `dart format`, then `cd backend && dotnet build --warnaserror && dotnet format
+  --verify-no-changes && dotnet test --filter "FullyQualifiedName~Receipt"`.
+
+## M13.2 — Module packages, capabilities client & customer invoicing (2026-09-25, CODE WRITTEN — PARTIALLY VERIFIED)
+
+Spec: `specs/module-packages.md` (new). Tasks: `tasks/module-packages/TASKS.md` (new).
+Delivers the first add-on package end to end on top of the M13/M13.1 entitlement base.
+
+- **Package model**: `Plan.IsPackage` + `Plan.InvoiceManagerCode = "invoice-manager"`,
+  seeded by `DatabaseSeeder.EnsureBillingCatalogAsync` (Free 0 TZS / backstop keys,
+  Pro with 3/5/3000 quotas, `invoice-manager` with `invoicing.enabled`). A package is
+  stored as a `SubscriptionItem` and never replaces `Subscription.PlanId`, so
+  `invoicing.enabled` cannot leak into Free or Pro.
+- **Entitlement formula**: `(base plan keys ∪ active SubscriptionItem plan keys) ∩ enabled
+  tenant feature flags` — a package can never widen the tenant past its provisioned flags.
+- **403 vs 402 is a product decision**: healthy plan + missing key → 403 `ModuleDisabled`
+  ("upgrade"); debt + missing key on a non-backstop module → 402 `BillingRequired` ("pay").
+  Collapsing them into one code was explicitly rejected. `ModuleRouteMap` maps route
+  segments to modules (including the `/customers/{id}/credit/*` special case);
+  `SubscriptionAccessMiddleware` enforces it and writes a `module` ProblemDetails
+  extension; `SubscriptionEntitlementGuard` covers sub-features and quotas the route map
+  cannot express. Quotas are nulled under degraded access so a debt tenant is never blocked
+  on a module it still owns.
+- **Capabilities API**: `GET /api/v1/capabilities` → `CapabilitiesDto` incl.
+  `PlanFeatureKeys`, `Packages`, and `validOfflineUntil = min(nextDue + 7d, now + 30d)`.
+  Package activate/remove: `POST|DELETE /api/v1/billing/packages/{planCode}` behind
+  `Billing.Manage`, both returning the recalculated code list. The client is strictly
+  `200`-based — `Result<T>.ToApiResult()` maps success to 200, never 201.
+- **Customer invoicing** (separate from subscription billing): `CustomerInvoice` aggregate
+  with `CustomerInvoiceLine` and status `Unpaid → PartiallyPaid → Paid` + terminal `Void`,
+  partial payments, overpayment rejection, derived `BalanceDue`, server-recomputed totals,
+  tenant advisory lock for exactly-once numbering. Permissions `Invoices.View/Create/Manage`.
+  Migration `20260925001000_AddCustomerInvoices` creates `CustomerInvoices` before
+  `CustomerInvoiceLines` (parent before FK target).
+- **Deliberate list/detail asymmetry**: the list returns
+  `PagedResult<CustomerInvoiceSummaryDto>` (no `Lines`, `Subtotal`, `TaxAmount`, payment or
+  void fields) while detail/create/payment/void return the full `CustomerInvoiceDto`. Hence
+  two Dart models, `CustomerInvoiceSummary` and `CustomerInvoice`. Do not "fix" this in the
+  client. `CustomerInvoiceStatus` serializes as an **integer** (no
+  `JsonStringEnumConverter` is registered), so the client sends `status.code` in query
+  strings for the same reason.
+- **Flutter capabilities**: `features/capabilities/` (domain `WorkspaceModule`, DAO in the
+  existing `MetaEntries` table — **no migration** — repository, controller,
+  `enabledModulesProvider`). Cached copies are honoured only until `validOfflineUntil` and
+  this check is deliberately **not** skipped for full-access tenants; on expiry the app
+  falls back to the backstop set rather than either everything (unpaid modules) or nothing
+  (locked-out cashier). `CapabilitiesState.source` drives the stale banner.
+- **Navigation**: `More` entries are per-module gated; primary tabs now too — `_NavDest`
+  carries an optional `WorkspaceModule`, locked tabs show a lock badge, tapping routes to
+  billing (if `Billing.Manage`) or `/module-locked`, and a locked tab renders a placeholder
+  instead of the real page because `IndexedStack` builds children eagerly. Tab **indices are
+  stable** (never filter the list) because `Routes.pos` and `_MoreTab.onNavigateToTab` use
+  raw indices. Of the primary tabs only Reports can be locked; Products/POS are backstops.
+- **Duplicate fetch removed**: login used to call both `/billing/subscription` and
+  `/capabilities`, which write the same `SubscriptionEntitlement`. `/capabilities` is a
+  strict superset, so it is now the single login fetch and the subscription endpoint is only
+  a fallback when capabilities yields nothing. `setEntitlement` bumps the controller
+  revision, so a late subscription response cannot clobber newer capability state.
+- **Errors + sync**: `ModuleDisabledException` (carries `module`) and
+  `QuotaExceededException` added; `error_mapper` recognises `ModuleDisabled`,
+  `BillingRequired`, `QuotaExceeded`, `AccountNotVerified` and parses the `module`
+  extension. A queued op refused with `ModuleDisabled` fails terminally as
+  `MODULE_DISABLED`; one refused with `BillingRequired` is **released unattempted** (no
+  attempt burned) so it retries after payment; `QuotaExceeded` fails as `QUOTA`.
+  `SyncOutcome` exposes `moduleDisabled` / `billingRequired`.
+- **POS is deliberately not capability-gated.** The M5 `offlineWindowOpen()` session-journal
+  control is an authentication/security window, not an entitlement check, and stays
+  untouched — a cashier must never be locked out of taking money.
+- **Localization blocker found and fixed**: the committed generated localizations were
+  badly stale (363 ARB keys missing, 295 of them referenced from `lib/`, e.g.
+  `suppliersTitle`, `userFormTitleAdd`, `billingBackstopMessage`) — the app could not
+  compile without regeneration. Pre-existing since commit `5f6db83`, not caused by this
+  slice. Resolved with `flutter gen-l10n`; ARB is the source of truth, so edit
+  `app_en.arb` / `app_sw.arb` and regenerate rather than hand-patching
+  `lib/l10n/generated/`.
+- **Tests written (unrun)**: backend — `ModuleRouteMapTests`, `CustomerInvoiceTests`,
+  `ModulePackagesTests`; Flutter — billing controller test fake now implements
+  `activatePackage` / `removePackage`.
+- **Pending verification (user-run)**: `dotnet build`, `dotnet test
+  backend/tests/BusinessOS.Tests`, the `AddCustomerInvoices` migration against Postgres,
+  `dart format`, `flutter analyze`, `flutter test`. Everything above was reviewed by
+  static reading; the only command run in this slice was `flutter gen-l10n`.
+
+## Mx Catch-up commit pass (done 2026-10-05)
+
+~5 weeks of uncommitted work (M9.2→M13.2, 400+ paths) committed as 4 thematic
+commits: `b448cb8` repo hygiene, `7507e24` backend, `28d766c` Flutter client,
+`e5217ac` docs. **Real defects found by the first-ever build/analyze of the
+code-only milestones:** missing `auth_controller.dart` import in
+`two_factor_page.dart` (`AuthNeedsTwoFactor` undefined — analyze error);
+`.AsTask()` on an already-`Task` `AddRangeAsync` (PlatformRepositories);
+`BinaryPrimitives.WriteInt64BigEndian` void assigned to `var` (TotpService);
+two test stubs missing `IRefreshTokenRepository.ListActiveByUserAsync`.
+All fixed minimally. **Verified:** `dotnet build --warnaserror` clean
+(0/0), `flutter analyze` 0 issues, dart format applied, gen-l10n in sync.
+**NOT run (user decision):** `dotnet test` (unit + integration), `flutter test`.
+Running both suites is the immediate next task — M13/M13.1/M13.2 logic has
+never been executed by any test.
 
 ## technical_debt.md
 

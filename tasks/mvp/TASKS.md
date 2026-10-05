@@ -33,14 +33,14 @@ out of scope. Backend endpoints are reused as-is; Flutter is the UI + offline la
 | M4 | POS core / sales (product→cart→payment→sale→receipt, online) | done |
 | M5 | Offline-first POS + sync (encrypted Drift DB, device identity, cache, offline sale, sync queue/engine, conflicts) — rescoped 2026-08-23 (former "Basic inventory" mostly delivered in M3; remainder → backlog) | done |
 | M6 | POS (search/cart/payment cash+mobile money → complete sale) — delivered by M4 | done |
-| M7 | Receipts (preview/share/print/reprint) — preview/copy/save .txt shipped in M4; share-to-app/print/reprint remain | partial |
+| M7 | Receipts (preview/share/print/reprint) — redesigned ticket, thermal print, reprint watermark + print audit (spec: `specs/receipts.md`) | done |
 | M8 | Offline-first POS + sync (Drift encrypted DB, ClientSaleId idempotency, queue) — delivered by M5 | done |
 | M9 | Auth to global standard (optional business name, required phone + login by email OR phone, forgot/reset password, password UX, EN/SW i18n scaffold) | done |
 | M9.1 | Staff join-by-invitation-code (owner generates a code → staff registers with it → joins owner's business with Staff role; no tenant/Administrator created) | done |
 | M10 | Backup & recovery (encrypted export/import + validation) | pending |
 | M11 | UX hardening (Swahili-first nav, a11y, confirmations) | pending |
 | M12 | Pilot preparation + checklist | pending |
-| M13 | Subscription foundation (Starter trial gates) | pending |
+| M13 | Subscription foundation (Starter trial gates) | partial |
 | M14 | Production readiness checks | pending |
 
 ## Open blockers from 2026-08-24 device bring-up
@@ -192,6 +192,24 @@ Flutter slice:
 Known debt flagged: buying price not supported by backend (omitted from form); product
 list stock badges join one balances page client-side (no batch endpoint); case-sensitive
 search fixed for products only.
+
+### M3 stock follow-up (done 2026-09-12)
+
+Post-M3 improvements to make stock advisory and shippable:
+
+- **Stock is advisory, never blocks sales.** `SaleStockDebitService` locks row, creates
+  balance if missing, always debits (negative allowed). `StockBalance.Apply` no longer
+  throws on negative.
+- **Idempotent adjustments.** `AdjustStockCommand` dedupes via `Idempotency-Key` header or
+  `ClientAdjustmentId` body field; replays return current balance without double-applying.
+- **Staff can top up stock.** `InventoryManage` + `WarehousesView` added to the Staff role
+  (`PermissionNames.cs`).
+- **defaultWarehouse** prefers code `MAINSTORE` over `.first` (multi-warehouse safe).
+- **Flutter AddStockSheet** localized, idempotent, opens from ProductDetailPage stock card.
+- **Products tile** reverts to chevron; opens detail page where stock action lives.
+- **ARB keys** (en+sw): add-stock flow + product detail stock card + product badges.
+- **Tests:** `StockRow.status` + `StockReady.visible` filtering; backend adjustment
+  idempotency + non-blocking debit + oversell-to-negative integration.
 
 ## M2 task breakdown (real auth + workspace/onboarding)
 
@@ -403,3 +421,44 @@ future-proof; >1 workspaces is unreachable today.
     only for owners (Users.Create permission). ARB strings added for the staff
     flow. dart analyze: only 2 pre-existing checkout_controller warnings + 1
     pre-existing unused import; 129/129 flutter tests green.
+- 2026-09-22: M13 backend slice written (code-only; build/tests run on the next
+    permitted session). Freemium monetization on free hosting: platform plan
+    catalog (Free = POS+inventory backstop; Pro = TZS 25,000/mo, quota
+    branches=3/users=5/products=3000) + per-tenant Subscription (14-day Pro trial
+    auto-granted at registration/provisioning, backfilled for legacy tenants by
+    the seeder) + prepaid voucher codes (CSPRNG `XXXX-XXXX-XXXX`, unambiguous
+    alphabet, 1–365 days) + per-tenant Invoices (renewal invoice auto-issued on
+    trial lapse; PDF rendered client-side from the DTO — offline-first decision,
+    no server PDF endpoint). New permissions Billing.View + Billing.Manage.
+    Enforcement: SubscriptionAccessMiddleware 402s premium writes while a
+    subscription is in debt (reads + POS/inventory writes keep working);
+    entitlement derived purely from dates by a stateless evaluator and cached
+    30s. Commands/queries: GetSubscription (entitlement), ListPlans,
+    ListInvoices, GetInvoice, RedeemVoucher, EvaluateSubscription (idempotent
+    self-heal), owner desk MarkInvoicePaid (extends subscription by payable
+    window — the manual M-Pesa settlement path) + IssueVouchers + ListBillingDebts
+    under /admin/billing. Migration `20260922000000_AddPlansSubscriptionsVouchers
+    Invoices` (hand-written Up/Down + snapshot + Designer that delegates BuildTargetModel
+    to the snapshot so a future `dotnet ef migrations add` cannot drift it; the
+    three additive billing tables reuse the "attribute-only Designer" pattern
+    from slice-8/9 plus a slight variant). Unit tests (evaluator, entity state
+    machines, code format/unambiguity) + integration suite
+    (BillingEndpointsTests) written. Flutter billing page + client feature gating
+    are the next task (deferred). Pricing note: legacy docs quote USD Starter/
+    Growth/Pro — actual MVP catalogs Pro at TZS 25,000/mo; Flutterwave phase
+    replaces manual voucher/M-Pesa settlement later.
+- 2026-09-25: M13.1 written (code-only; still unverified — the M13 row stays
+    `partial` until the user runs build/analyze/tests). Flutter billing client
+    shipped: domain/repository/providers/controller, `/billing` page + home tile,
+    invoice PDF share, EN/SW strings, `PaymentRequiredException` with a
+    single-flight entitlement refresh on 402, debt lock + premium route redirects,
+    and product price fields gated on full access. Backend hardening: reads
+    short-circuit before entitlement access; disabled module on a write → 403
+    ModuleDisabled; pricing/price-lists mapped in ModuleRouteMap; quota checks on
+    branch/user/product creation under the tenant advisory lock; feature-flag
+    toggles now raise `FeatureFlagChangedEvent` so the 30s entitlement cache
+    invalidates post-commit; evaluate/redeem self-heal in one round trip via EF
+    local-tracker visibility; `SetFeatureFlag` no longer enables a flag when
+    `IsEnabled=false` with a config payload. Tests added on both sides (unrun).
+    Known edge: product metadata + price are two requests, so a 402 on the price
+    write leaves metadata saved.
