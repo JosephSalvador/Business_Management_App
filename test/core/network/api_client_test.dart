@@ -2,9 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 
-import 'package:business_management_system/core/config/app_config.dart';
-import 'package:business_management_system/core/network/api_client.dart';
-import 'package:business_management_system/core/network/app_exception.dart';
+import 'package:jolinx_app/core/config/app_config.dart';
+import 'package:jolinx_app/core/network/api_client.dart';
+import 'package:jolinx_app/core/network/app_exception.dart';
 
 import '../../support/fakes.dart';
 
@@ -75,6 +75,60 @@ void main() {
     await client.get<dynamic>('/api/v1/ping');
 
     expect(capturedHeaders['Authorization'], 'Bearer access-1');
+    // The refresh token is deliberately withheld from ordinary traffic.
+    expect(capturedHeaders.containsKey('X-Refresh-Token'), isFalse);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('sends the refresh token only on the session list', () async {
+    final capturedHeaders = <String, dynamic>{};
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          capturedHeaders.clear();
+          capturedHeaders.addAll(options.headers);
+          handler.next(options);
+        },
+      ),
+    );
+
+    await store.writeTokens(accessToken: 'access-1', refreshToken: 'r1');
+    adapter.onGet(
+      '/api/v1/me/security/sessions',
+      (server) => server.reply(200, <dynamic>[]),
+    );
+    adapter.onGet(
+      '/api/v1/products',
+      (server) => server.reply(200, <dynamic>[]),
+    );
+
+    await client.get<dynamic>('/api/v1/me/security/sessions');
+    expect(capturedHeaders['X-Refresh-Token'], 'r1');
+
+    await client.get<dynamic>('/api/v1/products');
+    expect(capturedHeaders.containsKey('X-Refresh-Token'), isFalse);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('sends no session header before a session exists', () async {
+    final capturedHeaders = <String, dynamic>{};
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          capturedHeaders.clear();
+          capturedHeaders.addAll(options.headers);
+          handler.next(options);
+        },
+      ),
+    );
+
+    adapter.onGet(
+      '/api/v1/me/security/sessions',
+      (server) => server.reply(200, <dynamic>[]),
+    );
+
+    await client.get<dynamic>('/api/v1/me/security/sessions');
+
+    expect(capturedHeaders.containsKey('Authorization'), isFalse);
+    expect(capturedHeaders.containsKey('X-Refresh-Token'), isFalse);
   }, timeout: const Timeout(Duration(seconds: 30)));
 
   test('maps ProblemDetails to typed exceptions', () async {
@@ -104,7 +158,9 @@ void main() {
         'title': 'Validation Error',
         'detail': 'One or more validation errors occurred.',
         'status': 400,
-        'errors': {'name': ['required']},
+        'errors': {
+          'name': ['required']
+        },
       }),
     );
 
@@ -140,7 +196,8 @@ void main() {
       ScriptedResponse(200, '{"data":42}'),
     ]);
     dio.httpClientAdapter = adapter;
-    await store.writeTokens(accessToken: 'stale', refreshToken: 'valid-refresh');
+    await store.writeTokens(
+        accessToken: 'stale', refreshToken: 'valid-refresh');
 
     final response = await client.get<dynamic>('/api/v1/protected');
 
@@ -170,5 +227,61 @@ void main() {
     expect(sessionExpiredFired, isTrue);
     expect(await store.readAccessToken(), isNull);
     expect(await store.readRefreshToken(), isNull);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('402 notifies the payment callback and maps to PaymentRequiredException',
+      () async {
+    const problem = '{"title":"BillingRequired",'
+        '"detail":"Renew to restore full access.",'
+        '"status":402,"code":"BillingRequired"}';
+    final scripted = ScriptedAdapter(const [ScriptedResponse(402, problem)]);
+    dio.httpClientAdapter = scripted;
+    var notified = 0;
+    client.onPaymentRequired = () async => notified++;
+
+    try {
+      await client.post<dynamic>('/api/v1/thing', body: {});
+      fail('should throw');
+    } on PaymentRequiredException catch (error) {
+      expect(error.message, 'Renew to restore full access.');
+    }
+    expect(notified, 1);
+    expect(scripted.requests, hasLength(1));
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('concurrent 402s share a single payment-required notification',
+      () async {
+    const problem = '{"title":"BillingRequired",'
+        '"detail":"Debt lock.",'
+        '"status":402,"code":"BillingRequired"}';
+    final scripted = ScriptedAdapter(const [
+      ScriptedResponse(402, problem),
+      ScriptedResponse(402, problem),
+    ]);
+    dio.httpClientAdapter = scripted;
+    var notified = 0;
+    client.onPaymentRequired = () async {
+      notified++;
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    };
+
+    Future<Object> capture(Future<Response<dynamic>> call) async {
+      try {
+        await call;
+        return StateError('expected a failure');
+      } on Object catch (error) {
+        return error;
+      }
+    }
+
+    final errors = await Future.wait([
+      capture(client.get<dynamic>('/api/v1/a')),
+      capture(client.get<dynamic>('/api/v1/b')),
+    ]);
+
+    expect(errors[0], isA<PaymentRequiredException>());
+    expect(errors[1], isA<PaymentRequiredException>());
+    expect(notified, 1, reason: 'the 402 notification must be single-flight');
+    expect(scripted.requests, hasLength(2));
   }, timeout: const Timeout(Duration(seconds: 30)));
 }

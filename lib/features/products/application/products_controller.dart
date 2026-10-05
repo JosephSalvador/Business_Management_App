@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../data/product_repository.dart';
 import '../domain/catalog.dart';
@@ -47,12 +48,14 @@ class ProductsFailure extends ProductsState {
 
 /// Loads and mutates products through [ProductRepository]. Mutations throw on
 /// failure so the calling page can surface the backend's message directly.
-class ProductsController extends StateNotifier<ProductsState> {
-  ProductsController(this._repository) : super(const ProductsLoading());
-
-  final ProductRepository _repository;
+class ProductsController extends Notifier<ProductsState> {
   PriceList? _defaultPriceList;
   String _search = '';
+
+  @override
+  ProductsState build() => const ProductsLoading();
+
+  ProductRepository get _repository => ref.read(productRepositoryProvider);
 
   /// Reloads the list. Pass [search] to change the filter; omit it to keep
   /// the current one (e.g. after create/update).
@@ -112,30 +115,80 @@ class ProductsController extends StateNotifier<ProductsState> {
     );
   }
 
-  /// Creates the product and (optionally) its opening selling price.
-  /// Returns the created product so the caller can offer opening stock.
-  Future<Product> create(ProductDraft draft, double? sellingPrice) async {
+  Future<void> _ensureDefaultPriceList() async {
+    if (_defaultPriceList != null) return;
+    try {
+      _defaultPriceList = await _repository.defaultPriceList();
+    } on AppException {
+      _defaultPriceList = null;
+    }
+  }
+
+  /// Retail price type code (mirrors the backend enum ProductPriceType).
+  static const int _retailPriceType = 0;
+
+  /// Wholesale price type code.
+  static const int _wholesalePriceType = 1;
+
+  /// Creates the product and (optionally) its opening retail and wholesale
+  /// prices. Returns the created product so the caller can offer opening stock.
+  Future<Product> create(
+    ProductDraft draft,
+    double? sellingPrice, {
+    double? wholesalePrice,
+  }) async {
     final product = await _repository.create(draft);
+    if (sellingPrice != null || wholesalePrice != null) {
+      await _ensureDefaultPriceList();
+    }
     if (sellingPrice != null && sellingPrice > 0 && _defaultPriceList != null) {
       await _repository.setSellingPrice(
         priceList: _defaultPriceList!,
         productId: product.id,
         price: sellingPrice,
+        priceType: _retailPriceType,
+      );
+    }
+    if (wholesalePrice != null &&
+        wholesalePrice > 0 &&
+        _defaultPriceList != null) {
+      await _repository.setSellingPrice(
+        priceList: _defaultPriceList!,
+        productId: product.id,
+        price: wholesalePrice,
+        priceType: _wholesalePriceType,
       );
     }
     await load();
     return product;
   }
 
-  Future<void> update(String id, ProductDraft draft, double? sellingPrice) async {
+  Future<void> update(
+    String id,
+    ProductDraft draft,
+    double? sellingPrice, {
+    double? wholesalePrice,
+  }) async {
     await _repository.update(id, draft);
-    if (sellingPrice != null &&
-        sellingPrice > 0 &&
-        _defaultPriceList != null) {
+    if (sellingPrice != null || wholesalePrice != null) {
+      await _ensureDefaultPriceList();
+    }
+    if (sellingPrice != null && sellingPrice > 0 && _defaultPriceList != null) {
       await _repository.setSellingPrice(
         priceList: _defaultPriceList!,
         productId: id,
         price: sellingPrice,
+        priceType: _retailPriceType,
+      );
+    }
+    if (wholesalePrice != null &&
+        wholesalePrice > 0 &&
+        _defaultPriceList != null) {
+      await _repository.setSellingPrice(
+        priceList: _defaultPriceList!,
+        productId: id,
+        price: wholesalePrice,
+        priceType: _wholesalePriceType,
       );
     }
     await load();

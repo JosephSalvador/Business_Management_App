@@ -19,10 +19,12 @@ class Product {
     this.sku,
     this.barcode,
     this.categoryId,
+    this.brandId,
     required this.unitOfMeasureId,
     required this.productType,
     required this.status,
     this.taxCategoryId,
+    this.costPrice,
   });
 
   final String id;
@@ -31,10 +33,12 @@ class Product {
   final String? sku;
   final String? barcode;
   final String? categoryId;
+  final String? brandId;
   final String unitOfMeasureId;
   final int productType;
   final int status;
   final String? taxCategoryId;
+  final double? costPrice;
 
   bool get isActive => status == ProductStatus.active;
 
@@ -45,10 +49,12 @@ class Product {
         sku: json['sku'] as String?,
         barcode: json['barcode'] as String?,
         categoryId: json['categoryId'] as String?,
+        brandId: json['brandId'] as String?,
         unitOfMeasureId: json['unitOfMeasureId'] as String,
         productType: (json['productType'] as num).toInt(),
         status: (json['status'] as num).toInt(),
         taxCategoryId: json['taxCategoryId'] as String?,
+        costPrice: (json['costPrice'] as num?)?.toDouble(),
       );
 
   Map<String, dynamic> toCreateBody() => {
@@ -57,15 +63,20 @@ class Product {
         if (hasText(sku)) 'sku': sku!.trim(),
         if (hasText(barcode)) 'barcode': barcode!.trim(),
         if (categoryId != null) 'categoryId': categoryId,
+        if (brandId != null) 'brandId': brandId,
         'unitOfMeasureId': unitOfMeasureId,
         'productType': productType,
-        // New products must be sellable immediately.
         'status': ProductStatus.active,
         if (taxCategoryId != null) 'taxCategoryId': taxCategoryId,
+        if (costPrice != null) 'costPrice': costPrice,
       };
 
+  /// The update endpoint has no productType field — it is immutable once a
+  /// product exists, so the field is not sent on update.
   Map<String, dynamic> toUpdateBody() {
-    final body = toCreateBody()..remove('status');
+    final body = toCreateBody()
+      ..remove('status')
+      ..remove('productType');
     return body;
   }
 

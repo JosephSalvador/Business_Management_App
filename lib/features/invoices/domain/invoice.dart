@@ -1,0 +1,261 @@
+enum InvoiceStatus {
+  unpaid(0),
+  partiallyPaid(1),
+  paid(2),
+  voided(3);
+
+  const InvoiceStatus(this.code);
+
+  final int code;
+
+  bool get isOpen =>
+      this == InvoiceStatus.unpaid || this == InvoiceStatus.partiallyPaid;
+
+  static InvoiceStatus fromCode(Object? value) {
+    final code = _requiredInt(value, 'status');
+    return values.firstWhere(
+      (status) => status.code == code,
+      orElse: () => throw FormatException('Unknown invoice status: $code'),
+    );
+  }
+}
+
+class InvoiceLine {
+  const InvoiceLine({
+    required this.id,
+    required this.description,
+    required this.quantity,
+    required this.unitPrice,
+    required this.taxRatePercent,
+    required this.lineTotal,
+    required this.taxAmount,
+  });
+
+  final String id;
+  final String description;
+  final double quantity;
+  final double unitPrice;
+  final double taxRatePercent;
+  final double lineTotal;
+  final double taxAmount;
+
+  factory InvoiceLine.fromJson(Map<String, dynamic> json) => InvoiceLine(
+        id: _requiredString(json, 'id'),
+        description: _requiredString(json, 'description'),
+        quantity: _requiredDouble(json, 'quantity'),
+        unitPrice: _requiredDouble(json, 'unitPrice'),
+        taxRatePercent: _requiredDouble(json, 'taxRatePercent'),
+        lineTotal: _requiredDouble(json, 'lineTotal'),
+        taxAmount: _requiredDouble(json, 'taxAmount'),
+      );
+}
+
+class CustomerInvoice {
+  const CustomerInvoice({
+    required this.id,
+    required this.number,
+    required this.customerId,
+    required this.customerName,
+    required this.currency,
+    required this.issueDate,
+    required this.dueDate,
+    required this.notes,
+    required this.status,
+    required this.subtotal,
+    required this.taxAmount,
+    required this.totalAmount,
+    required this.amountPaid,
+    required this.balanceDue,
+    required this.paymentMethod,
+    required this.paymentReference,
+    required this.paidAtUtc,
+    required this.lines,
+  });
+
+  final String id;
+  final String number;
+  final String? customerId;
+  final String? customerName;
+  final String currency;
+  final DateTime issueDate;
+  final DateTime? dueDate;
+  final String? notes;
+  final InvoiceStatus status;
+  final double subtotal;
+  final double taxAmount;
+  final double totalAmount;
+  final double amountPaid;
+  final double balanceDue;
+  final String? paymentMethod;
+  final String? paymentReference;
+  final DateTime? paidAtUtc;
+  final List<InvoiceLine> lines;
+
+  String get customerLabel =>
+      customerName != null && customerName!.isNotEmpty ? customerName! : '—';
+
+  bool get canTakePayment => status.isOpen && balanceDue > 0;
+
+  bool get canVoid =>
+      status != InvoiceStatus.paid && status != InvoiceStatus.voided;
+
+  bool get isOverdue {
+    final due = dueDate;
+    if (due == null || !status.isOpen) return false;
+    return due.isBefore(DateTime.now());
+  }
+
+  factory CustomerInvoice.fromJson(Map<String, dynamic> json) {
+    final rawLines = json['lines'];
+    return CustomerInvoice(
+      id: _requiredString(json, 'id'),
+      number: _requiredString(json, 'number'),
+      customerId: _optionalString(json, 'customerId'),
+      customerName: _optionalString(json, 'customerName'),
+      currency: _optionalString(json, 'currency') ?? 'TZS',
+      issueDate: _requiredDateTime(json, 'issueDate'),
+      dueDate: _optionalDateTime(json, 'dueDate'),
+      notes: _optionalString(json, 'notes'),
+      status: InvoiceStatus.fromCode(json['status']),
+      subtotal: _requiredDouble(json, 'subtotal'),
+      taxAmount: _requiredDouble(json, 'taxAmount'),
+      totalAmount: _requiredDouble(json, 'totalAmount'),
+      amountPaid: _requiredDouble(json, 'amountPaid'),
+      balanceDue: _requiredDouble(json, 'balanceDue'),
+      paymentMethod: _optionalString(json, 'paymentMethod'),
+      paymentReference: _optionalString(json, 'paymentReference'),
+      paidAtUtc: _optionalDateTime(json, 'paidAtUtc'),
+      lines: rawLines is List
+          ? rawLines
+              .whereType<Map<dynamic, dynamic>>()
+              .map(
+                  (raw) => InvoiceLine.fromJson(Map<String, dynamic>.from(raw)))
+              .toList(growable: false)
+          : const [],
+    );
+  }
+}
+
+class CustomerInvoiceSummary {
+  const CustomerInvoiceSummary({
+    required this.id,
+    required this.number,
+    required this.customerId,
+    required this.customerName,
+    required this.status,
+    required this.issueDate,
+    required this.dueDate,
+    required this.totalAmount,
+    required this.amountPaid,
+    required this.balanceDue,
+  });
+
+  final String id;
+  final String number;
+  final String? customerId;
+  final String? customerName;
+  final InvoiceStatus status;
+  final DateTime issueDate;
+  final DateTime? dueDate;
+  final double totalAmount;
+  final double amountPaid;
+  final double balanceDue;
+
+  String get customerLabel =>
+      customerName != null && customerName!.isNotEmpty ? customerName! : '—';
+
+  bool get isOverdue {
+    final due = dueDate;
+    if (due == null || !status.isOpen) return false;
+    return due.isBefore(DateTime.now());
+  }
+
+  factory CustomerInvoiceSummary.fromJson(Map<String, dynamic> json) {
+    return CustomerInvoiceSummary(
+      id: _requiredString(json, 'id'),
+      number: _requiredString(json, 'number'),
+      customerId: _optionalString(json, 'customerId'),
+      customerName: _optionalString(json, 'customerName'),
+      status: InvoiceStatus.fromCode(json['status']),
+      issueDate: _requiredDateTime(json, 'issueDate'),
+      dueDate: _optionalDateTime(json, 'dueDate'),
+      totalAmount: _requiredDouble(json, 'totalAmount'),
+      amountPaid: _requiredDouble(json, 'amountPaid'),
+      balanceDue: _requiredDouble(json, 'balanceDue'),
+    );
+  }
+}
+
+class InvoicePage {
+  const InvoicePage(
+      {required this.items, required this.total, required this.page});
+
+  final List<CustomerInvoiceSummary> items;
+  final int total;
+  final int page;
+
+  bool get hasMore => items.length < total;
+}
+
+class InvoiceDraftLine {
+  InvoiceDraftLine({
+    this.description = '',
+    this.quantity = 1,
+    this.unitPrice = 0,
+    this.taxRatePercent = 0,
+  });
+
+  String description;
+  double quantity;
+  double unitPrice;
+  double taxRatePercent;
+
+  double get lineTotal => quantity * unitPrice;
+
+  double get lineTax => lineTotal * taxRatePercent / 100;
+
+  Map<String, dynamic> toJson() => {
+        'description': description.trim(),
+        'quantity': quantity,
+        'unitPrice': unitPrice,
+        'taxRatePercent': taxRatePercent,
+      };
+}
+
+int _requiredInt(Object? value, String field) {
+  if (value is num && value.isFinite && value == value.roundToDouble()) {
+    return value.toInt();
+  }
+  throw FormatException('$field must be an integer.');
+}
+
+String _requiredString(Map<String, dynamic> json, String field) {
+  final value = json[field];
+  if (value is String && value.isNotEmpty) return value;
+  throw FormatException('$field must be a non-empty string.');
+}
+
+String? _optionalString(Map<String, dynamic> json, String field) {
+  final value = json[field];
+  if (value == null || value is String) return value as String?;
+  throw FormatException('$field must be a string.');
+}
+
+double _requiredDouble(Map<String, dynamic> json, String field) {
+  final value = json[field];
+  if (value is num && value.isFinite) return value.toDouble();
+  throw FormatException('$field must be a number.');
+}
+
+DateTime _requiredDateTime(Map<String, dynamic> json, String field) {
+  final value = json[field];
+  if (value is! String) throw FormatException('$field must be a date.');
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) throw FormatException('$field must be a date.');
+  return parsed;
+}
+
+DateTime? _optionalDateTime(Map<String, dynamic> json, String field) {
+  if (json[field] == null) return null;
+  return _requiredDateTime(json, field);
+}

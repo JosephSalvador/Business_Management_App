@@ -1,10 +1,12 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:business_management_system/core/network/app_exception.dart';
-import 'package:business_management_system/features/products/application/catalog_controller.dart';
-import 'package:business_management_system/features/products/application/products_controller.dart';
-import 'package:business_management_system/features/products/data/product_repository.dart';
-import 'package:business_management_system/features/products/domain/catalog.dart';
-import 'package:business_management_system/features/products/domain/product.dart';
+import 'package:jolinx_app/app/providers.dart';
+import 'package:jolinx_app/core/network/app_exception.dart';
+import 'package:jolinx_app/features/products/application/catalog_controller.dart';
+import 'package:jolinx_app/features/products/application/products_controller.dart';
+import 'package:jolinx_app/features/products/data/product_repository.dart';
+import 'package:jolinx_app/features/products/domain/catalog.dart';
+import 'package:jolinx_app/features/products/domain/product.dart';
 
 class FakeProductRepository implements ProductRepository {
   FakeProductRepository();
@@ -12,6 +14,8 @@ class FakeProductRepository implements ProductRepository {
   List<Product> products = [];
   List<UnitOfMeasure> unitRows = [];
   List<TaxCategory> taxCategoryRows = [];
+  List<Category> categoryRows = [];
+  List<Brand> brandRows = [];
   List<Warehouse> warehouseRows = const [
     Warehouse(id: 'w1', name: 'Main Store', code: 'MAINSTORE'),
   ];
@@ -23,15 +27,19 @@ class FakeProductRepository implements ProductRepository {
     isDefault: true,
   );
   final Map<String, double> retailPrices = {};
+  final Map<String, double> wholesalePrices = {};
   Object? createError;
 
   int unitsCreated = 0;
   ProductDraft? lastDraft;
   double? lastPrice;
+  double? lastWholesalePrice;
   OpeningStockEntry? lastOpening;
+  AdjustStockEntry? lastAdjustment;
 
   @override
-  Future<PagedProducts> list({int page = 1, int pageSize = 50, String? search}) async {
+  Future<PagedProducts> list(
+      {int page = 1, int pageSize = 50, String? search}) async {
     var items = products;
     if (search != null && search.isNotEmpty) {
       items = items
@@ -101,6 +109,12 @@ class FakeProductRepository implements ProductRepository {
   Future<List<TaxCategory>> taxCategories() async => taxCategoryRows;
 
   @override
+  Future<List<Category>> categories() async => categoryRows;
+
+  @override
+  Future<List<Brand>> brands() async => brandRows;
+
+  @override
   Future<List<Warehouse>> warehouses() async => warehouseRows;
 
   @override
@@ -125,6 +139,20 @@ class FakeProductRepository implements ProductRepository {
   }
 
   @override
+  Future<StockBalance> adjustStock(AdjustStockEntry entry) async {
+    lastAdjustment = entry;
+    openingQuantities = {
+      ...openingQuantities,
+      entry.productId: entry.quantityDelta,
+    };
+    return StockBalance(
+      warehouseId: entry.warehouseId,
+      productId: entry.productId,
+      quantity: entry.quantityDelta,
+    );
+  }
+
+  @override
   Future<PriceList?> defaultPriceList() async => defaultPriceListRow;
 
   @override
@@ -134,6 +162,14 @@ class FakeProductRepository implements ProductRepository {
             id: 'row-${entry.key}',
             productId: entry.key,
             priceType: 0,
+            price: entry.value,
+            currency: 'TZS',
+          ),
+        for (final entry in wholesalePrices.entries)
+          ProductPrice(
+            id: 'wrow-${entry.key}',
+            productId: entry.key,
+            priceType: 1,
             price: entry.value,
             currency: 'TZS',
           ),
@@ -147,7 +183,12 @@ class FakeProductRepository implements ProductRepository {
     int priceType = 0,
   }) async {
     lastPrice = price;
-    retailPrices[productId] = price;
+    if (priceType == 1) {
+      lastWholesalePrice = price;
+      wholesalePrices[productId] = price;
+    } else {
+      retailPrices[productId] = price;
+    }
   }
 }
 
@@ -155,7 +196,11 @@ void main() {
   group('CatalogController', () {
     test('creates starter units when the tenant has none', () async {
       final repository = FakeProductRepository();
-      final controller = CatalogController(repository);
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(catalogControllerProvider.notifier);
 
       await controller.load();
 
@@ -167,12 +212,35 @@ void main() {
 
     test('keeps existing units and reports readiness', () async {
       final repository = FakeProductRepository()
-        ..unitRows = [const UnitOfMeasure(id: 'u9', name: 'Kilo', abbreviation: 'kg')];
-      final controller = CatalogController(repository);
+        ..unitRows = [
+          const UnitOfMeasure(id: 'u9', name: 'Kilo', abbreviation: 'kg')
+        ];
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(catalogControllerProvider.notifier);
 
       await controller.load();
 
       expect(controller.state, isA<CatalogReady>());
+    });
+
+    test('exposes categories and brands for the product form', () async {
+      final repository = FakeProductRepository()
+        ..categoryRows = [const Category(id: 'c1', name: 'Pamba')]
+        ..brandRows = [const Brand(id: 'b1', name: 'Jamaa')];
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(catalogControllerProvider.notifier);
+
+      await controller.load();
+
+      final state = controller.state as CatalogReady;
+      expect(state.categories.single.id, 'c1');
+      expect(state.brands.single.id, 'b1');
     });
   });
 
@@ -180,7 +248,11 @@ void main() {
     test('create persists the product and its selling price, then reloads',
         () async {
       final repository = FakeProductRepository();
-      final controller = ProductsController(repository);
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(productsControllerProvider.notifier);
       await controller.load();
 
       final created = await controller.create(
@@ -195,9 +267,58 @@ void main() {
       expect(state.prices[created.id], 2500);
     });
 
+    test('create also persists an optional wholesale price', () async {
+      final repository = FakeProductRepository();
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(productsControllerProvider.notifier);
+      await controller.load();
+
+      final created = await controller.create(
+        const ProductDraft(name: 'Sukari', unitOfMeasureId: 'u1'),
+        3000,
+        wholesalePrice: 2800,
+      );
+
+      expect(repository.retailPrices[created.id], 3000);
+      expect(repository.wholesalePrices[created.id], 2800);
+      expect(repository.lastWholesalePrice, 2800);
+      final state = controller.state as ProductsLoaded;
+      expect(state.prices[created.id], 3000);
+    });
+
+    test('update persists retail and wholesale prices together', () async {
+      final repository = FakeProductRepository();
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(productsControllerProvider.notifier);
+      await controller.create(
+        const ProductDraft(name: 'Mchele', unitOfMeasureId: 'u1'),
+        null,
+      );
+
+      await controller.update(
+        'p1',
+        const ProductDraft(name: 'Mchele', unitOfMeasureId: 'u1'),
+        900,
+        wholesalePrice: 800,
+      );
+
+      expect(repository.retailPrices['p1'], 900);
+      expect(repository.wholesalePrices['p1'], 800);
+    });
+
     test('create without a default price list still succeeds', () async {
       final repository = FakeProductRepository()..defaultPriceListRow = null;
-      final controller = ProductsController(repository);
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(productsControllerProvider.notifier);
       await controller.load();
 
       final created = await controller.create(
@@ -209,10 +330,15 @@ void main() {
       expect(repository.lastPrice, isNull);
     });
 
-    test('backend conflict surfaces as an exception, state untouched', () async {
+    test('backend conflict surfaces as an exception, state untouched',
+        () async {
       final repository = FakeProductRepository()
         ..createError = ConflictException('SKU already exists.');
-      final controller = ProductsController(repository);
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(productsControllerProvider.notifier);
       await controller.load();
       final before = controller.state;
 
@@ -227,9 +353,14 @@ void main() {
       expect(controller.state, same(before));
     });
 
-    test('update refreshes the list with the previous search applied', () async {
+    test('update refreshes the list with the previous search applied',
+        () async {
       final repository = FakeProductRepository();
-      final controller = ProductsController(repository);
+      final container = ProviderContainer(overrides: [
+        productRepositoryProvider.overrideWithValue(repository),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(productsControllerProvider.notifier);
       await controller.create(
         const ProductDraft(name: 'Mchele', unitOfMeasureId: 'u1'),
         null,

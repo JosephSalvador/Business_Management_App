@@ -88,4 +88,58 @@ class SaleRepository {
       return null;
     }
   }
+
+  /// Resolves selling prices for many [productIds] in ONE round trip against
+  /// the tenant's default price list (Retail). Returns productId → price for
+  /// every line the server could price; unresolvable lines are simply absent
+  /// so callers fall back to the cart price.
+  Future<Map<String, double>> resolvePrices({
+    required List<String> productIds,
+    List<double>? quantities,
+    String? branchId,
+  }) async {
+    final response = await _api.post<List<dynamic>>(
+      '/api/v1/pricing/resolve-many',
+      body: {
+        'lines': [
+          for (var i = 0; i < productIds.length; i++)
+            {
+              'productId': productIds[i],
+              'quantity': quantities?[i] ?? 1,
+            },
+        ],
+        if (branchId != null) 'branchId': branchId,
+        'priceType': 0,
+      },
+    );
+    final prices = <String, double>{};
+    for (final raw in response.data ?? const <dynamic>[]) {
+      final item = (raw as Map).cast<String, dynamic>();
+      final price = item['price'];
+      if (price is num) {
+        prices[item['productId'] as String] = price.toDouble();
+      }
+    }
+    return prices;
+  }
+
+  /// Ensures the tenant's hidden "Uza Haraka" quick-sale product exists and
+  /// returns its id. The product is created lazily on the server, so the POS
+  /// can book an anonymous sale with a client-fixed unit price.
+  Future<String> getOrCreateQuickSaleProduct() async {
+    final response =
+        await _api.post<Map<String, dynamic>>('/api/v1/products/quick-sale');
+    return response.data!['id'] as String;
+  }
+
+  /// Voids a completed sale, returning the updated sale. The backend flips the
+  /// status to Voided, reverses stock and raises the audit event; the receipt
+  /// number never disappears. Requires the `Sales.Delete` permission.
+  Future<SaleDto> voidSale(String saleId, String reason) async {
+    final response = await _api.post<Map<String, dynamic>>(
+      '/api/v1/sales/$saleId/void',
+      body: {'reason': reason},
+    );
+    return SaleDto.fromJson(response.data!);
+  }
 }

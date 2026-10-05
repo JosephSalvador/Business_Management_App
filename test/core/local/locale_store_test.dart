@@ -1,10 +1,10 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:business_management_system/core/local/locale_store.dart';
-import 'package:business_management_system/l10n/generated/app_localizations.dart';
+import 'package:jolinx_app/core/storage/locale_store.dart';
+import 'package:jolinx_app/l10n/generated/app_localizations.dart';
 
 /// Minimal in-memory platform so writes never hit the method channel.
 class _MemoryStoragePlatform extends FlutterSecureStoragePlatform {
@@ -63,18 +63,24 @@ void main() {
 
   group('LocaleController', () {
     test('defaults to Swahili — the product is Swahili-first', () {
-      final controller = LocaleController(LocaleStore());
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(localeControllerProvider.notifier);
       expect(controller.state.languageCode, 'sw');
     });
 
     test('restore applies a stored preference', () {
-      final controller = LocaleController(LocaleStore());
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(localeControllerProvider.notifier);
       controller.restore('en');
       expect(controller.state.languageCode, 'en');
     });
 
     test('restore ignores null and unknown codes', () {
-      final controller = LocaleController(LocaleStore());
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(localeControllerProvider.notifier);
       controller.restore(null);
       expect(controller.state.languageCode, 'sw');
 
@@ -85,7 +91,11 @@ void main() {
 
     test('setLocale switches and persists the choice', () async {
       final store = LocaleStore();
-      final controller = LocaleController(store);
+      final container = ProviderContainer(overrides: [
+        localeStoreProvider.overrideWithValue(store),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(localeControllerProvider.notifier);
 
       await controller.setLocale(const Locale('en'));
       expect(controller.state.languageCode, 'en');

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:business_management_system/core/network/api_client.dart';
+import 'package:jolinx_app/core/network/api_client.dart';
 
 /// One scripted HTTP outcome, consumed in registration order.
 class ScriptedResponse {

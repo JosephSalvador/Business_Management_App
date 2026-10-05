@@ -2,8 +2,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:business_management_system/core/local/db_key_store.dart';
-import 'package:business_management_system/core/local/device_identity.dart';
+import 'package:jolinx_app/core/storage/db_key_store.dart';
+import 'package:jolinx_app/core/platform/device_info.dart';
 
 class InMemorySecureStoragePlatform extends FlutterSecureStoragePlatform {
   final Map<String, String> values = {};
@@ -91,8 +91,7 @@ void main() {
       expect(id, isNotEmpty);
       // UUIDv4 shape.
       expect(
-        RegExp(
-                r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+        RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
             .hasMatch(id),
         isTrue,
       );

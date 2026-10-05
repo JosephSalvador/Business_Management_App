@@ -5,20 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:business_management_system/core/di/providers.dart';
-import 'package:business_management_system/core/local/local_database.dart';
-import 'package:business_management_system/core/local/tables.dart';
-import 'package:business_management_system/core/network/app_exception.dart';
-import 'package:business_management_system/core/network/connectivity_monitor.dart';
-import 'package:business_management_system/core/routing/app_router.dart';
-import 'package:business_management_system/features/products/data/product_repository.dart';
-import 'package:business_management_system/features/products/domain/product.dart';
-import 'package:business_management_system/features/sales/application/checkout_controller.dart';
-import 'package:business_management_system/features/sales/application/local_sales_service.dart';
-import 'package:business_management_system/features/sales/application/pos_catalog_controller.dart';
-import 'package:business_management_system/features/sales/application/sales_history_controller.dart';
-import 'package:business_management_system/features/sales/domain/sale.dart';
-import 'package:business_management_system/features/sales/presentation/pages/pos_page.dart';
+import 'package:jolinx_app/app/providers.dart';
+import 'package:jolinx_app/core/storage/local_database.dart';
+import 'package:jolinx_app/core/sync/local_sales_service.dart';
+import 'package:jolinx_app/core/storage/tables.dart';
+import 'package:jolinx_app/core/network/app_exception.dart';
+import 'package:jolinx_app/core/network/connectivity_monitor.dart';
+import 'package:jolinx_app/app/router.dart';
+import 'package:jolinx_app/features/products/data/product_repository.dart';
+import 'package:jolinx_app/features/products/domain/product.dart';
+import 'package:jolinx_app/features/sales/domain/sale.dart';
+import 'package:jolinx_app/features/sales/presentation/pages/pos_page.dart';
 
 import 'checkout_controller_test.dart' show FakeSaleRepository;
 import '../products/products_controller_test.dart' show FakeProductRepository;
@@ -80,22 +77,12 @@ Widget _app({
   return ProviderScope(
     overrides: [
       localDatabaseProvider.overrideWithValue(db),
+      localSalesServiceProvider.overrideWithValue(service),
+      productRepositoryProvider.overrideWithValue(products),
+      saleRepositoryProvider.overrideWithValue(sales),
+      sessionContextProvider.overrideWithValue(const ('tenant-1', 'user-1')),
       connectionQualityProvider.overrideWithValue(ConnectionQuality.online),
-      posCatalogControllerProvider.overrideWith(
-        (ref) => PosCatalogController(
-          dao: service.catalog,
-          repository: products,
-          tenantIdOf: () async => 'tenant-1',
-        ),
-      ),
-      checkoutControllerProvider.overrideWith(
-        (ref) => CheckoutController(sales, () async => 'branch-1'),
-      ),
-      salesHistoryControllerProvider.overrideWith(
-        (ref) => SalesHistoryController(FakeSaleRepository()),
-      ),
-      syncStatusProvider
-          .overrideWith((ref) => SyncStatusController(service)),
+      posBranchIdProvider.overrideWithValue(() async => 'branch-1'),
     ],
     child: MaterialApp.router(routerConfig: router),
   );
@@ -187,17 +174,13 @@ void main() {
       ProviderScope(
         overrides: [
           localDatabaseProvider.overrideWithValue(db),
+          localSalesServiceProvider.overrideWithValue(service),
+          productRepositoryProvider
+              .overrideWithValue(_OfflineProductRepository()),
+          sessionContextProvider
+              .overrideWithValue(const ('tenant-1', 'user-1')),
           connectionQualityProvider
               .overrideWithValue(ConnectionQuality.offline),
-          posCatalogControllerProvider.overrideWith(
-            (ref) => PosCatalogController(
-              dao: service.catalog,
-              repository: _OfflineProductRepository(),
-              tenantIdOf: () async => 'tenant-1',
-            ),
-          ),
-          syncStatusProvider
-              .overrideWith((ref) => SyncStatusController(service)),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -207,7 +190,8 @@ void main() {
 
     // Offline banner + product served purely from cache.
     expect(
-      find.text('Offline — Mauzo yataendelea. Yatasawazishwa internet ikirudi.'),
+      find.text(
+          'Offline — Mauzo yataendelea. Yatasawazishwa internet ikirudi.'),
       findsOneWidget,
     );
     expect(find.text('Mchele'), findsOneWidget);
@@ -248,16 +232,12 @@ void main() {
       ProviderScope(
         overrides: [
           localDatabaseProvider.overrideWithValue(db),
+          localSalesServiceProvider.overrideWithValue(service),
+          productRepositoryProvider
+              .overrideWithValue(_OfflineProductRepository()),
+          sessionContextProvider
+              .overrideWithValue(const ('tenant-1', 'user-1')),
           connectionQualityProvider.overrideWithValue(ConnectionQuality.online),
-          posCatalogControllerProvider.overrideWith(
-            (ref) => PosCatalogController(
-              dao: service.catalog,
-              repository: _OfflineProductRepository(),
-              tenantIdOf: () async => 'tenant-1',
-            ),
-          ),
-          syncStatusProvider
-              .overrideWith((ref) => SyncStatusController(service)),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -271,5 +251,107 @@ void main() {
 
     // Out-of-stock cards do not open the cart at all.
     expect(find.text('1 bidhaa'), findsNothing);
+  });
+
+  testWidgets(
+      'quick sale: inline panel commits to the cart live and UZA returns',
+      (tester) async {
+    final db = LocalDatabase(NativeDatabase.memory());
+    final service = LocalSalesService(database: db);
+
+    // Seed the cache with both a normal product and the reserved quick-sale
+    // product (QS-BILA-JINA): the offline path resolves its id by SKU, so no
+    // network call is needed to open the panel.
+    await service.catalog.replaceCatalog(
+      tenantId: 'tenant-1',
+      products: [
+        CachedProductsCompanion.insert(
+          tenantId: 'tenant-1',
+          productId: 'p1',
+          name: 'Mchele',
+          status: LocalProductCodes.statusActive,
+          sellable: true,
+          productType: LocalProductCodes.typeGoods,
+          retailPrice: 2500,
+          currency: 'TZS',
+          fetchedAt: DateTime.now().toUtc(),
+        ),
+        CachedProductsCompanion.insert(
+          tenantId: 'tenant-1',
+          productId: 'p-quick',
+          name: 'Uza Haraka',
+          sku: const Value(QuickSaleDefaults.sku),
+          barcode: const Value(null),
+          status: LocalProductCodes.statusActive,
+          sellable: false,
+          productType: LocalProductCodes.typeGoods,
+          retailPrice: 0,
+          currency: 'TZS',
+          fetchedAt: DateTime.now().toUtc(),
+        ),
+      ],
+      stock: [
+        CachedStockCompanion.insert(
+          tenantId: 'tenant-1',
+          productId: 'p1',
+          warehouseId: '*',
+          quantity: 10,
+          fetchedAt: DateTime.now().toUtc(),
+        ),
+      ],
+    );
+
+    final router = GoRouter(
+      initialLocation: '/pos-test',
+      routes: [
+        GoRoute(path: '/pos-test', builder: (_, __) => const PosPage()),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localDatabaseProvider.overrideWithValue(db),
+          localSalesServiceProvider.overrideWithValue(service),
+          productRepositoryProvider
+              .overrideWithValue(_OfflineProductRepository()),
+          sessionContextProvider
+              .overrideWithValue(const ('tenant-1', 'user-1')),
+          connectionQualityProvider
+              .overrideWithValue(ConnectionQuality.offline),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
+
+    // Product grid is showing; open Quick Sale.
+    expect(find.text('Mchele'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Uza Haraka'));
+    await tester.pumpAndSettle();
+
+    // The inline panel replaces the grid: name + amount fields visible, grid hidden.
+    expect(find.text('Jina la bidhaa'), findsOneWidget);
+    expect(find.text('Bei'), findsOneWidget);
+    expect(find.text('Mchele'), findsNothing);
+
+    // Type a name + amount and stash it with "+ Ongeza nyingine".
+    await tester.enterText(find.byType(TextField).at(0), 'Madafu');
+    await tester.enterText(find.byType(TextField).at(1), '1000');
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Ongeza nyingine'));
+    await tester.pump();
+
+    // Cart updated live: bottom bar shows the item and the panel counts it.
+    expect(find.text('1 bidhaa'), findsOneWidget);
+    expect(find.text('1 zimeongezwa'), findsOneWidget);
+
+    // Second item, then a big UZA commits any leftover and returns to the grid.
+    await tester.enterText(find.byType(TextField).at(0), 'Dagaa');
+    await tester.enterText(find.byType(TextField).at(1), '2000');
+    await tester.tap(find.widgetWithText(FilledButton, 'UZA'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mchele'), findsOneWidget);
+    expect(find.text('2 bidhaa'), findsOneWidget);
   });
 }

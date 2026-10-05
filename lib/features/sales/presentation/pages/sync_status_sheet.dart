@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/di/providers.dart';
+import '../../../../app/providers.dart';
 import '../../../../core/network/connectivity_monitor.dart';
 
 /// A small, calm summary of how sales are doing against the internet
@@ -93,8 +93,7 @@ class _SyncStatusSheet extends ConsumerWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content:
-                                  Text('Muhtasari umesasishwa.'),
+                              content: Text('Muhtasari umesasishwa.'),
                             ),
                           );
                           Navigator.of(context).pop();

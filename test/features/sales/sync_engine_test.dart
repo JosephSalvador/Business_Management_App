@@ -3,14 +3,15 @@ import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:business_management_system/core/local/local_database.dart';
-import 'package:business_management_system/core/local/tables.dart';
-import 'package:business_management_system/core/network/app_exception.dart';
-import 'package:business_management_system/core/local/local_sales_dao.dart' show OfflineSaleLineInput;
-import 'package:business_management_system/features/sales/application/local_sales_service.dart';
-import 'package:business_management_system/features/sales/application/sync_engine.dart';
-import 'package:business_management_system/features/sales/data/sale_repository.dart';
-import 'package:business_management_system/features/sales/domain/sale.dart';
+import 'package:jolinx_app/core/storage/local_database.dart';
+import 'package:jolinx_app/core/storage/tables.dart';
+import 'package:jolinx_app/core/network/app_exception.dart';
+import 'package:jolinx_app/core/storage/local_sales_dao.dart'
+    show OfflineSaleLineInput;
+import 'package:jolinx_app/core/sync/local_sales_service.dart';
+import 'package:jolinx_app/core/sync/sync_engine.dart';
+import 'package:jolinx_app/features/sales/data/sale_repository.dart';
+import 'package:jolinx_app/features/sales/domain/sale.dart';
 
 /// Simulates the backend's contract: exactly-once per Idempotency-Key.
 /// Accepts the sale, records it, and replays the original on any later
@@ -28,8 +29,7 @@ class ServerSimulatingRepository implements SaleRepository {
     required Map<String, dynamic> body,
     required String idempotencyKey,
   }) async {
-    final priorAttempts =
-        attempts.where((k) => k == idempotencyKey).length;
+    final priorAttempts = attempts.where((k) => k == idempotencyKey).length;
     attempts.add(idempotencyKey);
 
     // Replay path runs first on the real backend.
@@ -130,8 +130,7 @@ void main() {
       expect(repository.accepted.keys, [id]);
       expect(repository.attempts.length, 1);
 
-      final local =
-          await service.sales.byClientSaleId(id);
+      final local = await service.sales.byClientSaleId(id);
       expect(local!.status, LocalSaleStatus.synced);
       expect(local.serverNumber, 'S-2026-00042');
     });
@@ -156,8 +155,7 @@ void main() {
   });
 
   group('transport failures retry safely (M5.7)', () {
-    test('timeout AFTER server acceptance → retry replays original',
-        () async {
+    test('timeout AFTER server acceptance → retry replays original', () async {
       final id = await recordOfflineSale();
       // The server accepts, but the response is lost on the way back.
       // Model: accept first, then make the NEXT new-key delivery time out.
@@ -239,14 +237,12 @@ void main() {
       expect(repository.attempts.length, 1);
     });
 
-    test('product deleted while offline → conflict requiring review',
-        () async {
+    test('product deleted while offline → conflict requiring review', () async {
       final id = await recordOfflineSale();
 
       // Price resolution 404s → the engine conflicts before sending.
       final repo = _NullPriceRepository();
-      final customEngine =
-          SyncEngine(salesService: service, repository: repo);
+      final customEngine = SyncEngine(salesService: service, repository: repo);
 
       final outcome = await customEngine.drain();
 
@@ -293,12 +289,10 @@ void main() {
   });
 
   group('price drift protection (M5.12 CASE 5)', () {
-    test('price changed at server → conflict PRICE, sale not sent',
-        () async {
+    test('price changed at server → conflict PRICE, sale not sent', () async {
       final id = await recordOfflineSale(); // snapshot 2500 × 2 = 5000 paid
       final repo = _PricedRepository(3000);
-      final customEngine =
-          SyncEngine(salesService: service, repository: repo);
+      final customEngine = SyncEngine(salesService: service, repository: repo);
 
       final outcome = await customEngine.drain();
 
@@ -312,8 +306,7 @@ void main() {
     test('unchanged price sends normally', () async {
       await recordOfflineSale();
       final repo = _PricedRepository(2500);
-      final customEngine =
-          SyncEngine(salesService: service, repository: repo);
+      final customEngine = SyncEngine(salesService: service, repository: repo);
 
       final outcome = await customEngine.drain();
 
@@ -322,8 +315,7 @@ void main() {
     });
   });
 
-  test('concurrent drains collapse into one worker (M5.18 #26)',
-      () async {
+  test('concurrent drains collapse into one worker (M5.18 #26)', () async {
     final id = await recordOfflineSale();
 
     // Gate the delivery so the first drain stays in flight.
@@ -347,8 +339,7 @@ void main() {
         LocalSaleStatus.synced);
   });
 
-  test('stale syncing operations recover after crash (M5.18 #23)',
-      () async {
+  test('stale syncing operations recover after crash (M5.18 #23)', () async {
     final id = await recordOfflineSale();
     // Simulate a crash mid-flight: op stuck in syncing.
     await service.queue.claimNext(now: DateTime.now().toUtc());

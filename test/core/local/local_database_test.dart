@@ -1,11 +1,11 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:business_management_system/core/local/cached_catalog_dao.dart';
-import 'package:business_management_system/core/local/local_database.dart';
-import 'package:business_management_system/core/local/local_sales_dao.dart';
-import 'package:business_management_system/core/local/sync_queue_dao.dart';
-import 'package:business_management_system/core/local/tables.dart';
+import 'package:jolinx_app/core/storage/cached_catalog_dao.dart';
+import 'package:jolinx_app/core/storage/local_database.dart';
+import 'package:jolinx_app/core/storage/local_sales_dao.dart';
+import 'package:jolinx_app/core/storage/sync_queue_dao.dart';
+import 'package:jolinx_app/core/storage/tables.dart';
 
 void main() {
   late LocalDatabase db;
@@ -90,9 +90,7 @@ void main() {
               status: LocalProductCodes.statusActive,
               sellable: false),
           product(
-              id: 'd',
-              name: 'Huduma',
-              type: LocalProductCodes.typeGoods + 1),
+              id: 'd', name: 'Huduma', type: LocalProductCodes.typeGoods + 1),
         ],
         stock: const [],
       );
@@ -102,8 +100,7 @@ void main() {
       expect(await catalog.search(tenant, 'huduma'), isEmpty);
     });
 
-    test('projectedQuantity subtracts pending offline sale lines',
-        () async {
+    test('projectedQuantity subtracts pending offline sale lines', () async {
       await catalog.replaceCatalog(
           tenantId: tenant, products: [product()], stock: [stock('p-1', 50)]);
 
@@ -164,8 +161,7 @@ void main() {
         ],
       );
 
-      final sale =
-          await sales.byClientSaleId(recorded.clientSaleId);
+      final sale = await sales.byClientSaleId(recorded.clientSaleId);
       expect(sale, isNotNull);
       expect(sale!.status, LocalSaleStatus.pending);
       expect(sale.paymentMethod, 1);
@@ -187,15 +183,14 @@ void main() {
       expect(payload['branchId'], 'b-1');
       expect(payload['source'], 0);
       expect(payload['isElectronicPayment'], true);
-      expect((payload['lines'] as List).first,
-          containsPair('productId', 'p-1'));
+      expect(
+          (payload['lines'] as List).first, containsPair('productId', 'p-1'));
       // No client-invented prices or tax in the wire body.
       expect((payload['lines'] as List).first.keys,
           everyElement(anyOf('productId', 'quantity')));
     });
 
-    test('payload keeps cash non-electronic and stable effectiveAt',
-        () async {
+    test('payload keeps cash non-electronic and stable effectiveAt', () async {
       final at = DateTime.utc(2026, 8, 23, 9, 15);
       final payload = LocalSalesDao.buildSalePayload(
         branchId: 'b-1',
@@ -207,6 +202,69 @@ void main() {
       );
       expect(payload, contains('"isElectronicPayment":false'));
       expect(payload, contains(at.toIso8601String()));
+    });
+
+    test('quick-sale line persists its client-fixed unit price in the payload',
+        () async {
+      final recorded = await sales.recordOfflineSale(
+        tenantId: tenant,
+        branchId: 'b-1',
+        deviceId: 'dev-1',
+        userId: 'u-1',
+        paymentMethod: 0,
+        subtotalEstimate: 15000,
+        taxEstimate: 0,
+        totalEstimate: 15000,
+        lines: [
+          OfflineSaleLineInput(
+            productId: 'p-quick',
+            productName: 'Uza Haraka',
+            quantity: 1,
+            unitPriceSnapshot: 15000,
+            unitPriceOverride: 15000,
+          ),
+        ],
+      );
+
+      final op = await queue.claimNext(now: DateTime.now().toUtc());
+      final payload = op!.decodedPayload;
+      expect(payload['lines'], [
+        {'productId': 'p-quick', 'quantity': 1, 'unitPrice': 15000},
+      ]);
+
+      final sale = await sales.byClientSaleId(recorded.clientSaleId);
+      expect(sale!.totalEstimate, 15000);
+    });
+
+    test('credit sale keeps the customer id and a non-electronic zero payment',
+        () async {
+      final recorded = await sales.recordOfflineSale(
+        tenantId: tenant,
+        branchId: 'b-1',
+        deviceId: 'dev-1',
+        userId: 'u-1',
+        paymentMethod: 4,
+        subtotalEstimate: 120000,
+        taxEstimate: 0,
+        totalEstimate: 120000,
+        paymentAmount: 0,
+        customerId: 'cust-1',
+        lines: [
+          line(qty: 2),
+        ],
+      );
+
+      final op = await queue.claimNext(now: DateTime.now().toUtc());
+      final payload = op!.decodedPayload;
+      expect(payload['customerId'], 'cust-1');
+      expect(payload['isElectronicPayment'], isFalse);
+      expect(payload['payments'], [
+        {'method': 4, 'amount': 0},
+      ]);
+
+      final sale = await sales.byClientSaleId(recorded.clientSaleId);
+      expect(sale!.paymentMethod, 4);
+      expect(sale.paymentAmount, 0);
     });
   });
 
@@ -256,7 +314,8 @@ void main() {
       expect(await queue.claimNext(now: now), isNull);
       // Due later.
       final later = row.nextAttemptAt!;
-      final third = await queue.claimNext(now: later.add(const Duration(milliseconds: 1)));
+      final third = await queue.claimNext(
+          now: later.add(const Duration(milliseconds: 1)));
       expect(third!.operationId, recorded.clientSaleId);
       expect(third.attemptCount, 1);
     });

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../data/product_repository.dart';
 import '../domain/catalog.dart';
@@ -19,16 +20,26 @@ class CatalogReady extends CatalogState {
     required this.units,
     required this.taxCategories,
     required this.warehouses,
+    required this.categories,
+    required this.brands,
   });
 
   final List<UnitOfMeasure> units;
   final List<TaxCategory> taxCategories;
   final List<Warehouse> warehouses;
+  final List<Category> categories;
+  final List<Brand> brands;
 
   /// The default "Main Store" provisioned during business setup. Users never
   /// need to learn the warehouse concept; this is just where stock lives.
-  Warehouse? get defaultWarehouse =>
-      warehouses.isEmpty ? null : warehouses.first;
+  /// Prefers the MAINSTORE code (multi-warehouse safe) with a first fallback.
+  Warehouse? get defaultWarehouse {
+    if (warehouses.isEmpty) return null;
+    return warehouses.firstWhere(
+      (w) => w.code.toUpperCase() == 'MAINSTORE',
+      orElse: () => warehouses.first,
+    );
+  }
 }
 
 class CatalogFailure extends CatalogState {
@@ -37,9 +48,7 @@ class CatalogFailure extends CatalogState {
   final String message;
 }
 
-class CatalogController extends StateNotifier<CatalogState> {
-  CatalogController(this._repository) : super(const CatalogLoading());
-
+class CatalogController extends Notifier<CatalogState> {
   static const _starterUnits = [
     (name: 'Kipande', abbreviation: 'kip'),
     (name: 'Kilo', abbreviation: 'kg'),
@@ -47,7 +56,10 @@ class CatalogController extends StateNotifier<CatalogState> {
     (name: 'Gunia', abbreviation: 'bag'),
   ];
 
-  final ProductRepository _repository;
+  @override
+  CatalogState build() => const CatalogLoading();
+
+  ProductRepository get _repository => ref.read(productRepositoryProvider);
 
   Future<void> load() async {
     state = const CatalogLoading();
@@ -57,11 +69,15 @@ class CatalogController extends StateNotifier<CatalogState> {
         _repository.units(),
         _repository.taxCategories(),
         _repository.warehouses(),
+        _repository.categories(),
+        _repository.brands(),
       ).wait;
       state = CatalogReady(
         units: results.$1,
         taxCategories: results.$2,
         warehouses: results.$3,
+        categories: results.$4,
+        brands: results.$5,
       );
     } on AppException catch (error) {
       state = CatalogFailure(error.message);

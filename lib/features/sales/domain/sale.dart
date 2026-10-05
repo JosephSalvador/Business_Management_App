@@ -23,7 +23,20 @@ abstract final class PaymentMethod {
       };
 
   /// Electronic tenders change the tax rate selection in some localizations.
-  static bool isElectronic(int method) => method != cash;
+  /// Cash and in-house CREDIT sales stay on the walk-in (rate A) schedule —
+  /// a credit balance is a ledger debt, not an electronic tender.
+  static bool isElectronic(int method) =>
+      method == mobileMoney ||
+      method == card ||
+      method == bankTransfer ||
+      method == other;
+}
+
+/// Defaults shared with the backend for the anonymous quick-sale product.
+abstract final class QuickSaleDefaults {
+  /// Reserved SKU of the hidden "Quick Sale" product, kept in sync with
+  /// `EnsureQuickSaleProductCommand.QuickSaleSku` on the server.
+  static const sku = 'QS-BILA-JINA';
 }
 
 /// One row in the POS cart: a product snapshot plus the chosen quantity.
@@ -33,7 +46,9 @@ class CartLine {
     required this.name,
     required this.unitPrice,
     this.quantity = 1,
-  });
+    this.unitPriceOverride,
+    String? key,
+  }) : key = key ?? productId;
 
   final String productId;
   final String name;
@@ -42,33 +57,61 @@ class CartLine {
   double unitPrice;
   double quantity;
 
+  /// When set, this price is client-fixed (quick sale / open price) and the
+  /// server uses it as the line unit price instead of the price list. Normal
+  /// catalogue lines keep this null — the server re-resolves their price.
+  double? unitPriceOverride;
+
+  /// Stable line identity for cart editing. Regular lines key on the product;
+  /// quick-sale lines get a unique key so a second "Uza Haraka" never merges
+  /// into the first (each has its own open price).
+  final String key;
+
   double get lineTotal => unitPrice * quantity;
 }
 
 /// Body of `POST /api/v1/sales`. Contains only what the client is allowed to
 /// provide; totals, tax and stock are server-computed.
+///
+/// [paymentAmount] is the money actually tendered (defaults to [total]; for a
+/// CREDIT sale it defaults to zero so the whole balance goes on the ledger).
+/// [customerId] links a credit sale to its ledger customer.
+/// For a CASH presentation the seller may tender more than the total so the
+/// server returns change; for other methods the tender must equal (or, on
+/// credit, fall below) the total.
 Map<String, dynamic> buildCreateSaleBody({
   required String branchId,
   required String clientSaleId,
   required List<CartLine> lines,
   required int paymentMethod,
   required double total,
+  double? paymentAmount,
+  String? customerId,
   DateTime? effectiveAt,
 }) {
   return {
     'branchId': branchId,
     'clientSaleId': clientSaleId,
     'source': 0,
+    if (customerId != null) 'customerId': customerId,
     'effectiveAt': (effectiveAt ?? DateTime.now().toUtc()).toIso8601String(),
     'isElectronicPayment': PaymentMethod.isElectronic(paymentMethod),
     'lines': [
       for (final line in lines)
-        {'productId': line.productId, 'quantity': line.quantity},
+        {
+          'productId': line.productId,
+          'quantity': line.quantity,
+          if (line.unitPriceOverride != null) ...{
+            'unitPrice': line.unitPriceOverride,
+            'productName': line.name,
+          },
+        },
     ],
     'payments': [
       {
         'method': paymentMethod,
-        'amount': total,
+        'amount': paymentAmount ??
+            (paymentMethod == PaymentMethod.credit ? 0 : total),
       },
     ],
   };
@@ -157,9 +200,8 @@ class SaleDto {
         id: json['id'] as String,
         number: json['number'] as String? ?? '',
         status: json['status'] as int? ?? 0,
-        saleDate:
-            DateTime.tryParse(json['saleDate'] as String? ?? '') ??
-                DateTime.fromMillisecondsSinceEpoch(0),
+        saleDate: DateTime.tryParse(json['saleDate'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
         currency: json['currency'] as String? ?? '',
         subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
         discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,

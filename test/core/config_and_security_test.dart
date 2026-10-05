@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:business_management_system/core/config/app_config.dart';
-import 'package:business_management_system/core/network/api_client.dart';
-import 'package:business_management_system/core/network/app_exception.dart';
+import 'package:jolinx_app/core/config/app_config.dart';
+import 'package:jolinx_app/core/network/api_client.dart';
+import 'package:jolinx_app/core/network/app_exception.dart';
 
 void main() {
   group('AppConfig', () {

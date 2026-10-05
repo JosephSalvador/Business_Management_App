@@ -23,12 +23,40 @@ class TimeoutException extends AppException {
 
 /// 401 — session missing, expired, or refresh failed.
 class UnauthorizedException extends AppException {
-  UnauthorizedException([super.message = 'Kipindi kimeisha. Tafadhali ingia tena.']);
+  UnauthorizedException(
+      [super.message = 'Kipindi kimeisha. Tafadhali ingia tena.']);
+}
+
+class PaymentRequiredException extends AppException {
+  PaymentRequiredException([
+    super.message = 'Mpango huu unahitaji malipo ili kuendelea.',
+  ]);
 }
 
 /// 403 — authenticated but not allowed to do this.
 class ForbiddenException extends AppException {
   ForbiddenException([super.message = 'Hauna ruhusa ya kitendo hiki.']);
+}
+
+class ModuleDisabledException extends AppException {
+  ModuleDisabledException(super.message, {this.module = ''});
+
+  final String module;
+}
+
+class QuotaExceededException extends AppException {
+  QuotaExceededException([
+    super.message = 'Umefikia kikomo cha mfumo huu.',
+  ]);
+}
+
+/// The account exists but its email address is not verified yet. Carries the
+/// account email so the UI can resume the verification flow (and resend a
+/// code) even when the user signed in with a phone number.
+class AccountNotVerifiedException extends AppException {
+  AccountNotVerifiedException(super.message, {required this.email});
+
+  final String email;
 }
 
 /// 404 — resource does not exist (or is not visible to this tenant).
@@ -50,7 +78,8 @@ class ValidationException extends AppException {
 
 /// 429 — rate limited.
 class RateLimitException extends AppException {
-  RateLimitException([super.message = 'Unaombi mno. Subiri kidogo ujaribu tena.']);
+  RateLimitException(
+      [super.message = 'Unaombi mno. Subiri kidogo ujaribu tena.']);
 }
 
 /// 5xx — backend failure. Message is generic; details stay in logs.

@@ -1,24 +1,41 @@
+import 'dart:async';
 
 import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:business_management_system/core/local/local_database.dart';
-import 'package:business_management_system/core/local/tables.dart';
-import 'package:business_management_system/core/network/app_exception.dart';
-import 'package:business_management_system/features/sales/application/checkout_controller.dart';
-import 'package:business_management_system/features/sales/application/local_sales_service.dart';
-import 'package:business_management_system/features/sales/application/offline_sale_recorder.dart';
-import 'package:business_management_system/features/sales/domain/sale.dart';
+import 'package:jolinx_app/app/providers.dart';
+import 'package:jolinx_app/core/storage/local_database.dart';
+import 'package:jolinx_app/core/storage/session_journal.dart';
+import 'package:jolinx_app/core/storage/tables.dart';
+import 'package:jolinx_app/core/network/app_exception.dart';
+import 'package:jolinx_app/core/sync/local_sales_service.dart';
+import 'package:jolinx_app/features/sales/data/offline_sale_recorder.dart';
+import 'package:jolinx_app/features/sales/domain/sale.dart';
 
 import 'checkout_controller_test.dart' show FakeSaleRepository;
+
+/// A controllable session journal for tests.
+class _TestJournal extends SessionJournal {
+  _TestJournal(super.db);
+
+  bool _windowOpen = true;
+
+  void setWindowOpen(bool open) => _windowOpen = open;
+
+  @override
+  Future<bool> offlineWindowOpen({Duration? window}) async => _windowOpen;
+}
 
 void main() {
   late LocalDatabase db;
   late LocalSalesService service;
+  late _TestJournal journal;
 
   setUp(() {
     db = LocalDatabase(NativeDatabase.memory());
     service = LocalSalesService(database: db);
+    journal = _TestJournal(db);
   });
 
   /// Seeds cached stock so the conservative guard lets normal sales through.
@@ -41,7 +58,6 @@ void main() {
   tearDown(() async => db.close());
 
   OfflineSaleRecorder recorder({
-    bool windowOpen = true,
     Future<String?> Function()? branch,
   }) =>
       OfflineSaleRecorder(
@@ -60,24 +76,26 @@ void main() {
         quantity: quantity,
       );
 
-  CheckoutController buildController({
+  ProviderContainer buildContainer({
     required FakeSaleRepository sales,
     required OfflineSaleRecorder offline,
-    bool windowOpen = true,
+    Future<String?> Function()? branch,
   }) =>
-      CheckoutController(
-        sales,
-        () async => 'branch-1',
-        offlineRecorder: offline,
-        offlineWindowOpen: () async => windowOpen,
-      );
+      ProviderContainer(overrides: [
+        saleRepositoryProvider.overrideWithValue(sales),
+        offlineSaleRecorderProvider.overrideWithValue(offline),
+        sessionJournalProvider.overrideWithValue(journal),
+        posBranchIdProvider
+            .overrideWithValue(branch ?? (() async => 'branch-1')),
+      ]);
 
   test('network failure records the SAME id locally and succeeds', () async {
     await seedStock(50);
     final sales = FakeSaleRepository(createError: NetworkException());
     final offline = recorder();
-    final controller =
-        buildController(sales: sales, offline: offline);
+    final container = buildContainer(sales: sales, offline: offline);
+    addTearDown(container.dispose);
+    final controller = container.read(checkoutControllerProvider.notifier);
 
     final result = await controller.submit(
       lines: [line()],
@@ -100,8 +118,9 @@ void main() {
     await seedStock(50);
     final sales = FakeSaleRepository(createError: TimeoutException());
     final offline = recorder();
-    final controller =
-        buildController(sales: sales, offline: offline);
+    final container = buildContainer(sales: sales, offline: offline);
+    addTearDown(container.dispose);
+    final controller = container.read(checkoutControllerProvider.notifier);
 
     final result = await controller.submit(
       lines: [line()],
@@ -110,19 +129,43 @@ void main() {
 
     expect(result!.pendingLocally, true);
     expect(sales.idempotencyKeys.single, result.id,
-        reason:
-            'server may hold this exact sale; replay must dedupe at sync');
+        reason: 'server may hold this exact sale; replay must dedupe at sync');
   });
 
-  test('expired offline window blocks selling with a clear message',
+  test('stalled backend falls back to the local queue after the deadline',
       () async {
-    final sales = FakeSaleRepository(createError: NetworkException());
-    final offline = recorder(windowOpen: false);
-    final controller = buildController(
-      sales: sales,
-      offline: offline,
-      windowOpen: false,
+    await seedStock(50);
+    final sales = FakeSaleRepository(stall: Completer<void>().future);
+    final offline = recorder();
+    final container = buildContainer(sales: sales, offline: offline);
+    addTearDown(container.dispose);
+    final controller = container.read(checkoutControllerProvider.notifier);
+
+    final result = await controller.submit(
+      lines: [line()],
+      paymentMethod: 1,
     );
+
+    expect(result, isNotNull);
+    expect(result!.pendingLocally, true,
+        reason: 'a slow-but-alive backend must still land on the receipt');
+    expect(sales.createCalls, 1,
+        reason: 'the online attempt must start before the deadline fires');
+    // The recorded local key equals the key the (still-running) online
+    // attempt used, so a late server accept cannot produce a second sale.
+    expect(sales.idempotencyKeys.single, result.id);
+    final pending = await service.sales.byStatus(LocalSaleStatus.pending);
+    expect(pending, hasLength(1));
+    expect(pending.single.clientSaleId, result.id);
+  });
+
+  test('expired offline window blocks selling with a clear message', () async {
+    final sales = FakeSaleRepository(createError: NetworkException());
+    final offline = recorder();
+    journal.setWindowOpen(false);
+    final container = buildContainer(sales: sales, offline: offline);
+    addTearDown(container.dispose);
+    final controller = container.read(checkoutControllerProvider.notifier);
 
     final result = await controller.submit(
       lines: [line()],
@@ -133,8 +176,7 @@ void main() {
     expect(await service.pendingSaleCount(), 0);
   });
 
-  test('local stock guard refuses to oversell the projected balance',
-      () async {
+  test('local stock guard refuses to oversell the projected balance', () async {
     await service.catalog.replaceCatalog(
       tenantId: 'tenant-1',
       products: const [],
@@ -151,8 +193,9 @@ void main() {
 
     final sales = FakeSaleRepository(createError: NetworkException());
     final offline = recorder();
-    final controller =
-        buildController(sales: sales, offline: offline);
+    final container = buildContainer(sales: sales, offline: offline);
+    addTearDown(container.dispose);
+    final controller = container.read(checkoutControllerProvider.notifier);
 
     final result = await controller.submit(
       lines: [line(quantity: 10)],
@@ -162,5 +205,34 @@ void main() {
     expect(result, isNull);
     expect(await service.pendingSaleCount(), 0,
         reason: 'nothing is written when the guard trips');
+  });
+
+  test('quick-sale line skips the stock guard (services hold no stock)',
+      () async {
+    final sales = FakeSaleRepository(createError: NetworkException());
+    final offline = recorder();
+    final container = buildContainer(sales: sales, offline: offline);
+    addTearDown(container.dispose);
+    final controller = container.read(checkoutControllerProvider.notifier);
+
+    final result = await controller.submit(
+      lines: [
+        CartLine(
+          productId: 'p-quick',
+          name: 'Uza Haraka',
+          unitPrice: 15000,
+          unitPriceOverride: 15000,
+          key: 'quick-1',
+        ),
+      ],
+      paymentMethod: 0,
+    );
+
+    expect(result, isNotNull);
+    expect(result!.pendingLocally, true);
+    expect(result.totalAmount, 15000);
+
+    final pending = await service.sales.byStatus(LocalSaleStatus.pending);
+    expect(pending, hasLength(1));
   });
 }

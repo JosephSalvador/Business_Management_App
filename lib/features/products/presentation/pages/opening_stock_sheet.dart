@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/di/providers.dart';
+import '../../../../app/providers.dart';
 import '../../../../core/network/app_exception.dart';
+import '../../../../l10n/loc.dart';
 import '../../application/catalog_controller.dart';
 import '../../data/product_repository.dart';
 import '../../domain/product.dart';
@@ -21,28 +22,34 @@ class OpeningStockSheet extends ConsumerStatefulWidget {
 
 class _OpeningStockSheetState extends ConsumerState<OpeningStockSheet> {
   final _quantityController = TextEditingController();
+  final _unitCostController = TextEditingController();
   String? _error;
   bool _saving = false;
 
   @override
   void dispose() {
     _quantityController.dispose();
+    _unitCostController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
+    final loc = context.loc;
     final parsed = double.tryParse(
       _quantityController.text.trim().replaceAll(',', '.'),
     );
     if (parsed == null || parsed <= 0) {
-      setState(() => _error = 'Weka idadi sahihi (zaidi ya sifuri).');
+      setState(() => _error = loc.addStockInvalidQuantity);
       return;
     }
     final catalog = ref.read(catalogControllerProvider);
     if (catalog is! CatalogReady || catalog.defaultWarehouse == null) {
-      setState(() => _error = 'Mahali pa kuhifadhi hakipatikani. Jaribu tena.');
+      setState(() => _error = loc.addStockWarehouseUnavailable);
       return;
     }
+    final unitCost = double.tryParse(
+      _unitCostController.text.trim().replaceAll(',', '.'),
+    );
     setState(() {
       _error = null;
       _saving = true;
@@ -54,7 +61,8 @@ class _OpeningStockSheetState extends ConsumerState<OpeningStockSheet> {
               productId: widget.product.id,
               quantity: parsed,
               unitOfMeasureId: widget.product.unitOfMeasureId,
-              reason: 'Stock ya mwanzo',
+              reason: loc.openingStockReason,
+              unitCost: unitCost,
             ),
           );
       if (mounted) {
@@ -63,7 +71,7 @@ class _OpeningStockSheetState extends ConsumerState<OpeningStockSheet> {
     } on ConflictException {
       setState(() {
         _saving = false;
-        _error = 'Stock ya mwanzo imesharekodiwa kwa bidhaa hii.';
+        _error = loc.openingStockDuplicate;
       });
     } on AppException catch (error) {
       setState(() {
@@ -75,6 +83,7 @@ class _OpeningStockSheetState extends ConsumerState<OpeningStockSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.loc;
     return Padding(
       padding: EdgeInsets.only(
         left: 24,
@@ -87,27 +96,36 @@ class _OpeningStockSheetState extends ConsumerState<OpeningStockSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Stock ya mwanzo',
+            loc.openingStockTitle,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 4),
-          Text('Bidhaa: ${widget.product.name}'),
+          Text(loc.addStockProduct(widget.product.name)),
           const SizedBox(height: 20),
           TextField(
             controller: _quantityController,
             autofocus: true,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: 'Kiasi',
+              labelText: loc.addStockQuantity,
               errorText: _error,
             ),
-            onSubmitted: (_) => _saving ? null : _save(),
+            onSubmitted: (_) {
+              if (!_saving) _save();
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _unitCostController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: loc.stockUnitCostOptional,
+            ),
           ),
           const SizedBox(height: 8),
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
-            child: Text('Ghala: Main Store'),
+            child: Text(loc.addStockWarehouse),
           ),
           const SizedBox(height: 24),
           FilledButton(
@@ -118,7 +136,7 @@ class _OpeningStockSheetState extends ConsumerState<OpeningStockSheet> {
                     width: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Hifadhi'),
+                : Text(loc.addStockSave),
           ),
         ],
       ),

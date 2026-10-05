@@ -1,10 +1,14 @@
+import 'dart:async' as async;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
+import '../../authentication/application/auth_controller.dart';
 import '../data/sale_repository.dart';
 import '../domain/sale.dart';
-import 'offline_sale_recorder.dart';
+import '../data/offline_sale_recorder.dart';
 
 sealed class CheckoutState {
   const CheckoutState();
@@ -43,38 +47,39 @@ class CheckoutFailure extends CheckoutState {
 /// - The key is discarded only after success or a definitive rejection
 ///   (validation, stock, permissions), where a new logical sale begins.
 ///
-/// Prices are re-resolved from `/pricing/resolve` immediately before an
-/// ONLINE submit so the payment amount equals the server-computed total.
-/// OFFLINE sales use cached shelf prices and are stored as estimates.
-class CheckoutController extends StateNotifier<CheckoutState> {
-  CheckoutController(
-    this._repository,
-    this._branchIdOf, {
-    OfflineSaleRecorder? offlineRecorder,
-    Future<bool> Function()? offlineWindowOpen,
-    Uuid uuid = const Uuid(),
-  })  : _offlineRecorder = offlineRecorder,
-        _offlineWindowOpen = offlineWindowOpen,
-        _uuid = uuid,
-        super(const CheckoutIdle());
-
-  final SaleRepository _repository;
-  final OfflineSaleRecorder? _offlineRecorder;
-  final Future<bool> Function()? _offlineWindowOpen;
-  final Uuid _uuid;
-
-  /// Resolves the branch the sale is recorded against (first tenant branch).
-  final Future<String?> Function() _branchIdOf;
-
+/// Prices are re-resolved from `/pricing/resolve-many` (one bulk call for the
+/// whole cart) immediately before an ONLINE submit so the payment amount
+/// equals the server-computed total. OFFLINE sales use cached shelf prices
+/// and are stored as estimates.
+class CheckoutController extends Notifier<CheckoutState> {
   String? _clientSaleId;
   String? _branchId;
+
+  /// How long an online attempt may take before the checkout falls back to
+  /// the local pending queue. Set so a slow-but-alive link still lands on the
+  /// receipt quickly; the idempotency key keeps a late server accept safe.
+  static const _checkoutDeadline = Duration(seconds: 4);
+
+  @override
+  CheckoutState build() => const CheckoutIdle();
+
+  SaleRepository get _repository => ref.read(saleRepositoryProvider);
 
   /// Submits the cart. Returns the created sale (or provisional pending
   /// sale), or null when the checkout failed (state carries the user-facing
   /// message) or was already running.
+  ///
+  /// [amountTendered] is the money actually handed over — used for CASH so the
+  /// server can compute change when the tender exceeds the total. For non-cash
+  /// methods pass null (exact total); for CREDIT pass the initial payment
+  /// (defaults to zero) so the balance goes on the customer's ledger.
+  /// [customerId]/[customerName] link a CREDIT sale to its ledger customer.
   Future<SaleDto?> submit({
     required List<CartLine> lines,
     required int paymentMethod,
+    double? amountTendered,
+    String? customerId,
+    String? customerName,
   }) async {
     if (state is CheckoutSubmitting || lines.isEmpty) {
       return null;
@@ -82,7 +87,7 @@ class CheckoutController extends StateNotifier<CheckoutState> {
 
     // Keep the same idempotency key across retries of the same logical sale;
     // only start a new one when no attempt is in flight.
-    _clientSaleId ??= _uuid.v4();
+    _clientSaleId ??= const Uuid().v4();
 
     state = const CheckoutSubmitting();
     try {
@@ -91,27 +96,34 @@ class CheckoutController extends StateNotifier<CheckoutState> {
         throw ValidationException('Tawi la biashara halipatikani.');
       }
 
-      List<CartLine> priced;
-      double total;
-      try {
-        priced = await _refreshPrices(lines, branchId);
-        total = priced.fold(0.0, (sum, line) => sum + line.lineTotal);
-      } on NetworkException {
-        return _recordOffline(lines, paymentMethod);
-      } on TimeoutException {
-        return _recordOffline(lines, paymentMethod);
-      }
-
-      final sale = await _repository.create(
-        body: buildCreateSaleBody(
-          branchId: branchId,
-          clientSaleId: _clientSaleId!,
-          lines: priced,
-          paymentMethod: paymentMethod,
-          total: total,
-        ),
-        idempotencyKey: _clientSaleId!,
+      final online = _tryOnline(
+        branchId: branchId,
+        lines: lines,
+        paymentMethod: paymentMethod,
+        amountTendered: amountTendered,
+        customerId: customerId,
       );
+      // Absorb a late success/error when the deadline already fell back
+      // offline — the server may still accept, and the idempotency key makes
+      // the later pending-queue replay harmless (M5.7).
+      online.ignore();
+
+      SaleDto sale;
+      try {
+        sale = await online.timeout(_checkoutDeadline);
+      } on async.TimeoutException {
+        // Only fast-path into the local pending queue when it can accept the
+        // sale; otherwise keep waiting for the authoritative outcome.
+        final windowOpen =
+            await ref.read(sessionJournalProvider).offlineWindowOpen();
+        if (windowOpen) {
+          return await _recordOffline(lines, paymentMethod,
+              amountTendered: amountTendered,
+              customerId: customerId,
+              customerName: customerName);
+        }
+        sale = await online;
+      }
 
       state = CheckoutSuccess(sale);
       _clientSaleId = null;
@@ -121,7 +133,10 @@ class CheckoutController extends StateNotifier<CheckoutState> {
       // including timeouts, where the server may already hold the sale with
       // this exact key (safe by idempotent replay).
       if (_isTransportFailure(error)) {
-        return _recordOffline(lines, paymentMethod);
+        return _recordOffline(lines, paymentMethod,
+            amountTendered: amountTendered,
+            customerId: customerId,
+            customerName: customerName);
       }
       state = CheckoutFailure(_mapError(error));
       if (!_isRetryable(error)) {
@@ -137,14 +152,19 @@ class CheckoutController extends StateNotifier<CheckoutState> {
     state = const CheckoutIdle();
   }
 
-  Future<SaleDto?> _recordOffline(List<CartLine> lines, int paymentMethod) async {
-    final recorder = _offlineRecorder;
-    if (recorder == null) {
-      state = CheckoutFailure(_mapError(NetworkException()));
-      return null;
-    }
-    final windowOpen = await _offlineWindowOpen?.call() ?? true;
-    if (!windowOpen) {
+  Future<SaleDto?> _recordOffline(
+    List<CartLine> lines,
+    int paymentMethod, {
+    double? amountTendered,
+    String? customerId,
+    String? customerName,
+  }) async {
+    final recorder = ref.read(offlineSaleRecorderProvider);
+
+    // Check offline window
+    final windowOpen = ref.read(sessionJournalProvider).offlineWindowOpen();
+    final isOpen = await windowOpen;
+    if (!isOpen) {
       state = const CheckoutFailure(
         'Kipindi cha kuuza nje ya mtandao kimeisha. '
         'Unganisha intaneti kuendelea kuuza.',
@@ -152,11 +172,33 @@ class CheckoutController extends StateNotifier<CheckoutState> {
       _clientSaleId = null;
       return null;
     }
+
+    // Check offline selling permission
+    final auth = ref.read(authControllerProvider);
+    if (auth is AuthAuthenticated) {
+      final hasPermission = auth.session.user.hasPermission('sale.create');
+      if (!hasPermission) {
+        state = const CheckoutFailure(
+          'Huna ruhusa ya kuuza. Ingia mtandoni kupata ruhusa.',
+        );
+        _clientSaleId = null;
+        return null;
+      }
+    } else {
+      state = const CheckoutFailure(
+        'Huna sessioni ya kuuza. Tafadhali ingia.',
+      );
+      _clientSaleId = null;
+      return null;
+    }
+
     try {
       final recorded = await recorder.record(
         clientSaleIdOverride: _clientSaleId,
         lines: lines,
         paymentMethod: paymentMethod,
+        paymentAmount: amountTendered,
+        customerId: customerId,
       );
       var subtotal = 0.0;
       for (final line in lines) {
@@ -167,6 +209,8 @@ class CheckoutController extends StateNotifier<CheckoutState> {
         lines: lines,
         paymentMethod: paymentMethod,
         total: subtotal,
+        paymentAmount: amountTendered,
+        customerName: customerName,
       );
       state = CheckoutSuccess(provisional);
       // Identity now lives in the persistent queue row.
@@ -182,37 +226,84 @@ class CheckoutController extends StateNotifier<CheckoutState> {
     if (_branchId != null) {
       return _branchId;
     }
-    return _branchId = await _branchIdOf();
+
+    // Try cache first (for offline scenarios)
+    final branchCache = ref.read(branchCacheProvider);
+    final cached = await branchCache.getCached();
+    if (cached != null) {
+      _branchId = cached;
+      return cached;
+    }
+
+    // Fall back to API
+    return _branchId = await ref.read(posBranchIdProvider)();
+  }
+
+  Future<SaleDto> _tryOnline({
+    required String branchId,
+    required List<CartLine> lines,
+    required int paymentMethod,
+    double? amountTendered,
+    String? customerId,
+  }) async {
+    final priced = await _refreshPrices(lines, branchId);
+    final total = priced.fold(0.0, (sum, line) => sum + line.lineTotal);
+    return _repository.create(
+      body: buildCreateSaleBody(
+        branchId: branchId,
+        clientSaleId: _clientSaleId!,
+        lines: priced,
+        paymentMethod: paymentMethod,
+        total: total,
+        paymentAmount: amountTendered,
+        customerId: customerId,
+      ),
+      idempotencyKey: _clientSaleId!,
+    );
   }
 
   Future<List<CartLine>> _refreshPrices(
     List<CartLine> lines,
     String branchId,
   ) async {
-    final priced = <CartLine>[];
+    // Quick-sale lines carry a client-fixed price — split them out.
+    final toResolve = <CartLine>[];
+    final quickLines = <CartLine>[];
     for (final line in lines) {
-      double price = line.unitPrice;
-      try {
-        final resolved = await _repository.resolvePrice(
-          line.productId,
-          quantity: line.quantity,
-          branchId: branchId,
-        );
-        if (resolved != null) {
-          price = resolved.price;
-        }
-      } on AppException {
-        // Fall back to the cart price; the backend still recomputes and any
-        // drift surfaces as a validation error rather than a wrong charge.
+      if (line.unitPriceOverride != null) {
+        quickLines.add(line);
+      } else {
+        toResolve.add(line);
       }
-      priced.add(CartLine(
-        productId: line.productId,
-        name: line.name,
-        unitPrice: price,
-        quantity: line.quantity,
-      ));
     }
-    return priced;
+
+    if (toResolve.isEmpty) {
+      return lines;
+    }
+
+    // One bulk call prices the whole cart instead of one round trip per line.
+    Map<String, double> prices;
+    try {
+      prices = await _repository.resolvePrices(
+        productIds: [for (final line in toResolve) line.productId],
+        quantities: [for (final line in toResolve) line.quantity],
+        branchId: branchId,
+      );
+    } on AppException {
+      // Fall back to the cart prices as-is.
+      return lines;
+    }
+
+    return [
+      for (final line in toResolve)
+        CartLine(
+          productId: line.productId,
+          name: line.name,
+          unitPrice: prices[line.productId] ?? line.unitPrice,
+          quantity: line.quantity,
+        ),
+      ...quickLines,
+    ];
   }
 
   bool _isTransportFailure(AppException error) =>
@@ -240,16 +331,16 @@ class CheckoutController extends StateNotifier<CheckoutState> {
     if (message.contains('fully cover')) {
       return 'Malipo hayakutosheleza. Jaribu tena.';
     }
+    if (message.contains('credit sale needs a customer')) {
+      return 'Chagua mteja kwa mauzo ya mkopo.';
+    }
     return switch (error) {
       UnauthorizedException() => error.message,
       ForbiddenException() => error.message,
-      NetworkException() =>
-        'Hakuna mtandao. Sale haijatumwa — jaribu tena.',
+      NetworkException() => 'Hakuna mtandao. Sale haijatumwa — jaribu tena.',
       TimeoutException() =>
         'Muunganisho ulikwama. Thibitisha mauzo kabla ya kujaribu tena.',
-      _ => message.isEmpty
-          ? 'Imeshindikana kukamilisha mauzo.'
-          : message,
+      _ => message.isEmpty ? 'Imeshindikana kukamilisha mauzo.' : message,
     };
   }
 }

@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.business_app">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Network access for the Business OS API (release builds don't inherit
          the debug manifest's INTERNET permission). -->
@@ -21,13 +20,9 @@
         android:required="true" />
 
     <application
-        android:label="business_app"
+        android:label="Jolinx"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
-        <!-- usesCleartextTraffic: DEV ONLY — the dev backend serves plain
-             HTTP on the LAN. Production must use HTTPS and drop this flag. -->
-
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"

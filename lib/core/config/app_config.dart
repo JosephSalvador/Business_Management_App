@@ -24,6 +24,9 @@ class AppConfig {
   final AppEnvironment environment;
   final Uri apiBaseUrl;
 
+  /// IANA timezone name from the device (e.g. `EAT`).
+  String get timezone => DateTime.now().timeZoneName;
+
   /// Compile-time overrides win over `.env` values
   /// (`flutter build apk --dart-define=API_BASE_URL=https://...`).
   static const _dartDefineApiUrl = String.fromEnvironment('API_BASE_URL');

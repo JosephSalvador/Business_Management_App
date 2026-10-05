@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart' show Options, DioException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../di/core_providers.dart';
 import 'api_client.dart';
 import 'api_routes.dart';
 import 'app_exception.dart';
@@ -31,21 +32,7 @@ enum ConnectionQuality {
 /// Watches connectivity_plus events and verifies actual API reachability
 /// with a cheap unauthenticated health probe plus hysteresis so flapping
 /// links don't flip the POS banner every second.
-class ConnectivityMonitor extends StateNotifier<ConnectionQuality> {
-  ConnectivityMonitor({
-    required ApiClient apiClient,
-    Connectivity? connectivity,
-  })  : _apiClient = apiClient,
-        _connectivity = connectivity ?? Connectivity(),
-        super(ConnectionQuality.unknown) {
-    _subscription = _connectivity.onConnectivityChanged.listen(
-      (_) => scheduleCheck(),
-    );
-    scheduleCheck();
-  }
-
-  final ApiClient _apiClient;
-  final Connectivity _connectivity;
+class ConnectivityMonitor extends Notifier<ConnectionQuality> {
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   Timer? _debounce;
   int _consecutiveFailures = 0;
@@ -57,6 +44,23 @@ class ConnectivityMonitor extends StateNotifier<ConnectionQuality> {
   /// the sync engine.
   void Function()? onRestored;
 
+  @override
+  ConnectionQuality build() {
+    final connectivity = Connectivity();
+
+    _subscription = connectivity.onConnectivityChanged.listen(
+      (_) => scheduleCheck(),
+    );
+    scheduleCheck();
+
+    ref.onDispose(() {
+      _subscription?.cancel();
+      _debounce?.cancel();
+    });
+
+    return ConnectionQuality.unknown;
+  }
+
   void scheduleCheck() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () => check());
@@ -64,16 +68,17 @@ class ConnectivityMonitor extends StateNotifier<ConnectionQuality> {
 
   /// Re-evaluates reachability now.
   Future<void> check() async {
+    final apiClient = ref.read(apiClientProvider);
     final hasInterface = await _hasInterface();
     if (!hasInterface) {
       _consecutiveFailures = 0;
       _set(ConnectionQuality.offline);
       return;
     }
-    final reachable = await _probe();
+    final reachable = await _probe(apiClient);
     if (reachable) {
-      final wasOffline =
-          state == ConnectionQuality.offline || state == ConnectionQuality.unreachable;
+      final wasOffline = state == ConnectionQuality.offline ||
+          state == ConnectionQuality.unreachable;
       _consecutiveFailures = 0;
       _set(ConnectionQuality.online);
       if (wasOffline) {
@@ -96,8 +101,8 @@ class ConnectivityMonitor extends StateNotifier<ConnectionQuality> {
   /// response proves reachability better than a probe can.
   void noteApiSuccess() {
     _consecutiveFailures = 0;
-    final wasOffline =
-        state == ConnectionQuality.offline || state == ConnectionQuality.unreachable;
+    final wasOffline = state == ConnectionQuality.offline ||
+        state == ConnectionQuality.unreachable;
     if (state != ConnectionQuality.online && wasOffline) {
       onRestored?.call();
     }
@@ -107,22 +112,17 @@ class ConnectivityMonitor extends StateNotifier<ConnectionQuality> {
   }
 
   Future<bool> _hasInterface() async {
-    final results = await _connectivity.checkConnectivity();
+    final results = await Connectivity().checkConnectivity();
     return !results.contains(ConnectivityResult.none);
   }
 
-  Future<bool> _probe() async {
+  Future<bool> _probe(ApiClient apiClient) async {
     try {
-      await _apiClient.raw.get<dynamic>(
+      await apiClient.raw.get<dynamic>(
         _probePath,
         options: Options(
           sendTimeout: _probeTimeout,
           receiveTimeout: _probeTimeout,
-          // Unauthenticated endpoint: never touch token storage here. The
-          // auth-interceptor read contends with session bootstrap at app
-          // start, and concurrent flutter_secure_storage platform-channel
-          // reads can deadlock on some Android builds — parking the whole
-          // journey on the splash screen.
           extra: const {'skip_auth': true},
         ),
       );
@@ -138,12 +138,5 @@ class ConnectivityMonitor extends StateNotifier<ConnectionQuality> {
     if (state != quality) {
       state = quality;
     }
-  }
-
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    _debounce?.cancel();
-    super.dispose();
   }
 }

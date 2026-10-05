@@ -41,6 +41,8 @@ typedef TokenRefresher = Future<TokenPair> Function(String refreshToken);
 /// auth layer can route the user back to login.
 typedef SessionExpiredCallback = void Function();
 
+typedef PaymentRequiredCallback = Future<void> Function();
+
 /// Central HTTP client for every backend call.
 ///
 /// PATH CONVENTION: [baseUrl] points at the server root. Versioned business
@@ -68,7 +70,10 @@ class ApiClient {
             connectTimeout: const Duration(seconds: 15),
             receiveTimeout: const Duration(seconds: 30),
             sendTimeout: const Duration(seconds: 30),
-            headers: {'Accept': 'application/json'},
+            headers: {
+              'Accept': 'application/json',
+              'X-Client-Timezone': config.timezone,
+            },
           ),
         );
     _dio.interceptors.addAll([
@@ -86,9 +91,11 @@ class ApiClient {
   /// session becomes unrecoverable mid-use. Mutable by design: the auth
   /// controller registers itself after both providers are constructed.
   SessionExpiredCallback? onSessionExpired;
+  PaymentRequiredCallback? onPaymentRequired;
 
   /// In-flight refresh guard so parallel 401s trigger exactly one refresh.
   Future<TokenPair>? _refreshInFlight;
+  Future<void>? _paymentRequiredInFlight;
 
   Dio get dio => _dio;
 
@@ -130,14 +137,22 @@ class ApiClient {
     Object? body,
     Map<String, dynamic> extra = const {},
   }) =>
-      _send(() => _dio.put<T>(path, data: body, options: Options(extra: extra)));
+      _send(() => _dio.put<T>(
+            path,
+            data: body,
+            options: Options(
+              headers: {'Content-Type': Headers.jsonContentType},
+              extra: extra,
+            ),
+          ));
 
   Future<Response<T>> patch<T>(
     String path, {
     Object? body,
     Map<String, dynamic> extra = const {},
   }) =>
-      _send(() => _dio.patch<T>(path, data: body, options: Options(extra: extra)));
+      _send(() =>
+          _dio.patch<T>(path, data: body, options: Options(extra: extra)));
 
   Future<Response<T>> delete<T>(
     String path, {
@@ -157,15 +172,31 @@ class ApiClient {
     try {
       return await request();
     } on DioException catch (error) {
+      if (error.response?.statusCode == 402) {
+        await _notifyPaymentRequired();
+      }
       throw mapDioException(error);
     }
   }
 
-  Future<void> _attachAuth(RequestOptions options, RequestInterceptorHandler handler) async {
+  Future<void> _attachAuth(
+      RequestOptions options, RequestInterceptorHandler handler) async {
     if (options.extra['skip_auth'] != true) {
       final token = await _tokenStore.readAccessToken();
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
+
+        // The access token carries no session identity, so the session list needs a way to
+        // tell "this device" apart from the user's others. The refresh token is attached
+        // *only* to that request rather than to every call: it is long-lived, and putting it
+        // on all traffic would widen its exposure to any log or proxy along the way.
+        // The server treats it as a display marker only, matching it against the stored hash.
+        if (options.path.endsWith('/me/security/sessions')) {
+          final refresh = await _tokenStore.readRefreshToken();
+          if (refresh != null && refresh.isNotEmpty) {
+            options.headers['X-Refresh-Token'] = refresh;
+          }
+        }
       }
     }
     handler.next(options);
@@ -195,6 +226,31 @@ class ApiClient {
       handler.next(err);
     } finally {
       _refreshInFlight = null;
+    }
+  }
+
+  Future<void> _notifyPaymentRequired() async {
+    final current = _paymentRequiredInFlight;
+    if (current != null) {
+      await current;
+      return;
+    }
+    final request = _refreshEntitlement();
+    _paymentRequiredInFlight = request;
+    try {
+      await request;
+    } finally {
+      if (identical(_paymentRequiredInFlight, request)) {
+        _paymentRequiredInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _refreshEntitlement() async {
+    try {
+      await onPaymentRequired?.call();
+    } on Object {
+      return;
     }
   }
 

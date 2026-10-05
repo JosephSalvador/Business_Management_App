@@ -1,12 +1,18 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/local/cached_catalog_dao.dart';
-import '../../../core/local/local_database.dart'
-    show CachedProductsCompanion, CachedStockCompanion;
+import '../../../app/providers.dart';
+import '../../../core/storage/cached_catalog_dao.dart';
+import '../../../core/storage/local_database.dart'
+    show
+        CachedProductsCompanion,
+        CachedStockCompanion,
+        CachedWarehousesCompanion;
 import '../../../core/network/app_exception.dart';
 import '../../products/data/product_repository.dart';
-import '../../products/domain/product.dart';/// One sellable row on the POS grid, served from the local cache with a
+import '../../products/domain/product.dart';
+
+/// One sellable row on the POS grid, served from the local cache with a
 /// stock projection that accounts for still-unsynced offline sales.
 class PosProduct {
   const PosProduct({
@@ -68,21 +74,14 @@ class PosCatalogState {
 /// Cache-first catalog for the POS (M5.3). Reads NEVER hit the network:
 /// search works fully offline. A refresh pulls products, default-list retail
 /// prices and balances into the encrypted cache when connectivity allows.
-class PosCatalogController extends StateNotifier<PosCatalogState> {
-  PosCatalogController({
-    required CachedCatalogDao dao,
-    required ProductRepository repository,
-    required Future<String?> Function() tenantIdOf,
-  })  : _dao = dao,
-        _repository = repository,
-        _tenantIdOf = tenantIdOf,
-        super(const PosCatalogState());
-
+class PosCatalogController extends Notifier<PosCatalogState> {
   static const _pageSize = 200;
 
-  final CachedCatalogDao _dao;
-  final ProductRepository _repository;
-  final Future<String?> Function() _tenantIdOf;
+  @override
+  PosCatalogState build() => const PosCatalogState();
+
+  CachedCatalogDao get _dao => ref.read(localSalesServiceProvider).catalog;
+  ProductRepository get _repository => ref.read(productRepositoryProvider);
 
   /// Loads the visible list: cached rows immediately, then a silent online
   /// refresh that swaps in fresher data if it succeeds.
@@ -112,7 +111,7 @@ class PosCatalogController extends StateNotifier<PosCatalogState> {
 
   /// Pulls the minimum selling data from the API and replaces the cache.
   Future<void> refresh() async {
-    final tenantId = await _tenantIdOf();
+    final tenantId = ref.read(sessionContextProvider).$1;
     if (tenantId == null) {
       throw ValidationException('Chagua biashara kwanza.');
     }
@@ -144,13 +143,25 @@ class PosCatalogController extends StateNotifier<PosCatalogState> {
       // server-side either way.
     }
 
-    final stock = <String, double>{};
-    for (final balance in await _repository.balances()) {
-      stock[balance.productId] =
-          (stock[balance.productId] ?? 0) + balance.quantity;
-    }
+    final balances = await _repository.balances();
 
     final now = DateTime.now().toUtc();
+    List<CachedWarehousesCompanion> warehouseRows = const [];
+    try {
+      warehouseRows = [
+        for (final w in await _repository.warehouses())
+          CachedWarehousesCompanion.insert(
+            tenantId: tenantId,
+            warehouseId: w.id,
+            name: w.name,
+            code: w.code,
+            fetchedAt: now,
+          ),
+      ];
+    } on AppException {
+      // Warehouse names are a display nicety for the hub; a missed fetch
+      // degrades to the stock-only cache.
+    }
     await _dao.replaceCatalog(
       tenantId: tenantId,
       products: [
@@ -172,24 +183,24 @@ class PosCatalogController extends StateNotifier<PosCatalogState> {
           ),
       ],
       stock: [
-        for (final entry in stock.entries)
+        for (final balance in balances)
           CachedStockCompanion.insert(
             tenantId: tenantId,
-            productId: entry.key,
-            warehouseId: '*',
-            quantity: entry.value,
+            productId: balance.productId,
+            warehouseId: balance.warehouseId,
+            quantity: balance.quantity,
             fetchedAt: now,
           ),
       ],
+      warehouses: warehouseRows,
     );
     await _emitFromCache(staleOverride: false);
   }
 
   Future<void> _emitFromCache({bool? staleOverride}) async {
-    final tenantId = await _tenantIdOf();
+    final tenantId = ref.read(sessionContextProvider).$1;
     if (tenantId == null) {
-      state =
-          state.copyWith(items: const [], stale: true, loading: false);
+      state = state.copyWith(items: const [], stale: true, loading: false);
       return;
     }
     final query = state.search.trim();
@@ -203,7 +214,8 @@ class PosCatalogController extends StateNotifier<PosCatalogState> {
         name: row.name,
         sku: row.sku,
         price: row.retailPrice,
-        projectedQuantity: await _dao.projectedQuantity(tenantId, row.productId),
+        projectedQuantity:
+            await _dao.projectedQuantity(tenantId, row.productId),
       ));
     }
     state = state.copyWith(

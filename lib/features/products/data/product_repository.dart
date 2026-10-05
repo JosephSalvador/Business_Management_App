@@ -14,7 +14,9 @@ class ProductDraft {
     this.sku,
     this.barcode,
     this.categoryId,
+    this.brandId,
     this.taxCategoryId,
+    this.costPrice,
   });
 
   final String name;
@@ -24,7 +26,9 @@ class ProductDraft {
   final String? sku;
   final String? barcode;
   final String? categoryId;
+  final String? brandId;
   final String? taxCategoryId;
+  final double? costPrice;
 
   Product toDomain() => Product(
         id: '',
@@ -33,10 +37,12 @@ class ProductDraft {
         sku: sku,
         barcode: barcode,
         categoryId: categoryId,
+        brandId: brandId,
         unitOfMeasureId: unitOfMeasureId,
         productType: productType,
         status: ProductStatus.active,
         taxCategoryId: taxCategoryId,
+        costPrice: costPrice,
       );
 }
 
@@ -54,6 +60,7 @@ class OpeningStockEntry {
     required this.quantity,
     required this.unitOfMeasureId,
     this.reason,
+    this.unitCost,
   });
 
   final String warehouseId;
@@ -61,6 +68,7 @@ class OpeningStockEntry {
   final double quantity;
   final String unitOfMeasureId;
   final String? reason;
+  final double? unitCost;
 
   Map<String, dynamic> toBody() => {
         'warehouseId': warehouseId,
@@ -68,7 +76,45 @@ class OpeningStockEntry {
         'quantity': quantity,
         'unitOfMeasureId': unitOfMeasureId,
         'effectiveAt': DateTime.now().toUtc().toIso8601String(),
-        if (reason != null && reason!.trim().isNotEmpty) 'reason': reason!.trim(),
+        if (reason != null && reason!.trim().isNotEmpty)
+          'reason': reason!.trim(),
+        if (unitCost != null) 'unitCost': unitCost,
+      };
+}
+
+/// A positive/negative stock movement recorded through the adjustments
+/// endpoint. The backend rejects a zero delta and any delta below the current
+/// balance. [idempotencyKey] is a client-generated GUID that makes a retry after
+/// a dropped response safe — the server dedupes on it (mirrors sales).
+class AdjustStockEntry {
+  const AdjustStockEntry({
+    required this.warehouseId,
+    required this.productId,
+    required this.quantityDelta,
+    this.reason,
+    this.unitCost,
+    this.reasonType,
+    this.idempotencyKey,
+  });
+
+  final String warehouseId;
+  final String productId;
+  final double quantityDelta;
+  final String? reason;
+  final double? unitCost;
+  final String? reasonType;
+  final String? idempotencyKey;
+
+  Map<String, dynamic> toBody() => {
+        'warehouseId': warehouseId,
+        'productId': productId,
+        'quantityDelta': quantityDelta,
+        'effectiveAt': DateTime.now().toUtc().toIso8601String(),
+        if (reason != null && reason!.trim().isNotEmpty)
+          'reason': reason!.trim(),
+        if (unitCost != null) 'unitCost': unitCost,
+        if (reasonType != null && reasonType!.trim().isNotEmpty)
+          'reasonType': reasonType!.trim(),
       };
 }
 
@@ -149,6 +195,18 @@ class ProductRepository {
     return data.map(TaxCategory.fromJson).toList(growable: false);
   }
 
+  /// Product categories for the tenant. Empty for a fresh business.
+  Future<List<Category>> categories() async {
+    final data = await _listArray('/api/v1/categories');
+    return data.map(Category.fromJson).toList(growable: false);
+  }
+
+  /// Brands for the tenant. Empty for a fresh business.
+  Future<List<Brand>> brands() async {
+    final data = await _listArray('/api/v1/brands');
+    return data.map(Brand.fromJson).toList(growable: false);
+  }
+
   /// Active warehouses for the tenant. The default "Main Store" created during
   /// business setup arrives first in practice; callers should not care.
   Future<List<Warehouse>> warehouses() async {
@@ -197,6 +255,22 @@ class ProductRepository {
     );
   }
 
+  Future<StockBalance> adjustStock(AdjustStockEntry entry) async {
+    final response = await _apiClient.post<dynamic>(
+      '/api/v1/inventory/stock/adjustments',
+      body: entry.toBody(),
+      headers: entry.idempotencyKey != null
+          ? {'Idempotency-Key': entry.idempotencyKey!}
+          : const {},
+    );
+    if (response.statusCode != 200 || response.data is! Map) {
+      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    }
+    return StockBalance.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
   /// The tenant's default price list — created automatically during business
   /// setup. Selling prices live here, not on products.
   Future<PriceList?> defaultPriceList() async {
@@ -226,12 +300,13 @@ class ProductRepository {
   }) async {
     final existing = await prices(priceList.id);
     final others = existing
-        .where((row) => !(row.productId == productId && row.priceType == priceType))
+        .where((row) =>
+            !(row.productId == productId && row.priceType == priceType))
         .toList();
     final mine = ProductPrice(
       id: existing
-          .where((row) =>
-              row.productId == productId && row.priceType == priceType)
+          .where(
+              (row) => row.productId == productId && row.priceType == priceType)
           .map((row) => row.id)
           .firstOrNull,
       productId: productId,
@@ -241,7 +316,9 @@ class ProductRepository {
     );
     final response = await _apiClient.put<dynamic>(
       '/api/v1/price-lists/${priceList.id}/prices',
-      body: {'prices': [...others, mine].map((row) => row.toBody()).toList()},
+      body: {
+        'prices': [...others, mine].map((row) => row.toBody()).toList()
+      },
     );
     if (response.statusCode == 409) {
       throw ConflictException('Bei hii ipo tayari.');

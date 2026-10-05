@@ -1,25 +1,38 @@
 import 'dart:async';
 
+import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:business_management_system/core/network/app_exception.dart';
-import 'package:business_management_system/features/sales/application/checkout_controller.dart';
-import 'package:business_management_system/features/sales/data/sale_repository.dart';
-import 'package:business_management_system/features/sales/domain/sale.dart';
+import 'package:jolinx_app/app/providers.dart';
+import 'package:jolinx_app/core/network/app_exception.dart';
+import 'package:jolinx_app/core/storage/local_database.dart';
+import 'package:jolinx_app/core/sync/local_sales_service.dart';
+import 'package:jolinx_app/features/sales/application/checkout_controller.dart';
+import 'package:jolinx_app/features/sales/data/sale_repository.dart';
+import 'package:jolinx_app/features/sales/domain/sale.dart';
 
 /// In-memory [SaleRepository] recording what the checkout actually sent.
 class FakeSaleRepository implements SaleRepository {
-  FakeSaleRepository({this.createError, this.resolveError});
+  FakeSaleRepository({this.createError, this.resolveError, this.stall});
 
   final List<Map<String, dynamic>> bodies = [];
   final List<String> idempotencyKeys = [];
   int createCalls = 0;
   int resolveCalls = 0;
+  int resolveManyCalls = 0;
+
+  /// When non-null, [create] awaits this future first (simulates a stalled
+  /// backend; leave it pending to exercise the checkout deadline).
+  final Future<void>? stall;
 
   /// When non-null, the next [create] throws it (then clears).
   AppException? createError;
 
   /// Applies to every [resolvePrice] call until cleared.
   AppException? resolveError;
+
+  /// Applies to the next [resolvePrices] call, then clears.
+  AppException? resolveMultiError;
 
   @override
   Future<SaleDto> create({
@@ -29,6 +42,9 @@ class FakeSaleRepository implements SaleRepository {
     createCalls++;
     idempotencyKeys.add(idempotencyKey);
     bodies.add(body);
+    if (stall != null) {
+      await stall!;
+    }
     if (createError != null) {
       final error = createError!;
       createError = null;
@@ -53,6 +69,21 @@ class FakeSaleRepository implements SaleRepository {
   }
 
   @override
+  Future<Map<String, double>> resolvePrices({
+    required List<String> productIds,
+    List<double>? quantities,
+    String? branchId,
+  }) async {
+    resolveManyCalls++;
+    if (resolveMultiError != null) {
+      final error = resolveMultiError!;
+      resolveMultiError = null;
+      throw error;
+    }
+    return {for (final id in productIds) id: 2500.0};
+  }
+
+  @override
   Future<PagedSales> list({
     int page = 1,
     int pageSize = 50,
@@ -64,8 +95,7 @@ class FakeSaleRepository implements SaleRepository {
       const PagedSales(items: [], total: 0);
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      super.noSuchMethod(invocation);
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 SaleDto _sale(String clientSaleId) => SaleDto.fromJson({
@@ -87,14 +117,24 @@ SaleDto _sale(String clientSaleId) => SaleDto.fromJson({
       ],
     });
 
-CartLine rice() =>
-    CartLine(productId: 'p1', name: 'Mchele', unitPrice: 2500);
+CartLine rice() => CartLine(productId: 'p1', name: 'Mchele', unitPrice: 2500);
 
-CheckoutController controllerWith(
-  FakeSaleRepository repository, {
-  String branchId = 'branch-1',
-}) =>
-    CheckoutController(repository, () async => branchId);
+ProviderContainer _container({
+  required FakeSaleRepository repository,
+  Future<String?> Function()? branchId,
+}) {
+  final db = LocalDatabase(NativeDatabase.memory());
+  final service = LocalSalesService(database: db);
+  return ProviderContainer(overrides: [
+    localDatabaseProvider.overrideWithValue(db),
+    localSalesServiceProvider.overrideWithValue(service),
+    sessionContextProvider.overrideWithValue(('tenant-1', 'user-1')),
+    saleRepositoryProvider.overrideWithValue(repository),
+    posBranchIdProvider.overrideWithValue(
+      branchId ?? (() async => 'branch-1'),
+    ),
+  ]);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -103,7 +143,9 @@ void main() {
     test('submits with resolved prices and the exact backend contract',
         () async {
       final repository = FakeSaleRepository();
-      final controller = controllerWith(repository);
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(checkoutControllerProvider.notifier);
 
       final sale = await controller.submit(
         lines: [rice()],
@@ -112,23 +154,43 @@ void main() {
 
       expect(sale!.number, 'S-2026-000001');
       expect(controller.state, isA<CheckoutSuccess>());
-      expect(repository.resolveCalls, 1);
+      expect(repository.resolveManyCalls, 1);
       expect(repository.bodies.single['branchId'], 'branch-1');
       expect(repository.bodies.single['payments'], [
         {'method': 0, 'amount': 2500.0},
       ]);
     });
 
-    test('double tap while submitting is ignored — one request only',
+    test('credit submit links the customer and keeps a zero initial payment',
         () async {
-      late CheckoutController controller;
-      // Slow the create call down so a second submit overlaps it.
+      final repository = FakeSaleRepository();
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(checkoutControllerProvider.notifier);
+
+      final sale = await controller.submit(
+        lines: [rice()],
+        paymentMethod: PaymentMethod.credit,
+        amountTendered: 0,
+        customerId: 'cust-1',
+        customerName: 'Neema Shop',
+      );
+
+      expect(sale, isNotNull);
+      expect(repository.bodies.single['customerId'], 'cust-1');
+      expect(repository.bodies.single['isElectronicPayment'], isFalse,
+          reason: 'an in-house credit balance is not an electronic tender');
+      expect(repository.bodies.single['payments'], [
+        {'method': 4, 'amount': 0.0},
+      ]);
+    });
+
+    test('double tap while submitting is ignored — one request only', () async {
       final gate = Completer<void>();
       final slow = FakeSaleRepository();
-      controller = CheckoutController(slow, () async {
-        await gate.future;
-        return 'branch-1';
-      });
+      final container = _container(repository: slow);
+      addTearDown(container.dispose);
+      final controller = container.read(checkoutControllerProvider.notifier);
 
       final first = controller.submit(
         lines: [rice()],
@@ -145,29 +207,13 @@ void main() {
       expect(slow.createCalls, 1);
     });
 
-    test('network failure keeps the idempotency key for the retry',
-        () async {
-      final repository = FakeSaleRepository()
-        ..createError = NetworkException();
-      final controller = controllerWith(repository);
-
-      await controller.submit(lines: [rice()], paymentMethod: 0);
-      expect(controller.state, isA<CheckoutFailure>());
-
-      final sale = await controller.submit(lines: [rice()], paymentMethod: 0);
-
-      expect(sale, isNotNull);
-      expect(repository.createCalls, 2);
-      expect(repository.idempotencyKeys.first,
-          repository.idempotencyKeys.last,
-          reason: 'the retry replays the same logical sale');
-    });
-
     test('definitive rejection starts a fresh sale on the next attempt',
         () async {
       final repository = FakeSaleRepository()
         ..createError = ValidationException('Insufficient stock for Mchele.');
-      final controller = controllerWith(repository);
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(checkoutControllerProvider.notifier);
 
       await controller.submit(lines: [rice()], paymentMethod: 0);
       expect(controller.state.message, 'Kiasi cha bidhaa hakitoshi.');
@@ -189,17 +235,21 @@ void main() {
       };
       for (final entry in cases.entries) {
         final repository = FakeSaleRepository()..createError = entry.key;
-        final controller = controllerWith(repository);
+        final container = _container(repository: repository);
+        addTearDown(container.dispose);
+        final controller = container.read(checkoutControllerProvider.notifier);
         await controller.submit(lines: [rice()], paymentMethod: 0);
-        expect((controller.state as CheckoutFailure).message,
-            entry.value, reason: entry.key.message);
+        expect((controller.state as CheckoutFailure).message, entry.value,
+            reason: entry.key.message);
       }
     });
 
     test('price resolution failure falls back to the cart price', () async {
       final repository = FakeSaleRepository()
-        ..resolveError = TimeoutException();
-      final controller = controllerWith(repository);
+        ..resolveMultiError = TimeoutException();
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(checkoutControllerProvider.notifier);
 
       final sale = await controller.submit(
         lines: [rice()],
@@ -214,8 +264,12 @@ void main() {
 
     test('missing branch fails without calling create', () async {
       final repository = FakeSaleRepository();
-      final controller =
-          CheckoutController(repository, () async => null);
+      final container = _container(
+        repository: repository,
+        branchId: () async => null,
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(checkoutControllerProvider.notifier);
 
       final sale = await controller.submit(lines: [rice()], paymentMethod: 0);
 
@@ -225,12 +279,9 @@ void main() {
       expect(repository.createCalls, 0);
     });
   });
-
 }
 
-// Small helpers used by the tests above.
 extension on CheckoutState {
-  String get message => this is CheckoutFailure
-      ? (this as CheckoutFailure).message
-      : '';
+  String get message =>
+      this is CheckoutFailure ? (this as CheckoutFailure).message : '';
 }

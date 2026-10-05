@@ -2,10 +2,10 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:business_management_system/core/config/app_config.dart';
-import 'package:business_management_system/core/network/api_client.dart';
-import 'package:business_management_system/features/sales/data/sale_repository.dart';
-import 'package:business_management_system/features/sales/domain/sale.dart';
+import 'package:jolinx_app/core/config/app_config.dart';
+import 'package:jolinx_app/core/network/api_client.dart';
+import 'package:jolinx_app/features/sales/data/sale_repository.dart';
+import 'package:jolinx_app/features/sales/domain/sale.dart';
 import '../../support/fakes.dart';
 
 ApiClient clientWith(ScriptedAdapter adapter) => ApiClient(
@@ -161,8 +161,7 @@ void main() {
       expect(sale.payments.single.label, 'Cash');
     });
 
-    test('cash payments are not electronic and methods bind as ints',
-        () async {
+    test('cash payments are not electronic and methods bind as ints', () async {
       final adapter = ScriptedAdapter([const ScriptedResponse(200, '{}')]);
       final body = buildCreateSaleBody(
         branchId: 'b',
@@ -171,13 +170,63 @@ void main() {
         paymentMethod: PaymentMethod.cash,
         total: 2500,
       );
-      await clientWith(adapter).post<Map<String, dynamic>>(
-          '/sales', body: body);
+      await clientWith(adapter)
+          .post<Map<String, dynamic>>('/sales', body: body);
 
       final sent =
           jsonDecode(adapter.requests.single.body!) as Map<String, dynamic>;
       expect(sent['isElectronicPayment'], isFalse);
       expect((sent['payments'] as List).single['method'], 0);
+    });
+
+    test('quick-sale line sends a client-fixed unit price override', () async {
+      final adapter = ScriptedAdapter([const ScriptedResponse(200, '{}')]);
+      final body = buildCreateSaleBody(
+        branchId: 'b',
+        clientSaleId: 'x',
+        lines: [
+          CartLine(
+            productId: 'p-quick',
+            name: 'Uza Haraka',
+            unitPrice: 15000,
+            unitPriceOverride: 15000,
+            key: 'quick-1',
+          ),
+        ],
+        paymentMethod: PaymentMethod.cash,
+        total: 15000,
+      );
+      await clientWith(adapter)
+          .post<Map<String, dynamic>>('/sales', body: body);
+
+      final sent =
+          jsonDecode(adapter.requests.single.body!) as Map<String, dynamic>;
+      expect(sent['lines'], [
+        {'productId': 'p-quick', 'quantity': 1, 'unitPrice': 15000},
+      ]);
+    });
+
+    test('getOrCreateQuickSaleProduct posts and returns the product id',
+        () async {
+      final adapter = ScriptedAdapter([
+        ScriptedResponse(
+            200,
+            jsonEncode({
+              'id': 'p-quick',
+              'name': 'Uza Haraka',
+              'sku': 'QS-BILA-JINA',
+            })),
+      ]);
+      final repository = SaleRepository(apiClient: clientWith(adapter));
+
+      final id = await repository.getOrCreateQuickSaleProduct();
+
+      expect(adapter.requests.single.method, 'POST');
+      expect(
+        adapter.requests.single.path,
+        'https://api.test.local/api/v1/products/quick-sale',
+      );
+      expect(id, 'p-quick');
     });
 
     test('getById fetches one sale', () async {
@@ -197,12 +246,14 @@ void main() {
 
     test('list sends today window and status filter', () async {
       final adapter = ScriptedAdapter([
-        ScriptedResponse(200, jsonEncode({
-          'items': [saleJson('s1')],
-          'page': 1,
-          'pageSize': 100,
-          'total': 1,
-        })),
+        ScriptedResponse(
+            200,
+            jsonEncode({
+              'items': [saleJson('s1')],
+              'page': 1,
+              'pageSize': 100,
+              'total': 1,
+            })),
       ]);
       final repository = SaleRepository(apiClient: clientWith(adapter));
 
@@ -221,13 +272,15 @@ void main() {
 
     test('resolvePrice returns the resolved retail price', () async {
       final adapter = ScriptedAdapter([
-        ScriptedResponse(200, jsonEncode({
-          'price': 2500,
-          'currency': 'TZS',
-          'priceListId': 'pl1',
-          'priceType': 0,
-          'minQuantity': 1,
-        })),
+        ScriptedResponse(
+            200,
+            jsonEncode({
+              'price': 2500,
+              'currency': 'TZS',
+              'priceListId': 'pl1',
+              'priceType': 0,
+              'minQuantity': 1,
+            })),
       ]);
       final repository = SaleRepository(apiClient: clientWith(adapter));
 
@@ -238,6 +291,71 @@ void main() {
         contains('/api/v1/pricing/resolve?productId=p1&'),
       );
       expect(price!.price, 2500);
+    });
+
+    test('resolvePrices prices many lines in ONE request', () async {
+      final adapter = ScriptedAdapter([
+        ScriptedResponse(
+            200,
+            jsonEncode([
+              {
+                'productId': 'p1',
+                'price': 2500,
+                'currency': 'TZS',
+              },
+              {
+                'productId': 'p2',
+                'price': null,
+                'currency': null,
+                'errorMessage':
+                    'No price could be resolved for the given product.',
+              },
+            ])),
+      ]);
+      final repository = SaleRepository(apiClient: clientWith(adapter));
+
+      final prices = await repository.resolvePrices(
+        productIds: ['p1', 'p2'],
+        quantities: [1, 2],
+        branchId: 'b1',
+      );
+
+      expect(adapter.requests.single.method, 'POST');
+      expect(
+        adapter.requests.single.path,
+        'https://api.test.local/api/v1/pricing/resolve-many',
+      );
+      final sent =
+          jsonDecode(adapter.requests.single.body!) as Map<String, dynamic>;
+      expect(sent['priceType'], 0);
+      expect(sent['branchId'], 'b1');
+      expect(sent['lines'], [
+        {'productId': 'p1', 'quantity': 1},
+        {'productId': 'p2', 'quantity': 2},
+      ]);
+      expect(prices, {'p1': 2500.0},
+          reason: 'unresolvable lines are absent so callers keep cart prices');
+    });
+
+    test('voidSale posts the reason and returns the voided sale', () async {
+      final voided = saleJson('s9');
+      voided['status'] = 1;
+      final adapter = ScriptedAdapter([
+        ScriptedResponse(200, jsonEncode(voided)),
+      ]);
+      final repository = SaleRepository(apiClient: clientWith(adapter));
+
+      final sale = await repository.voidSale('s9', 'Mmuhudumu alikosea');
+
+      expect(adapter.requests.single.method, 'POST');
+      expect(
+        adapter.requests.single.path,
+        'https://api.test.local/api/v1/sales/s9/void',
+      );
+      final sent =
+          jsonDecode(adapter.requests.single.body!) as Map<String, dynamic>;
+      expect(sent['reason'], 'Mmuhudumu alikosea');
+      expect(sale.isVoided, isTrue);
     });
   });
 }

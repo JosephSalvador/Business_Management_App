@@ -1,5 +1,32 @@
+class Category {
+  const Category({required this.id, required this.name, this.parentId});
+
+  final String id;
+  final String name;
+  final String? parentId;
+
+  factory Category.fromJson(Map<String, dynamic> json) => Category(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        parentId: json['parentId'] as String?,
+      );
+}
+
+class Brand {
+  const Brand({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  factory Brand.fromJson(Map<String, dynamic> json) => Brand(
+        id: json['id'] as String,
+        name: json['name'] as String,
+      );
+}
+
 class UnitOfMeasure {
-  const UnitOfMeasure({required this.id, required this.name, required this.abbreviation});
+  const UnitOfMeasure(
+      {required this.id, required this.name, required this.abbreviation});
 
   final String id;
   final String name;
