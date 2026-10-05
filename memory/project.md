@@ -1311,6 +1311,21 @@ billing fixture omit-switch, TOTP test missing `$` interpolation, inverted
 `isReprint` expectation (preview semantic = printCount > 0). Load-flake candidates
 (register 500s, Npgsql timeouts) noted on the 2h40m run — watch on re-runs.
 
+## Mx register-staff 500 (done 2026-10-05)
+
+`POST /api/v1/auth/register-staff` 500'd on every call — staff invitation was
+completely broken in production. Root cause: `RegisterStaffCommandHandler`
+looked up the tenant's Staff role via `IRoleRepository.GetByNameAsync`, which is
+`AsNoTracking` (with `Include(Permissions)`), then attached that untracked role
+to the new user. EF treated the whole graph as Added and re-INSERTed the role +
+its 14-row permission catalog → `23505 PK_Permissions`. Same EF child-state
+pitfall documented in slice 2a. Fix: re-load the role tracked via `GetByIdAsync`
+(other `GetByNameAsync` callers are read-only checks, unaffected). One more
+envelope parse (`tokens.user.permissions`) fixed in `InvitationStaffFlowTests`.
+6/6 invitation tests green. New helper: `backend/test-batches.sh` — runs the
+suite in small feature batches (unit/auth/sales/inventory-pricing/org-identity/
+billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
+
 ## technical_debt.md
 
 - Flutter app: SharedPreferences + in-memory mocks still drive auth/products/sales; Drift DB

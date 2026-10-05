@@ -235,7 +235,7 @@ public sealed class InvitationStaffFlowTests : IClassFixture<BusinessOsApiFactor
         var loginDoc = Body(await login.Content.ReadAsStringAsync());
         Assert.Equal(ownerTenantId, GetProperty(loginDoc, "tokens", "user", "tenantId"));
 
-        var permissions = loginDoc.GetProperty("user").GetProperty("permissions")
+        var permissions = loginDoc.GetProperty("tokens").GetProperty("user").GetProperty("permissions")
             .EnumerateArray().Select(p => p.ToString()).ToArray();
         Assert.DoesNotContain("Users.Manage", permissions);
         Assert.DoesNotContain("Organizations.Manage", permissions);

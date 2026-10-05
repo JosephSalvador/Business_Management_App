@@ -120,6 +120,15 @@ public sealed class RegisterStaffCommandHandler : IRequestHandler<RegisterStaffC
             staffRole.Grant(permissions);
             await _roles.AddAsync(staffRole, cancellationToken);
         }
+        else
+        {
+            // GetByNameAsync is AsNoTracking: assigning that instance to the new
+            // user makes EF treat the whole graph as Added and re-INSERT the role
+            // and its permission catalog (PK_Permissions violation). Re-load it
+            // tracked so only the UserRoles join row is written.
+            staffRole = await _roles.GetByIdAsync(tenant.Id, staffRole.Id, cancellationToken)
+                ?? throw new InvalidOperationException("Staff role disappeared mid-request.");
+        }
 
         var hq = await _branches.GetByCodeAsync(tenant.Id, Branch.DefaultCode, cancellationToken);
 
