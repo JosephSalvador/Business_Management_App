@@ -81,7 +81,7 @@ public abstract class SalesTestBase : IClassFixture<BusinessOsApiFactory>, IAsyn
 
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        return GetProperty(Body(await login.Content.ReadAsStringAsync()), "accessToken");
+        return GetProperty(Body(await login.Content.ReadAsStringAsync()), "tokens", "accessToken");
     }
 
     protected void Authorize(string token)

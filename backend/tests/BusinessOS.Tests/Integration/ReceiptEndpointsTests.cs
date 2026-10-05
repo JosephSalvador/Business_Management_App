@@ -60,7 +60,8 @@ public sealed class ReceiptEndpointsTests : SalesTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var doc = Body(await response.Content.ReadAsStringAsync());
-        var items = doc.GetProperty("value").EnumerateArray().ToList();
+        // The list endpoint returns a bare JSON array (the Flutter client maps it directly).
+        var items = doc.EnumerateArray().ToList();
         Assert.Single(items);
         Assert.Equal("thermal_80mm_default", items[0].GetProperty("layoutId").GetString());
         Assert.Equal(1, items[0].GetProperty("version").GetInt32());
@@ -197,7 +198,9 @@ public sealed class ReceiptEndpointsTests : SalesTestBase
         var previewResponse = await _client.GetAsync($"/api/v1/receipts/{saleId}/preview");
         var previewDoc = Body(await previewResponse.Content.ReadAsStringAsync());
         Assert.Equal("1", GetProperty(previewDoc, "printCount"));
-        Assert.Equal("False", GetProperty(previewDoc, "isReprint")); // First print, not a reprint
+        // One print is recorded, so every preview/print from now on IS a reprint
+        // (the client's watermark rule is the same: printCount > 0).
+        Assert.Equal("True", GetProperty(previewDoc, "isReprint"));
     }
 
     [Fact]

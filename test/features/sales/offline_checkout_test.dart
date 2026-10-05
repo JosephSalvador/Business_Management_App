@@ -10,6 +10,9 @@ import 'package:jolinx_app/core/storage/session_journal.dart';
 import 'package:jolinx_app/core/storage/tables.dart';
 import 'package:jolinx_app/core/network/app_exception.dart';
 import 'package:jolinx_app/core/sync/local_sales_service.dart';
+import 'package:jolinx_app/features/authentication/application/auth_controller.dart';
+import 'package:jolinx_app/features/authentication/domain/session.dart';
+import 'package:jolinx_app/features/sales/data/branch_cache.dart';
 import 'package:jolinx_app/features/sales/data/offline_sale_recorder.dart';
 import 'package:jolinx_app/features/sales/domain/sale.dart';
 
@@ -26,6 +29,37 @@ class _TestJournal extends SessionJournal {
   @override
   Future<bool> offlineWindowOpen({Duration? window}) async => _windowOpen;
 }
+
+/// Branch cache with no platform storage behind it: always empty, so the
+/// controller falls through to the overridden [posBranchIdProvider].
+class _FakeBranchCache extends BranchCache {
+  @override
+  Future<String?> getCached() async => null;
+
+  @override
+  Future<void> store({required String branchId, String? branchName}) async {}
+}
+
+/// Always-authenticated controller: the offline permission check needs a
+/// live session holding `sale.create` without bootstrapping AppConfig.
+class _FakeAuthController extends AuthController {
+  @override
+  AuthState build() => AuthAuthenticated(_offlineSession());
+}
+
+Session _offlineSession() => Session(
+      user: const AuthUser(
+        id: 'user-1',
+        tenantId: 'tenant-1',
+        email: 'cashier@test.local',
+        fullName: 'Test Cashier',
+        phone: null,
+        isActive: true,
+        emailVerified: true,
+        permissions: ['sale.create'],
+      ),
+      accessTokenExpiresAt: DateTime.now().add(const Duration(hours: 1)),
+    );
 
 void main() {
   late LocalDatabase db;
@@ -87,6 +121,8 @@ void main() {
         sessionJournalProvider.overrideWithValue(journal),
         posBranchIdProvider
             .overrideWithValue(branch ?? (() async => 'branch-1')),
+        branchCacheProvider.overrideWithValue(_FakeBranchCache()),
+        authControllerProvider.overrideWith(() => _FakeAuthController()),
       ]);
 
   test('network failure records the SAME id locally and succeeds', () async {

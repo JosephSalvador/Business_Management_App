@@ -8,7 +8,10 @@ namespace BusinessOS.Domain.Sales;
 /// </summary>
 public sealed class BusinessIdentitySnapshot
 {
-    private BusinessIdentitySnapshot(
+    // Internal rather than private: the source-generated serializer context in this
+    // assembly must be able to call the constructor (SYSLIB1222). Factory stays `Create`.
+    [System.Text.Json.Serialization.JsonConstructor]
+    internal BusinessIdentitySnapshot(
         string businessName,
         string? tin,
         string? vrn,

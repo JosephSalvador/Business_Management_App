@@ -12,13 +12,15 @@ Map<String, dynamic> entitlementJson({
   Object? maxUsers = 3,
   Object? maxProducts = 50,
   Object evaluatedAtUtc = '2026-09-25T10:00:00Z',
+  bool omitEffectiveFeatureKeys = false,
 }) {
   return {
     'status': status,
     'accessLevel': accessLevel,
     'planCode': planCode,
-    'effectiveFeatureKeys':
-        effectiveFeatureKeys ?? ['pos.enabled', 'inventory.enabled'],
+    if (!omitEffectiveFeatureKeys)
+      'effectiveFeatureKeys':
+          effectiveFeatureKeys ?? ['pos.enabled', 'inventory.enabled'],
     'nextDueUtc': nextDueUtc,
     'hasOpenInvoice': hasOpenInvoice,
     'maxBranches': maxBranches,
@@ -104,7 +106,7 @@ void main() {
     test('rejects a missing feature key list', () {
       expect(
         () => SubscriptionEntitlement.fromJson(
-          entitlementJson(effectiveFeatureKeys: null),
+          entitlementJson(omitEffectiveFeatureKeys: true),
         ),
         throwsA(isA<FormatException>()),
       );

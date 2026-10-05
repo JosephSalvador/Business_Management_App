@@ -227,12 +227,21 @@ class CheckoutController extends Notifier<CheckoutState> {
       return _branchId;
     }
 
-    // Try cache first (for offline scenarios)
-    final branchCache = ref.read(branchCacheProvider);
-    final cached = await branchCache.getCached();
-    if (cached != null) {
-      _branchId = cached;
-      return cached;
+    // Try cache first (for offline scenarios). The cache is best-effort:
+    // a storage failure OR a wedged keystore read (thrown error or read
+    // that never answers) must never block a sale — fall through to the
+    // API instead.
+    try {
+      final cached = await ref
+          .read(branchCacheProvider)
+          .getCached()
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      if (cached != null) {
+        _branchId = cached;
+        return cached;
+      }
+    } on Exception {
+      // Cache unreadable — the API path below is the source of truth.
     }
 
     // Fall back to API

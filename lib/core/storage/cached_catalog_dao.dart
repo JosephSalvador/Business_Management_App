@@ -204,9 +204,11 @@ class CachedCatalogDao {
     });
   }
 
+  /// When the product catalog was last fully replaced via [replaceCatalog].
+  /// (`replaceStockBalances` stamps its own `last_stock_refresh` key.)
   Future<DateTime?> lastRefresh() async {
     final row = await (_db.select(_db.metaEntries)
-          ..where((t) => t.key.equals('last_stock_refresh')))
+          ..where((t) => t.key.equals('last_catalog_refresh')))
         .getSingleOrNull();
     return row == null ? null : DateTime.tryParse(row.value)?.toUtc();
   }

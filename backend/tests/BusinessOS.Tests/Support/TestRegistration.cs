@@ -35,10 +35,12 @@ public static class TestRegistration
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
         var doc = JsonDocument.Parse(await login.Content.ReadAsStringAsync()).RootElement;
+        // Login returns the LoginResponse envelope: tokens live under "tokens".
+        var tokens = doc.GetProperty("tokens");
         return (
-            doc.GetProperty("accessToken").ToString(),
-            doc.GetProperty("user").GetProperty("tenantId").ToString(),
-            doc.GetProperty("user").GetProperty("id").ToString());
+            tokens.GetProperty("accessToken").ToString(),
+            tokens.GetProperty("user").GetProperty("tenantId").ToString(),
+            tokens.GetProperty("user").GetProperty("id").ToString());
     }
 
     public static async Task<HttpResponseMessage> RegisterUnverifiedAsync(
@@ -94,9 +96,11 @@ public static class TestRegistration
     public static (string AccessToken, string TenantId) ParseAuthResponse(string json)
     {
         var doc = JsonSerializer.Deserialize<JsonElement>(json);
+        // Login returns the LoginResponse envelope: tokens live under "tokens".
+        var tokens = doc.GetProperty("tokens");
         return (
-            doc.GetProperty("accessToken").ToString(),
-            doc.GetProperty("user").GetProperty("tenantId").ToString());
+            tokens.GetProperty("accessToken").ToString(),
+            tokens.GetProperty("user").GetProperty("tenantId").ToString());
     }
 
     public static BusinessDbContext CreateDbContext()

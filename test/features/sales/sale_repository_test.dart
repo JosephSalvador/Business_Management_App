@@ -202,7 +202,12 @@ void main() {
       final sent =
           jsonDecode(adapter.requests.single.body!) as Map<String, dynamic>;
       expect(sent['lines'], [
-        {'productId': 'p-quick', 'quantity': 1, 'unitPrice': 15000},
+        {
+          'productId': 'p-quick',
+          'quantity': 1.0,
+          'unitPrice': 15000.0,
+          'productName': 'Uza Haraka',
+        },
       ]);
     });
 

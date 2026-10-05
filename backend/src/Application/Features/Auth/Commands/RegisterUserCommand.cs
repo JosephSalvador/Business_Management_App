@@ -3,6 +3,7 @@ using BusinessOS.Application.Features.Auth.Services;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Billing;
+using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Shared;
@@ -28,6 +29,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
     private readonly IUserRepository _users;
     private readonly IAuditLogRepository _auditLogs;
     private readonly ISubscriptionRepository _subscriptions;
+    private readonly IFeatureFlagRepository _flags;
     private readonly IPasswordHasher _passwordHasher;
     private readonly EmailVerificationService _verification;
     private readonly IOptions<PaymentsOptions> _paymentsOptions;
@@ -40,6 +42,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         IUserRepository users,
         IAuditLogRepository auditLogs,
         ISubscriptionRepository subscriptions,
+        IFeatureFlagRepository flags,
         IPasswordHasher passwordHasher,
         EmailVerificationService verification,
         IOptions<PaymentsOptions> paymentsOptions)
@@ -51,6 +54,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         _users = users;
         _auditLogs = auditLogs;
         _subscriptions = subscriptions;
+        _flags = flags;
         _passwordHasher = passwordHasher;
         _verification = verification;
         _paymentsOptions = paymentsOptions;
@@ -136,6 +140,16 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         // Free 14-day Pro trial starts at registration (M13 monetization).
         await _subscriptions.AddAsync(
             Subscription.StartTrial(tenant.Id), cancellationToken);
+
+        // All module flags start enabled; owners narrow them later in settings.
+        // Without rows here the entitlement intersection is empty and every
+        // module-gated write 403s even during the trial (mirrors provisioning).
+        foreach (var key in FeatureKeys.All)
+        {
+            await _flags.AddAsync(
+                FeatureFlag.Create(tenant.Id, key, isEnabled: true),
+                cancellationToken);
+        }
 
         // No session is issued until the email address is verified.
         await _verification.IssueAsync(user, cancellationToken);

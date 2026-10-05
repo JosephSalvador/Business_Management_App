@@ -229,7 +229,12 @@ void main() {
       final op = await queue.claimNext(now: DateTime.now().toUtc());
       final payload = op!.decodedPayload;
       expect(payload['lines'], [
-        {'productId': 'p-quick', 'quantity': 1, 'unitPrice': 15000},
+        {
+          'productId': 'p-quick',
+          'quantity': 1.0,
+          'unitPrice': 15000.0,
+          'productName': 'Uza Haraka',
+        },
       ]);
 
       final sale = await sales.byClientSaleId(recorded.clientSaleId);

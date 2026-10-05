@@ -158,6 +158,9 @@ class FakeAuthRepository implements AuthRepository {
     pinUnlockCalls++;
     final error = pinUnlockError;
     if (error != null) throw error;
+    // Mirror the real repository: the PIN is verified against the store
+    // before the trusted session is released.
+    await store.verifyUnlockPin(pin);
     return pinUnlockResult;
   }
 

@@ -125,7 +125,7 @@ public sealed class AuthFlowTests : IClassFixture<BusinessOsApiFactory>, IAsyncL
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         var doc = Body(await login.Content.ReadAsStringAsync());
-        var originalRefresh = GetProperty(doc, "refreshToken");
+        var originalRefresh = GetProperty(doc, "tokens", "refreshToken");
 
         var first = await _client.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = originalRefresh });
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);

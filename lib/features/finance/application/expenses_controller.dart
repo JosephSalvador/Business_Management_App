@@ -123,7 +123,9 @@ class ExpensesController extends Notifier<ExpensesState> {
       items: result.items,
       total: result.total,
       page: page,
-      hasMore: result.items.length < result.total,
+      // items.length is the size of THIS page, not the loaded total — a
+      // short last page (5 < 25) must still end pagination.
+      hasMore: page * expensePageSize < result.total,
       search: _search,
       fromDate: _fromDate,
       toDate: _toDate,

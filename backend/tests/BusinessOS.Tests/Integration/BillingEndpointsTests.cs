@@ -72,7 +72,8 @@ public sealed class BillingEndpointsTests : IClassFixture<BusinessOsApiFactory>,
         var login = await _client.PostAsJsonAsync(
             "/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        return Body(await login.Content.ReadAsStringAsync()).GetProperty("accessToken").GetString()!;
+        return Body(await login.Content.ReadAsStringAsync())
+            .GetProperty("tokens").GetProperty("accessToken").GetString()!;
     }
 
     private void Authorize(string token) =>

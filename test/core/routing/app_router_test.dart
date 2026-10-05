@@ -22,13 +22,13 @@ AuthAuthenticated authed() => AuthAuthenticated(Session(
           ),
     ));
 
-Workspace workspace(String id) => Workspace(
+Workspace workspace(String id, {bool onboardingComplete = true}) => Workspace(
       id: id,
       name: 'Biz $id',
       currency: 'TZS',
       countryCode: 'TZ',
       businessType: null,
-      onboardingComplete: false,
+      onboardingComplete: onboardingComplete,
       roles: const ['Administrator'],
     );
 
@@ -216,6 +216,31 @@ void main() {
       expect(
         journeyRedirect(
             auth: authed(), workspace: workspaceState, path: Routes.picker),
+        isNull,
+      );
+    });
+
+    test('selection with incomplete onboarding is pinned to business setup',
+        () {
+      final workspaceState = WorkspaceReady(
+        workspaces: [workspace('a', onboardingComplete: false)],
+        selected: workspace('a', onboardingComplete: false),
+      );
+      expect(
+        journeyRedirect(
+            auth: authed(), workspace: workspaceState, path: Routes.home),
+        Routes.createBusiness,
+      );
+      expect(
+        journeyRedirect(
+            auth: authed(),
+            workspace: workspaceState,
+            path: Routes.createBusiness),
+        isNull,
+      );
+      expect(
+        journeyRedirect(
+            auth: authed(), workspace: workspaceState, path: Routes.setup),
         isNull,
       );
     });

@@ -102,7 +102,7 @@ public sealed class IdentityEndpointsTests : IClassFixture<BusinessOsApiFactory>
 
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = user.Email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        return GetProperty(Body(await login.Content.ReadAsStringAsync()), "accessToken");
+        return GetProperty(Body(await login.Content.ReadAsStringAsync()), "tokens", "accessToken");
     }
 
     private async Task<Guid> GetAdminRoleIdAsync(Guid tenantId)

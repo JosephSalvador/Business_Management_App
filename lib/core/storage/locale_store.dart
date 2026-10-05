@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -51,10 +52,13 @@ class LocaleController extends Notifier<Locale> {
     }
   }
 
-  /// Matches the device locale against supported locales. Falls back to
+  static Locale get _deviceLocale =>
+      resolveDeviceLocale(PlatformDispatcher.instance.locale);
+
+  /// Matches a device locale against supported locales. Falls back to
   /// Swahili if the device language is not supported.
-  static Locale get _deviceLocale {
-    final deviceLocale = PlatformDispatcher.instance.locale;
+  @visibleForTesting
+  static Locale resolveDeviceLocale(Locale deviceLocale) {
     final match = supported.where(
       (locale) => locale.languageCode == deviceLocale.languageCode,
     );

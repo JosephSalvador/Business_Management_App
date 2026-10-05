@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jolinx_app/app/theme/app_theme.dart';
 import 'package:jolinx_app/features/authentication/presentation/pages/register_page.dart';
 import 'package:jolinx_app/features/authentication/presentation/widgets/password_field.dart';
 
 Widget _host(Widget child) => ProviderScope(
-      child: MaterialApp(home: Scaffold(body: child)),
+      // The app theme registers AppSemanticColors, which widgets such as
+      // PasswordStrengthMeter read via Theme.of(context).extension.
+      child: MaterialApp(theme: AppTheme.lightTheme, home: Scaffold(body: child)),
     );
 
 void main() {

@@ -128,7 +128,7 @@ public sealed class TotpServiceTests
         var uri = _totp.GetProvisioningUri(secret, "owner@shop.test", "Business OS");
 
         Assert.StartsWith("otpauth://totp/", uri);
-        Assert.Contains("secret=$secret", uri);
+        Assert.Contains($"secret={secret}", uri);
         Assert.Contains("issuer=Business%20OS", uri);
         Assert.Contains("algorithm=SHA1", uri);
         Assert.Contains("digits=6", uri);

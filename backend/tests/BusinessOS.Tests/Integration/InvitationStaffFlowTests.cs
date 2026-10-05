@@ -233,7 +233,7 @@ public sealed class InvitationStaffFlowTests : IClassFixture<BusinessOsApiFactor
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         var loginDoc = Body(await login.Content.ReadAsStringAsync());
-        Assert.Equal(ownerTenantId, GetProperty(loginDoc, "user", "tenantId"));
+        Assert.Equal(ownerTenantId, GetProperty(loginDoc, "tokens", "user", "tenantId"));
 
         var permissions = loginDoc.GetProperty("user").GetProperty("permissions")
             .EnumerateArray().Select(p => p.ToString()).ToArray();

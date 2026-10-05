@@ -146,7 +146,7 @@ public sealed class PlatformHardeningTests : IClassFixture<BusinessOsApiFactory>
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         var loginDoc = System.Text.Json.JsonDocument.Parse(await login.Content.ReadAsStringAsync()).RootElement;
-        var refreshToken = loginDoc.GetProperty("refreshToken").GetString()!;
+        var refreshToken = loginDoc.GetProperty("tokens").GetProperty("refreshToken").GetString()!;
 
         var revoke = await _client.PostAsJsonAsync("/api/v1/auth/revoke", new { refreshToken });
         Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);

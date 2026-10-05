@@ -12,6 +12,8 @@ import 'package:jolinx_app/core/storage/tables.dart';
 import 'package:jolinx_app/core/network/app_exception.dart';
 import 'package:jolinx_app/core/network/connectivity_monitor.dart';
 import 'package:jolinx_app/app/router.dart';
+import 'package:jolinx_app/features/inventory/application/stock_controller.dart';
+import 'package:jolinx_app/features/inventory/data/inventory_providers.dart';
 import 'package:jolinx_app/features/products/data/product_repository.dart';
 import 'package:jolinx_app/features/products/domain/product.dart';
 import 'package:jolinx_app/features/sales/domain/sale.dart';
@@ -43,6 +45,14 @@ class _OfflineProductRepository extends FakeProductRepository {
   Future<PagedProducts> list(
           {int page = 1, int pageSize = 50, String? search}) =>
       throw NetworkException();
+}
+
+/// The real StockController pulls a live InventoryRepository (ApiClient →
+/// AppConfig) on load; the POS flow does not assert stock rows, so loading
+/// is a no-op here.
+class _FakeStockController extends StockController {
+  @override
+  Future<void> load() async {}
 }
 
 Widget _app({
@@ -83,6 +93,7 @@ Widget _app({
       sessionContextProvider.overrideWithValue(const ('tenant-1', 'user-1')),
       connectionQualityProvider.overrideWithValue(ConnectionQuality.online),
       posBranchIdProvider.overrideWithValue(() async => 'branch-1'),
+      stockControllerProvider.overrideWith(() => _FakeStockController()),
     ],
     child: MaterialApp.router(routerConfig: router),
   );
@@ -109,20 +120,25 @@ void main() {
       await tester.tap(find.text('Mchele'));
       await tester.pump();
       expect(find.text('1 bidhaa'), findsOneWidget);
-      expect(find.text('TSh 2,500'), findsNWidgets(2));
+      // Card price + cart-bar line + cart-bar total.
+      expect(find.text('TSh 2,500'), findsNWidgets(3));
 
       // Open the payment sheet and pay cash.
       await tester.tap(find.widgetWithText(FilledButton, 'Lipa').first);
       await tester.pumpAndSettle();
-      expect(find.text('Jumla'), findsOneWidget);
-      expect(find.text('Njia ya malipo:'), findsOneWidget);
+      // Sheet title + total row both read "Jumla".
+      expect(find.text('Jumla'), findsNWidgets(2));
+      expect(find.text('Njia ya malipo'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Cash'));
+      await tester.tap(find.text('Fedha'));
       await tester.pump();
       await tester.tap(find.widgetWithText(FilledButton, 'Lipa').last);
       // No pumpAndSettle here: the submitting spinner would never settle.
+      // (The best-effort branch-cache read takes up to 2s to time out in
+      // tests, where secure storage never answers.)
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
 
       // Success screen replaces the POS with server-truth numbers.
@@ -188,12 +204,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    // Offline banner + product served purely from cache.
-    expect(
-      find.text(
-          'Offline — Mauzo yataendelea. Yatasawazishwa internet ikirudi.'),
-      findsOneWidget,
-    );
+    // Compact offline indicator (the long banner was removed in M9.2) +
+    // product served purely from cache.
+    expect(find.byIcon(Icons.wifi_off), findsOneWidget);
     expect(find.text('Mchele'), findsOneWidget);
     expect(find.text('TSh 2,500'), findsOneWidget);
   });

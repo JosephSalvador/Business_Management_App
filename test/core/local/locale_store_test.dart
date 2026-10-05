@@ -62,11 +62,23 @@ void main() {
   });
 
   group('LocaleController', () {
-    test('defaults to Swahili — the product is Swahili-first', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      final controller = container.read(localeControllerProvider.notifier);
-      expect(controller.state.languageCode, 'sw');
+    test('defaults to the device language when it is supported', () {
+      expect(
+        LocaleController.resolveDeviceLocale(const Locale('en')).languageCode,
+        'en',
+      );
+      expect(
+        LocaleController.resolveDeviceLocale(const Locale('sw')).languageCode,
+        'sw',
+      );
+    });
+
+    test('falls back to Swahili when the device language is not supported',
+        () {
+      expect(
+        LocaleController.resolveDeviceLocale(const Locale('fr')).languageCode,
+        'sw',
+      );
     });
 
     test('restore applies a stored preference', () {
@@ -81,11 +93,12 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final controller = container.read(localeControllerProvider.notifier);
+      final initial = controller.state;
       controller.restore(null);
-      expect(controller.state.languageCode, 'sw');
+      expect(controller.state, initial);
 
       controller.restore('fr');
-      expect(controller.state.languageCode, 'sw',
+      expect(controller.state, initial,
           reason: 'only supported locales may be applied');
     });
 

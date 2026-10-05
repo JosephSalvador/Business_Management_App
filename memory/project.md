@@ -1280,6 +1280,37 @@ All fixed minimally. **Verified:** `dotnet build --warnaserror` clean
 Running both suites is the immediate next task — M13/M13.1/M13.2 logic has
 never been executed by any test.
 
+## Mx First-ever full verification of M9.2→M13.2 (done 2026-10-05)
+
+First complete test pass over the code-only milestones. Flutter: 31 failures →
+**493/493 green**. Backend: 161 failures → targeted batches green (receipt+TOTP
+25/25); full-suite re-run in progress at push time.
+
+**Real production bugs found (the suites earned their keep):**
+1. **`RegisterUserCommand` never seeded `FeatureFlag` rows** — every self-registered
+   tenant got an empty entitlement intersection, so ALL module-gated writes
+   (products/sales/inventory…) 403'd even during the full-access trial. Masked for
+   weeks because integration tests failed earlier at the login parse. Fixed by
+   mirroring `TenantProvisioningCommands`' flag seeding (`FeatureKeys.All`, enabled).
+2. **`BusinessIdentitySnapshot` not deserializable** — private ctor invisible to the
+   source-gen `JsonContext` → receipt reprints 500. Now `internal` + `[JsonConstructor]`.
+3. **`SeedDefaultLayout` returned a bare JSON string**; client+tests expect `{ value }`
+   → now returns `SeedDefaultLayoutResult`.
+4. **Branch-cache secure-storage read could hang checkout forever** (wedged keystore;
+   in tests the plugin never answers). Now best-effort: 2s timeout + API fallthrough.
+5. **Expenses `hasMore` used page size vs total** → infinite pagination. Now offset-based.
+
+**Test-side drift:** login envelope (`tokens.*`) updated across 14 backend test
+files (`LoginResponse` replaced flat `AuthResponse` at login; refresh stays flat);
+Flutter — stale quick-sale payloads (decimal qty + `productName`, matches backend),
+locale default now device-locale w/ Swahili fallback (`resolveDeviceLocale` seam),
+router onboarding-complete gate coverage, UI-drift assertions (Jumla ×2, Fedha,
+wifi_off indicator, price ×3), missing fakes (`_FakeBranchCache`,
+`_FakeAuthController`, `_FakeStockController`), theme extension in widget host,
+billing fixture omit-switch, TOTP test missing `$` interpolation, inverted
+`isReprint` expectation (preview semantic = printCount > 0). Load-flake candidates
+(register 500s, Npgsql timeouts) noted on the 2h40m run — watch on re-runs.
+
 ## technical_debt.md
 
 - Flutter app: SharedPreferences + in-memory mocks still drive auth/products/sales; Drift DB

@@ -10,9 +10,12 @@ namespace BusinessOS.Application.Features.Receipts.Commands;
 /// Seeds the default thermal 80mm receipt layout for a tenant. Called during onboarding or
 /// when a tenant first uses the POS. Idempotent: no-ops if the layout already exists.
 /// </summary>
-public sealed record SeedDefaultLayoutCommand : IRequest<Result<Guid>>;
+public sealed record SeedDefaultLayoutCommand : IRequest<Result<SeedDefaultLayoutResult>>;
 
-public sealed class SeedDefaultLayoutCommandHandler : IRequestHandler<SeedDefaultLayoutCommand, Result<Guid>>
+/// <summary>Contract: <c>{ "value": "&lt;layout row id&gt;" }</c> — clients read the id by name.</summary>
+public sealed record SeedDefaultLayoutResult(string Value);
+
+public sealed class SeedDefaultLayoutCommandHandler : IRequestHandler<SeedDefaultLayoutCommand, Result<SeedDefaultLayoutResult>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IReceiptLayoutRepository _layouts;
@@ -25,14 +28,14 @@ public sealed class SeedDefaultLayoutCommandHandler : IRequestHandler<SeedDefaul
         _layouts = layouts;
     }
 
-    public async Task<Result<Guid>> Handle(SeedDefaultLayoutCommand request, CancellationToken cancellationToken)
+    public async Task<Result<SeedDefaultLayoutResult>> Handle(SeedDefaultLayoutCommand request, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
 
         var existing = await _layouts.GetActiveAsync(tenantId, Thermal80mmDefaults.LayoutId, cancellationToken);
         if (existing is not null)
         {
-            return existing.Id;
+            return new SeedDefaultLayoutResult(existing.Id.ToString());
         }
 
         var layout = ReceiptLayout.Create(
@@ -43,7 +46,7 @@ public sealed class SeedDefaultLayoutCommandHandler : IRequestHandler<SeedDefaul
             styling: JsonDocument.Parse(Thermal80mmDefaults.Styling));
 
         await _layouts.AddAsync(layout, cancellationToken);
-        return layout.Id;
+        return new SeedDefaultLayoutResult(layout.Id.ToString());
     }
 }
 
