@@ -43,6 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.kotlin/
+/android/build/
 
 # Environment overrides (never commit real environment config)
 .env
@@ -56,4 +58,5 @@ app.*.map.json
 TestResults/
 **/appsettings.Development.json
 **/appsettings.Local.json
+**/appsettings.LocalPreProduction.json
 backend/run-backend.sh
