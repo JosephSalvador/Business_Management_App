@@ -31,7 +31,6 @@ permissions:
   contents: write
 
 env:
-  FLUTTER_VERSION: '3.41.0'
   API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL || 'https://api.joberthix.xyz' }}
   API_FALLBACK_URL: ${{ inputs.api_fallback_url || vars.API_FALLBACK_URL || 'https://jolinx-api.onrender.com' }}
 
@@ -47,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -60,11 +59,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.3'
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies & generate localizations
+      - name: Generate production .env, install dependencies & localizations
         run: |
+          printf "APP_ENV=production\nAPI_BASE_URL=%s\nAPI_FALLBACK_URL=%s\n" "${{ env.API_BASE_URL }}" "${{ env.API_FALLBACK_URL }}" > .env
           flutter pub get
           flutter gen-l10n
 
@@ -117,11 +118,17 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.3'
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies & generate localizations
+      - name: Generate production .env, install dependencies & localizations
         run: |
+          @(
+            "APP_ENV=production"
+            "API_BASE_URL=${{ env.API_BASE_URL }}"
+            "API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}"
+          ) | Set-Content -Path .env -Encoding UTF8
           flutter pub get
           flutter gen-l10n
 
@@ -152,11 +159,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.3'
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies & generate localizations
+      - name: Generate production .env, install dependencies & localizations
         run: |
+          printf "APP_ENV=production\nAPI_BASE_URL=%s\nAPI_FALLBACK_URL=%s\n" "${{ env.API_BASE_URL }}" "${{ env.API_FALLBACK_URL }}" > .env
           flutter pub get
           flutter gen-l10n
 
