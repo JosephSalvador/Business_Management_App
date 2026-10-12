@@ -175,7 +175,7 @@ jobs:
             --dart-define=APP_ENV=production \
             --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
             --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
-          cd build/macos/Build/Products/Release && zip -r ../../../../../jolinx-macos.zip jolinx_app.app
+          cd build/macos/Build/Products/Release && zip -r ../../../../../jolinx-macos.zip business_app.app
 
       - name: Build iOS Release (Unsigned IPA)
         run: |

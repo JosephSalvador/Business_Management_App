@@ -13,7 +13,6 @@ import 'package:jolinx_app/core/network/app_exception.dart';
 import 'package:jolinx_app/core/network/connectivity_monitor.dart';
 import 'package:jolinx_app/app/router.dart';
 import 'package:jolinx_app/features/inventory/application/stock_controller.dart';
-import 'package:jolinx_app/features/inventory/data/inventory_providers.dart';
 import 'package:jolinx_app/features/products/data/product_repository.dart';
 import 'package:jolinx_app/features/products/domain/product.dart';
 import 'package:jolinx_app/features/sales/domain/sale.dart';
