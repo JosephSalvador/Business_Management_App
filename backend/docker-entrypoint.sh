@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Render sets PORT (default 10000); default to 8080 if not provided.
-export ASPNETCORE_URLS="http://0.0.0.0:${PORT:-8080}"
+# Render/Koyeb set PORT explicitly; Hugging Face Spaces defaults to 7860.
+export ASPNETCORE_URLS="http://0.0.0.0:${PORT:-7860}"
 export ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Production}"
 export DOTNET_ENVIRONMENT="${DOTNET_ENVIRONMENT:-$ASPNETCORE_ENVIRONMENT}"
+export HOME="${HOME:-/tmp}"
 
-# Keep GC memory footprint bounded inside 512 MB free-tier containers.
+# Keep GC memory footprint bounded inside free-tier containers.
 export DOTNET_gcServer=0
 
 echo "Starting BusinessOS.Workers in background..."

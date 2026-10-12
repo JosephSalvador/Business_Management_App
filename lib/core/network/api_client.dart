@@ -62,13 +62,15 @@ class ApiClient {
     required TokenRefresher refresher,
     Dio? dio,
   })  : _tokenStore = tokenStore,
-        _refresher = refresher {
+        _refresher = refresher,
+        _primaryBaseUrl = config.apiBaseUrl.toString(),
+        _fallbackBaseUrl = config.apiFallbackUrl?.toString() {
     _dio = dio ??
         Dio(
           BaseOptions(
             baseUrl: config.apiBaseUrl.toString(),
-            connectTimeout: const Duration(seconds: 15),
-            receiveTimeout: const Duration(seconds: 30),
+            connectTimeout: const Duration(seconds: 45),
+            receiveTimeout: const Duration(seconds: 60),
             sendTimeout: const Duration(seconds: 30),
             headers: {
               'Accept': 'application/json',
@@ -85,6 +87,8 @@ class ApiClient {
 
   final TokenStore _tokenStore;
   final TokenRefresher _refresher;
+  final String _primaryBaseUrl;
+  final String? _fallbackBaseUrl;
   late final Dio _dio;
 
   /// Set by the auth layer so it can route the user back to login when the
@@ -98,6 +102,9 @@ class ApiClient {
   Future<void>? _paymentRequiredInFlight;
 
   Dio get dio => _dio;
+
+  /// The currently active base URL (primary or fallback after failover).
+  String get activeBaseUrl => _dio.options.baseUrl;
 
   Future<Response<T>> get<T>(
     String path, {
@@ -172,11 +179,43 @@ class ApiClient {
     try {
       return await request();
     } on DioException catch (error) {
+      if (_canFailover(error)) {
+        _switchActiveHost();
+        try {
+          return await request();
+        } on DioException catch (retryError) {
+          if (retryError.response?.statusCode == 402) {
+            await _notifyPaymentRequired();
+          }
+          throw mapDioException(retryError);
+        }
+      }
       if (error.response?.statusCode == 402) {
         await _notifyPaymentRequired();
       }
       throw mapDioException(error);
     }
+  }
+
+  bool _canFailover(DioException error) {
+    final fallback = _fallbackBaseUrl;
+    if (fallback == null || fallback.isEmpty || fallback == _primaryBaseUrl) {
+      return false;
+    }
+    final status = error.response?.statusCode;
+    if (status == 502 || status == 503 || status == 504) {
+      return true;
+    }
+    return error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout;
+  }
+
+  void _switchActiveHost() {
+    final fallback = _fallbackBaseUrl;
+    if (fallback == null || fallback.isEmpty) return;
+    _dio.options.baseUrl =
+        _dio.options.baseUrl == _primaryBaseUrl ? fallback : _primaryBaseUrl;
   }
 
   Future<void> _attachAuth(

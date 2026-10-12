@@ -1,0 +1,225 @@
+name: Build All Client Platforms
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'Primary Production HTTPS API Base URL'
+        required: true
+        default: 'https://api.joberthix.xyz'
+      api_fallback_url:
+        description: 'Fallback Production HTTPS API Base URL'
+        required: false
+        default: 'https://jolinx-api.onrender.com'
+  push:
+    branches:
+      - feature/mobile-pos-foundation
+      - main
+    paths:
+      - 'lib/**'
+      - 'assets/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'web/**'
+      - 'windows/**'
+      - 'linux/**'
+      - 'macos/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/build-clients.yml'
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.41.0'
+  API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL || 'https://api.joberthix.xyz' }}
+  API_FALLBACK_URL: ${{ inputs.api_fallback_url || vars.API_FALLBACK_URL || 'https://jolinx-api.onrender.com' }}
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. Android APK + Web Bundle + Linux Desktop (Ubuntu Runner)
+  # ──────────────────────────────────────────────────────────────────────────
+  build-android-web-linux:
+    name: Build Android, Web & Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Linux Desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies & generate localizations
+        run: |
+          flutter pub get
+          flutter gen-l10n
+
+      - name: Analyze Flutter code
+        run: flutter analyze --no-pub
+
+      - name: Build Android Release APK (arm64)
+        run: |
+          flutter build apk --release --target-platform android-arm64 \
+            --dart-define=APP_ENV=production \
+            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
+            --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
+          cp build/app/outputs/flutter-apk/app-release.apk jolinx-android.apk
+
+      - name: Build Flutter Web Release
+        run: |
+          flutter build web --release \
+            --dart-define=APP_ENV=production \
+            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
+            --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
+          cd build/web && zip -r ../../jolinx-web.zip .
+
+      - name: Build Linux Desktop Release
+        run: |
+          flutter build linux --release \
+            --dart-define=APP_ENV=production \
+            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
+            --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
+          tar -czf jolinx-linux-x64.tar.gz -C build/linux/x64/release/bundle .
+
+      - name: Upload Android, Web & Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jolinx-android-web-linux
+          path: |
+            jolinx-android.apk
+            jolinx-web.zip
+            jolinx-linux-x64.tar.gz
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. Windows Desktop (Windows Runner)
+  # ──────────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows Desktop
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies & generate localizations
+        run: |
+          flutter pub get
+          flutter gen-l10n
+
+      - name: Build Windows Release
+        run: |
+          flutter build windows --release `
+            --dart-define=APP_ENV=production `
+            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} `
+            --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath jolinx-windows-x64.zip
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jolinx-windows
+          path: jolinx-windows-x64.zip
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3. macOS Desktop & iOS Unsigned IPA (macOS Runner)
+  # ──────────────────────────────────────────────────────────────────────────
+  build-apple:
+    name: Build macOS & iOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies & generate localizations
+        run: |
+          flutter pub get
+          flutter gen-l10n
+
+      - name: Build macOS Desktop Release
+        run: |
+          flutter build macos --release \
+            --dart-define=APP_ENV=production \
+            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
+            --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
+          cd build/macos/Build/Products/Release && zip -r ../../../../../jolinx-macos.zip jolinx_app.app
+
+      - name: Build iOS Release (Unsigned IPA)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=APP_ENV=production \
+            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
+            --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r jolinx-ios-unsigned.ipa Payload
+
+      - name: Upload macOS & iOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jolinx-apple
+          path: |
+            jolinx-macos.zip
+            jolinx-ios-unsigned.ipa
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4. Publish All 6 Bundles to GitHub Releases
+  # ──────────────────────────────────────────────────────────────────────────
+  publish-release:
+    name: Publish to GitHub Release
+    needs: [build-android-web-linux, build-windows, build-apple]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create or Update Latest GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Jolinx Business OS — Latest Multi-Platform Build"
+          body: |
+            Automated multi-platform production release with multi-cloud failover:
+            - **Primary API:** `${{ env.API_BASE_URL }}`
+            - **Fallback API:** `${{ env.API_FALLBACK_URL }}`
+            - **Android Phone/POS:** `jolinx-android.apk`
+            - **Windows PC:** `jolinx-windows-x64.zip`
+            - **Web Bundle:** `jolinx-web.zip`
+            - **Linux Desktop:** `jolinx-linux-x64.tar.gz`
+            - **macOS Desktop:** `jolinx-macos.zip`
+            - **iOS (Unsigned IPA):** `jolinx-ios-unsigned.ipa`
+          prerelease: false
+          files: |
+            dist/jolinx-android.apk
+            dist/jolinx-web.zip
+            dist/jolinx-linux-x64.tar.gz
+            dist/jolinx-windows-x64.zip
+            dist/jolinx-macos.zip
+            dist/jolinx-ios-unsigned.ipa

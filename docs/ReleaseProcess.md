@@ -44,4 +44,6 @@ YYYY-MM-DD  v0.1.0  Phase 0 foundation
 
 1. Bump version in csproj + pubspec + changelog.
 2. Run full backend + frontend check suites.
-4. Deploy via `render.yaml` (`backend/Dockerfile`) + managed PostgreSQL 17 (e.g. Neon.tech), then build the Flutter release APK with `--dart-define=APP_ENV=production --dart-define=API_BASE_URL=https://<your-service>.onrender.com`.
+3. Deploy primary + backup backends using the universal `Dockerfile` (compatible with Render, Hugging Face Spaces, and Koyeb) connected to managed PostgreSQL 17 (Neon.tech), fronted by `deploy/cloudflare-failover-worker.js` at `https://api.joberthix.xyz`.
+4. Push to GitHub or trigger `.github/workflows/build-clients.yml` to build all 6 client platforms (Android, Web, Windows, Linux, macOS, iOS) with `--dart-define=APP_ENV=production --dart-define=API_BASE_URL=https://api.joberthix.xyz --dart-define=API_FALLBACK_URL=https://jolinx-api.onrender.com`.
+5. Nightly PostgreSQL disaster recovery backups run via `.github/workflows/db-backup.yml` (`pg_dump` custom compressed format retained for 90 days).

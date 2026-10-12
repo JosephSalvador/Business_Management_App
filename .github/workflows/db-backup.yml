@@ -1,0 +1,53 @@
+name: Nightly PostgreSQL Disaster Recovery Backup
+
+on:
+  schedule:
+    # Runs every night at 00:00 UTC (03:00 EAT)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pg-dump-backup:
+    name: Backup Neon PostgreSQL Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if DATABASE_URL secret is configured
+        id: check-secret
+        env:
+          DB_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::DATABASE_URL secret is not set yet. Add it in GitHub Settings -> Secrets -> Actions to enable automated nightly pg_dump backups."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install PostgreSQL 17 Client
+        if: steps.check-secret.outputs.configured == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run pg_dump compressed backup
+        if: steps.check-secret.outputs.configured == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
+          BACKUP_FILE="jolinx-db-backup-${TIMESTAMP}.dump"
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --compress=9 --file="$BACKUP_FILE"
+          ls -lh "$BACKUP_FILE"
+          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_OUTPUT"
+        id: dump
+
+      - name: Upload 90-day Encrypted Artifact Backup
+        if: steps.check-secret.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jolinx-db-backup-${{ github.run_number }}
+          path: ${{ steps.dump.outputs.backup_file }}
+          retention-days: 90

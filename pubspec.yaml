@@ -64,6 +64,7 @@ flutter:
   generate: true
   assets:
     - .env
+    - assets/images/jolinx_logo.png
   fonts:
     - family: VT323
       fonts:

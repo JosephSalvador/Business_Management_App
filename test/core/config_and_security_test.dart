@@ -28,8 +28,21 @@ void main() {
       final config = AppConfig.forTest(
         environment: AppEnvironment.production,
         apiBaseUrl: Uri.parse('https://api.jolinx.example'),
+        apiFallbackUrl: Uri.parse('https://backup.jolinx.example'),
       );
       expect(config.apiBaseUrl.scheme, 'https');
+      expect(config.apiFallbackUrl?.scheme, 'https');
+    });
+
+    test('rejects plain http fallback url outside dev', () {
+      expect(
+        () => AppConfig.forTest(
+          environment: AppEnvironment.production,
+          apiBaseUrl: Uri.parse('https://api.jolinx.example'),
+          apiFallbackUrl: Uri.parse('http://backup.jolinx.example'),
+        ),
+        throwsStateError,
+      );
     });
   });
 

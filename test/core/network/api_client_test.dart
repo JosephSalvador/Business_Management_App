@@ -284,4 +284,40 @@ void main() {
     expect(notified, 1, reason: 'the 402 notification must be single-flight');
     expect(scripted.requests, hasLength(2));
   }, timeout: const Timeout(Duration(seconds: 30)));
+
+  test('automatically fails over to fallback URL on 503 and pins active host',
+      () async {
+    final failoverConfig = AppConfig.forTest(
+      environment: AppEnvironment.dev,
+      apiBaseUrl: Uri.parse('http://primary.local'),
+      apiFallbackUrl: Uri.parse('http://backup.local'),
+    );
+    final failoverDio = Dio(BaseOptions(baseUrl: 'http://primary.local'));
+    final scripted = ScriptedAdapter(const [
+      ScriptedResponse(503, '{"title":"Service Unavailable"}'),
+      ScriptedResponse(200, '{"status":"ok_from_backup"}'),
+      ScriptedResponse(200, '{"status":"second_call_from_backup"}'),
+    ]);
+    failoverDio.httpClientAdapter = scripted;
+    final failoverClient = ApiClient(
+      config: failoverConfig,
+      tokenStore: store,
+      refresher: (_) async => throw UnauthorizedException(),
+      dio: failoverDio,
+    );
+
+    final firstResponse = await failoverClient.get<dynamic>('/api/v1/ping');
+    expect(firstResponse.statusCode, 200);
+    expect(firstResponse.data, {'status': 'ok_from_backup'});
+    expect(failoverClient.activeBaseUrl, 'http://backup.local');
+    expect(scripted.requests, hasLength(2));
+    expect(scripted.requests[0].path, 'http://primary.local/api/v1/ping');
+    expect(scripted.requests[1].path, 'http://backup.local/api/v1/ping');
+
+    // Subsequent calls use the pinned backup host directly without hitting primary first.
+    final secondResponse = await failoverClient.get<dynamic>('/api/v1/ping');
+    expect(secondResponse.statusCode, 200);
+    expect(scripted.requests, hasLength(3));
+    expect(scripted.requests[2].path, 'http://backup.local/api/v1/ping');
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }

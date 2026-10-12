@@ -23,12 +23,12 @@ RUN dotnet publish src/Workers/BusinessOS.Workers.csproj -c Release -o /app/work
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-RUN mkdir -p /app/storage
+RUN mkdir -p /app/storage && chmod -R 777 /app/storage
 
 COPY --from=build /app/api /app/api
 COPY --from=build /app/workers /app/workers
 COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-EXPOSE 8080
+EXPOSE 7860 8080 10000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

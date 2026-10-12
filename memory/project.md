@@ -1342,3 +1342,27 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
 - `backend/src/API/Program.cs`: extended startup auto-migration + platform bootstrap seeding (`createDemoTenant: false`) to `Production` alongside `LocalPreProduction`.
 - Added `backend/Dockerfile`, `backend/docker-entrypoint.sh`, `backend/.dockerignore`, and root `render.yaml` to run both `BusinessOS.Workers` and `BusinessOS.API` inside a single 512 MB free-tier container (`DOTNET_gcServer=0`).
 - Verified Release build (`-warnaserror`) for both `BusinessOS.API` and `BusinessOS.Workers`: 0 warnings, 0 errors.
+
+## Mx Option 2 Brand Logo + Animated Splash + Live Cloud APK (done 2026-10-12)
+
+- **Logo (Option 2 — "Rising Growth J"):** generated and installed across Android (`mipmap-mdpi` through `mipmap-xxxhdpi`), iOS (`AppIcon.appiconset`), Web (`web/icons/*` + `web/favicon.png`), and `assets/images/jolinx_logo.png` (registered in `pubspec.yaml`).
+- **Animated Splash Screen (`lib/features/onboarding/presentation/pages/splash_page.dart`):** replaced static `'JO'` box with `_AnimatedSplashView` + `_RisingGrowthJLogoPainter` (`CustomPainter`) featuring a 1450ms choreographed multi-stage vector entrance (elastic royal-blue card, sequential rising white/emerald bars, sweeping J-curve + ascending arrowhead, wordmark + Swahili tagline slide-in, and ambient pulse).
+- **Tests:** added `test/features/onboarding/splash_page_test.dart` (2/2 passing); `flutter analyze` 0 issues; `dart format` clean.
+- **Production Cloud Deployment & APK:** backend live at `https://jolinx-api.onrender.com` backed by Neon PostgreSQL 17 (`/health/live` and `/health/ready` both `Healthy`); built `build/app/outputs/flutter-apk/app-release.apk` (30.1 MB `android-arm64`) with `--dart-define=APP_ENV=production --dart-define=API_BASE_URL=https://jolinx-api.onrender.com`.
+
+## Mx $0 Multi-Cloud High-Availability, Failover & Multi-Platform CI/CD (done 2026-10-13)
+
+- **Client-Side Automatic Failover (`lib/core/config/app_config.dart`, `lib/core/network/api_client.dart`):**
+  - Added `API_FALLBACK_URL` (`apiFallbackUrl`) with HTTPS enforcement outside `dev`.
+  - Increased `ApiClient` timeouts (`connectTimeout: 45s`, `receiveTimeout: 60s`) to tolerate free-tier cold starts.
+  - Added automatic single-retry failover in `_handleResponseError`: if the active host fails with `connectionError`, `connectionTimeout`, `receiveTimeout`, or HTTP `502`/`503`/`504`, `ApiClient` switches `baseUrl` to the alternate host (`_primaryBaseUrl` ↔ `_fallbackBaseUrl`) and replays the request transparently.
+  - Unit tests added in `test/core/config_and_security_test.dart` and `test/core/network/api_client_test.dart`.
+- **Universal Multi-Cloud Docker Image (`Dockerfile`, `backend/Dockerfile`, `backend/docker-entrypoint.sh`, `backend/src/API/Program.cs`):**
+  - Added `UseForwardedHeaders` (`XForwardedFor | XForwardedProto`) for Cloudflare/reverse proxies.
+  - Configured world-writable `/app/storage` (`chmod -R 777`), `HOME=/tmp` fallback, and default `PORT=7860` so the exact same image runs on Render, Koyeb, and Hugging Face Spaces (non-root `uid=1000`).
+- **Cloudflare Edge Failover Worker (`deploy/cloudflare-failover-worker.js`):**
+  - Edge router for `https://api.joberthix.xyz` that forwards to `PRIMARY_ORIGIN` (`https://jolinx-api.onrender.com`) and automatically fails over to `BACKUP_ORIGIN` on network errors or 502/503/504/52x statuses.
+- **GitHub Actions Multi-Platform Build & Nightly DB Backups (`.github/workflows/build-clients.yml`, `.github/workflows/db-backup.yml`):**
+  - Automated CI/CD building all 6 platforms (Android APK, Web ZIP, Windows x64 ZIP, Linux x64 tar.gz, macOS `.app` ZIP, iOS unsigned `.ipa`) with `API_BASE_URL` and `API_FALLBACK_URL` injected and published to GitHub Releases (`latest`).
+  - Automated nightly `pg_dump` backup workflow for Neon PostgreSQL with 90-day encrypted artifact retention.
+

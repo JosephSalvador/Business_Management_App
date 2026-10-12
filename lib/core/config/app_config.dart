@@ -6,17 +6,25 @@ enum AppEnvironment { dev, staging, production }
 /// Immutable, load-once application configuration.
 ///
 /// Security rules enforced here:
-/// - Non-dev environments MUST use HTTPS base URLs.
+/// - Non-dev environments MUST use HTTPS base URLs (both primary and fallback).
 /// - This file never carries secrets: tokens live in secure storage, and every
 ///   backend secret (JWT signing keys, DB passwords, payment keys) stays server-side.
 class AppConfig {
   AppConfig._({
     required this.environment,
     required this.apiBaseUrl,
+    this.apiFallbackUrl,
   }) {
     if (environment != AppEnvironment.dev && apiBaseUrl.scheme != 'https') {
       throw StateError(
         'API_BASE_URL must use HTTPS outside the dev environment.',
+      );
+    }
+    if (apiFallbackUrl != null &&
+        environment != AppEnvironment.dev &&
+        apiFallbackUrl!.scheme != 'https') {
+      throw StateError(
+        'API_FALLBACK_URL must use HTTPS outside the dev environment.',
       );
     }
   }
@@ -24,12 +32,18 @@ class AppConfig {
   final AppEnvironment environment;
   final Uri apiBaseUrl;
 
+  /// Optional secondary/backup API base URL for automatic multi-cloud failover
+  /// when the primary host is unreachable or returns 502/503/504.
+  final Uri? apiFallbackUrl;
+
   /// IANA timezone name from the device (e.g. `EAT`).
   String get timezone => DateTime.now().timeZoneName;
 
   /// Compile-time overrides win over `.env` values
   /// (`flutter build apk --dart-define=API_BASE_URL=https://...`).
   static const _dartDefineApiUrl = String.fromEnvironment('API_BASE_URL');
+  static const _dartDefineFallbackUrl =
+      String.fromEnvironment('API_FALLBACK_URL');
   static const _dartDefineEnv = String.fromEnvironment('APP_ENV');
 
   static AppConfig? _instance;
@@ -39,6 +53,7 @@ class AppConfig {
     String read(String key) {
       final compileTime = switch (key) {
         'API_BASE_URL' => _dartDefineApiUrl,
+        'API_FALLBACK_URL' => _dartDefineFallbackUrl,
         'APP_ENV' => _dartDefineEnv,
         _ => '',
       };
@@ -72,7 +87,29 @@ class AppConfig {
       );
     }
 
-    _instance = AppConfig._(environment: environment, apiBaseUrl: uri);
+    Uri? fallbackUri;
+    final rawFallback = read('API_FALLBACK_URL').trim();
+    if (rawFallback.isNotEmpty) {
+      final parsedFallback = Uri.tryParse(rawFallback);
+      if (parsedFallback == null ||
+          !parsedFallback.hasScheme ||
+          parsedFallback.host.isEmpty) {
+        throw StateError('API_FALLBACK_URL is not a valid URL: $rawFallback');
+      }
+      if (environment != AppEnvironment.dev &&
+          parsedFallback.scheme != 'https') {
+        throw StateError(
+          'API_FALLBACK_URL must use HTTPS outside the dev environment.',
+        );
+      }
+      fallbackUri = parsedFallback;
+    }
+
+    _instance = AppConfig._(
+      environment: environment,
+      apiBaseUrl: uri,
+      apiFallbackUrl: fallbackUri,
+    );
     return _instance!;
   }
 
@@ -80,8 +117,13 @@ class AppConfig {
   factory AppConfig.forTest({
     required AppEnvironment environment,
     required Uri apiBaseUrl,
+    Uri? apiFallbackUrl,
   }) {
-    return AppConfig._(environment: environment, apiBaseUrl: apiBaseUrl);
+    return AppConfig._(
+      environment: environment,
+      apiBaseUrl: apiBaseUrl,
+      apiFallbackUrl: apiFallbackUrl,
+    );
   }
 
   static AppConfig get instance {
