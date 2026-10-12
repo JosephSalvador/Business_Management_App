@@ -44,5 +44,4 @@ YYYY-MM-DD  v0.1.0  Phase 0 foundation
 
 1. Bump version in csproj + pubspec + changelog.
 2. Run full backend + frontend check suites.
-3. Tag `vX.Y.Z` in git. Write changelog entry.
-4. (Deployment is out of scope until later phases.)
+4. Deploy via `render.yaml` (`backend/Dockerfile`) + managed PostgreSQL 17 (e.g. Neon.tech), then build the Flutter release APK with `--dart-define=APP_ENV=production --dart-define=API_BASE_URL=https://<your-service>.onrender.com`.

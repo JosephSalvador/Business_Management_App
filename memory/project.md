@@ -1336,3 +1336,9 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
 - Dev DB `businessos` may contain smoke-test users; `businessos_test` is recreated per run.
 - Roadmap checkboxes marked `[x]` for Phase 0 are aspirational — many are now real (see
   "architecture.md" above).
+
+## Mx Free Cloud Deployment Setup (Render + Neon, done 2026-10-12)
+
+- `backend/src/API/Program.cs`: extended startup auto-migration + platform bootstrap seeding (`createDemoTenant: false`) to `Production` alongside `LocalPreProduction`.
+- Added `backend/Dockerfile`, `backend/docker-entrypoint.sh`, `backend/.dockerignore`, and root `render.yaml` to run both `BusinessOS.Workers` and `BusinessOS.API` inside a single 512 MB free-tier container (`DOTNET_gcServer=0`).
+- Verified Release build (`-warnaserror`) for both `BusinessOS.API` and `BusinessOS.Workers`: 0 warnings, 0 errors.

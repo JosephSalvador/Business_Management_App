@@ -260,9 +260,9 @@ if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironmen
     await db.Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>().SeedAsync();
 }
-else if (app.Environment.IsEnvironment("LocalPreProduction"))
+else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.IsProduction())
 {
-    // Pending migrations are applied here so preprod stays operable offline.
+    // Pending migrations are applied here so preprod/production stays operable on managed DB hosts.
     // Only platform-level bootstrap data is seeded: the demo tenant and its known
     // dev credentials are never created outside Development/Testing.
     using var scope = app.Services.CreateScope();

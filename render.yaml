@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: jolinx-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health/live
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Jwt__Secret
+        generateValue: true
+      - key: Security__TwoFactorEncryptionKey
+        generateValue: true
+      - key: Smtp__Host
+        sync: false
+      - key: Smtp__Port
+        value: "587"
+      - key: Smtp__Username
+        sync: false
+      - key: Smtp__Password
+        sync: false
+      - key: Smtp__From
+        sync: false
+      - key: Smtp__FromName
+        value: "Jolinx Business OS"
+      - key: Smtp__UseStartTls
+        value: "true"
