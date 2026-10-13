@@ -1,25 +1,21 @@
 /**
- * Jolinx Business OS — $0 Multi-Cloud Cloudflare Failover Worker
+ * Jolinx Business OS — $0 Multi-Cloud Cloudflare Failover + Keep-Warm Worker
  * Domain: https://api.joberthix.xyz
  *
- * How to deploy (Free on Cloudflare Workers — 100,000 requests/day):
- * 1. Open Cloudflare Dashboard -> Workers & Pages -> Create Worker -> Name it `jolinx-api-router`.
- * 2. Paste this script into the Worker editor and click "Deploy".
- * 3. In the Worker's Settings -> Domains & Routes -> Add Custom Domain: `api.joberthix.xyz`.
- * 4. Optional: In Settings -> Variables, set:
- *    - PRIMARY_ORIGIN = https://jolinx-api.onrender.com
- *    - BACKUP_ORIGIN  = https://<your-username>-jolinx-api.hf.space (or Koyeb URL)
- *
- * Behavior:
- * - Forwards incoming requests to PRIMARY_ORIGIN first.
- * - If PRIMARY_ORIGIN throws a network error, times out, or returns 502/503/504/521/522/523/524,
- *   automatically retries the exact same request against BACKUP_ORIGIN.
- * - Preserves client IP, HTTP method, headers, query string, and body stream.
+ * Features:
+ * 1. Automatic Keep-Warm (Cron Trigger `*/10 * * * *`):
+ *    Pings PRIMARY_ORIGIN/health/live every 10 minutes so Render never spins down
+ *    into a 50-second cold start (Render Free gives 750 hrs/mo; a 31-day month is 744 hrs).
+ * 2. Smart Failover Routing:
+ *    - Forwards incoming requests to PRIMARY_ORIGIN (Render) with a 25s timeout.
+ *    - If PRIMARY_ORIGIN times out or returns 502/503/504/52x, automatically retries
+ *      BACKUP_ORIGIN (if configured) or retries PRIMARY_ORIGIN once more.
  */
 
 const DEFAULT_PRIMARY_ORIGIN = "https://jolinx-api.onrender.com";
-const DEFAULT_BACKUP_ORIGIN = "https://businessmanagementapp-bnjucdtx.b4a.run";
+const DEFAULT_BACKUP_ORIGIN = "";
 const FAILOVER_STATUS_CODES = new Set([502, 503, 504, 520, 521, 522, 523, 524, 530]);
+const UPSTREAM_TIMEOUT_MS = 28000;
 
 export default {
   async fetch(request, env) {
@@ -29,33 +25,53 @@ export default {
     const incomingUrl = new URL(request.url);
     const pathAndQuery = incomingUrl.pathname + incomingUrl.search;
 
-    // Buffer body for non-GET/HEAD requests so it can be replayed if primary fails.
     let bodyBuffer = null;
     if (request.method !== "GET" && request.method !== "HEAD") {
       bodyBuffer = await request.arrayBuffer();
     }
 
+    // 1. Try Primary Origin (Render)
     try {
       const primaryResponse = await forwardRequest(
         request,
         primaryOrigin + pathAndQuery,
         bodyBuffer,
+        UPSTREAM_TIMEOUT_MS,
       );
 
       if (!FAILOVER_STATUS_CODES.has(primaryResponse.status)) {
         return withUpstreamHeader(primaryResponse, "primary");
       }
     } catch (_) {
-      // Primary network/TLS timeout — fall through to backup origin.
+      // Primary timed out or network error — proceed to backup / retry.
     }
 
+    // 2. Try Backup Origin if configured and distinct from primary
+    if (backupOrigin && backupOrigin !== primaryOrigin) {
+      try {
+        const backupResponse = await forwardRequest(
+          request,
+          backupOrigin + pathAndQuery,
+          bodyBuffer,
+          UPSTREAM_TIMEOUT_MS,
+        );
+        if (backupResponse.status !== 404 && !FAILOVER_STATUS_CODES.has(backupResponse.status)) {
+          return withUpstreamHeader(backupResponse, "backup");
+        }
+      } catch (_) {
+        // Backup also unavailable — fall through to second primary attempt.
+      }
+    }
+
+    // 3. Second attempt on Primary (in case primary just finished waking up from cold start)
     try {
-      const backupResponse = await forwardRequest(
+      const retryResponse = await forwardRequest(
         request,
-        backupOrigin + pathAndQuery,
+        primaryOrigin + pathAndQuery,
         bodyBuffer,
+        UPSTREAM_TIMEOUT_MS,
       );
-      return withUpstreamHeader(backupResponse, "backup");
+      return withUpstreamHeader(retryResponse, "primary-retry");
     } catch (_) {
       return new Response(
         JSON.stringify({
@@ -74,9 +90,20 @@ export default {
       );
     }
   },
+
+  // Automatic Keep-Warm Cron Handler (set Cron Trigger to `*/10 * * * *` in Cloudflare Worker Settings)
+  async scheduled(_event, env, ctx) {
+    const primaryOrigin = (env.PRIMARY_ORIGIN || DEFAULT_PRIMARY_ORIGIN).replace(/\/+$/, "");
+    ctx.waitUntil(
+      fetch(primaryOrigin + "/health/live", {
+        method: "GET",
+        headers: { "User-Agent": "Jolinx-Cloudflare-KeepWarm/1.0" },
+      }).catch(() => {}),
+    );
+  },
 };
 
-async function forwardRequest(originalRequest, targetUrl, bodyBuffer) {
+async function forwardRequest(originalRequest, targetUrl, bodyBuffer, timeoutMs) {
   const targetHost = new URL(targetUrl).host;
   const headers = new Headers(originalRequest.headers);
   headers.set("Host", targetHost);
@@ -88,6 +115,7 @@ async function forwardRequest(originalRequest, targetUrl, bodyBuffer) {
     headers,
     body: bodyBuffer,
     redirect: "manual",
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 

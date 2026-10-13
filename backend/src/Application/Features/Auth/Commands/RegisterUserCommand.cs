@@ -107,10 +107,14 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
 
         var adminRole = Role.Create(tenant.Id, SystemRoles.Administrator, isSystem: true);
         var allPermissions = await _permissions.ResolveByNamesAsync(PermissionNames.All, cancellationToken);
+        var permissionsByName = allPermissions.ToDictionary(p => p.Name, StringComparer.Ordinal);
         adminRole.Grant(allPermissions);
         await _roles.AddAsync(adminRole, cancellationToken);
 
-        var staffPermissions = await _permissions.ResolveByNamesAsync(PermissionNames.Staff, cancellationToken);
+        var staffPermissions = PermissionNames.Staff
+            .Where(permissionsByName.ContainsKey)
+            .Select(name => permissionsByName[name])
+            .ToArray();
         var staffRole = Role.Create(
             tenant.Id,
             SystemRoles.Staff,
@@ -122,7 +126,10 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         foreach (var template in RoleTemplates.Starter)
         {
             var role = Role.Create(tenant.Id, template.Name, description: template.Description);
-            var permissions = await _permissions.ResolveByNamesAsync(template.PermissionNames, cancellationToken);
+            var permissions = template.PermissionNames
+                .Where(permissionsByName.ContainsKey)
+                .Select(name => permissionsByName[name])
+                .ToArray();
             role.Grant(permissions);
             await _roles.AddAsync(role, cancellationToken);
         }

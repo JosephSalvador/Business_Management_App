@@ -10,7 +10,7 @@ on:
       api_fallback_url:
         description: 'Fallback Production HTTPS API Base URL'
         required: false
-        default: 'https://jolinx-api.onrender.com'
+        default: 'https://jolinx-api-router.josephsalvador662.workers.dev'
   push:
     branches:
       - feature/mobile-pos-foundation
@@ -32,7 +32,7 @@ permissions:
 
 env:
   API_BASE_URL: ${{ inputs.api_base_url || vars.API_BASE_URL || 'https://api.joberthix.xyz' }}
-  API_FALLBACK_URL: ${{ inputs.api_fallback_url || vars.API_FALLBACK_URL || 'https://jolinx-api.onrender.com' }}
+  API_FALLBACK_URL: ${{ inputs.api_fallback_url || vars.API_FALLBACK_URL || 'https://jolinx-api-router.josephsalvador662.workers.dev' }}
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────

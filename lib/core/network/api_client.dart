@@ -69,7 +69,7 @@ class ApiClient {
         Dio(
           BaseOptions(
             baseUrl: config.apiBaseUrl.toString(),
-            connectTimeout: const Duration(seconds: 45),
+            connectTimeout: const Duration(seconds: 20),
             receiveTimeout: const Duration(seconds: 60),
             sendTimeout: const Duration(seconds: 30),
             headers: {
@@ -180,10 +180,14 @@ class ApiClient {
       return await request();
     } on DioException catch (error) {
       if (_canFailover(error)) {
+        final previousHost = _dio.options.baseUrl;
         _switchActiveHost();
         try {
           return await request();
         } on DioException catch (retryError) {
+          if (_canFailover(retryError)) {
+            _dio.options.baseUrl = previousHost;
+          }
           if (retryError.response?.statusCode == 402) {
             await _notifyPaymentRequired();
           }
