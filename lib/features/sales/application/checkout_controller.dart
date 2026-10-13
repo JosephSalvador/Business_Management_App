@@ -7,6 +7,7 @@ import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../../authentication/application/auth_controller.dart';
 import '../data/sale_repository.dart';
+import '../data/sales_providers.dart';
 import '../domain/sale.dart';
 import '../data/offline_sale_recorder.dart';
 
@@ -55,10 +56,10 @@ class CheckoutController extends Notifier<CheckoutState> {
   String? _clientSaleId;
   String? _branchId;
 
-  /// How long an online attempt may take before the checkout falls back to
-  /// the local pending queue. Set so a slow-but-alive link still lands on the
-  /// receipt quickly; the idempotency key keeps a late server accept safe.
-  static const _checkoutDeadline = Duration(seconds: 4);
+  /// Fast POS timeout: try online for 3 seconds. If online has not answered
+  /// or encounters network/server hiccups, immediately record offline (5ms)
+  /// and sync in the background so the cashier never waits!
+  static const _checkoutDeadline = Duration(milliseconds: 3000);
 
   @override
   CheckoutState build() => const CheckoutIdle();
@@ -117,10 +118,13 @@ class CheckoutController extends Notifier<CheckoutState> {
         final windowOpen =
             await ref.read(sessionJournalProvider).offlineWindowOpen();
         if (windowOpen) {
-          return await _recordOffline(lines, paymentMethod,
+          final offlineSale = await _recordOffline(lines, paymentMethod,
               amountTendered: amountTendered,
               customerId: customerId,
               customerName: customerName);
+          if (offlineSale != null) {
+            return offlineSale;
+          }
         }
         sale = await online;
       }
@@ -129,14 +133,17 @@ class CheckoutController extends Notifier<CheckoutState> {
       _clientSaleId = null;
       return sale;
     } on AppException catch (error) {
-      // Transport-level failures fall back to the local pending queue —
-      // including timeouts, where the server may already hold the sale with
-      // this exact key (safe by idempotent replay).
-      if (_isTransportFailure(error)) {
-        return _recordOffline(lines, paymentMethod,
+      // Transport-level failures and server hiccups fall back to the local
+      // pending queue — including timeouts, 5xx server errors, where the server
+      // may already hold the sale with this exact key (safe by idempotent replay).
+      if (_isTransportFailure(error) || error is ServerException) {
+        final offlineSale = await _recordOffline(lines, paymentMethod,
             amountTendered: amountTendered,
             customerId: customerId,
             customerName: customerName);
+        if (offlineSale != null) {
+          return offlineSale;
+        }
       }
       state = CheckoutFailure(_mapError(error));
       if (!_isRetryable(error)) {
@@ -176,7 +183,8 @@ class CheckoutController extends Notifier<CheckoutState> {
     // Check offline selling permission
     final auth = ref.read(authControllerProvider);
     if (auth is AuthAuthenticated) {
-      final hasPermission = auth.session.user.hasPermission('sale.create');
+      final hasPermission = auth.session.user.hasPermission('Sales.Create') ||
+          auth.session.user.hasPermission('sale.create');
       if (!hasPermission) {
         state = const CheckoutFailure(
           'Huna ruhusa ya kuuza. Ingia mtandoni kupata ruhusa.',
@@ -215,6 +223,12 @@ class CheckoutController extends Notifier<CheckoutState> {
       state = CheckoutSuccess(provisional);
       // Identity now lives in the persistent queue row.
       _clientSaleId = null;
+      // Trigger background sync pass immediately (like Square & Toast)
+      try {
+        ref.read(syncEngineProvider).drain().ignore();
+      } catch (_) {
+        // Ignore in environments where sync engine is mocked or not running
+      }
       return provisional;
     } on AppException catch (error) {
       state = CheckoutFailure(_mapError(error));

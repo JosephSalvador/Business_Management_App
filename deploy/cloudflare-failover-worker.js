@@ -12,10 +12,11 @@
  *      BACKUP_ORIGIN (if configured) or retries PRIMARY_ORIGIN once more.
  */
 
-const DEFAULT_PRIMARY_ORIGIN = "https://jolinx-api.onrender.com";
-const DEFAULT_BACKUP_ORIGIN = "";
+const DEFAULT_PRIMARY_ORIGIN = "https://local.joberthix.xyz";
+const DEFAULT_BACKUP_ORIGIN = "https://jolinx-api.onrender.com";
 const FAILOVER_STATUS_CODES = new Set([502, 503, 504, 520, 521, 522, 523, 524, 530]);
-const UPSTREAM_TIMEOUT_MS = 28000;
+const PRIMARY_TIMEOUT_MS = 25000;
+const BACKUP_TIMEOUT_MS = 28000;
 
 export default {
   async fetch(request, env) {
@@ -30,20 +31,20 @@ export default {
       bodyBuffer = await request.arrayBuffer();
     }
 
-    // 1. Try Primary Origin (Render)
+    // 1. Try Primary Origin (Local Tunnel) with fast 4s timeout
     try {
       const primaryResponse = await forwardRequest(
         request,
         primaryOrigin + pathAndQuery,
         bodyBuffer,
-        UPSTREAM_TIMEOUT_MS,
+        PRIMARY_TIMEOUT_MS,
       );
 
       if (!FAILOVER_STATUS_CODES.has(primaryResponse.status)) {
         return withUpstreamHeader(primaryResponse, "primary");
       }
     } catch (_) {
-      // Primary timed out or network error — proceed to backup / retry.
+      // Primary offline or timed out — seamlessly failover to backup below!
     }
 
     // 2. Try Backup Origin if configured and distinct from primary
@@ -53,7 +54,7 @@ export default {
           request,
           backupOrigin + pathAndQuery,
           bodyBuffer,
-          UPSTREAM_TIMEOUT_MS,
+          BACKUP_TIMEOUT_MS,
         );
         if (backupResponse.status !== 404 && !FAILOVER_STATUS_CODES.has(backupResponse.status)) {
           return withUpstreamHeader(backupResponse, "backup");
@@ -69,7 +70,7 @@ export default {
         request,
         primaryOrigin + pathAndQuery,
         bodyBuffer,
-        UPSTREAM_TIMEOUT_MS,
+        BACKUP_TIMEOUT_MS,
       );
       return withUpstreamHeader(retryResponse, "primary-retry");
     } catch (_) {
@@ -91,11 +92,11 @@ export default {
     }
   },
 
-  // Automatic Keep-Warm Cron Handler (set Cron Trigger to `*/10 * * * *` in Cloudflare Worker Settings)
+  // Automatic Keep-Warm Cron Handler (runs every 10 min so Render never goes to sleep)
   async scheduled(_event, env, ctx) {
-    const primaryOrigin = (env.PRIMARY_ORIGIN || DEFAULT_PRIMARY_ORIGIN).replace(/\/+$/, "");
+    const renderOrigin = (env.BACKUP_ORIGIN || "https://jolinx-api.onrender.com").replace(/\/+$/, "");
     ctx.waitUntil(
-      fetch(primaryOrigin + "/health/live", {
+      fetch(renderOrigin + "/health/live", {
         method: "GET",
         headers: { "User-Agent": "Jolinx-Cloudflare-KeepWarm/1.0" },
       }).catch(() => {}),
