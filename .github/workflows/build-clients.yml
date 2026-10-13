@@ -74,6 +74,8 @@ jobs:
 
       - name: Build Android Release APK (arm64)
         run: |
+          sed -i '/org.gradle.java.home/d' android/gradle.properties
+          sed -i 's/-Xmx8G/-Xmx4G/' android/gradle.properties
           flutter build apk --release --target-platform android-arm64 \
             --dart-define=APP_ENV=production \
             --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
