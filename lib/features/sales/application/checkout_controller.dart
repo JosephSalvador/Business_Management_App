@@ -7,7 +7,6 @@ import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../../authentication/application/auth_controller.dart';
 import '../data/sale_repository.dart';
-import '../data/sales_providers.dart';
 import '../domain/sale.dart';
 import '../data/offline_sale_recorder.dart';
 
