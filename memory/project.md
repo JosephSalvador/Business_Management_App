@@ -1366,3 +1366,12 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
   - Automated CI/CD building all 6 platforms (Android APK, Web ZIP, Windows x64 ZIP, Linux x64 tar.gz, macOS `.app` ZIP, iOS unsigned `.ipa`) with `API_BASE_URL` and `API_FALLBACK_URL` injected and published to GitHub Releases (`latest`).
   - Automated nightly `pg_dump` backup workflow for Neon PostgreSQL with 90-day encrypted artifact retention.
 
+
+
+## client_versioning_and_updates.md — Mandatory Automatic Build Version Upgrades (Locked 2026-10-13)
+
+- **Rule:** Every build and release MUST have a strictly incremented `versionCode` / `build-number` (`new build-number > previous build-number`).
+- **Core User Requirement:** The user must be able to update the installed app directly on their Android device without uninstalling, preserving their offline SQLite database and authenticated session.
+- **CI Enforcement (.github/workflows/build-clients.yml):**
+  All Flutter release builds pass `--build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }}`. Because `${{ github.run_number }}` monotonically increases on every run, every new APK always has a strictly higher `versionCode`.
+- **Local Versioning (pubspec.yaml):** Bump `version` (+buildNumber) on every client change.

@@ -20,6 +20,7 @@ Read this file, plus `memory/project.md`, `docs/ArchitectureRules.md`, and
 - Ignore warnings.
 - Mix UI and business logic.
 - Commit code without verification.
+- Ship or commit client builds without strictly incrementing build-number/versionCode (so installed devices can update in-place without uninstalling).
 
 ## Definition of Done
 
