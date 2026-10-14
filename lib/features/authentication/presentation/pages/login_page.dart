@@ -162,6 +162,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         if (!hasPin && mounted) {
           final biometricGate = ref.read(biometricAuthGateProvider);
           final biometricHardware = await biometricGate.isAvailable();
+          if (!mounted) return;
           await showQuickPinSetupSheet(
             context,
             biometricSupported: biometricHardware,

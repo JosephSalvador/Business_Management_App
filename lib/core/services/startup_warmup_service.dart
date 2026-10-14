@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../di/core_providers.dart';
-import '../network/connectivity_monitor.dart';
 import '../../features/billing/application/billing_providers.dart';
 import '../../features/capabilities/application/capabilities_controller.dart';
 import '../../features/products/data/product_providers.dart';

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/workspace_controller.dart';
+import '../../data/workspace_providers.dart';
 
 /// Splash screen — shown while session/workspace resolves.
 ///

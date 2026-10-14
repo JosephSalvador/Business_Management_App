@@ -225,6 +225,22 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> enableQuickPin({
+    required String pin,
+    bool enableBiometric = false,
+  }) async {
+    await offlineStore.setUnlockPin(pin);
+  }
+
+  @override
+  Future<void> disableQuickPin() async {
+    await offlineStore.clearUnlockPin();
+  }
+
+  @override
+  Future<void> setBiometricEnabled(bool enabled) async {}
+
+  @override
   Future<void> requestPasswordReset({required String email}) async {}
 
   @override
