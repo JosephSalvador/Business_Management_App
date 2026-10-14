@@ -11,10 +11,20 @@ on:
         description: 'Fallback Production HTTPS API Base URL'
         required: false
         default: 'https://jolinx-api-router.josephsalvador662.workers.dev'
+      deploy_target:
+        description: 'Cloudflare Pages Web Target (Staging vs Production)'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
   push:
     branches:
       - feature/mobile-pos-foundation
       - main
+    tags:
+      - 'v*'
     paths:
       - 'lib/**'
       - 'assets/**'
@@ -72,6 +82,9 @@ jobs:
       - name: Analyze Flutter code
         run: flutter analyze --no-pub
 
+      - name: Run Automated Flutter Test Guard (POS, Cart, Auth & Offline DB)
+        run: flutter test --no-pub
+
       - name: Build Android Release APK (arm64)
         run: |
           sed -i '/org.gradle.java.home/d' android/gradle.properties
@@ -92,7 +105,38 @@ jobs:
             --dart-define=APP_ENV=production \
             --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
             --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
+          cp web/_redirects build/web/_redirects 2>/dev/null || true
+          cp web/_headers build/web/_headers 2>/dev/null || true
           cd build/web && zip -r ../../jolinx-web.zip .
+
+      - name: Determine Cloudflare Target Environment
+        id: cf_env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="${{ inputs.deploy_target }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TARGET="production"
+          else
+            TARGET="staging"
+          fi
+
+          if [ "$TARGET" = "production" ]; then
+            CF_BRANCH="main"
+          else
+            CF_BRANCH="staging"
+          fi
+
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
+          echo "cf_branch=$CF_BRANCH" >> $GITHUB_OUTPUT
+          echo "::notice title=Cloudflare Deployment::Deploying to environment: $TARGET (branch: $CF_BRANCH)"
+
+      - name: Deploy Flutter Web to Cloudflare Pages
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
+          command: pages deploy build/web --project-name=jolinx-app --branch=${{ steps.cf_env.outputs.cf_branch }} --commit-dirty=true
 
       - name: Build Linux Desktop Release
         run: |

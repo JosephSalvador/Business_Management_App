@@ -46,4 +46,8 @@ YYYY-MM-DD  v0.1.0  Phase 0 foundation
 2. Run full backend + frontend check suites.
 3. Deploy primary + backup backends using the universal `Dockerfile` (compatible with Render, Hugging Face Spaces, and Koyeb) connected to managed PostgreSQL 17 (Neon.tech), fronted by `deploy/cloudflare-failover-worker.js` at `https://api.joberthix.xyz`.
 4. Push to GitHub or trigger `.github/workflows/build-clients.yml` to build all 6 client platforms (Android, Web, Windows, Linux, macOS, iOS) with `--dart-define=APP_ENV=production --dart-define=API_BASE_URL=https://api.joberthix.xyz --dart-define=API_FALLBACK_URL=https://jolinx-api.onrender.com`.
-5. Nightly PostgreSQL disaster recovery backups run via `.github/workflows/db-backup.yml` (`pg_dump` custom compressed format retained for 90 days).
+5. **Cloudflare Pages Web App Deployment Safety:**
+   - **Staging / Preview (Default):** Pushes to working branches deploy to `https://staging.jolinx-app.pages.dev`. Live stores are untouched while you test checkout, receipts, and offline sync.
+   - **Production Release:** Official release tags (`v*`) or manual `workflow_dispatch` with target `production` promote the build to live stores at `https://app.joberthix.xyz`.
+   - **Emergency 1-Click Rollback:** In the Cloudflare Pages dashboard, any previous working deployment can be rolled back globally in under 1 second without recompiling.
+6. Nightly PostgreSQL disaster recovery backups run via `.github/workflows/db-backup.yml` (`pg_dump` custom compressed format retained for 90 days).
