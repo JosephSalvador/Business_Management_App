@@ -31,7 +31,45 @@ export default {
       bodyBuffer = await request.arrayBuffer();
     }
 
-    // 1. Try Primary Origin (Local Tunnel) with fast 4s timeout
+    // Detect Staging requests via subdomain (staging-api.joberthix.xyz) or header
+    const isStaging =
+      incomingUrl.hostname.startsWith("staging-api") ||
+      incomingUrl.hostname.startsWith("api-staging") ||
+      request.headers.get("x-jolinx-environment") === "staging";
+
+    if (isStaging) {
+      const stagingOrigin = (env.STAGING_ORIGIN || DEFAULT_PRIMARY_ORIGIN).replace(/\/+$/, "");
+      try {
+        const stagingResponse = await forwardRequest(
+          request,
+          stagingOrigin + pathAndQuery,
+          bodyBuffer,
+          PRIMARY_TIMEOUT_MS,
+        );
+        return withUpstreamHeader(stagingResponse, "staging");
+      } catch (err) {
+        return new Response(
+          JSON.stringify({
+            title: "Staging Backend Unavailable",
+            detail: "Seva ya Staging haipatikani kwa sasa. Hakikisha staging backend inafanya kazi.",
+            status: 503,
+            environment: "staging",
+            code: "StagingUpstreamUnavailable",
+          }),
+          {
+            status: 503,
+            headers: {
+              "content-type": "application/problem+json; charset=utf-8",
+              "x-jolinx-upstream": "staging-none",
+              "x-jolinx-environment": "staging",
+            },
+          },
+        );
+      }
+    }
+
+    // --- Production Routing with Multi-Cloud Failover ---
+    // 1. Try Primary Origin (Production)
     try {
       const primaryResponse = await forwardRequest(
         request,
@@ -41,7 +79,7 @@ export default {
       );
 
       if (!FAILOVER_STATUS_CODES.has(primaryResponse.status)) {
-        return withUpstreamHeader(primaryResponse, "primary");
+        return withUpstreamHeader(primaryResponse, "production-primary");
       }
     } catch (_) {
       // Primary offline or timed out — seamlessly failover to backup below!

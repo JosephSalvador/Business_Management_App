@@ -95,19 +95,7 @@ jobs:
             --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
           cp build/app/outputs/flutter-apk/app-release.apk jolinx-android.apk
 
-      - name: Build Flutter Web Release
-        run: |
-          flutter build web --release \
-            --build-number=${{ github.run_number }} \
-            --build-name=1.0.${{ github.run_number }} \
-            --dart-define=APP_ENV=production \
-            --dart-define=API_BASE_URL=${{ env.API_BASE_URL }} \
-            --dart-define=API_FALLBACK_URL=${{ env.API_FALLBACK_URL }}
-          cp web/_redirects build/web/_redirects 2>/dev/null || true
-          cp web/_headers build/web/_headers 2>/dev/null || true
-          cd build/web && zip -r ../../jolinx-web.zip .
-
-      - name: Determine Cloudflare Target Environment
+      - name: Determine Target Environment & API Routing
         id: cf_env
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -120,13 +108,34 @@ jobs:
 
           if [ "$TARGET" = "production" ]; then
             CF_BRANCH="main"
+            APP_ENV="production"
+            API_URL="https://api.joberthix.xyz"
+            FALLBACK_URL="https://jolinx-api.onrender.com"
           else
             CF_BRANCH="staging"
+            APP_ENV="staging"
+            API_URL="https://staging-api.joberthix.xyz"
+            FALLBACK_URL="https://local.joberthix.xyz"
           fi
 
           echo "target=$TARGET" >> $GITHUB_OUTPUT
           echo "cf_branch=$CF_BRANCH" >> $GITHUB_OUTPUT
-          echo "::notice title=Cloudflare Deployment::Deploying to environment: $TARGET (branch: $CF_BRANCH)"
+          echo "app_env=$APP_ENV" >> $GITHUB_OUTPUT
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "fallback_url=$FALLBACK_URL" >> $GITHUB_OUTPUT
+          echo "::notice title=Deployment Environment::Target: $TARGET | API: $API_URL | CF Branch: $CF_BRANCH"
+
+      - name: Build Flutter Web Release
+        run: |
+          flutter build web --release \
+            --build-number=${{ github.run_number }} \
+            --build-name=1.0.${{ github.run_number }} \
+            --dart-define=APP_ENV=${{ steps.cf_env.outputs.app_env }} \
+            --dart-define=API_BASE_URL=${{ steps.cf_env.outputs.api_url }} \
+            --dart-define=API_FALLBACK_URL=${{ steps.cf_env.outputs.fallback_url }}
+          cp web/_redirects build/web/_redirects 2>/dev/null || true
+          cp web/_headers build/web/_headers 2>/dev/null || true
+          cd build/web && zip -r ../../jolinx-web.zip .
 
       - name: Deploy Flutter Web to Cloudflare Pages
         env:
