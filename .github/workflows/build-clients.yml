@@ -23,8 +23,6 @@ on:
     branches:
       - feature/mobile-pos-foundation
       - main
-    tags:
-      - 'v*'
     paths:
       - 'lib/**'
       - 'assets/**'
@@ -131,12 +129,16 @@ jobs:
           echo "::notice title=Cloudflare Deployment::Deploying to environment: $TARGET (branch: $CF_BRANCH)"
 
       - name: Deploy Flutter Web to Cloudflare Pages
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
-          command: pages deploy build/web --project-name=jolinx-app --branch=${{ steps.cf_env.outputs.cf_branch }} --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "Deploying to Cloudflare Pages (branch: ${{ steps.cf_env.outputs.cf_branch }})..."
+            npx wrangler pages deploy build/web --project-name=jolinx-app --branch="${{ steps.cf_env.outputs.cf_branch }}" --commit-dirty=true
+          else
+            echo "CLOUDFLARE_API_TOKEN secret not configured yet. Skipping Cloudflare Pages deployment."
+          fi
 
       - name: Build Linux Desktop Release
         run: |
