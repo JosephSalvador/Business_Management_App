@@ -11,6 +11,7 @@ using BusinessOS.Infrastructure.Persistence.Repositories;
 using BusinessOS.Infrastructure.Security;
 using BusinessOS.Shared.Configuration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -28,6 +29,7 @@ public static class DependencyInjection
             var connectionString = config.GetConnectionString("Default")
                 ?? throw new InvalidOperationException("Connection string 'Default' is not configured.");
             options.UseNpgsql(connectionString);
+            options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<BusinessDbContext>());

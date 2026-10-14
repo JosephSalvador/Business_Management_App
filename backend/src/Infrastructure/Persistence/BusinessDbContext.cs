@@ -96,6 +96,12 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<UserDevice> UserDevices => Set<UserDevice>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+        base.OnConfiguring(optionsBuilder);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Tenant>(entity =>
