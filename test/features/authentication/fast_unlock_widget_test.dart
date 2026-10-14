@@ -238,6 +238,11 @@ Future<FakeAuthRepository> _pumpLogin(
     store: store,
     gate: gate,
   );
+  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: overrides.container,
@@ -269,6 +274,7 @@ void main() {
       expect(find.text('Ingia kwa nenosiri'), findsOneWidget);
       expect(find.byType(TextFormField), findsNothing);
 
+      await tester.ensureVisible(find.text('Ingia kwa nenosiri'));
       await tester.tap(find.text('Ingia kwa nenosiri'));
       await tester.pumpAndSettle();
 
