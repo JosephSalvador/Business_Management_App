@@ -13,6 +13,7 @@ import 'package:jolinx_app/features/authentication/domain/session.dart';
 import 'package:jolinx_app/features/authentication/presentation/pages/lock_page.dart';
 import 'package:jolinx_app/features/authentication/presentation/pages/login_page.dart';
 import 'package:jolinx_app/features/authentication/presentation/widgets/pin_pad.dart';
+import 'package:jolinx_app/l10n/generated/app_localizations.dart';
 
 final _session = Session(
   user: AuthUser(
@@ -240,7 +241,12 @@ Future<FakeAuthRepository> _pumpLogin(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: overrides.container,
-      child: const MaterialApp(home: LoginPage()),
+      child: const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: Locale('sw'),
+        home: LoginPage(),
+      ),
     ),
   );
   await tester.pumpAndSettle();
