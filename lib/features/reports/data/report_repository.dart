@@ -22,11 +22,35 @@ class TopProduct {
     required this.productName,
     required this.totalQuantity,
     required this.totalRevenue,
+    this.totalCost = 0,
+    this.totalProfit = 0,
+    this.marginPercent = 0,
   });
 
   final String productName;
   final num totalQuantity;
   final num totalRevenue;
+  final num totalCost;
+  final num totalProfit;
+  final num marginPercent;
+
+  Map<String, dynamic> toJson() => {
+        'productName': productName,
+        'totalQuantity': totalQuantity,
+        'totalRevenue': totalRevenue,
+        'totalCost': totalCost,
+        'totalProfit': totalProfit,
+        'marginPercent': marginPercent,
+      };
+
+  factory TopProduct.fromJson(Map<String, dynamic> json) => TopProduct(
+        productName: json['productName'] as String? ?? '',
+        totalQuantity: json['totalQuantity'] as num? ?? 0,
+        totalRevenue: json['totalRevenue'] as num? ?? 0,
+        totalCost: json['totalCost'] as num? ?? 0,
+        totalProfit: json['totalProfit'] as num? ?? 0,
+        marginPercent: json['marginPercent'] as num? ?? 0,
+      );
 }
 
 class SalesTrendPoint {
@@ -278,12 +302,17 @@ class ReportRepository {
         'limit': limit,
       },
     );
-    final items = (response.data!['items'] as List<dynamic>?) ?? [];
+    final items = (response.data!['products'] as List<dynamic>?) ??
+        (response.data!['items'] as List<dynamic>?) ??
+        [];
     return items
         .map((e) => TopProduct(
               productName: (e['productName'] ?? '') as String,
               totalQuantity: (e['totalQuantity'] ?? 0) as num,
               totalRevenue: (e['totalRevenue'] ?? 0) as num,
+              totalCost: (e['totalCost'] ?? 0) as num,
+              totalProfit: (e['totalProfit'] ?? 0) as num,
+              marginPercent: (e['marginPercent'] ?? 0) as num,
             ))
         .toList();
   }
@@ -338,6 +367,9 @@ class ReportRepository {
                 productName: (e['productName'] ?? '') as String,
                 totalQuantity: (e['totalQuantity'] ?? 0) as num,
                 totalRevenue: (e['totalRevenue'] ?? 0) as num,
+                totalCost: (e['totalCost'] ?? 0) as num,
+                totalProfit: (e['totalProfit'] ?? 0) as num,
+                marginPercent: (e['marginPercent'] ?? 0) as num,
               ))
           .toList(),
     );

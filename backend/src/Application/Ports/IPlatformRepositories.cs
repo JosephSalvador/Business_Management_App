@@ -8,6 +8,7 @@ using BusinessOS.Domain.Finance;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Invoicing;
+using BusinessOS.Domain.Notifications;
 using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
@@ -594,7 +595,8 @@ public sealed record SalesByBranchSummary(
 
 public sealed record TopProductRow(
     Guid ProductId, string ProductName, string? Sku,
-    decimal TotalQuantity, decimal TotalRevenue, decimal TotalTax, int Rank);
+    decimal TotalQuantity, decimal TotalRevenue, decimal TotalTax, int Rank,
+    decimal TotalCost = 0m, decimal TotalProfit = 0m, decimal MarginPercent = 0m);
 
 public sealed record SalesTrendPoint(string Label, int SaleCount, decimal Revenue, decimal Tax);
 
@@ -820,4 +822,50 @@ public interface ICustomerInvoiceRepository
         Guid tenantId, DateTime date, CancellationToken cancellationToken = default);
     Task AddAsync(CustomerInvoice invoice, CancellationToken cancellationToken = default);
     Task UpdateAsync(CustomerInvoice invoice, CancellationToken cancellationToken = default);
+}
+
+public sealed record NotificationListFilter(
+    string? Category,
+    bool? UnreadOnly);
+
+public interface IAppNotificationRepository
+{
+    Task<AppNotification?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AppNotification>> ListPagedAsync(
+        Guid tenantId,
+        Guid? userId,
+        string? targetRole,
+        int page,
+        int pageSize,
+        NotificationListFilter filter,
+        CancellationToken cancellationToken = default);
+    Task<int> GetUnreadCountAsync(
+        Guid tenantId,
+        Guid? userId,
+        string? targetRole,
+        CancellationToken cancellationToken = default);
+    Task MarkAsReadAsync(Guid tenantId, Guid id, DateTime readAt, CancellationToken cancellationToken = default);
+    Task<int> MarkAllAsReadAsync(Guid tenantId, Guid userId, DateTime readAt, CancellationToken cancellationToken = default);
+    Task AddAsync(AppNotification notification, CancellationToken cancellationToken = default);
+}
+
+public interface IUserDeviceRepository
+{
+    Task<UserDevice?> GetByDeviceAsync(Guid tenantId, Guid userId, string deviceId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserDevice>> ListActiveForUsersAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid> userIds,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserDevice>> ListActiveForRoleAsync(
+        Guid tenantId,
+        string roleName,
+        CancellationToken cancellationToken = default);
+    Task UpsertAsync(UserDevice device, CancellationToken cancellationToken = default);
+    Task DeactivateAsync(Guid tenantId, Guid userId, string deviceId, CancellationToken cancellationToken = default);
+}
+
+public interface INotificationPreferenceRepository
+{
+    Task<NotificationPreference?> GetByTenantAndUserAsync(Guid tenantId, Guid? userId, CancellationToken cancellationToken = default);
+    Task UpsertAsync(NotificationPreference preference, CancellationToken cancellationToken = default);
 }

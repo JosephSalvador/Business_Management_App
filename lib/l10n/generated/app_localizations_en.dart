@@ -993,6 +993,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsSoldLabel => 'sold';
 
   @override
+  String get dashboardCachedBanner =>
+      'Viewing offline data (cached). Pull to refresh when connected.';
+
+  @override
+  String get dashboardUpdatedJustNow => 'Just now';
+
+  @override
+  String get reportsProfitLabel => 'Profit';
+
+  @override
+  String get reportsLossLabel => 'Loss';
+
+  @override
+  String get reportsCostLabel => 'Cost';
+
+  @override
   String get reportsTopProducts => 'Top Products';
 
   @override
@@ -1668,6 +1684,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get productFormCostPriceInvalid => 'Cost price cannot be negative';
+
+  @override
+  String get productFormCostPriceGuidance => 'Required to calculate real profit and inventory valuation.';
 
   @override
   String get navHome => 'Home';

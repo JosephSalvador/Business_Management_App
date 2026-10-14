@@ -562,9 +562,46 @@ class AuthRepository {
     return Session.fromAuthResponse(data);
   }
 
-  /// Stores credentials for offline authentication and enables biometric-only
-  /// quick unlock (fire-and-forget). The password was just verified online,
-  /// so the device is trusted for the next app open.
+  /// Configures a Quick PIN and optionally enables biometrics for this device.
+  Future<void> enableQuickPin({
+    required String pin,
+    bool enableBiometric = false,
+  }) async {
+    await _offlineCredentialStore.setUnlockPin(pin);
+    await _offlineCredentialStore.setQuickPinEnabled(true);
+    await _offlineCredentialStore.setBiometricEnabled(enableBiometric);
+
+    final cachedUserId = await _offlineCredentialStore.getCachedUserId();
+    final cachedTenantId = await _offlineCredentialStore.getCachedTenantId();
+    if (cachedUserId != null && cachedTenantId != null) {
+      final user = AuthUser(
+        id: cachedUserId,
+        tenantId: cachedTenantId,
+        email: await _offlineCredentialStore.getCachedEmail() ?? '',
+        fullName: await _offlineCredentialStore.getCachedFullName() ?? '',
+        phone: null,
+        isActive: true,
+        emailVerified: true,
+        permissions: await _offlineCredentialStore.getCachedPermissions(),
+      );
+      await _offlineCredentialStore.enableQuickUnlock(user);
+    }
+  }
+
+  /// Disables Quick PIN and quick unlock on this device.
+  Future<void> disableQuickPin() async {
+    await _offlineCredentialStore.clearUnlockPin();
+    await _offlineCredentialStore.setBiometricEnabled(false);
+    await _offlineCredentialStore.disableQuickUnlock();
+  }
+
+  /// Updates biometric opt-in preference on this device.
+  Future<void> setBiometricEnabled(bool enabled) async {
+    await _offlineCredentialStore.setBiometricEnabled(enabled);
+  }
+
+  /// Stores credentials for offline authentication. Does not force quick
+  /// unlock unless the user has already configured Quick PIN or biometrics.
   Future<void> _storeOfflineCredentials({
     required String password,
     required AuthUser user,
@@ -574,7 +611,11 @@ class AuthRepository {
         password: password,
         user: user,
       );
-      await _offlineCredentialStore.enableQuickUnlock(user);
+      final isPinEnabled = await _offlineCredentialStore.isQuickPinEnabled();
+      final isBiometric = await _offlineCredentialStore.isBiometricEnabled();
+      if (isPinEnabled || isBiometric) {
+        await _offlineCredentialStore.enableQuickUnlock(user);
+      }
     } catch (_) {
       // Non-critical: offline auth simply won't work if this fails.
     }

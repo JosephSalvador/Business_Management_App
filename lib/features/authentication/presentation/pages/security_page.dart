@@ -7,10 +7,13 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../../app/providers.dart';
+import '../../application/auth_controller.dart';
 import '../../application/security_controller.dart';
 import '../../data/auth_providers.dart';
 import '../../data/security_repository.dart';
 import '../widgets/code_input_field.dart';
+import '../widgets/quick_pin_setup_sheet.dart';
 
 /// Own-account security: second-factor enrolment and the device list.
 ///
@@ -85,6 +88,8 @@ class _LoadedView extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const _DeviceSecuritySection(),
+          const SizedBox(height: 20),
           _SectionTitle(loc.securityTwoFactorSection),
           Card(
             child: Column(
@@ -600,5 +605,184 @@ Future<void> _promptForCode(
   } finally {
     controller.dispose();
     focusNode.dispose();
+  }
+}
+
+class _DeviceSecuritySection extends ConsumerStatefulWidget {
+  const _DeviceSecuritySection();
+
+  @override
+  ConsumerState<_DeviceSecuritySection> createState() =>
+      _DeviceSecuritySectionState();
+}
+
+class _DeviceSecuritySectionState
+    extends ConsumerState<_DeviceSecuritySection> {
+  bool _loading = true;
+  bool _hasPin = false;
+  bool _biometricEnabled = false;
+  bool _biometricHardware = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeviceSecurity();
+  }
+
+  Future<void> _loadDeviceSecurity() async {
+    final store = ref.read(offlineCredentialStoreProvider);
+    final gate = ref.read(biometricAuthGateProvider);
+    final hasPin = await store.hasUnlockPin();
+    final isBiometricEnabled = await store.isBiometricEnabled();
+    final hardware = await gate.isAvailable();
+    if (mounted) {
+      setState(() {
+        _hasPin = hasPin;
+        _biometricEnabled = isBiometricEnabled;
+        _biometricHardware = hardware;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _setupOrChangePin() async {
+    final ok = await showQuickPinSetupSheet(
+      context,
+      biometricSupported: _biometricHardware,
+      onSave: ({required pin, required enableBiometric}) async {
+        await ref.read(authControllerProvider.notifier).enableQuickPin(
+              pin: pin,
+              enableBiometric: enableBiometric,
+            );
+      },
+    );
+    if (ok) {
+      await _loadDeviceSecurity();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PIN ya haraka imewekwa kikamilifu!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _disablePin() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Zima PIN ya Haraka?'),
+        content: const Text(
+          'Utahitaji kuingiza nenosiri kamili la akaunti yako kila wakati unapoingia kwenye kifaa hiki.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Ghairi'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Zima PIN'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(authControllerProvider.notifier).disableQuickPin();
+      await _loadDeviceSecurity();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PIN ya haraka imezimwa.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleBiometric(bool enable) async {
+    if (enable) {
+      final gate = ref.read(biometricAuthGateProvider);
+      final ok = await gate.authenticate(
+        reason: 'Thibitisha alama ya kidole ili kuiwasha',
+      );
+      if (!ok) return;
+    }
+    await ref.read(authControllerProvider.notifier).setBiometricEnabled(enable);
+    await _loadDeviceSecurity();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SectionTitle('Ulinzi wa Kifaa hiki (Kuingia Haraka)'),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.pin_outlined,
+                  color: _hasPin
+                      ? AppColors.success
+                      : AppColors.resolveTextSecondary(context),
+                ),
+                title: Text(
+                  _hasPin
+                      ? 'PIN ya Haraka (Tarakimu 4)'
+                      : 'Weka PIN ya Haraka',
+                ),
+                subtitle: Text(
+                  _hasPin
+                      ? 'Imewashwa kwenye kifaa hiki'
+                      : 'Fungua app haraka bila kuandika nenosiri',
+                ),
+                trailing: _hasPin
+                    ? PopupMenuButton<String>(
+                        onSelected: (val) {
+                          if (val == 'change') _setupOrChangePin();
+                          if (val == 'disable') _disablePin();
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'change',
+                            child: Text('Badili PIN'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'disable',
+                            child: Text('Zima PIN'),
+                          ),
+                        ],
+                      )
+                    : TextButton(
+                        onPressed: _setupOrChangePin,
+                        child: const Text('Washa'),
+                      ),
+              ),
+              if (_biometricHardware)
+                SwitchListTile.adaptive(
+                  value: _biometricEnabled,
+                  onChanged: _hasPin ? _toggleBiometric : null,
+                  secondary: Icon(
+                    Icons.fingerprint,
+                    color: _biometricEnabled
+                        ? AppColors.primary
+                        : AppColors.resolveTextSecondary(context),
+                  ),
+                  title: const Text('Alama ya Kidole au Uso'),
+                  subtitle: Text(
+                    _hasPin
+                        ? 'Tumia biometrics kufungua haraka'
+                        : 'Washa PIN kwanza ili utumie biometrics',
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

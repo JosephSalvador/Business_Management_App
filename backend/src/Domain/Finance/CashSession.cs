@@ -56,5 +56,17 @@ public sealed class CashSession : AggregateRoot
         Status = CashSessionStatus.Closed;
         ClosedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new Events.CashSessionClosedEvent(
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            Id,
+            TenantId,
+            AccountId,
+            OpeningCash,
+            closingCash,
+            expectedCash,
+            Variance.Value,
+            Notes));
     }
 }

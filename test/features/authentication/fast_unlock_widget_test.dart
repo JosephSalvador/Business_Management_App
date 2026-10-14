@@ -58,6 +58,22 @@ class FakeOfflineCredentialStore implements OfflineCredentialStore {
   Future<bool> hasUnlockPin() async => hasPin;
 
   @override
+  Future<bool> isBiometricEnabled() async => biometricAvailable;
+
+  @override
+  Future<void> setBiometricEnabled(bool enabled) async {
+    biometricAvailable = enabled;
+  }
+
+  @override
+  Future<bool> isQuickPinEnabled() async => hasPin;
+
+  @override
+  Future<void> setQuickPinEnabled(bool enabled) async {
+    hasPin = enabled;
+  }
+
+  @override
   Future<void> setUnlockPin(String value) async {
     pin = value;
     hasPin = true;
@@ -158,8 +174,6 @@ class FakeAuthRepository implements AuthRepository {
     pinUnlockCalls++;
     final error = pinUnlockError;
     if (error != null) throw error;
-    // Mirror the real repository: the PIN is verified against the store
-    // before the trusted session is released.
     await store.verifyUnlockPin(pin);
     return pinUnlockResult;
   }
@@ -235,46 +249,7 @@ Future<FakeAuthRepository> _pumpLogin(
 
 void main() {
   group('LoginPage fast unlock (trusted device)', () {
-    testWidgets('opens directly into the biometric prompt and hides the form',
-        (tester) async {
-      await _pumpLogin(
-        tester,
-        trusted: true,
-        hasPin: false,
-        biometric: true,
-        biometricResult: _session,
-      );
-
-      expect(find.text('Habari, Mama!'), findsOneWidget);
-      expect(find.text('Fungua kwa Kidole'), findsOneWidget);
-      expect(find.text('Ingiza PIN yako'), findsNothing);
-      expect(find.byType(TextFormField), findsNothing);
-      expect(find.text('Mtu mwingine? Ingia kwa akaunti yako'), findsOneWidget);
-
-      await tester.tap(find.text('Mtu mwingine? Ingia kwa akaunti yako'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(TextFormField), findsNWidgets(2));
-      expect(find.text('Tumia Kidole au PIN'), findsOneWidget);
-    });
-
-    testWidgets('biometric tap releases the trusted session', (tester) async {
-      final repository = await _pumpLogin(
-        tester,
-        trusted: true,
-        hasPin: false,
-        biometric: true,
-        biometricResult: _session,
-      );
-
-      await tester.tap(find.text('Fungua kwa Kidole'));
-      await tester.pumpAndSettle();
-
-      expect(repository.biometricCalls, 1);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('no biometric shows the inline PIN pad directly',
+    testWidgets('shows PinPad and switches to standard form with Ingia kwa nenosiri',
         (tester) async {
       await _pumpLogin(
         tester,
@@ -283,14 +258,34 @@ void main() {
         biometric: false,
       );
 
+      expect(find.text('Habari, Mama!'), findsOneWidget);
       expect(find.byType(PinPad), findsOneWidget);
-      expect(find.text('Ingiza PIN yako'), findsOneWidget);
-      expect(find.byIcon(Icons.fingerprint), findsNothing);
+      expect(find.text('Ingia kwa nenosiri'), findsOneWidget);
       expect(find.byType(TextFormField), findsNothing);
+
+      await tester.tap(find.text('Ingia kwa nenosiri'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextFormField), findsNWidgets(2));
+      expect(find.text('Tumia Kidole au PIN'), findsOneWidget);
     });
 
-    testWidgets('valid PIN submit releases the trusted session with 4 digits',
+    testWidgets('biometric-enabled trusted device auto-prompts biometric',
         (tester) async {
+      final repository = await _pumpLogin(
+        tester,
+        trusted: true,
+        hasPin: true,
+        biometric: true,
+        biometricResult: _session,
+      );
+
+      // Auto-prompt post frame callback fires:
+      expect(repository.biometricCalls, 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('valid PIN submit auto-submits on 4th digit', (tester) async {
       final repository = await _pumpLogin(
         tester,
         trusted: true,
@@ -305,10 +300,6 @@ void main() {
         ));
         await tester.pump();
       }
-      await tester.tap(find.descendant(
-        of: find.byType(PinPad),
-        matching: find.byIcon(Icons.check),
-      ));
       await tester.pumpAndSettle();
 
       expect(repository.store.lastPin, '1234');
@@ -333,10 +324,6 @@ void main() {
         ));
         await tester.pump();
       }
-      await tester.tap(find.descendant(
-        of: find.byType(PinPad),
-        matching: find.byIcon(Icons.check),
-      ));
       await tester.pumpAndSettle();
 
       expect(find.text('PIN si sahihi. Jaribu tena.'), findsOneWidget);
@@ -389,7 +376,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Drive the controller into a locked session.
       final notifier = container.read(authControllerProvider.notifier);
       await tester.pump();
       await notifier.loginOffline(password: 'x');
@@ -397,10 +383,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PinPad), findsOneWidget);
-      expect(find.byIcon(Icons.fingerprint), findsNothing);
-      expect(find.text('Ingia kwa nenosiri'), findsNothing);
+      expect(find.text('Ingia kwa nenosiri'), findsOneWidget);
 
-      // Enter a wrong PIN → inline error, still locked.
       for (final digit in ['1', '2', '3', '4']) {
         await tester.tap(find.descendant(
           of: find.byType(PinPad),
@@ -408,10 +392,6 @@ void main() {
         ));
         await tester.pump();
       }
-      await tester.tap(find.descendant(
-        of: find.byType(PinPad),
-        matching: find.byIcon(Icons.check),
-      ));
       await tester.pumpAndSettle();
 
       expect(store.lastPin, '1234');
@@ -420,7 +400,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('correct PIN unlocks the locked session', (tester) async {
+    testWidgets('correct PIN unlocks the locked session on 4th digit',
+        (tester) async {
       final store = FakeOfflineCredentialStore(
         trusted: true,
         hasPin: true,
@@ -459,10 +440,6 @@ void main() {
         ));
         await tester.pump();
       }
-      await tester.tap(find.descendant(
-        of: find.byType(PinPad),
-        matching: find.byIcon(Icons.check),
-      ));
       await tester.pumpAndSettle();
 
       expect(container.read(authControllerProvider), isA<AuthAuthenticated>());

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using BusinessOS.Domain.Accounting;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Infrastructure.Persistence;
 using BusinessOS.Tests.Support;
@@ -28,6 +29,15 @@ public sealed class ExpenseEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     }
 
     private static JsonElement Body(string json) => JsonSerializer.Deserialize<JsonElement>(json);
+
+    /// Expenses require a category (enforced by the validator); tenants that never
+    /// completed onboarding have none seeded, so tests create one explicitly.
+    private async Task<string> CreateCategoryAsync(string name)
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/expenses/categories", new { name });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return GetProperty(Body(await response.Content.ReadAsStringAsync()), "id");
+    }
 
     private static string GetProperty(JsonElement doc, params string[] path)
     {
@@ -102,6 +112,7 @@ public sealed class ExpenseEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     {
         var (token, _) = await RegisterAsync("explifecycle");
         Authorize(token);
+        var categoryId = await CreateCategoryAsync("Office");
 
         var created = await _client.PostAsJsonAsync("/api/v1/expenses", new
         {
@@ -111,6 +122,7 @@ public sealed class ExpenseEndpointsTests : IClassFixture<BusinessOsApiFactory>,
             paymentMethod = "Cash",
             reference = "INV-001",
             notes = "Monthly supplies",
+            categoryId = Guid.Parse(categoryId),
         });
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
         var createdDoc = Body(await created.Content.ReadAsStringAsync());
@@ -143,12 +155,14 @@ public sealed class ExpenseEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     {
         var (ownerToken, tenantId) = await RegisterAsync("expviewonly");
         Authorize(ownerToken);
+        var categoryId = await CreateCategoryAsync("General");
 
         var created = await _client.PostAsJsonAsync("/api/v1/expenses", new
         {
             description = "View Target Expense",
             amount = 50m,
             expenseDate = "2026-08-15T10:00:00Z",
+            categoryId = Guid.Parse(categoryId),
         });
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
         var expenseId = GetProperty(Body(await created.Content.ReadAsStringAsync()), "id");
@@ -207,12 +221,14 @@ public sealed class ExpenseEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     {
         var (token, _) = await RegisterAsync("expdelete");
         Authorize(token);
+        var categoryId = await CreateCategoryAsync("General");
 
         var created = await _client.PostAsJsonAsync("/api/v1/expenses", new
         {
             description = "To be deleted",
             amount = 75m,
             expenseDate = "2026-08-15T10:00:00Z",
+            categoryId = Guid.Parse(categoryId),
         });
         Assert.Equal(HttpStatusCode.OK, created.StatusCode);
         var expenseId = GetProperty(Body(await created.Content.ReadAsStringAsync()), "id");
@@ -275,7 +291,7 @@ public sealed class ExpenseEndpointsTests : IClassFixture<BusinessOsApiFactory>,
     [Fact]
     public async Task ExpenseSummary_ReturnsTotalAndByCategory_ForDateRange()
     {
-        var (token, _) = await RegisterAsync("expsummary");
+        var (token, tenantId) = await RegisterAsync("expsummary");
         Authorize(token);
 
         var category = await _client.PostAsJsonAsync("/api/v1/expenses/categories",
@@ -299,18 +315,20 @@ public sealed class ExpenseEndpointsTests : IClassFixture<BusinessOsApiFactory>,
             expenseDate = "2026-08-20T10:00:00Z",
             categoryId = Guid.Parse(categoryId),
         });
-        await _client.PostAsJsonAsync("/api/v1/expenses", new
+
+        // CategoryId is now mandatory at the API; the null-category bucket exists for
+        // legacy rows only, so those two are written straight to the database.
+        await using (var db = CreateDbContext())
         {
-            description = "Cash out",
-            amount = 50m,
-            expenseDate = "2026-08-11T10:00:00Z",
-        });
-        await _client.PostAsJsonAsync("/api/v1/expenses", new
-        {
-            description = "Out of range",
-            amount = 999m,
-            expenseDate = "2026-09-01T10:00:00Z",
-        });
+            var tenantGuid = Guid.Parse(tenantId);
+            db.Expenses.Add(Expense.Create(
+                tenantGuid, "Cash out", 50m,
+                DateTime.SpecifyKind(new DateTime(2026, 8, 11, 10, 0, 0), DateTimeKind.Utc)));
+            db.Expenses.Add(Expense.Create(
+                tenantGuid, "Out of range", 999m,
+                DateTime.SpecifyKind(new DateTime(2026, 9, 1, 10, 0, 0), DateTimeKind.Utc)));
+            await db.SaveChangesAsync();
+        }
 
         var summary = await _client.GetAsync(
             "/api/v1/expenses/summary?fromDate=2026-08-01T00%3A00%3A00Z&toDate=2026-08-31T23%3A59%3A59Z");

@@ -119,14 +119,29 @@ internal sealed class ReportRepository : IReportRepository
 
         var rows = lines
             .GroupBy(sl => new { sl.ProductId, sl.ProductName, sl.Sku })
-            .Select(g => new TopProductRow(
-                g.Key.ProductId,
-                g.Key.ProductName,
-                g.Key.Sku,
-                g.Sum(x => x.Quantity),
-                g.Sum(x => x.LineTotal),
-                g.Sum(x => x.TaxAmount),
-                0))
+            .Select(g =>
+            {
+                var totalQuantity = g.Sum(x => x.Quantity);
+                var totalRevenue = g.Sum(x => x.LineTotal);
+                var totalTax = g.Sum(x => x.TaxAmount);
+                var totalCost = g.Sum(x => (x.UnitCost ?? 0m) * x.Quantity);
+                var totalProfit = totalRevenue - totalCost;
+                var marginPercent = totalRevenue > 0
+                    ? Math.Round(totalProfit / totalRevenue * 100, 1)
+                    : 0m;
+
+                return new TopProductRow(
+                    g.Key.ProductId,
+                    g.Key.ProductName,
+                    g.Key.Sku,
+                    totalQuantity,
+                    totalRevenue,
+                    totalTax,
+                    0,
+                    Math.Round(totalCost, 2),
+                    Math.Round(totalProfit, 2),
+                    marginPercent);
+            })
             .OrderByDescending(t => t.TotalRevenue)
             .Take(limit)
             .ToList();
@@ -134,7 +149,8 @@ internal sealed class ReportRepository : IReportRepository
         // Assign rank after ordering
         var ranked = rows.Select((r, i) => new TopProductRow(
             r.ProductId, r.ProductName, r.Sku,
-            r.TotalQuantity, r.TotalRevenue, r.TotalTax, i + 1)).ToList();
+            r.TotalQuantity, r.TotalRevenue, r.TotalTax, i + 1,
+            r.TotalCost, r.TotalProfit, r.MarginPercent)).ToList();
 
         return ranked;
     }

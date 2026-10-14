@@ -179,6 +179,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   labelText: context.loc.productFormCostPrice,
                   prefixText: currency.isEmpty ? null : '$currency ',
                   hintText: context.loc.productFormCostPriceHint,
+                  helperText: context.loc.productFormCostPriceGuidance,
+                  helperMaxLines: 2,
+                  prefixIcon: const Icon(Icons.price_change_outlined),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) return null;

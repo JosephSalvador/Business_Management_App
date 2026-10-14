@@ -19,6 +19,12 @@ class DashboardSummary {
       totalProducts: (catalog['totalProducts'] as num?)?.toInt() ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'branchName': branchName,
+        'revenueToday': revenueToday,
+        'catalog': {'totalProducts': totalProducts},
+      };
 }
 
 class DashboardRepository {

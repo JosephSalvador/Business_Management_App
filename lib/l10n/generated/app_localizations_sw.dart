@@ -992,6 +992,22 @@ class AppLocalizationsSw extends AppLocalizations {
   String get reportsSoldLabel => 'zimeuzwa';
 
   @override
+  String get dashboardCachedBanner =>
+      'Unaangalia taarifa za awali (bila intaneti). Vuta chini kuonyesha upya ukiwa hewani.';
+
+  @override
+  String get dashboardUpdatedJustNow => 'Hivi sasa';
+
+  @override
+  String get reportsProfitLabel => 'Faida';
+
+  @override
+  String get reportsLossLabel => 'Hasara';
+
+  @override
+  String get reportsCostLabel => 'Gharama';
+
+  @override
   String get reportsTopProducts => 'Bidhaa Maarufu';
 
   @override
@@ -1672,7 +1688,11 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get productFormCostPriceInvalid =>
-      'Bei ya kununua haiwezi kuwa chini ya sifa';
+      'Bei ya kununua haiwezi kuwa chini ya sifuri';
+
+  @override
+  String get productFormCostPriceGuidance =>
+      'Inahitajika ili kukokotoa faida halisi na thamani ya stoo.';
 
   @override
   String get navHome => 'Mwanzo';

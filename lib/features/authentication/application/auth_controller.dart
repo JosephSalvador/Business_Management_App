@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
+import '../../notifications/application/device_registration_service.dart';
 import '../data/auth_repository.dart';
 import '../domain/session.dart';
 
@@ -111,6 +112,7 @@ class AuthController extends Notifier<AuthState> {
       switch (outcome) {
         case AuthenticatedLogin(:final session):
           state = AuthAuthenticated(session);
+          ref.read(deviceRegistrationServiceProvider).registerDevice();
         case MfaChallenge(:final challengeToken, :final email):
           state = AuthNeedsTwoFactor(
             challengeToken: challengeToken,
@@ -351,6 +353,27 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Sets up a Quick PIN and optional biometric unlock for this device.
+  Future<void> enableQuickPin({
+    required String pin,
+    bool enableBiometric = false,
+  }) async {
+    await _repository.enableQuickPin(
+      pin: pin,
+      enableBiometric: enableBiometric,
+    );
+  }
+
+  /// Disables Quick PIN and quick unlock on this device.
+  Future<void> disableQuickPin() async {
+    await _repository.disableQuickPin();
+  }
+
+  /// Updates biometric toggle preference on this device.
+  Future<void> setBiometricEnabled(bool enabled) async {
+    await _repository.setBiometricEnabled(enabled);
+  }
+
   /// Best-effort fallback when the backend did not return the account email:
   /// reuse the identifier when it looks like an email address.
   static String _emailFromIdentifier(String identifier) {
@@ -437,6 +460,9 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    try {
+      await ref.read(deviceRegistrationServiceProvider).unregisterDevice();
+    } catch (_) {}
     await _repository.logout();
     state = const AuthUnauthenticated();
   }

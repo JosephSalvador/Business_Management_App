@@ -6,6 +6,7 @@ import '../platform/device_info.dart';
 import '../session/app_lock.dart';
 import '../storage/db_key_store.dart';
 import '../storage/local_database.dart';
+import '../storage/offline_cache_dao.dart';
 import '../storage/session_journal.dart';
 import '../../features/authentication/data/biometric_auth_gate.dart';
 import '../../features/authentication/data/offline_credential_store.dart';
@@ -33,6 +34,10 @@ final sessionJournalProvider = Provider<SessionJournal>(
 
 final localSalesServiceProvider = Provider<LocalSalesService>(
   (ref) => LocalSalesService(database: ref.watch(localDatabaseProvider)),
+);
+
+final offlineCacheDaoProvider = Provider<OfflineCacheDao>(
+  (ref) => OfflineCacheDao(ref.watch(localDatabaseProvider)),
 );
 
 /// Abstract: overridden by [auth_providers.dart] with the authenticated client.

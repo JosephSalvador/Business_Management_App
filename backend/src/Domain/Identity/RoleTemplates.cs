@@ -31,6 +31,7 @@ public static class RoleTemplates
                 PermissionNames.ExpensesView, PermissionNames.ExpensesCreate, PermissionNames.ExpensesUpdate,
                 PermissionNames.ReceiptsView, PermissionNames.ReceiptsPrint, PermissionNames.ReceiptsManageLayouts,
                 PermissionNames.InvoicesView, PermissionNames.InvoicesCreate, PermissionNames.InvoicesManage,
+                PermissionNames.NotificationsView, PermissionNames.NotificationsManage,
             ]),
         new(
             "Cashier",
@@ -42,6 +43,7 @@ public static class RoleTemplates
                 PermissionNames.InventoryView, PermissionNames.WarehousesView,
                 PermissionNames.CustomersView, PermissionNames.CustomersCreate, PermissionNames.CustomersUpdate,
                 PermissionNames.ReceiptsView, PermissionNames.ReceiptsPrint,
+                PermissionNames.NotificationsView,
             ]),
         new(
             "Inventory Officer",
@@ -55,6 +57,7 @@ public static class RoleTemplates
                 PermissionNames.WarehousesView, PermissionNames.WarehousesCreate, PermissionNames.WarehousesUpdate, PermissionNames.WarehousesDelete,
                 PermissionNames.InventoryView, PermissionNames.InventoryManage,
                 PermissionNames.PricingView,
+                PermissionNames.NotificationsView,
             ]),
         new(
             "Accountant",
@@ -69,6 +72,7 @@ public static class RoleTemplates
                 PermissionNames.ReceiptsView, PermissionNames.ReceiptsPrint,
                 PermissionNames.InvoicesView,
                 PermissionNames.AuditView,
+                PermissionNames.NotificationsView,
             ]),
     ];
 }

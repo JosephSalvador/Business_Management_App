@@ -43,6 +43,8 @@ class OfflineCredentialStore {
   static const _quickUnlockExpiryKey = 'jolinx.auth.quick_unlock_expiry';
   static const _unlockPinKey = 'jolinx.auth.unlock_pin';
   static const _unlockPinSaltKey = 'jolinx.auth.unlock_pin_salt';
+  static const _biometricEnabledKey = 'jolinx.auth.biometric_enabled';
+  static const _quickPinEnabledKey = 'jolinx.auth.quick_pin_enabled';
   static const _userIdKey = 'jolinx.auth.offline_user_id';
   static const _tenantIdKey = 'jolinx.auth.offline_tenant_id';
   static const _permissionsKey = 'jolinx.auth.offline_permissions';
@@ -297,6 +299,36 @@ class OfflineCredentialStore {
         (saltBase64 != null && saltBase64.isNotEmpty);
   }
 
+  /// Whether the user has explicitly opted in to biometric unlock.
+  Future<bool> isBiometricEnabled() async {
+    final value = await _storage.read(key: _biometricEnabledKey);
+    return value == 'true';
+  }
+
+  /// Sets user preference for biometric unlock.
+  Future<void> setBiometricEnabled(bool enabled) async {
+    await _storage.write(
+      key: _biometricEnabledKey,
+      value: enabled ? 'true' : 'false',
+    );
+  }
+
+  /// Whether Quick PIN is enabled on this device (must also have a PIN stored).
+  Future<bool> isQuickPinEnabled() async {
+    final hasPin = await hasUnlockPin();
+    if (!hasPin) return false;
+    final value = await _storage.read(key: _quickPinEnabledKey);
+    return value != 'false';
+  }
+
+  /// Sets user preference for Quick PIN unlock.
+  Future<void> setQuickPinEnabled(bool enabled) async {
+    await _storage.write(
+      key: _quickPinEnabledKey,
+      value: enabled ? 'true' : 'false',
+    );
+  }
+
   /// Stores a device-local unlock PIN (PBKDF2 hash) for fast, offline-capable
   /// unlock on devices without a biometric sensor. The PIN is never the
   /// account password and never leaves the device.
@@ -314,6 +346,7 @@ class OfflineCredentialStore {
     await Future.wait([
       _storage.write(key: _unlockPinKey, value: hash),
       _storage.write(key: _unlockPinSaltKey, value: base64Url.encode(salt)),
+      _storage.write(key: _quickPinEnabledKey, value: 'true'),
       // A freshly chosen PIN resets the shared lockout counter.
       _storage.write(key: _failedAttemptsKey, value: '0'),
       _storage.delete(key: _lockoutUntilKey),
@@ -347,6 +380,7 @@ class OfflineCredentialStore {
     await Future.wait([
       _storage.delete(key: _unlockPinKey),
       _storage.delete(key: _unlockPinSaltKey),
+      _storage.delete(key: _quickPinEnabledKey),
     ]);
   }
 
@@ -406,6 +440,8 @@ class OfflineCredentialStore {
       _storage.delete(key: _quickUnlockExpiryKey),
       _storage.delete(key: _unlockPinKey),
       _storage.delete(key: _unlockPinSaltKey),
+      _storage.delete(key: _biometricEnabledKey),
+      _storage.delete(key: _quickPinEnabledKey),
       _storage.delete(key: _userIdKey),
       _storage.delete(key: _tenantIdKey),
       _storage.delete(key: _permissionsKey),

@@ -176,6 +176,8 @@
   "dashboardEmptyTitle": "Karibu JOLINX!",
   "dashboardEmptyMessage": "Anza kuongeza bidhaa na kufanya mauzo.\nTaarita zitaonekana hapa.",
   "dashboardItemUnits": "vipimo",
+  "dashboardCachedBanner": "Unaangalia taarifa za awali (bila intaneti). Vuta chini kuonyesha upya ukiwa hewani.",
+  "dashboardUpdatedJustNow": "Hivi sasa",
 
   "posTitle": "Mauzo",
   "posSearchProducts": "Tafuta bidhaa...",
@@ -374,6 +376,9 @@
   "reportsSaleCount": "Idadi ya mauzo",
   "reportsTrendLast7Days": "Siku 7 zilizopita",
   "reportsSoldLabel": "zimeuzwa",
+  "reportsProfitLabel": "Faida",
+  "reportsLossLabel": "Hasara",
+  "reportsCostLabel": "Gharama",
   "reportsTopProducts": "Bidhaa Maarufu",
   "reportsSeeAll": "Ona zote",
   "reportsNoSalesData": "Hakuna data ya mauzo bado",
@@ -606,7 +611,8 @@
   "stockUnitCostOptional": "Bei ya kununua kwa kitu (hiari)",
   "productFormCostPrice": "Bei ya kununua",
   "productFormCostPriceHint": "Unalipa bei gani kununua bidhaa hii",
-  "productFormCostPriceInvalid": "Bei ya kununua haiwezi kuwa chini ya sifa",
+  "productFormCostPriceInvalid": "Bei ya kununua haiwezi kuwa chini ya sifuri",
+  "productFormCostPriceGuidance": "Inahitajika ili kukokotoa faida halisi na thamani ya stoo.",
 
   "navHome": "Mwanzo",
   "navPos": "Uza",

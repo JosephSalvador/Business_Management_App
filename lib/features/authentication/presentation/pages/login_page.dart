@@ -15,7 +15,7 @@ import '../widgets/auth_form_card.dart';
 import '../widgets/fast_unlock_panel.dart';
 import '../widgets/language_switcher.dart';
 import '../widgets/password_field.dart';
-import '../widgets/pin_unlock_sheet.dart';
+import '../widgets/quick_pin_setup_sheet.dart';
 
 /// M-Pesa-style auth screen: a trusted device opens straight into the security
 /// prompt (fingerprint and/or inline PIN pad). The username/password form is
@@ -75,49 +75,34 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     final trusted = await offlineStore.hasValidQuickUnlock();
     final hasPin = await offlineStore.hasUnlockPin();
-    final biometricAvailable = await biometricGate.isAvailable();
+    final isQuickPinEnabled = await offlineStore.isQuickPinEnabled();
+    final isBiometricOptedIn = await offlineStore.isBiometricEnabled();
+    final biometricHardwareAvailable = await biometricGate.isAvailable();
     final fullName = await offlineStore.getCachedFullName();
+
+    final biometricReady = biometricHardwareAvailable && isBiometricOptedIn;
+    final canFastLogin = trusted && (isQuickPinEnabled || biometricReady);
 
     if (!mounted) return;
     setState(() {
       _trusted = trusted;
-      _hasPin = hasPin;
-      _biometricAvailable = biometricAvailable;
+      _hasPin = hasPin && isQuickPinEnabled;
+      _biometricAvailable = biometricReady;
       _firstName = _firstToken(fullName);
-      _fastMode = trusted;
+      _fastMode = canFastLogin;
     });
 
-    // Trusted device with neither fingerprint nor PIN yet: choose a PIN first,
-    // like M-Pesa does on a device seen before.
-    if (trusted && !biometricAvailable && !hasPin) await _offerPinSetup();
+    if (canFastLogin && biometricReady) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _fastMode) _fingerprint();
+      });
+    }
   }
 
   String? _firstToken(String? name) {
     final trimmed = (name ?? '').trim();
     if (trimmed.isEmpty) return null;
     return trimmed.split(RegExp(r'\s+')).first;
-  }
-
-  Future<void> _offerPinSetup() async {
-    if (!mounted) return;
-    final ok = await showPinUnlockSheet(
-      context,
-      setup: true,
-      onSubmit: (pin) =>
-          ref.read(authControllerProvider.notifier).setupPin(pin: pin),
-    );
-    if (!mounted) return;
-    final auth = ref.read(authControllerProvider);
-    if (auth is AuthAuthenticated) return; // navigated away
-    if (auth is AuthUnauthenticated && auth.message != null) {
-      // PIN rejected its pattern — fall back to the password form.
-      setState(() {
-        _fastMode = false;
-        _unlockError = auth.message;
-      });
-      return;
-    }
-    if (!ok) setState(() => _fastMode = false);
   }
 
   /// Runs a fast-unlock action, surfacing failures as the inline panel error.
@@ -170,6 +155,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             identifier: _identifierController.text,
             password: _passwordController.text,
           );
+      final auth = ref.read(authControllerProvider);
+      if (auth is AuthAuthenticated && mounted) {
+        final offlineStore = ref.read(offlineCredentialStoreProvider);
+        final hasPin = await offlineStore.hasUnlockPin();
+        if (!hasPin && mounted) {
+          final biometricGate = ref.read(biometricAuthGateProvider);
+          final biometricHardware = await biometricGate.isAvailable();
+          await showQuickPinSetupSheet(
+            context,
+            biometricSupported: biometricHardware,
+            onSave: ({required pin, required enableBiometric}) async {
+              await ref.read(authControllerProvider.notifier).enableQuickPin(
+                    pin: pin,
+                    enableBiometric: enableBiometric,
+                  );
+            },
+          );
+        }
+      }
     } on AppException catch (error) {
       setState(() => _errors = mapAuthError(error));
     } finally {
@@ -223,16 +227,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             color: AppColors.resolveTextSecondary(context),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         FastUnlockPanel(
           biometricAvailable: _biometricAvailable,
-          showPinPad: _hasPin,
+          showPinPad: true,
           busy: _busy,
           errorMessage: _unlockError,
+          label: 'Ingiza PIN ya tarakimu 4',
           onFingerprint: _fingerprint,
           onPin: _pin,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         TextButton(
           onPressed: _busy
               ? null
@@ -240,7 +245,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     _fastMode = false;
                     _unlockError = null;
                   }),
-          child: const Text('Mtu mwingine? Ingia kwa akaunti yako'),
+          child: const Text('Ingia kwa nenosiri'),
         ),
       ],
     );

@@ -221,9 +221,9 @@ public sealed class TopProductsQueryTests
         var tenant = ReportingTestHelper.StubTenant();
         var repo = new StubReportRepository();
         repo.SeedTopProducts(
-            new TopProductRow(Guid.NewGuid(), "Widget A", "WA-001", 100m, 5000m, 800m, 1),
-            new TopProductRow(Guid.NewGuid(), "Widget B", "WB-001", 80m, 4000m, 640m, 2),
-            new TopProductRow(Guid.NewGuid(), "Widget C", "WC-001", 50m, 2500m, 400m, 3));
+            new TopProductRow(Guid.NewGuid(), "Widget A", "WA-001", 100m, 5000m, 800m, 1, 3000m, 2000m, 40.0m),
+            new TopProductRow(Guid.NewGuid(), "Widget B", "WB-001", 80m, 4000m, 640m, 2, 2800m, 1200m, 30.0m),
+            new TopProductRow(Guid.NewGuid(), "Widget C", "WC-001", 50m, 2500m, 400m, 3, 2000m, 500m, 20.0m));
         var handler = new TopProductsQueryHandler(tenant, repo);
 
         var from = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -233,6 +233,9 @@ public sealed class TopProductsQueryTests
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value.Products.Count);
         Assert.Equal(1, result.Value.Products[0].Rank);
+        Assert.Equal(2000m, result.Value.Products[0].TotalProfit);
+        Assert.Equal(3000m, result.Value.Products[0].TotalCost);
+        Assert.Equal(40.0m, result.Value.Products[0].MarginPercent);
         Assert.Equal(2, result.Value.Products[1].Rank);
     }
 

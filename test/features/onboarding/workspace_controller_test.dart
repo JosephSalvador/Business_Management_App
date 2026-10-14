@@ -14,6 +14,20 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
   int loadCalls = 0;
   OnboardingDraft? lastDraft;
   int createCalls = 0;
+  Workspace? cachedWorkspace;
+
+  @override
+  Future<Workspace?> getCachedWorkspace() async => cachedWorkspace;
+
+  @override
+  Future<void> saveCachedWorkspace(Workspace workspace) async {
+    cachedWorkspace = workspace;
+  }
+
+  @override
+  Future<void> clearCachedWorkspace() async {
+    cachedWorkspace = null;
+  }
 
   @override
   Future<List<Workspace>> mine() async {
@@ -146,6 +160,45 @@ void main() {
       });
       final ready = controller.state as WorkspaceReady;
       expect(ready.selected!.onboardingComplete, isTrue);
+    });
+
+    test('load optimistically hydrates from cache before network responds',
+        () async {
+      final fake = FakeWorkspaceRepository(
+        mineResult: [workspace('remote', complete: true)],
+      )..cachedWorkspace = workspace('cached', complete: true);
+
+      final container = ProviderContainer(overrides: [
+        workspaceRepositoryProvider.overrideWithValue(fake),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(workspaceControllerProvider.notifier);
+
+      await controller.load();
+
+      // Successfully updated to remote while seamlessly serving cached
+      final ready = controller.state as WorkspaceReady;
+      expect(ready.selected!.id, 'remote');
+      expect(fake.cachedWorkspace!.id, 'remote');
+    });
+
+    test('network failure retains optimistic cached workspace', () async {
+      final fake = FakeWorkspaceRepository(
+        mineError: NetworkException(),
+      )..cachedWorkspace = workspace('cached', complete: true);
+
+      final container = ProviderContainer(overrides: [
+        workspaceRepositoryProvider.overrideWithValue(fake),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(workspaceControllerProvider.notifier);
+
+      await controller.load();
+
+      // Did not transition to WorkspaceFailure because cached state was available
+      expect(controller.state, isA<WorkspaceReady>());
+      final ready = controller.state as WorkspaceReady;
+      expect(ready.selected!.id, 'cached');
     });
   });
 }

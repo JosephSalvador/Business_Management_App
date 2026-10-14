@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/app_exception.dart';
 import '../domain/workspace.dart';
@@ -34,9 +36,56 @@ class OnboardingDraft {
 /// Reads and completes the signed-in user's workspaces against
 /// `/api/v1/workspaces/mine` and `/api/v1/organization/onboarding`.
 class WorkspaceRepository {
-  WorkspaceRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+  WorkspaceRepository({
+    required ApiClient apiClient,
+    FlutterSecureStorage? storage,
+  })  : _apiClient = apiClient,
+        _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(),
+              iOptions: IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock_this_device,
+              ),
+            );
 
   final ApiClient _apiClient;
+  final FlutterSecureStorage _storage;
+
+  static const _cachedWorkspaceKey = 'jolinx.workspace.cached_selected';
+
+  /// Returns locally cached workspace for instant cold start hydration.
+  Future<Workspace?> getCachedWorkspace() async {
+    try {
+      final raw = await _storage.read(key: _cachedWorkspaceKey);
+      if (raw == null || raw.isEmpty) return null;
+      final map = jsonDecode(raw);
+      if (map is Map<String, dynamic>) {
+        return Workspace.fromJson(map);
+      }
+    } catch (_) {
+      // Corrupt or outdated cache is non-fatal
+    }
+    return null;
+  }
+
+  /// Persists selected workspace locally for optimistic startup.
+  Future<void> saveCachedWorkspace(Workspace workspace) async {
+    try {
+      final encoded = jsonEncode(workspace.toJson());
+      await _storage.write(key: _cachedWorkspaceKey, value: encoded);
+    } catch (_) {
+      // Storage write failures are non-fatal
+    }
+  }
+
+  /// Clears cached workspace on session loss/logout.
+  Future<void> clearCachedWorkspace() async {
+    try {
+      await _storage.delete(key: _cachedWorkspaceKey);
+    } catch (_) {
+      // Non-fatal
+    }
+  }
 
   /// Workspaces derived from the session's tenant claim. At least one entry
   /// exists for every authenticated user (registration provisions a tenant).

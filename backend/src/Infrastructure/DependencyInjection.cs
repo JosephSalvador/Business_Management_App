@@ -80,6 +80,9 @@ public static class DependencyInjection
         services.AddScoped<IVoucherRepository, VoucherRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<ICustomerInvoiceRepository, CustomerInvoiceRepository>();
+        services.AddScoped<IAppNotificationRepository, AppNotificationRepository>();
+        services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
+        services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
         services.AddScoped<IAccountMappingService, AccountMappingService>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddSingleton<ICsvExportService, CsvExportService>();

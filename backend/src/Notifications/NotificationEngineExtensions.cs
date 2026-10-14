@@ -2,6 +2,7 @@ using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Events;
 using BusinessOS.Notifications.Channels;
 using BusinessOS.Notifications.Events;
+using BusinessOS.Notifications.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 using INotificationService = BusinessOS.Application.Ports.INotificationService;
 
@@ -16,6 +17,7 @@ public static class NotificationEngineExtensions
         services.AddScoped<EmailChannel>();
         services.AddScoped<LoggingSmsChannel>();
         services.AddScoped<LoggingPushChannel>();
+        services.AddScoped<PushNotificationChannel>();
         services.AddScoped<LoggingWhatsAppChannel>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDomainEventHandler<UserRegisteredEvent>, UserRegisteredNotificationHandler>();
@@ -54,6 +56,11 @@ public static class NotificationEngineExtensions
         services.AddScoped<IDomainEventHandler<SupplierBillCreatedEvent>, PostSupplierBillJournalEntryHandler>();
         services.AddScoped<IDomainEventHandler<SupplierBillPaidEvent>, PostSupplierPaymentJournalEntryHandler>();
         services.AddScoped<IDomainEventHandler<SaleVoidedEvent>, PostSaleVoidJournalEntryHandler>();
+
+        services.AddScoped<IDomainEventHandler<CashSessionClosedEvent>, CashShortageAlertNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<SaleVoidedEvent>, SaleVoidedAlertNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<SaleCompletedEvent>, HighValueSaleAlertNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<CustomerInvoicePaidEvent>, CustomerInvoicePaidAlertNotificationHandler>();
 
         return services;
     }

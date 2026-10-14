@@ -99,7 +99,8 @@ public sealed class TopProductsQueryHandler
 
         var productDtos = rows.Select(r => new TopProductDto(
             r.ProductId, r.ProductName, r.Sku,
-            r.TotalQuantity, r.TotalRevenue, r.TotalTax, r.Rank)).ToList();
+            r.TotalQuantity, r.TotalRevenue, r.TotalTax, r.Rank,
+            r.TotalCost, r.TotalProfit, r.MarginPercent)).ToList();
 
         return Result.Success(new TopProductsDto(query.From, query.To, productDtos));
     }
@@ -138,7 +139,8 @@ public sealed class DashboardTaxKpisQueryHandler
 
         var topProductDtos = topProducts.Select(r => new TopProductDto(
             r.ProductId, r.ProductName, r.Sku,
-            r.TotalQuantity, r.TotalRevenue, r.TotalTax, r.Rank)).ToList();
+            r.TotalQuantity, r.TotalRevenue, r.TotalTax, r.Rank,
+            r.TotalCost, r.TotalProfit, r.MarginPercent)).ToList();
 
         return Result.Success(new DashboardTaxKpisDto(
             taxLineDtos.Sum(l => l.TotalBaseAmount),
@@ -283,10 +285,10 @@ public sealed class ExportTopProductsCommandHandler
         var rows = await _reports.GetTopProductsAsync(
             tenantId, command.From, command.To, command.Limit, command.BranchId, cancellationToken);
 
-        var headers = new[] { "Rank", "Product", "SKU", "Quantity", "Revenue", "Tax" };
+        var headers = new[] { "Rank", "Product", "SKU", "Quantity", "Revenue", "Tax", "Cost", "Profit", "Margin %" };
         var bytes = _csv.Export(rows, headers, r => new object[]
         {
-            r.Rank, r.ProductName, r.Sku ?? "", r.TotalQuantity, r.TotalRevenue, r.TotalTax
+            r.Rank, r.ProductName, r.Sku ?? "", r.TotalQuantity, r.TotalRevenue, r.TotalTax, r.TotalCost, r.TotalProfit, $"{r.MarginPercent}%"
         });
 
         var fileName = $"top-products-{command.From:yyyyMMdd}-{command.To:yyyyMMdd}.csv";
@@ -368,7 +370,7 @@ public sealed class BusinessOverviewQueryHandler
             new BusinessOverviewKpiDto(expenseSummary.Total, prevExpenseSummary.Total, CalcChange(expenseSummary.Total, prevExpenseSummary.Total), expenseSummary.Total <= prevExpenseSummary.Total),
             new BusinessOverviewKpiDto(moneyBalance, 0, 0, true),
             trend.Select(t => new SalesTrendPointDto(t.Label, t.SaleCount, t.Revenue, t.Tax)).ToList(),
-            topProducts.Select(p => new TopProductDto(p.ProductId, p.ProductName, p.Sku, p.TotalQuantity, p.TotalRevenue, p.TotalTax, p.Rank)).ToList()));
+            topProducts.Select(p => new TopProductDto(p.ProductId, p.ProductName, p.Sku, p.TotalQuantity, p.TotalRevenue, p.TotalTax, p.Rank, p.TotalCost, p.TotalProfit, p.MarginPercent)).ToList()));
     }
 }
 

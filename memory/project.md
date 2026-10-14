@@ -1364,9 +1364,22 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
   - Edge router for `https://api.joberthix.xyz` that forwards to `PRIMARY_ORIGIN` (`https://jolinx-api.onrender.com`) and automatically fails over to `BACKUP_ORIGIN` on network errors or 502/503/504/52x statuses.
 - **GitHub Actions Multi-Platform Build & Nightly DB Backups (`.github/workflows/build-clients.yml`, `.github/workflows/db-backup.yml`):**
   - Automated CI/CD building all 6 platforms (Android APK, Web ZIP, Windows x64 ZIP, Linux x64 tar.gz, macOS `.app` ZIP, iOS unsigned `.ipa`) with `API_BASE_URL` and `API_FALLBACK_URL` injected and published to GitHub Releases (`latest`).
-  - Automated nightly `pg_dump` backup workflow for Neon PostgreSQL with 90-day encrypted artifact retention.
 
+## Mx Per-Product Profitability & Cost Price Prominence (done 2026-10-13)
 
+- **Backend:**
+  - Extended `TopProductRow` and `TopProductDto` with `TotalCost`, `TotalProfit` (`TotalRevenue - TotalCost`), and `MarginPercent`.
+  - Updated `ReportRepository.GetTopProductsAsync` to compute cost from `SaleLine.UnitCost`, total profit, and margin percentage.
+  - Enhanced `ExportTopProductsCommandHandler` CSV output to include Cost, Profit, and Margin % columns for download.
+  - Updated `BusinessOverviewQueryHandler` and `DashboardTaxKpisQueryHandler` mappings.
+  - Verified: backend builds `--warnaserror` clean with 0 warnings, 0 errors. All 12 reporting unit tests pass.
+- **Flutter:**
+  - `report_repository.dart`: Updated `TopProduct` model and parser with `totalCost`, `totalProfit`, `marginPercent`, supporting both `products` and `items` payload envelopes.
+  - `top_products_page.dart`: Upgraded product tiles to display quantity, cost, revenue, and prominent Profit/Loss badges in green (`Faida: TZS X (Y%)`) or red (`Hasara: -TZS X (-Y%)`) for negative margins.
+  - `business_overview_page.dart`: Added profit subtitle to top product previews.
+  - `product_form_page.dart`: Promoted Cost Price (`Bei ya Kununua`) with prefix icon, helper guidance (`productFormCostPriceGuidance`), and Swahili translation correction (`sifuri`).
+  - Added localization keys (`reportsProfitLabel`, `reportsLossLabel`, `reportsCostLabel`, `productFormCostPriceGuidance`) in `app_en.arb` and `app_sw.arb` and updated generated localizations.
+  - Unit tests updated in `report_repository_test.dart` and `ReportingTests.cs`.
 
 ## client_versioning_and_updates.md — Mandatory Automatic Build Version Upgrades (Locked 2026-10-13)
 
@@ -1375,3 +1388,81 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
 - **CI Enforcement (.github/workflows/build-clients.yml):**
   All Flutter release builds pass `--build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }}`. Because `${{ github.run_number }}` monotonically increases on every run, every new APK always has a strictly higher `versionCode`.
 - **Local Versioning (pubspec.yaml):** Bump `version` (+buildNumber) on every client change.
+
+## Mx Offline Caching & Instant Dashboard / Reports Opening (done 2026-10-13)
+
+- **Architecture:** Implemented Stale-While-Revalidate (SWR) caching over the existing encrypted local Drift/SQLCipher database (`MetaEntries`).
+- **Storage Layer (`lib/core/storage/offline_cache_dao.dart`):**
+  - Added `OfflineCacheDao` providing `save`, `load`, `getLastUpdated`, and `clear` for serializable JSON payloads under `offline_cache:*` keys.
+  - Registered `offlineCacheDaoProvider` in `lib/core/di/core_providers.dart`.
+- **Dashboard (`lib/features/dashboard/application/dashboard_controller.dart`):**
+  - Zero-spinner instant open: immediately loads cached snapshot on `load()`, transitioning to `DashboardLoaded(isFromCache: true)` in 0ms.
+  - Background revalidation: queries server and saves latest state to `OfflineCacheDao`.
+  - Offline resilience: preserves the loaded snapshot on network failure (`AppException`), preventing destructive error screens when internet is disconnected.
+  - Added `dashboardCachedBanner` notification bar on `dashboard_page.dart` indicating cached offline data.
+- **Reports & Top Products (`lib/features/reports/application/top_products_controller.dart`):**
+  - Instant opening and offline persistence across periods (`top_products_{period}`) using `OfflineCacheDao`.
+  - TopProductsPage displays cached offline data without failure spinners or blank screens.
+- **Tests & Verification:**
+  - Added offline resilience unit tests in `test/features/dashboard/dashboard_controller_test.dart` and `test/features/reports/top_products_controller_test.dart`.
+
+## Mx Pro Splash Screen, Optimistic Startup & Background Warmup Pipeline (done 2026-10-13)
+
+- **Optimistic Startup & Workspace Caching (`lib/features/onboarding/data/workspace_repository.dart`, `lib/features/onboarding/application/workspace_controller.dart`):**
+  - Added `toJson` to `Workspace` domain model for secure persistent storage.
+  - Added `saveCachedWorkspace`, `getCachedWorkspace`, and `clearCachedWorkspace` to `WorkspaceRepository` using encrypted `flutter_secure_storage`.
+  - Upgraded `WorkspaceController.load()` to instantly hydrate `WorkspaceReady` from local storage (< 15ms), enabling the router to immediately proceed without locking the user behind network requests.
+  - Background stale-while-revalidate pattern: queries `/api/v1/workspaces/mine` in parallel to refresh cache seamlessly.
+- **Silent Background Warmup Pipeline (`lib/core/services/startup_warmup_service.dart`, `lib/app/providers.dart`):**
+  - Created `StartupWarmupService` running in the background upon authentication.
+  - Automatically pre-warms:
+    1. Active POS branch ID cache via `posBranchIdProvider`.
+    2. Catalog reference data (units, taxes, warehouses) via `catalogControllerProvider`.
+    3. POS sales catalog list via `posCatalogControllerProvider`.
+    4. Offline sales outbox queue sync via `syncEngineProvider.drain()`.
+    5. Tenant feature capabilities & subscription entitlements.
+  - Zero-spinner guarantee: background warmup is non-blocking and completely invisible to the user.
+- **Senior Multimedia Pro Splash Redesign (`lib/features/onboarding/presentation/pages/splash_page.dart`):**
+  - Replaced boring linear progress indicators with an elite brand intro experience.
+  - Dynamic breathing radial background aura (`#0055D4` & emerald bloom with spring pulse).
+  - Specular glass diagonal light sweep (`_SpecularSweepPainter`) dancing across the squircle badge.
+  - 3-stage kinetic vector choreography of Option 2 ("Rising Growth J"):
+    - Left & middle bars rise with ease-out cubic motion and metallic bevels.
+    - Sweeping J stem curves upward with neon-emerald outer glow (`#38F9D4`).
+    - Top arrow emerges with elastic spring overshoot.
+  - Kinetic typography: "JOLINX" with animated kerning expansion (`1.5` $\to$ `3.5`) and smooth opacity bloom.
+- **Tests & Build Verification:**
+  - Added optimistic cache and network-fault tolerance tests in `test/features/onboarding/workspace_controller_test.dart`.
+  - Bumped client version to `1.0.0+3` in `pubspec.yaml`.
+
+## Slice 11 — In-App Notifications & Owner Push Alerts ($0 Architecture, done 2026-10-13)
+
+- **$0 Architecture & Catalog:**
+  - In-app notification center runs over Postgres + REST API with $0 per-message operational cost.
+  - Push dispatcher targets Firebase Cloud Messaging (FCM HTTP v1) with zero cost per message (unlike SMS/WhatsApp).
+  - High-priority owner anti-theft triggers:
+    1. Cash drawer shortage detected (`CashSessionClosedEvent` where counted cash < expected cash).
+    2. Sale voided / cancelled after entry (`SaleVoidedEvent`).
+    3. Low stock threshold alert (`ProductLowStockEvent`).
+    4. Customer invoice payments & debt clearance milestones (`CustomerPaymentReceivedEvent`).
+- **Backend Implementation:**
+  - Permissions `Notifications.View` and `Notifications.Manage` in `backend/src/Domain/Identity/PermissionNames.cs`.
+  - Entities `AppNotification`, `UserDevice`, and `NotificationPreference` mapped in `BusinessDbContext.cs` under `public` schema.
+  - Repositories: `IAppNotificationRepository`, `IUserDeviceRepository`, and `INotificationPreferenceRepository` in `PlatformRepositories.cs`.
+  - REST Endpoints in `NotificationEndpoints.cs`:
+    - `GET /api/v1/notifications` (paged list with category filter).
+    - `GET /api/v1/notifications/unread-count`.
+    - `POST /api/v1/notifications/{id}/read`.
+    - `POST /api/v1/notifications/mark-all-read`.
+    - `POST /api/v1/devices/register` & `DELETE /api/v1/devices/{deviceId}`.
+  - Alert Handlers: `AlertNotificationHandlers.cs` in `BusinessOS.Notifications` outbox pipeline.
+  - Dispatcher: `PushNotificationChannel.cs` with FCM token batch delivery and structured fallback logging.
+  - Unit tests: 13 passed in `NotificationFeatureTests` and `AlertNotificationHandlerTests`.
+- **Flutter Client Implementation:**
+  - `NotificationItem` domain entity with Swahili/English localization helpers.
+  - Riverpod 3 `NotificationsController` with optimistic mark-read and unread count badges.
+  - In-app Notification Center Sheet (`NotificationCenterSheet`) with category filters (`Zote`, `Fedha & Mauzo`, `Stock`, `Madeni`) and deep-link routing.
+  - Bell Button (`NotificationBellButton`) integrated into `DashboardPage` top app bar.
+  - Device lifecycle (`DeviceRegistrationService`) wired to authentication: auto-registers persistent hardware UUID on login, de-registers on logout to prevent cross-tenant alert leakages.
+  - Tests: `notifications_controller_test.dart` and `notification_widgets_test.dart` (7/7 passed), `flutter analyze` 0 warnings.
+

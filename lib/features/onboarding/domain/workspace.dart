@@ -38,4 +38,14 @@ class Workspace {
           .toList(growable: false),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'currency': currency,
+        'countryCode': countryCode,
+        'businessType': businessType,
+        'onboardingComplete': onboardingComplete,
+        'roles': roles,
+      };
 }

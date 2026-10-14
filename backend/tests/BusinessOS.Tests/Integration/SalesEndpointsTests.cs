@@ -53,12 +53,14 @@ public sealed class SalesEndpointsTests : SalesTestBase
         Assert.Equal("0", GetProperty(doc, "status"));
         Assert.Equal("0", GetProperty(doc, "source"));
         Assert.Equal(100.00m, decimal.Parse(GetProperty(doc, "subtotal"), CultureInfo.InvariantCulture));
-        Assert.Equal(15.25m, decimal.Parse(GetProperty(doc, "taxAmount"), CultureInfo.InvariantCulture));
+        // Tax is deferred to the TRA addon (rule seeding disabled in DatabaseSeeder):
+        // every line is a zero-tax "NONE" snapshot and the gross stays the line total.
+        Assert.Equal(0.00m, decimal.Parse(GetProperty(doc, "taxAmount"), CultureInfo.InvariantCulture));
         Assert.Equal(100.00m, decimal.Parse(GetProperty(doc, "totalAmount"), CultureInfo.InvariantCulture));
         var line = Assert.Single(doc.GetProperty("lines").EnumerateArray());
-        Assert.Equal("A", GetProperty(line, "taxCode"));
-        Assert.Equal(0.18m, decimal.Parse(GetProperty(line, "appliedRate"), CultureInfo.InvariantCulture));
-        Assert.Equal(84.75m, decimal.Parse(GetProperty(line, "baseAmount"), CultureInfo.InvariantCulture));
+        Assert.Equal("NONE", GetProperty(line, "taxCode"));
+        Assert.Equal(0m, decimal.Parse(GetProperty(line, "appliedRate"), CultureInfo.InvariantCulture));
+        Assert.Equal(100.00m, decimal.Parse(GetProperty(line, "baseAmount"), CultureInfo.InvariantCulture));
         Assert.Equal("Walk-in", GetProperty(doc, "customer", "name"));
         var saleId = GetProperty(doc, "id");
 
@@ -289,19 +291,20 @@ public sealed class SalesEndpointsTests : SalesTestBase
         Assert.True(response.StatusCode == HttpStatusCode.OK, $"{response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
         var doc = Body(await response.Content.ReadAsStringAsync());
         Assert.Equal(150.00m, decimal.Parse(GetProperty(doc, "subtotal"), CultureInfo.InvariantCulture));
-        Assert.Equal(15.25m, decimal.Parse(GetProperty(doc, "taxAmount"), CultureInfo.InvariantCulture));
+        // Tax deferred to the TRA addon: both lines are zero-tax "NONE" snapshots.
+        Assert.Equal(0.00m, decimal.Parse(GetProperty(doc, "taxAmount"), CultureInfo.InvariantCulture));
         Assert.Equal(150.00m, decimal.Parse(GetProperty(doc, "totalAmount"), CultureInfo.InvariantCulture));
 
         var lines = doc.GetProperty("lines").EnumerateArray().ToList();
         Assert.Equal(2, lines.Count);
         var standard = lines.Single(l => GetProperty(l, "productId") == standardProductId);
         var zeroRated = lines.Single(l => GetProperty(l, "productId") == zeroRatedProductId);
-        Assert.Equal("A", GetProperty(standard, "taxCode"));
-        Assert.Equal("C", GetProperty(zeroRated, "taxCode"));
+        Assert.Equal("NONE", GetProperty(standard, "taxCode"));
+        Assert.Equal("NONE", GetProperty(zeroRated, "taxCode"));
         Assert.Equal(0m, decimal.Parse(GetProperty(zeroRated, "taxAmount"), CultureInfo.InvariantCulture));
     }
 
-    [Fact]
+    [Fact(Skip = "TZ dual-VAT rate B is deferred to the TRA addon — rule seeding is disabled in DatabaseSeeder; re-enable with the addon.")]
     public async Task CreateSale_ElectronicWithoutTin_UsesRateB()
     {
         var (token, _, branchId, productId, warehouseId) = await FixtureAsync("sale-electronic-b");

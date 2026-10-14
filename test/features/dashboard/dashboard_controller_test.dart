@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jolinx_app/core/network/app_exception.dart';
+import 'package:jolinx_app/core/di/core_providers.dart' show offlineCacheDaoProvider;
+import 'package:jolinx_app/core/storage/offline_cache_dao.dart';
 import 'package:jolinx_app/features/dashboard/application/dashboard_controller.dart';
 import 'package:jolinx_app/features/dashboard/data/dashboard_repository.dart';
 import 'package:jolinx_app/app/providers.dart';
@@ -64,15 +66,41 @@ class FakeDashboardRepository implements DashboardRepository {
   }
 }
 
+class FakeOfflineCacheDao implements OfflineCacheDao {
+  final Map<String, Map<String, dynamic>> cachedData = {};
+  final Map<String, DateTime> lastUpdatedTimes = {};
+
+  @override
+  Future<void> save(String key, Map<String, dynamic> data) async {
+    cachedData[key] = data;
+    lastUpdatedTimes[key] = DateTime.now();
+  }
+
+  @override
+  Future<Map<String, dynamic>?> load(String key) async => cachedData[key];
+
+  @override
+  Future<DateTime?> getLastUpdated(String key) async => lastUpdatedTimes[key];
+
+  @override
+  Future<void> clear(String key) async {
+    cachedData.remove(key);
+    lastUpdatedTimes.remove(key);
+  }
+}
+
 void main() {
   group('DashboardController', () {
     late FakeDashboardRepository repository;
+    late FakeOfflineCacheDao fakeCache;
     late ProviderContainer container;
 
     setUp(() {
       repository = FakeDashboardRepository();
+      fakeCache = FakeOfflineCacheDao();
       container = ProviderContainer(overrides: [
         dashboardRepositoryProvider.overrideWithValue(repository),
+        offlineCacheDaoProvider.overrideWithValue(fakeCache),
       ]);
     });
 
@@ -128,6 +156,31 @@ void main() {
       expect(points, hasLength(3));
       expect(points.every((p) => p.revenue == 0), isTrue);
       expect(points.every((p) => p.saleCount == 0), isTrue);
+    });
+
+    test('load() instantly populates cached data when offline', () async {
+      fakeCache.cachedData['dashboard'] = {
+        'summary': const DashboardSummary(
+          branchName: 'Cached Branch',
+          revenueToday: 50000,
+          totalProducts: 10,
+        ).toJson(),
+        'lowStock': <Map<String, dynamic>>[],
+        'recentActivity': <Map<String, dynamic>>[],
+        'trendData': <Map<String, dynamic>>[],
+        'topProducts': <Map<String, dynamic>>[],
+      };
+      // Simulate backend being completely unreachable
+      repository.summaryError = ServerException('No internet connection');
+
+      await controller().load(trendDays: 7);
+
+      final state = container.read(dashboardControllerProvider);
+      expect(state, isA<DashboardLoaded>());
+      final loaded = state as DashboardLoaded;
+      expect(loaded.isFromCache, isTrue);
+      expect(loaded.summary.branchName, 'Cached Branch');
+      expect(loaded.summary.revenueToday, 50000);
     });
   });
 }

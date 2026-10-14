@@ -77,9 +77,9 @@ public sealed class IdentityEndpointsTests : IClassFixture<BusinessOsApiFactory>
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         var doc = Body(await login.Content.ReadAsStringAsync());
         return (
-            GetProperty(doc, "accessToken"),
-            GetProperty(doc, "user", "tenantId"),
-            GetProperty(doc, "user", "id"));
+            GetProperty(doc, "tokens", "accessToken"),
+            GetProperty(doc, "tokens", "user", "tenantId"),
+            GetProperty(doc, "tokens", "user", "id"));
     }
 
     private async Task<string> RegisterLimitedUserAsync(string label, Guid tenantId, params string[] permissions)

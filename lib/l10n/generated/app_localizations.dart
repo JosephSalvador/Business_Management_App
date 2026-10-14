@@ -1970,6 +1970,36 @@ abstract class AppLocalizations {
   /// **'sold'**
   String get reportsSoldLabel;
 
+  /// No description provided for @dashboardCachedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewing offline data (cached). Pull to refresh when connected.'**
+  String get dashboardCachedBanner;
+
+  /// No description provided for @dashboardUpdatedJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get dashboardUpdatedJustNow;
+
+  /// No description provided for @reportsProfitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Profit'**
+  String get reportsProfitLabel;
+
+  /// No description provided for @reportsLossLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Loss'**
+  String get reportsLossLabel;
+
+  /// No description provided for @reportsCostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get reportsCostLabel;
+
   /// No description provided for @reportsTopProducts.
   ///
   /// In en, this message translates to:
@@ -3283,6 +3313,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cost price cannot be negative'**
   String get productFormCostPriceInvalid;
+
+  /// No description provided for @productFormCostPriceGuidance.
+  ///
+  /// In en, this message translates to:
+  /// **'Required to calculate real profit and inventory valuation.'**
+  String get productFormCostPriceGuidance;
 
   /// No description provided for @navHome.
   ///

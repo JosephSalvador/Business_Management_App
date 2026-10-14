@@ -82,21 +82,27 @@ void main() {
       expect(query['to'], '2026-09-08T00:00:00.000Z');
     });
 
-    test('topProducts parses items list with expected fields', () async {
+    test('topProducts parses items list with expected fields including profit', () async {
       final adapter = ScriptedAdapter([
         ScriptedResponse(
             200,
             jsonEncode({
-              'items': [
+              'products': [
                 {
                   'productName': 'Mchele',
                   'totalQuantity': 200,
                   'totalRevenue': 500000,
+                  'totalCost': 350000,
+                  'totalProfit': 150000,
+                  'marginPercent': 30.0,
                 },
                 {
                   'productName': 'Sukari',
                   'totalQuantity': 80,
                   'totalRevenue': 160000,
+                  'totalCost': 120000,
+                  'totalProfit': 40000,
+                  'marginPercent': 25.0,
                 },
               ],
             })),
@@ -113,7 +119,11 @@ void main() {
       expect(products[0].productName, 'Mchele');
       expect(products[0].totalQuantity, 200);
       expect(products[0].totalRevenue, 500000);
+      expect(products[0].totalCost, 350000);
+      expect(products[0].totalProfit, 150000);
+      expect(products[0].marginPercent, 30.0);
       expect(products[1].productName, 'Sukari');
+      expect(products[1].totalProfit, 40000);
     });
 
     test('topProducts returns empty list when items is absent', () async {

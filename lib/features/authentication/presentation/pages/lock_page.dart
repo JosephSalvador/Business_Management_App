@@ -14,9 +14,7 @@ import '../widgets/fast_unlock_panel.dart';
 
 /// Fast-factor unlock screen shown when the app is idle/background-locked.
 ///
-/// The session is already trusted, so neither a password nor a quick-unlock
-/// token is required — just a fresh biometric match or the local unlock PIN.
-/// Nothing about connectivity or "offline mode" is ever shown here.
+/// The session is already trusted: unlock with the 4-digit PIN or native biometric match.
 class LockPage extends ConsumerStatefulWidget {
   const LockPage({super.key});
 
@@ -39,13 +37,21 @@ class _LockPageState extends ConsumerState<LockPage> {
   Future<void> _probeFactors() async {
     final biometricGate = ref.read(biometricAuthGateProvider);
     final store = ref.read(offlineCredentialStoreProvider);
-    final biometricAvailable = await biometricGate.isAvailable();
+    final biometricHardware = await biometricGate.isAvailable();
+    final biometricOptedIn = await store.isBiometricEnabled();
+    final isBiometric = biometricHardware && biometricOptedIn;
     final hasUnlockPin = await store.hasUnlockPin();
     if (mounted) {
       setState(() {
-        _biometricAvailable = biometricAvailable;
+        _biometricAvailable = isBiometric;
         _hasUnlockPin = hasUnlockPin;
       });
+      // Auto-trigger native biometric prompt if user enabled biometric!
+      if (isBiometric) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _unlockWithBiometric();
+        });
+      }
     }
   }
 
@@ -58,11 +64,10 @@ class _LockPageState extends ConsumerState<LockPage> {
     await ref.read(authControllerProvider.notifier).unlock();
     if (mounted) {
       setState(() => _busy = false);
-      // Unlock failure leaves AuthUnauthenticated → router sends to /login.
       final auth = ref.read(authControllerProvider);
       if (auth is AuthLocked) {
         setState(
-            () => _message = 'Hakuna uwezo wa kufungua. Jaribu neno siri.');
+            () => _message = 'Uthibitisho wa kidole haukufanikiwa. Ingiza PIN.');
       }
     }
   }
@@ -107,8 +112,9 @@ class _LockPageState extends ConsumerState<LockPage> {
                 Text(
                   'App imefungwa kwa usalama',
                   style: TextStyle(
-                    fontSize: 15,
-                    color: AppColors.resolveTextSecondary(context),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.resolveTextPrimary(context),
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -126,6 +132,7 @@ class _LockPageState extends ConsumerState<LockPage> {
                   FastUnlockPanel(
                     biometricAvailable: _biometricAvailable,
                     showPinPad: _hasUnlockPin,
+                    label: 'Ingiza PIN yako ya tarakimu 4',
                     busy: _busy,
                     errorMessage: _message,
                     onFingerprint: _unlockWithBiometric,
@@ -139,6 +146,11 @@ class _LockPageState extends ConsumerState<LockPage> {
                     ),
                     child: const Text('Ingia kwa nenosiri'),
                   ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _busy ? null : _logoutToLogin,
+                  child: const Text('Ingia kwa nenosiri'),
+                ),
               ],
             ),
           ),

@@ -10,6 +10,7 @@ using BusinessOS.Domain.Finance;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Invoicing;
+using BusinessOS.Domain.Notifications;
 using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
@@ -2758,4 +2759,212 @@ public sealed class CustomerInvoiceRepository : ICustomerInvoiceRepository
     public Task<string> AllocateNumberAsync(
         Guid tenantId, DateTime date, CancellationToken cancellationToken = default)
         => _numberSequences.AllocateAsync(tenantId, "CustomerInvoice", date, cancellationToken);
+}
+
+public sealed class AppNotificationRepository : IAppNotificationRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public AppNotificationRepository(BusinessDbContext db) => _db = db;
+
+    public Task<AppNotification?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.Notifications.FirstOrDefaultAsync(n => n.TenantId == tenantId && n.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<AppNotification>> ListPagedAsync(
+        Guid tenantId,
+        Guid? userId,
+        string? targetRole,
+        int page,
+        int pageSize,
+        NotificationListFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.Notifications.Where(n => n.TenantId == tenantId);
+
+        if (userId.HasValue)
+        {
+            if (!string.IsNullOrWhiteSpace(targetRole))
+            {
+                query = query.Where(n => n.UserId == userId.Value || (n.UserId == null && (n.TargetRole == null || n.TargetRole == targetRole)));
+            }
+            else
+            {
+                query = query.Where(n => n.UserId == userId.Value || n.UserId == null);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Category))
+        {
+            query = query.Where(n => n.Category == filter.Category);
+        }
+
+        if (filter.UnreadOnly == true)
+        {
+            query = query.Where(n => !n.IsRead);
+        }
+
+        return await query
+            .OrderByDescending(n => n.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> GetUnreadCountAsync(
+        Guid tenantId,
+        Guid? userId,
+        string? targetRole,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.Notifications.Where(n => n.TenantId == tenantId && !n.IsRead);
+
+        if (userId.HasValue)
+        {
+            if (!string.IsNullOrWhiteSpace(targetRole))
+            {
+                query = query.Where(n => n.UserId == userId.Value || (n.UserId == null && (n.TargetRole == null || n.TargetRole == targetRole)));
+            }
+            else
+            {
+                query = query.Where(n => n.UserId == userId.Value || n.UserId == null);
+            }
+        }
+
+        return query.CountAsync(cancellationToken);
+    }
+
+    public async Task MarkAsReadAsync(Guid tenantId, Guid id, DateTime readAt, CancellationToken cancellationToken = default)
+    {
+        var notif = await _db.Notifications.FirstOrDefaultAsync(n => n.TenantId == tenantId && n.Id == id, cancellationToken);
+        if (notif is not null && !notif.IsRead)
+        {
+            notif.MarkAsRead(readAt);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<int> MarkAllAsReadAsync(Guid tenantId, Guid userId, DateTime readAt, CancellationToken cancellationToken = default)
+    {
+        var unread = await _db.Notifications
+            .Where(n => n.TenantId == tenantId && (n.UserId == userId || n.UserId == null) && !n.IsRead)
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in unread)
+        {
+            item.MarkAsRead(readAt);
+        }
+
+        if (unread.Count > 0)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return unread.Count;
+    }
+
+    public async Task AddAsync(AppNotification notification, CancellationToken cancellationToken = default)
+    {
+        _db.Notifications.Add(notification);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+}
+
+public sealed class UserDeviceRepository : IUserDeviceRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public UserDeviceRepository(BusinessDbContext db) => _db = db;
+
+    public Task<UserDevice?> GetByDeviceAsync(
+        Guid tenantId, Guid userId, string deviceId, CancellationToken cancellationToken = default)
+        => _db.UserDevices.FirstOrDefaultAsync(
+            d => d.TenantId == tenantId && d.UserId == userId && d.DeviceId == deviceId,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<UserDevice>> ListActiveForUsersAsync(
+        Guid tenantId, IReadOnlyList<Guid> userIds, CancellationToken cancellationToken = default)
+        => await _db.UserDevices
+            .Where(d => d.TenantId == tenantId && userIds.Contains(d.UserId) && d.IsActive)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<UserDevice>> ListActiveForRoleAsync(
+        Guid tenantId, string roleName, CancellationToken cancellationToken = default)
+    {
+        var userIdsInRole = await _db.Users
+            .Where(u => u.TenantId == tenantId && u.IsActive && u.Roles.Any(r => r.Name == roleName))
+            .Select(u => u.Id)
+            .ToListAsync(cancellationToken);
+
+        return await _db.UserDevices
+            .Where(d => d.TenantId == tenantId && userIdsInRole.Contains(d.UserId) && d.IsActive)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task UpsertAsync(UserDevice device, CancellationToken cancellationToken = default)
+    {
+        var existing = await _db.UserDevices.FirstOrDefaultAsync(
+            d => d.TenantId == device.TenantId && d.UserId == device.UserId && d.DeviceId == device.DeviceId,
+            cancellationToken);
+
+        if (existing is null)
+        {
+            _db.UserDevices.Add(device);
+        }
+        else
+        {
+            existing.UpdateToken(device.FcmToken, device.DeviceName);
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeactivateAsync(
+        Guid tenantId, Guid userId, string deviceId, CancellationToken cancellationToken = default)
+    {
+        var device = await _db.UserDevices.FirstOrDefaultAsync(
+            d => d.TenantId == tenantId && d.UserId == userId && d.DeviceId == deviceId,
+            cancellationToken);
+
+        if (device is not null)
+        {
+            device.Deactivate();
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+    }
+}
+
+public sealed class NotificationPreferenceRepository : INotificationPreferenceRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public NotificationPreferenceRepository(BusinessDbContext db) => _db = db;
+
+    public Task<NotificationPreference?> GetByTenantAndUserAsync(
+        Guid tenantId, Guid? userId, CancellationToken cancellationToken = default)
+        => _db.NotificationPreferences.FirstOrDefaultAsync(
+            p => p.TenantId == tenantId && p.UserId == userId,
+            cancellationToken);
+
+    public async Task UpsertAsync(NotificationPreference preference, CancellationToken cancellationToken = default)
+    {
+        var existing = await _db.NotificationPreferences.FirstOrDefaultAsync(
+            p => p.TenantId == preference.TenantId && p.UserId == preference.UserId,
+            cancellationToken);
+
+        if (existing is null)
+        {
+            _db.NotificationPreferences.Add(preference);
+        }
+        else
+        {
+            existing.Update(
+                preference.NotifyCashShortage,
+                preference.NotifySaleVoided,
+                preference.NotifyLowStock,
+                preference.HighSaleThreshold,
+                preference.PushEnabled);
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
 }

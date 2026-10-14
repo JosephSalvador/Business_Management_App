@@ -3,13 +3,18 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../app/providers.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/workspace_controller.dart';
 
 /// Splash screen — shown while session/workspace resolves.
-/// Features a choreographed vector animation of the Jolinx "Rising Growth J" emblem.
+///
+/// Features a tier-1 multimedia design:
+/// - Breathing radial background aura
+/// - Specular glass light sweep over the brand badge
+/// - Kinetic vector choreography (3-stage rising growth J with neon-emerald glow)
+/// - Modern typography with kinetic kerning expansion
+/// - Zero boring linear spinners
 class SplashPage extends ConsumerWidget {
   const SplashPage({super.key});
 
@@ -26,7 +31,7 @@ class SplashPage extends ConsumerWidget {
                 onRetry: () =>
                     ref.read(workspaceControllerProvider.notifier).load(),
               ),
-            _ => const _AnimatedSplashView(),
+            _ => const _ProSplashHero(),
           },
         ),
       ),
@@ -34,138 +39,217 @@ class SplashPage extends ConsumerWidget {
   }
 }
 
-class _AnimatedSplashView extends StatefulWidget {
-  const _AnimatedSplashView();
+class _ProSplashHero extends StatefulWidget {
+  const _ProSplashHero();
 
   @override
-  State<_AnimatedSplashView> createState() => _AnimatedSplashViewState();
+  State<_ProSplashHero> createState() => _ProSplashHeroState();
 }
 
-class _AnimatedSplashViewState extends State<_AnimatedSplashView>
+class _ProSplashHeroState extends State<_ProSplashHero>
     with TickerProviderStateMixin {
-  late final AnimationController _introController;
-  late final AnimationController _pulseController;
+  late final AnimationController _choreographyController;
+  late final AnimationController _ambientGlowController;
+  late final AnimationController _shimmerController;
 
-  late final Animation<double> _cardScale;
+  late final Animation<double> _badgeScale;
   late final Animation<double> _bar1Progress;
   late final Animation<double> _bar2Progress;
   late final Animation<double> _jArrowProgress;
   late final Animation<double> _textOpacity;
   late final Animation<Offset> _textSlide;
+  late final Animation<double> _letterSpacing;
 
   @override
   void initState() {
     super.initState();
 
-    _introController = AnimationController(
+    // 1. Choreographed entry (1200ms)
+    _choreographyController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1450),
+      duration: const Duration(milliseconds: 1250),
     );
 
-    _pulseController = AnimationController(
+    // 2. Continuous ambient specular breathing glow
+    _ambientGlowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 2400),
     )..repeat(reverse: true);
 
-    _cardScale = CurvedAnimation(
-      parent: _introController,
-      curve: const Interval(0.0, 0.42, curve: Curves.easeOutBack),
+    // 3. Specular glass diagonal light sweep
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat();
+
+    // Elastic spring entrance for emblem badge
+    _badgeScale = CurvedAnimation(
+      parent: _choreographyController,
+      curve: const Interval(0.0, 0.40, curve: Curves.easeOutBack),
     );
 
+    // Bar 1 rising curve
     _bar1Progress = CurvedAnimation(
-      parent: _introController,
-      curve: const Interval(0.18, 0.56, curve: Curves.easeOutCubic),
+      parent: _choreographyController,
+      curve: const Interval(0.15, 0.52, curve: Curves.easeOutCubic),
     );
 
+    // Bar 2 rising curve
     _bar2Progress = CurvedAnimation(
-      parent: _introController,
-      curve: const Interval(0.30, 0.68, curve: Curves.easeOutCubic),
+      parent: _choreographyController,
+      curve: const Interval(0.28, 0.65, curve: Curves.easeOutCubic),
     );
 
+    // Sweeping J arrow path drawing
     _jArrowProgress = CurvedAnimation(
-      parent: _introController,
-      curve: const Interval(0.42, 0.92, curve: Curves.easeInOutCubic),
+      parent: _choreographyController,
+      curve: const Interval(0.40, 0.88, curve: Curves.easeInOutCubic),
     );
 
+    // Typography fade & slide
     _textOpacity = CurvedAnimation(
-      parent: _introController,
-      curve: const Interval(0.66, 1.0, curve: Curves.easeOut),
+      parent: _choreographyController,
+      curve: const Interval(0.60, 1.0, curve: Curves.easeOut),
     );
 
     _textSlide = Tween<Offset>(
-      begin: const Offset(0, 0.25),
+      begin: const Offset(0, 0.20),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
-        parent: _introController,
-        curve: const Interval(0.66, 1.0, curve: Curves.easeOutCubic),
+        parent: _choreographyController,
+        curve: const Interval(0.60, 1.0, curve: Curves.easeOutCubic),
       ),
     );
 
-    _introController.forward();
+    _letterSpacing = Tween<double>(begin: 1.5, end: 3.5).animate(
+      CurvedAnimation(
+        parent: _choreographyController,
+        curve: const Interval(0.60, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    _choreographyController.forward();
   }
 
   @override
   void dispose() {
-    _introController.dispose();
-    _pulseController.dispose();
+    _choreographyController.dispose();
+    _ambientGlowController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_introController, _pulseController]),
+      animation: Listenable.merge([
+        _choreographyController,
+        _ambientGlowController,
+        _shimmerController,
+      ]),
       builder: (context, _) {
-        final pulse = _pulseController.value;
+        final glowPulse = _ambientGlowController.value;
+        final shimmerValue = _shimmerController.value;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Transform.scale(
-              scale: _cardScale.value,
-              child: Container(
-                width: 112,
-                height: 112,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF1A6DFF),
-                      Color(0xFF0055D4),
-                      Color(0xFF003B99),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary
-                          .withValues(alpha: 0.28 + (pulse * 0.14)),
-                      blurRadius: 24 + (pulse * 10),
-                      spreadRadius: 1 + (pulse * 2),
-                      offset: const Offset(0, 10),
+            // Emblem Badge with ambient aura and glass specular sweep
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. Ambient Breathing Radial Aura behind emblem
+                Container(
+                  width: 170,
+                  height: 170,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.primary.withValues(
+                          alpha: 0.35 + (glowPulse * 0.25),
+                        ),
+                        const Color(0xFF00C99B).withValues(
+                          alpha: 0.15 + (glowPulse * 0.15),
+                        ),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.55, 1.0],
                     ),
-                    BoxShadow(
-                      color: AppColors.secondary.withValues(
-                        alpha: 0.16 * _jArrowProgress.value,
+                  ),
+                ),
+
+                // 2. Emblem Badging Container
+                Transform.scale(
+                  scale: _badgeScale.value,
+                  child: Container(
+                    width: 114,
+                    height: 114,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF2272FF),
+                          Color(0xFF0052CC),
+                          Color(0xFF003080),
+                        ],
                       ),
-                      blurRadius: 20,
-                      offset: const Offset(0, -4),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary
+                              .withValues(alpha: 0.38 + (glowPulse * 0.16)),
+                          blurRadius: 30 + (glowPulse * 12),
+                          spreadRadius: 2,
+                          offset: const Offset(0, 12),
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFF38F9D4).withValues(
+                            alpha: 0.22 * _jArrowProgress.value,
+                          ),
+                          blurRadius: 22,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: CustomPaint(
-                  painter: _RisingGrowthJLogoPainter(
-                    bar1Progress: _bar1Progress.value,
-                    bar2Progress: _bar2Progress.value,
-                    jArrowProgress: _jArrowProgress.value,
-                    pulse: pulse,
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      children: [
+                        // Specular Light Sweep diagonal shimmer
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _SpecularSweepPainter(
+                              progress: shimmerValue,
+                            ),
+                          ),
+                        ),
+
+                        // Vector kinetic artwork
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _RisingGrowthJLogoPainter(
+                              bar1Progress: _bar1Progress.value,
+                              bar2Progress: _bar2Progress.value,
+                              jArrowProgress: _jArrowProgress.value,
+                              pulse: glowPulse,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
+
+            // Kinetic Wordmark & Slogan
             FadeTransition(
               opacity: _textOpacity,
               child: SlideTransition(
@@ -176,41 +260,23 @@ class _AnimatedSplashViewState extends State<_AnimatedSplashView>
                     Text(
                       'JOLINX',
                       style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 3.0,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: _letterSpacing.value,
                         color: AppColors.resolveTextPrimary(context),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       'Simamia biashara yako yote sehemu moja',
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 13,
                         fontWeight: FontWeight.w500,
                         letterSpacing: 0.2,
                         color: AppColors.resolveTextSecondary(context),
                       ),
                     ),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: 120,
-              height: 4,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.14),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Color.lerp(
-                      AppColors.primary,
-                      AppColors.secondary,
-                      pulse,
-                    )!,
-                  ),
                 ),
               ),
             ),
@@ -221,9 +287,46 @@ class _AnimatedSplashViewState extends State<_AnimatedSplashView>
   }
 }
 
-/// Vector recreation of Option 2 ("Rising Growth J") with per-element progress.
+/// Renders a diagonal specular light shimmer across the badge surface.
+class _SpecularSweepPainter extends CustomPainter {
+  const _SpecularSweepPainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // Sweeps from left (-w) to right (2*w)
+    final sweepX = -w + (3 * w * progress);
+    final paint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withValues(alpha: 0.0),
+          Colors.white.withValues(alpha: 0.15),
+          Colors.white.withValues(alpha: 0.35),
+          Colors.white.withValues(alpha: 0.15),
+          Colors.white.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.4, 0.5, 0.6, 1.0],
+      ).createShader(Rect.fromLTWH(sweepX - 40, 0, 80, h));
+
+    final rect = Rect.fromLTWH(0, 0, w, h);
+    canvas.drawRect(rect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpecularSweepPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+
+/// Vector choreography of Option 2 ("Rising Growth J") with neon-emerald glow.
 class _RisingGrowthJLogoPainter extends CustomPainter {
-  _RisingGrowthJLogoPainter({
+  const _RisingGrowthJLogoPainter({
     required this.bar1Progress,
     required this.bar2Progress,
     required this.jArrowProgress,
@@ -274,8 +377,10 @@ class _RisingGrowthJLogoPainter extends CustomPainter {
       final whiteFacet = Path()
         ..moveTo(left, currentTop)
         ..lineTo(right - (right - left) * 0.15, currentTop)
-        ..lineTo(left + (right - left) * 0.52,
-            currentTop + (bottom - fullTop) * 0.36)
+        ..lineTo(
+          left + (right - left) * 0.52,
+          currentTop + (bottom - fullTop) * 0.36,
+        )
         ..lineTo(left + (right - left) * 0.52, bottom)
         ..lineTo(left, bottom)
         ..close();
@@ -344,9 +449,9 @@ class _RisingGrowthJLogoPainter extends CustomPainter {
 
       // Subtle outer emerald glow on the J stroke
       final glowStroke = Paint()
-        ..color = _tealGlow.withValues(alpha: 0.25 + 0.15 * pulse)
+        ..color = _tealGlow.withValues(alpha: 0.28 + 0.18 * pulse)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = stemWidth + 5
+        ..strokeWidth = stemWidth + 6
         ..strokeCap = StrokeCap.butt
         ..isAntiAlias = true;
       canvas.drawPath(extracted, glowStroke);
@@ -411,8 +516,8 @@ class _RisingGrowthJLogoPainter extends CustomPainter {
         canvas.drawPath(
           fullArrow,
           Paint()
-            ..color = _tealGlow.withValues(alpha: 0.30 * arrowT)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+            ..color = _tealGlow.withValues(alpha: 0.35 * arrowT)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
         );
 
         canvas.drawPath(fullArrow, tealPaint);

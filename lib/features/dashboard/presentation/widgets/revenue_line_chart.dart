@@ -256,4 +256,10 @@ class SalesTrendPoint {
       revenue: (json['revenue'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'saleCount': saleCount,
+        'revenue': revenue,
+      };
 }

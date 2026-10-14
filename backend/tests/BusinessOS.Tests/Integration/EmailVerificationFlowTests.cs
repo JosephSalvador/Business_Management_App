@@ -121,7 +121,7 @@ public sealed class EmailVerificationFlowTests : IClassFixture<BusinessOsApiFact
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         var doc = Body(await login.Content.ReadAsStringAsync());
-        Assert.True(bool.Parse(GetProperty(doc, "user", "emailVerified")));
+        Assert.True(bool.Parse(GetProperty(doc, "tokens", "user", "emailVerified")));
 
         // The code is single-use.
         var replay = await _client.PostAsJsonAsync("/api/v1/auth/verify-email", new { email, code });
@@ -340,6 +340,6 @@ public sealed class EmailVerificationFlowTests : IClassFixture<BusinessOsApiFact
 
         var login = await _client.PostAsJsonAsync("/api/v1/auth/login", new { identifier = email, password = "Passw0rd!" });
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        return GetProperty(Body(await login.Content.ReadAsStringAsync()), "accessToken");
+        return GetProperty(Body(await login.Content.ReadAsStringAsync()), "tokens", "accessToken");
     }
 }

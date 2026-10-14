@@ -261,6 +261,7 @@ app.MapFeatureFlagEndpoints();
 app.MapBillingEndpoints();
 app.MapCapabilitiesEndpoints();
 app.MapInvoiceEndpoints();
+app.MapNotificationEndpoints();
 app.MapTenantProvisioningEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))

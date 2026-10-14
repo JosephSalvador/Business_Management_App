@@ -11,6 +11,7 @@ using BusinessOS.Domain.Accounting;
 using BusinessOS.Domain.Crm;
 using BusinessOS.Domain.Finance;
 using BusinessOS.Domain.Invoicing;
+using BusinessOS.Domain.Notifications;
 using BusinessOS.Domain.Purchasing;
 using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
@@ -91,6 +92,9 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<CustomerInvoice> CustomerInvoices => Set<CustomerInvoice>();
     public DbSet<CustomerInvoiceLine> CustomerInvoiceLines => Set<CustomerInvoiceLine>();
+    public DbSet<AppNotification> Notifications => Set<AppNotification>();
+    public DbSet<UserDevice> UserDevices => Set<UserDevice>();
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1106,6 +1110,52 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.Property(l => l.TaxAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.HasIndex(l => l.CustomerInvoiceId);
             });
+
+        modelBuilder.Entity<AppNotification>(entity =>
+        {
+            entity.ToTable(Tables.Notifications.NotificationsTable, Schemas.Notifications);
+            entity.HasKey(n => n.Id);
+            entity.Property(n => n.TenantId).IsRequired();
+            entity.Property(n => n.Category).IsRequired().HasMaxLength(50);
+            entity.Property(n => n.Type).IsRequired().HasMaxLength(100);
+            entity.Property(n => n.TitleSw).IsRequired().HasMaxLength(255);
+            entity.Property(n => n.TitleEn).IsRequired().HasMaxLength(255);
+            entity.Property(n => n.BodySw).IsRequired().HasMaxLength(1000);
+            entity.Property(n => n.BodyEn).IsRequired().HasMaxLength(1000);
+            entity.Property(n => n.TargetRole).HasMaxLength(50);
+            entity.Property(n => n.DataJson).HasColumnType("text");
+            entity.Property(n => n.IsRead).IsRequired();
+            entity.HasIndex(n => new { n.TenantId, n.UserId, n.CreatedAt });
+            entity.HasIndex(n => new { n.TenantId, n.UserId, n.IsRead });
+        });
+
+        modelBuilder.Entity<UserDevice>(entity =>
+        {
+            entity.ToTable(Tables.Notifications.UserDevices, Schemas.Notifications);
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.TenantId).IsRequired();
+            entity.Property(d => d.UserId).IsRequired();
+            entity.Property(d => d.DeviceId).IsRequired().HasMaxLength(100);
+            entity.Property(d => d.FcmToken).IsRequired().HasMaxLength(500);
+            entity.Property(d => d.Platform).IsRequired().HasMaxLength(20);
+            entity.Property(d => d.DeviceName).HasMaxLength(100);
+            entity.Property(d => d.IsActive).IsRequired();
+            entity.HasIndex(d => new { d.TenantId, d.UserId, d.DeviceId }).IsUnique();
+            entity.HasIndex(d => new { d.TenantId, d.UserId });
+        });
+
+        modelBuilder.Entity<NotificationPreference>(entity =>
+        {
+            entity.ToTable(Tables.Notifications.NotificationPreferences, Schemas.Notifications);
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.TenantId).IsRequired();
+            entity.Property(p => p.HighSaleThreshold).IsRequired().HasColumnType("decimal(18,2)");
+            entity.Property(p => p.NotifyCashShortage).IsRequired();
+            entity.Property(p => p.NotifySaleVoided).IsRequired();
+            entity.Property(p => p.NotifyLowStock).IsRequired();
+            entity.Property(p => p.PushEnabled).IsRequired();
+            entity.HasIndex(p => new { p.TenantId, p.UserId }).IsUnique();
+        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -176,6 +176,8 @@
   "dashboardEmptyTitle": "Welcome to JOLINX!",
   "dashboardEmptyMessage": "Start by adding products and making sales.\nActivity will appear here.",
   "dashboardItemUnits": "units",
+  "dashboardCachedBanner": "Viewing offline data (cached). Pull to refresh when connected.",
+  "dashboardUpdatedJustNow": "Just now",
 
   "posTitle": "Point of Sale",
   "posSearchProducts": "Search products...",
@@ -374,6 +376,9 @@
   "reportsSaleCount": "Sales count",
   "reportsTrendLast7Days": "Last 7 days",
   "reportsSoldLabel": "sold",
+  "reportsProfitLabel": "Profit",
+  "reportsLossLabel": "Loss",
+  "reportsCostLabel": "Cost",
   "reportsTopProducts": "Top Products",
   "reportsSeeAll": "See all",
   "reportsNoSalesData": "No sales data yet",
@@ -607,6 +612,7 @@
   "productFormCostPrice": "Cost price",
   "productFormCostPriceHint": "How much you pay to buy this product",
   "productFormCostPriceInvalid": "Cost price cannot be negative",
+  "productFormCostPriceGuidance": "Required to calculate real profit and inventory valuation.",
 
   "navHome": "Home",
   "navPos": "Sell",

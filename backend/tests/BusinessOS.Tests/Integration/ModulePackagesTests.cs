@@ -271,7 +271,7 @@ public sealed class ModulePackagesTests : IClassFixture<BusinessOsApiFactory>, I
         var invoice = Body(await created.Content.ReadAsStringAsync());
         var invoiceId = Text(invoice, "id");
 
-        Assert.StartsWith("CI-", Text(invoice, "number"));
+        Assert.StartsWith("CINV-", Text(invoice, "number"));
         Assert.Equal("0", Text(invoice, "status"));
         Assert.Equal("100000", Text(invoice, "subtotal"));
         Assert.Equal("100000", Text(invoice, "totalAmount"));
@@ -397,7 +397,7 @@ public sealed class ModulePackagesTests : IClassFixture<BusinessOsApiFactory>, I
 
         var voids = Body(await (await _client.GetAsync("/api/v1/invoices?status=3")).Content.ReadAsStringAsync());
         Assert.Equal(1, Get(voids, "total").GetInt32());
-        Assert.Equal("Consultation", Text(Get(voids, "items")[0], "customerName"));
+        Assert.Equal("Consultant Baker", Text(Get(voids, "items")[0], "customerName"));
 
         var unpaid = Body(await (await _client.GetAsync("/api/v1/invoices?status=0")).Content.ReadAsStringAsync());
         Assert.Equal(1, Get(unpaid, "total").GetInt32());

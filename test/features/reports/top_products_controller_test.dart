@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jolinx_app/core/di/core_providers.dart' show offlineCacheDaoProvider;
+import 'package:jolinx_app/core/storage/offline_cache_dao.dart';
 import 'package:jolinx_app/core/network/app_exception.dart';
 import 'package:jolinx_app/features/reports/application/reports_controller.dart';
 import 'package:jolinx_app/features/reports/application/top_products_controller.dart';
@@ -112,12 +114,42 @@ class FakeReportRepository implements ReportRepository {
   }
 }
 
+class FakeOfflineCacheDao implements OfflineCacheDao {
+  final Map<String, Map<String, dynamic>> cachedData = {};
+  final Map<String, DateTime> lastUpdatedTimes = {};
+
+  @override
+  Future<void> save(String key, Map<String, dynamic> data) async {
+    cachedData[key] = data;
+    lastUpdatedTimes[key] = DateTime.now();
+  }
+
+  @override
+  Future<Map<String, dynamic>?> load(String key) async => cachedData[key];
+
+  @override
+  Future<DateTime?> getLastUpdated(String key) async => lastUpdatedTimes[key];
+
+  @override
+  Future<void> clear(String key) async {
+    cachedData.remove(key);
+    lastUpdatedTimes.remove(key);
+  }
+}
+
 void main() {
   group('TopProductsController', () {
+    late FakeOfflineCacheDao fakeCache;
+
+    setUp(() {
+      fakeCache = FakeOfflineCacheDao();
+    });
+
     test('initial state is Loading', () {
       final repository = FakeReportRepository();
       final container = ProviderContainer(overrides: [
         reportRepositoryProvider.overrideWithValue(repository),
+        offlineCacheDaoProvider.overrideWithValue(fakeCache),
       ]);
       addTearDown(container.dispose);
       final controller = container.read(topProductsControllerProvider.notifier);
@@ -135,6 +167,7 @@ void main() {
         ];
       final container = ProviderContainer(overrides: [
         reportRepositoryProvider.overrideWithValue(repository),
+        offlineCacheDaoProvider.overrideWithValue(fakeCache),
       ]);
       addTearDown(container.dispose);
       final controller = container.read(topProductsControllerProvider.notifier);
@@ -150,6 +183,7 @@ void main() {
       final repository = FakeReportRepository();
       final container = ProviderContainer(overrides: [
         reportRepositoryProvider.overrideWithValue(repository),
+        offlineCacheDaoProvider.overrideWithValue(fakeCache),
       ]);
       addTearDown(container.dispose);
       final controller = container.read(topProductsControllerProvider.notifier);
@@ -166,6 +200,7 @@ void main() {
       final repository = FakeReportRepository();
       final container = ProviderContainer(overrides: [
         reportRepositoryProvider.overrideWithValue(repository),
+        offlineCacheDaoProvider.overrideWithValue(fakeCache),
       ]);
       addTearDown(container.dispose);
       final controller = container.read(topProductsControllerProvider.notifier);
@@ -185,6 +220,7 @@ void main() {
         ..errorToThrow = ServerException('Backend crashed');
       final container = ProviderContainer(overrides: [
         reportRepositoryProvider.overrideWithValue(repository),
+        offlineCacheDaoProvider.overrideWithValue(fakeCache),
       ]);
       addTearDown(container.dispose);
       final controller = container.read(topProductsControllerProvider.notifier);
@@ -193,6 +229,39 @@ void main() {
 
       final state = controller.state as TopProductsFailure;
       expect(state.message, 'Backend crashed');
+    });
+
+    test('load() instantly populates cached products when offline', () async {
+      fakeCache.cachedData['top_products_today'] = {
+        'items': [
+          const TopProduct(
+            productName: 'Chai Jaba',
+            totalQuantity: 20,
+            totalRevenue: 20000,
+            totalCost: 10000,
+            totalProfit: 10000,
+            marginPercent: 50.0,
+          ).toJson(),
+        ],
+      };
+      final repository = FakeReportRepository()
+        ..errorToThrow = ServerException('Network down');
+      final container = ProviderContainer(overrides: [
+        reportRepositoryProvider.overrideWithValue(repository),
+        offlineCacheDaoProvider.overrideWithValue(fakeCache),
+      ]);
+      addTearDown(container.dispose);
+      final controller = container.read(topProductsControllerProvider.notifier);
+
+      await controller.load(period: ReportPeriod.today);
+
+      final state = controller.state;
+      expect(state, isA<TopProductsLoaded>());
+      final loaded = state as TopProductsLoaded;
+      expect(loaded.isFromCache, isTrue);
+      expect(loaded.products, hasLength(1));
+      expect(loaded.products[0].productName, 'Chai Jaba');
+      expect(loaded.products[0].totalProfit, 10000);
     });
   });
 }

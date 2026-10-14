@@ -31,6 +31,15 @@ public sealed class BusinessLifecycleEndToEndTests : SalesTestBase
 
     // ── Helpers (reuse SalesTestBase + TestRegistration; no new test framework) ──
 
+    /// Expenses require a category (validator-enforced); these tenants never
+    /// complete onboarding, so no defaults are seeded — create one per test.
+    private async Task<string> CreateCategoryAsync(string token, string name)
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/expenses/categories", new { name });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return GetProperty(Body(await response.Content.ReadAsStringAsync()), "id");
+    }
+
     private async Task<(string Token, Guid TenantId, Guid BranchId, string ProductId, string WarehouseId)>
         FullSalesFixtureAsync(string label, decimal opening = 20m, decimal price = 1000m)
     {
@@ -265,6 +274,7 @@ public sealed class BusinessLifecycleEndToEndTests : SalesTestBase
     {
         var (token, _) = await RegisterVerifiedAsync("e2e-expense");
         Authorize(token);
+        var categoryId = await CreateCategoryAsync(token, "Rent");
 
         // Ledger expense (POST /expenses): description/amount/date/tenant, NOT linked to a money account.
         var created = await _client.PostAsJsonAsync("/api/v1/expenses", new
@@ -275,6 +285,7 @@ public sealed class BusinessLifecycleEndToEndTests : SalesTestBase
             paymentMethod = "Bank",
             reference = "RENT-AUG",
             notes = "Monthly",
+            categoryId = Guid.Parse(categoryId),
         });
         Assert.True(created.StatusCode == HttpStatusCode.OK, $"expense creation failed: {await created.Content.ReadAsStringAsync()}");
         var createdDoc = Body(await created.Content.ReadAsStringAsync());
@@ -545,11 +556,13 @@ public sealed class BusinessLifecycleEndToEndTests : SalesTestBase
         Assert.Equal(HttpStatusCode.OK, saleA.StatusCode);
         var saleAId = GetProperty(Body(await saleA.Content.ReadAsStringAsync()), "id");
 
+        var expenseACategoryId = await CreateCategoryAsync(tokenA, "Operations");
         var expenseA = await _client.PostAsJsonAsync("/api/v1/expenses", new
         {
             description = "Tenant A Expense",
             amount = 100m,
             expenseDate = "2026-08-20T10:00:00Z",
+            categoryId = Guid.Parse(expenseACategoryId),
         });
         Assert.Equal(HttpStatusCode.OK, expenseA.StatusCode);
         var expenseAId = GetProperty(Body(await expenseA.Content.ReadAsStringAsync()), "id");

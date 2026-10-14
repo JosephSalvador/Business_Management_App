@@ -53,6 +53,8 @@ export '../features/receipts/data/receipt_providers.dart';
 export '../core/storage/printer_store.dart';
 export '../core/storage/receipt_cache.dart';
 
+import '../core/services/startup_warmup_service.dart';
+
 /// Wires the workspace journey to the auth lifecycle: loading starts on
 /// login and state resets on logout/session expiry. Watched by the router so
 /// it is alive for the whole session.
@@ -66,18 +68,8 @@ final workspaceJourneyBindingProvider = Provider<void>((ref) {
     final controller = ref.read(workspaceControllerProvider.notifier);
     if (next is AuthAuthenticated) {
       controller.load();
-      final capabilities = ref.read(capabilitiesStateProvider.notifier);
-      if (!next.isOffline) {
-        unawaited(capabilities.refresh().then((_) {
-          if (ref.read(subscriptionEntitlementControllerProvider) == null) {
-            return ref
-                .read(subscriptionEntitlementControllerProvider.notifier)
-                .refresh();
-          }
-        }));
-      } else {
-        capabilities.restoreFromCache();
-      }
+      // Trigger background warmup pipeline (optimistic prefetch, outbox sync)
+      ref.read(startupWarmupServiceProvider).warmUp(isOffline: next.isOffline);
     } else if (next is AuthLocked) {
       // Non-destructive idle/background lock: keep every controller state
       // (cart, history, forms) so unlock resumes exactly where the user left.

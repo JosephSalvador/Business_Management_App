@@ -198,6 +198,20 @@ class _BusinessOverviewPageState extends ConsumerState<BusinessOverviewPage> {
                                           ),
                                         ),
                                         title: Text(product.productName),
+                                        subtitle: product.totalRevenue > 0
+                                            ? Text(
+                                                product.totalProfit >= 0
+                                                    ? '${loc.reportsProfitLabel}: ${formatMoney(product.totalProfit.toDouble())} (${product.marginPercent.toStringAsFixed(1)}%)'
+                                                    : '${loc.reportsLossLabel}: ${formatMoney(product.totalProfit.toDouble())} (${product.marginPercent.toStringAsFixed(1)}%)',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: product.totalProfit >= 0
+                                                      ? AppColors.success
+                                                      : AppColors.error,
+                                                ),
+                                              )
+                                            : null,
                                         trailing: Text(
                                           formatMoney(
                                               product.totalRevenue.toDouble()),

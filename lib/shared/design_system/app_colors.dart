@@ -90,6 +90,16 @@ class AppColors {
           ? textTertiaryDark
           : textTertiary;
 
+  static Color resolveCardBackground(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF1E293B)
+          : surface;
+
+  static Color resolveOutline(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF334155)
+          : outline;
+
   // ── Legacy aliases (backward compat) ────────────────────────────
   static const Color primaryColor = primary;
   static const Color secondaryColor = secondary;

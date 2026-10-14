@@ -21,6 +21,7 @@ public static class Schemas
     public const string Finance = "public";
     public const string Billing = "public";
     public const string Invoicing = "public";
+    public const string Notifications = "public";
 }
 
 /// <summary>
@@ -146,5 +147,12 @@ public static class Tables
     {
         public const string CustomerInvoices = "CustomerInvoices";
         public const string CustomerInvoiceLines = "CustomerInvoiceLines";
+    }
+
+    public static class Notifications
+    {
+        public const string NotificationsTable = "Notifications";
+        public const string UserDevices = "UserDevices";
+        public const string NotificationPreferences = "NotificationPreferences";
     }
 }

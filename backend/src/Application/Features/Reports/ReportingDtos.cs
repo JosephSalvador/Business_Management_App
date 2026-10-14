@@ -22,7 +22,8 @@ public sealed record SalesSummaryDto(
 
 public sealed record TopProductDto(
     Guid ProductId, string ProductName, string? Sku,
-    decimal TotalQuantity, decimal TotalRevenue, decimal TotalTax, int Rank);
+    decimal TotalQuantity, decimal TotalRevenue, decimal TotalTax, int Rank,
+    decimal TotalCost = 0m, decimal TotalProfit = 0m, decimal MarginPercent = 0m);
 
 public sealed record TopProductsDto(
     DateTime From, DateTime To,

@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-/// M-Pesa-style inline PIN entry: a row of dot indicators plus a numeric
-/// keypad (1–9, 0, backspace, confirm).
-///
-/// Unlike a text field it feels like a security prompt, works with a single
-/// hand, and keeps the digits off the system keyboard. Submits via [onSubmit]
-/// once the confirm key is pressed with 4–6 digits entered; the pad always
-/// clears afterwards so a rejected attempt starts fresh.
+/// Professional, fintech-grade inline PIN entry widget:
+/// - 4 clean animated dot indicators.
+/// - Tactile numeric keypad (1–9, optional biometric key, 0, backspace).
+/// - Automatic submission upon entering the 4th digit.
+/// - Physical keyboard support for desktop/web POS terminals.
 class PinPad extends StatefulWidget {
   const PinPad({
     required this.onSubmit,
     super.key,
     this.label = 'Ingiza PIN yako',
+    this.digitsCount = 4,
     this.disabled = false,
+    this.onBiometric,
   });
 
   /// Called with the completed PIN. Thrown errors surface as widget errors.
@@ -20,28 +21,32 @@ class PinPad extends StatefulWidget {
 
   final String label;
 
+  /// Number of digits for the PIN (default 4).
+  final int digitsCount;
+
   /// Disables the whole pad (e.g. while verification runs).
   final bool disabled;
+
+  /// Optional biometric callback for the bottom-left key.
+  final VoidCallback? onBiometric;
 
   @override
   State<PinPad> createState() => _PinPadState();
 }
 
 class _PinPadState extends State<PinPad> {
-  static const _maxDigits = 6;
-  static const _minDigits = 4;
-
   String _pin = '';
   bool _submitting = false;
 
   bool get _locked => widget.disabled || _submitting;
 
-  bool get _canSubmit =>
-      _pin.length >= _minDigits && _pin.length <= _maxDigits && !_locked;
-
   void _addDigit(String digit) {
-    if (_locked || _pin.length >= _maxDigits) return;
-    setState(() => _pin += digit);
+    if (_locked || _pin.length >= widget.digitsCount) return;
+    final next = _pin + digit;
+    setState(() => _pin = next);
+    if (next.length == widget.digitsCount) {
+      _submit(next);
+    }
   }
 
   void _backspace() {
@@ -49,11 +54,16 @@ class _PinPadState extends State<PinPad> {
     setState(() => _pin = _pin.substring(0, _pin.length - 1));
   }
 
-  Future<void> _submit() async {
-    if (!_canSubmit) return;
+  void _clear() {
+    if (mounted) {
+      setState(() => _pin = '');
+    }
+  }
+
+  Future<void> _submit(String pinToSubmit) async {
     setState(() => _submitting = true);
     try {
-      await widget.onSubmit(_pin);
+      await widget.onSubmit(pinToSubmit);
     } finally {
       if (mounted) {
         setState(() {
@@ -64,58 +74,76 @@ class _PinPadState extends State<PinPad> {
     }
   }
 
+  void _handleKeyEvent(KeyEvent event) {
+    if (_locked || event is! KeyDownEvent) return;
+    final char = event.character;
+    if (char != null && RegExp(r'^\d$').hasMatch(char)) {
+      _addDigit(char);
+    } else if (event.logicalKey == LogicalKeyboardKey.backspace) {
+      _backspace();
+    } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _clear();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (widget.label.isNotEmpty)
-          Text(
-            widget.label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    return KeyboardListener(
+      focusNode: FocusNode()..requestFocus(),
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.label.isNotEmpty)
+            Text(
+              widget.label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < _maxDigits; i++) ...[
-              if (i > 0) const SizedBox(width: 12),
-              _Dot(filled: i < _pin.length),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var i = 0; i < widget.digitsCount; i++) ...[
+                if (i > 0) const SizedBox(width: 16),
+                _PinDot(filled: i < _pin.length),
+              ],
             ],
-          ],
-        ),
-        const SizedBox(height: 16),
-        _Keypad(
-          locked: _locked,
-          canSubmit: _canSubmit,
-          onDigit: _addDigit,
-          onBackspace: _backspace,
-          onSubmit: _submit,
-        ),
-      ],
+          ),
+          const SizedBox(height: 24),
+          _PinKeypad(
+            locked: _locked,
+            onDigit: _addDigit,
+            onBackspace: _backspace,
+            onBiometric: widget.onBiometric,
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _Dot extends StatelessWidget {
-  const _Dot({required this.filled});
+class _PinDot extends StatelessWidget {
+  const _PinDot({required this.filled});
 
   final bool filled;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: 13,
-      height: 13,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: 16,
+      height: 16,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: filled ? colors.primary : Colors.transparent,
+        color: filled ? colors.primary : colors.surfaceContainerHighest,
         border: Border.all(
-          color: filled ? colors.primary : colors.outlineVariant,
+          color: filled ? colors.primary : colors.outline.withValues(alpha: 0.3),
           width: 1.5,
         ),
       ),
@@ -123,83 +151,89 @@ class _Dot extends StatelessWidget {
   }
 }
 
-class _Keypad extends StatelessWidget {
-  const _Keypad({
+class _PinKeypad extends StatelessWidget {
+  const _PinKeypad({
     required this.locked,
-    required this.canSubmit,
     required this.onDigit,
     required this.onBackspace,
-    required this.onSubmit,
+    this.onBiometric,
   });
 
   final bool locked;
-  final bool canSubmit;
   final ValueChanged<String> onDigit;
   final VoidCallback onBackspace;
-  final VoidCallback onSubmit;
+  final VoidCallback? onBiometric;
 
   @override
   Widget build(BuildContext context) {
     const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var row = 0; row < 3; row++)
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var row = 0; row < 3; row++)
+            Row(
+              children: [
+                for (var col = 0; col < 3; col++)
+                  Expanded(
+                    child: _KeyButton(
+                      label: digits[row * 3 + col],
+                      onTap: () => onDigit(digits[row * 3 + col]),
+                      locked: locked,
+                    ),
+                  ),
+              ],
+            ),
           Row(
             children: [
-              for (var col = 0; col < 3; col++)
-                Expanded(
-                  child: _Key(
-                    label: digits[row * 3 + col],
-                    onTap: () => onDigit(digits[row * 3 + col]),
-                    locked: locked,
-                  ),
+              Expanded(
+                child: onBiometric != null
+                    ? _KeyButton(
+                        icon: Icons.fingerprint,
+                        iconColor: Theme.of(context).colorScheme.primary,
+                        iconSize: 28,
+                        onTap: onBiometric!,
+                        locked: locked,
+                      )
+                    : const SizedBox(height: 58),
+              ),
+              Expanded(
+                child: _KeyButton(
+                  label: '0',
+                  onTap: () => onDigit('0'),
+                  locked: locked,
                 ),
+              ),
+              Expanded(
+                child: _KeyButton(
+                  icon: Icons.backspace_outlined,
+                  onTap: onBackspace,
+                  locked: locked,
+                ),
+              ),
             ],
           ),
-        Row(
-          children: [
-            Expanded(
-              child: _Key(
-                icon: Icons.backspace_outlined,
-                onTap: onBackspace,
-                locked: locked,
-              ),
-            ),
-            Expanded(
-              child: _Key(
-                label: '0',
-                onTap: () => onDigit('0'),
-                locked: locked,
-              ),
-            ),
-            Expanded(
-              child: _Key(
-                icon: Icons.check,
-                emphasized: true,
-                onTap: onSubmit,
-                locked: !canSubmit,
-              ),
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _Key extends StatelessWidget {
-  const _Key({
+class _KeyButton extends StatelessWidget {
+  const _KeyButton({
     this.label,
     this.icon,
-    this.emphasized = false,
+    this.iconColor,
+    this.iconSize = 22,
     required this.onTap,
     required this.locked,
   }) : assert(label != null || icon != null);
 
   final String? label;
   final IconData? icon;
-  final bool emphasized;
+  final Color? iconColor;
+  final double iconSize;
   final VoidCallback onTap;
   final bool locked;
 
@@ -207,31 +241,30 @@ class _Key extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final child = icon != null
-        ? Icon(icon, size: 24)
+        ? Icon(icon, size: iconSize, color: iconColor ?? colors.onSurface)
         : Text(
             label!,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-          );
-    final button = emphasized
-        ? FilledButton(
-            onPressed: locked ? null : onTap,
-            style: FilledButton.styleFrom(shape: const StadiumBorder()),
-            child: child,
-          )
-        : FilledButton.tonal(
-            onPressed: locked ? null : onTap,
-            style: FilledButton.styleFrom(
-              shape: const StadiumBorder(),
-              backgroundColor: colors.surfaceContainerHigh,
-              foregroundColor: colors.onSurface,
-              disabledBackgroundColor: colors.surfaceContainerHighest,
-              disabledForegroundColor: colors.onSurface.withValues(alpha: 0.4),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: colors.onSurface,
             ),
-            child: child,
           );
+
     return Padding(
-      padding: const EdgeInsets.all(4),
-      child: SizedBox(height: 52, width: double.infinity, child: button),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      child: SizedBox(
+        height: 56,
+        child: Material(
+          color: colors.surfaceContainerHigh,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: locked ? null : onTap,
+            child: Center(child: child),
+          ),
+        ),
+      ),
     );
   }
 }

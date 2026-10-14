@@ -172,5 +172,33 @@ void main() {
       await offline.enableQuickUnlock(owner());
       expect(await offline.hasValidQuickUnlock(), isTrue);
     });
+
+    test('biometric preference is false by default and toggles correctly', () async {
+      final offline = store();
+      expect(await offline.isBiometricEnabled(), isFalse);
+
+      await offline.setBiometricEnabled(true);
+      expect(await offline.isBiometricEnabled(), isTrue);
+
+      await offline.setBiometricEnabled(false);
+      expect(await offline.isBiometricEnabled(), isFalse);
+    });
+
+    test('isQuickPinEnabled requires unlock PIN to be set', () async {
+      final offline = store();
+      expect(await offline.isQuickPinEnabled(), isFalse);
+
+      await offline.setUnlockPin('1234');
+      expect(await offline.isQuickPinEnabled(), isTrue);
+
+      await offline.setQuickPinEnabled(false);
+      expect(await offline.isQuickPinEnabled(), isFalse);
+
+      await offline.setQuickPinEnabled(true);
+      expect(await offline.isQuickPinEnabled(), isTrue);
+
+      await offline.clearUnlockPin();
+      expect(await offline.isQuickPinEnabled(), isFalse);
+    });
   });
 }

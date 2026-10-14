@@ -13,6 +13,7 @@ import '../../../../shared/design_system/responsive.dart';
 import '../../../../shared/format/money.dart';
 import '../../application/dashboard_controller.dart';
 import '../widgets/revenue_line_chart.dart';
+import '../../../notifications/presentation/widgets/notification_bell_button.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -138,6 +139,38 @@ class _DashboardBody extends StatelessWidget {
     return ListView(
       padding: padding,
       children: [
+        if (state.isFromCache) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.resolveCardBackground(context),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppColors.resolveOutline(context).withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.cloud_off_rounded,
+                  size: 16,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loc.dashboardCachedBanner,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.resolveTextSecondary(context),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         _GreetingHeader(
             userName: userName, connectionQuality: connectionQuality),
         const SizedBox(height: 20),
@@ -333,31 +366,38 @@ class _GreetingHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: isOnline ? AppColors.success : AppColors.error,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    dateStr,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.resolveTextTertiary(context),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isOnline ? AppColors.success : AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        dateStr,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.resolveTextTertiary(context),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
+              const SizedBox(width: 4),
+              const NotificationBellButton(),
             ],
           ),
         ],

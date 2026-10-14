@@ -81,6 +81,9 @@ public static class PermissionNames
     public const string InvoicesCreate = "Invoices.Create";
     public const string InvoicesManage = "Invoices.Manage";
 
+    public const string NotificationsView = "Notifications.View";
+    public const string NotificationsManage = "Notifications.Manage";
+
     public static IReadOnlyList<string> All { get; } = new[]
     {
         DashboardView,
@@ -104,6 +107,7 @@ public static class PermissionNames
         ReceiptsView, ReceiptsPrint, ReceiptsManageLayouts,
         BillingView, BillingManage,
         InvoicesView, InvoicesCreate, InvoicesManage,
+        NotificationsView, NotificationsManage,
     };
 
     /// <summary>
@@ -123,5 +127,6 @@ public static class PermissionNames
         InventoryView, InventoryManage,
         WarehousesView,
         ReceiptsView, ReceiptsPrint,
+        NotificationsView,
     };
 }
