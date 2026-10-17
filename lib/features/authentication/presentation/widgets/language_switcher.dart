@@ -14,10 +14,16 @@ class LanguageSwitcher extends ConsumerWidget {
     final loc = context.loc;
     final colors = Theme.of(context).colorScheme;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
+        color: isDark ? Colors.white.withValues(alpha: 0.06) : colors.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.12) : colors.outlineVariant.withValues(alpha: 0.5),
+          width: 1,
+        ),
       ),
       padding: const EdgeInsets.all(3),
       child: Row(
@@ -57,20 +63,24 @@ class _LangButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? colors.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          color: selected
+              ? (isDark ? colors.primary.withValues(alpha: 0.25) : colors.surface)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected ? colors.primary : colors.onSurfaceVariant,
           ),
         ),

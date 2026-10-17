@@ -353,11 +353,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 textAlign: TextAlign.center,
               ),
             ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           FilledButton(
             onPressed: _busy ? null : _submit,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 2,
             ),
             child: _busy
                 ? const SizedBox(
@@ -368,25 +372,57 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       color: AppColors.onPrimary,
                     ),
                   )
-                : Text(loc.signIn),
+                : Text(
+                    loc.signIn,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           TextButton(
             onPressed: () => context.go(Routes.register),
-            child: Text(loc.noAccount),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () => context.push(Routes.download),
-            icon: const Icon(Icons.install_mobile, size: 18),
-            label: const Text('Pakua App (Android / iPhone)'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF00C48C),
-              side: BorderSide(
-                color: const Color(0xFF00C48C).withValues(alpha: 0.4),
+            child: Text(
+              loc.noAccount,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Center(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => context.push(Routes.download),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00C48C).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF00C48C).withValues(alpha: 0.35),
+                    width: 1,
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.install_mobile_rounded, size: 16, color: Color(0xFF00C48C)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Pakua App (Android / iPhone)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF00C48C),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
