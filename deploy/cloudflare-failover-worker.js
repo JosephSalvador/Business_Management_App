@@ -14,6 +14,7 @@
 
 const DEFAULT_PRIMARY_ORIGIN = "https://jolinx-api.onrender.com";
 const DEFAULT_BACKUP_ORIGIN = "https://jolinx-api.onrender.com";
+const DEFAULT_STAGING_ORIGIN = "https://jolinx-staging-api.onrender.com";
 const FAILOVER_STATUS_CODES = new Set([502, 503, 504, 520, 521, 522, 523, 524, 530]);
 const PRIMARY_TIMEOUT_MS = 25000;
 const BACKUP_TIMEOUT_MS = 28000;
@@ -38,7 +39,7 @@ export default {
       request.headers.get("x-jolinx-environment") === "staging";
 
     if (isStaging) {
-      const stagingOrigin = (env.STAGING_ORIGIN || DEFAULT_PRIMARY_ORIGIN).replace(/\/+$/, "");
+      const stagingOrigin = (env.STAGING_ORIGIN || DEFAULT_STAGING_ORIGIN).replace(/\/+$/, "");
       try {
         const stagingResponse = await forwardRequest(
           request,
@@ -132,12 +133,19 @@ export default {
 
   // Automatic Keep-Warm Cron Handler (runs every 10 min so Render never goes to sleep)
   async scheduled(_event, env, ctx) {
-    const renderOrigin = (env.BACKUP_ORIGIN || "https://jolinx-api.onrender.com").replace(/\/+$/, "");
+    const prodOrigin = (env.BACKUP_ORIGIN || DEFAULT_BACKUP_ORIGIN).replace(/\/+$/, "");
+    const stagingOrigin = (env.STAGING_ORIGIN || DEFAULT_STAGING_ORIGIN).replace(/\/+$/, "");
     ctx.waitUntil(
-      fetch(renderOrigin + "/health/live", {
-        method: "GET",
-        headers: { "User-Agent": "Jolinx-Cloudflare-KeepWarm/1.0" },
-      }).catch(() => {}),
+      Promise.allSettled([
+        fetch(prodOrigin + "/health/live", {
+          method: "GET",
+          headers: { "User-Agent": "Jolinx-Cloudflare-KeepWarm/1.0" },
+        }).catch(() => {}),
+        fetch(stagingOrigin + "/health/live", {
+          method: "GET",
+          headers: { "User-Agent": "Jolinx-Cloudflare-KeepWarm/1.0" },
+        }).catch(() => {}),
+      ]),
     );
   },
 };
