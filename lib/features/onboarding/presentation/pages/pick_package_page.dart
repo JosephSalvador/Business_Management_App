@@ -247,14 +247,13 @@ class _PickPackagePageState extends ConsumerState<PickPackagePage> {
                               ),
                             ],
                           ),
-                          leading: Radio<String>(
-                            value: plan.code,
-                            groupValue: _selectedPlanCode,
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => _selectedPlanCode = val);
-                              }
-                            },
+                          leading: Icon(
+                            isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            color: isSelected
+                                ? AppColors.primary
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           onTap: () {
                             setState(() => _selectedPlanCode = plan.code);
