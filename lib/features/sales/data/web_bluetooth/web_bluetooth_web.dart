@@ -3,7 +3,9 @@ import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
 
-import 'web_bluetooth_stub.dart';
+import 'web_bluetooth_platform.dart';
+
+export 'web_bluetooth_platform.dart';
 
 @JS('window')
 external JSObject get _window;

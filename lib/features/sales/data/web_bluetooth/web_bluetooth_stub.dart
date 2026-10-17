@@ -1,10 +1,8 @@
 import 'dart:typed_data';
 
-/// Common interface for Web Bluetooth thermal printing.
-abstract class WebBluetoothPrinterPlatform {
-  bool get isSupported;
-  Future<bool> printBytes(Uint8List bytes);
-}
+import 'web_bluetooth_platform.dart';
+
+export 'web_bluetooth_platform.dart';
 
 /// Stub implementation for non-web platforms.
 class WebBluetoothPrinterStub implements WebBluetoothPrinterPlatform {
