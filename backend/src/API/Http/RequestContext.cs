@@ -6,5 +6,7 @@ public sealed class RequestContext
     public Guid? UserId { get; set; }
     public Guid? TenantId { get; set; }
     public string? IpAddress { get; set; }
+    public string? TlsFingerprint { get; set; }
+    public int? BotScore { get; set; }
     public DateTime StartedAtUtc { get; } = DateTime.UtcNow;
 }

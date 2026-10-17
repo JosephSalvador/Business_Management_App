@@ -16,6 +16,9 @@ import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
 import '../../../onboarding/application/workspace_controller.dart';
 import '../../application/auth_controller.dart';
+import '../../../../core/platform/ios_install_prompt_banner.dart';
+import '../../../../core/services/app_update_service.dart';
+import '../widgets/quick_pin_setup_sheet.dart';
 
 /// The authenticated Business OS shell.
 ///
@@ -32,6 +35,56 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   late int _tab = widget.initialTab.clamp(0, 4);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkQuickPinPrompt();
+      _checkForAppUpdate();
+    });
+  }
+
+  Future<void> _checkForAppUpdate() async {
+    try {
+      final update = await AppUpdateService.instance.checkForUpdate();
+      if (update != null && mounted) {
+        await AppUpdateService.promptUpdateDialog(context, update);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _checkQuickPinPrompt() async {
+    final offlineStore = ref.read(offlineCredentialStoreProvider);
+    final hasPin = await offlineStore.hasUnlockPin();
+    if (hasPin || !mounted) return;
+
+    final biometricGate = ref.read(biometricAuthGateProvider);
+    final biometricHardware = await biometricGate.isAvailable();
+    final biometricLabel = await biometricGate.biometricLabel();
+
+    if (!mounted) return;
+
+    final wantSetup = await showQuickPinPromptDialog(
+      context,
+      biometricLabel: biometricLabel,
+      biometricSupported: biometricHardware,
+    );
+
+    if (wantSetup == true && mounted) {
+      await showQuickPinSetupSheet(
+        context,
+        biometricSupported: biometricHardware,
+        biometricLabel: biometricLabel,
+        onSave: ({required pin, required enableBiometric}) async {
+          await ref.read(authControllerProvider.notifier).enableQuickPin(
+                pin: pin,
+                enableBiometric: enableBiometric,
+              );
+        },
+      );
+    }
+  }
 
   @override
   void didUpdateWidget(HomePage oldWidget) {
@@ -179,27 +232,121 @@ class _MobileShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      body: IndexedStack(index: tab, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (i) {
-          final dest = destinations[i];
-          if (isEnabled(dest)) {
-            onTabChanged(i);
-          } else {
-            onLockedDest(dest);
-          }
-        },
-        destinations: destinations
-            .map((d) => NavigationDestination(
-                  icon:
-                      _NavIcon(dest: d, selected: false, locked: !isEnabled(d)),
-                  selectedIcon:
-                      _NavIcon(dest: d, selected: true, locked: !isEnabled(d)),
-                  label: _label(loc, d.labelKey),
-                ))
-            .toList(),
+      body: Column(
+        children: [
+          const IosInstallPromptBanner(),
+          Expanded(child: IndexedStack(index: tab, children: pages)),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E2124) : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: List.generate(destinations.length, (i) {
+                final dest = destinations[i];
+                final isSelected = tab == i;
+                final locked = !isEnabled(dest);
+                final isCenter = i == 2; // POS / Sell action
+
+                if (isCenter) {
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (!locked) {
+                          onTabChanged(i);
+                        } else {
+                          onLockedDest(dest);
+                        }
+                      },
+                      child: Center(
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF1976D2),
+                                Color(0xFF0D47A1),
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0D47A1)
+                                    .withValues(alpha: 0.35),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            dest.selectedIcon,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      if (!locked) {
+                        onTabChanged(i);
+                      } else {
+                        onLockedDest(dest);
+                      }
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _NavIcon(
+                          dest: dest,
+                          selected: isSelected,
+                          locked: locked,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _label(loc, dest.labelKey),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? const Color(0xFF0D47A1)
+                                : AppColors.resolveTextTertiary(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
       ),
     );
   }

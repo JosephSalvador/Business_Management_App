@@ -11,7 +11,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../app/providers.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../../receipts/data/receipt_providers.dart';
 import '../../../receipts/data/receipt_repository.dart' show PrintType;
+import '../../../receipts/domain/receipt_format.dart';
 import '../../../receipts/domain/receipt_preview.dart';
 import '../../../receipts/presentation/widgets/receipt_ticket_card.dart';
 import '../../data/receipt_printer_service.dart';
@@ -37,7 +39,7 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
   /// for a second print in the same session.
   int _printsThisSession = 0;
 
-  bool get _canPrintBt => Platform.isAndroid;
+  bool get _canPrintBt => !kIsWeb && Platform.isAndroid;
 
   bool get _isReprint => ((_receipt?.printCount ?? 0) + _printsThisSession) > 0;
 
@@ -86,18 +88,17 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
       appBar: AppBar(
         title: Text(context.loc.receiptTitle),
         actions: [
-          if (_canPrintBt)
-            IconButton(
-              tooltip: context.loc.posPrintReceipt,
-              icon: _printing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.print),
-              onPressed: _receipt == null || _printing ? null : _print,
-            ),
+          IconButton(
+            tooltip: context.loc.posPrintReceipt,
+            icon: _printing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.print),
+            onPressed: _receipt == null || _printing ? null : _print,
+          ),
           IconButton(
             tooltip: context.loc.receiptCopy,
             icon: const Icon(Icons.copy),
@@ -128,13 +129,42 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
   }
 
   Widget _buildReceiptContent(ReceiptPreview receipt) {
+    final currentWidth = ref.watch(receiptPaperWidthProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Card(
-        child: ReceiptTicketCard(
-          receipt: receipt,
-          isReprint: _isReprint,
-        ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: SegmentedButton<ReceiptPaperWidth>(
+              segments: const [
+                ButtonSegment(
+                  value: ReceiptPaperWidth.mm80,
+                  label: Text('80 mm'),
+                  icon: Icon(Icons.receipt_long, size: 18),
+                ),
+                ButtonSegment(
+                  value: ReceiptPaperWidth.mm58,
+                  label: Text('58 mm'),
+                  icon: Icon(Icons.receipt, size: 18),
+                ),
+              ],
+              selected: {currentWidth},
+              onSelectionChanged: (set) {
+                if (set.isNotEmpty) {
+                  ref.read(receiptPaperWidthProvider.notifier).state =
+                      set.first;
+                }
+              },
+            ),
+          ),
+          Card(
+            child: ReceiptTicketCard(
+              receipt: receipt,
+              isReprint: _isReprint,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -162,47 +192,131 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
   Future<void> _print() async {
     if (_printing || _receipt == null) return;
 
-    final printerController = ref.read(printerControllerProvider.notifier);
-    final printerState = ref.read(printerControllerProvider);
+    final printer = ref.read(receiptPrinterServiceProvider);
 
-    String? address = printerState.address;
-
-    // If no saved printer, show device selector
-    if (address == null) {
-      final device = await FlutterBluetoothPrinter.selectDevice(context);
-      if (device == null) return;
-      address = device.address;
-      await printerController.selectPrinter(
-          device.address, device.name ?? 'Printer');
-    }
-
-    setState(() => _printing = true);
-    final wasReprint = _isReprint;
-    try {
-      final printer = ref.read(receiptPrinterServiceProvider);
-      final printed = await printer.printToDevice(
-        address: address,
-        receipt: _receipt!,
-        isReprint: wasReprint,
-      );
-      if (printed) {
-        await _recordPrint(_receipt!.saleId, wasReprint);
-        if (mounted) setState(() => _printsThisSession++);
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              printed
-                  ? context.loc.posPrintSuccess
-                  : context.loc.posPrintFailed,
-            ),
-          ),
+    // 1. Web Bluetooth (Bluefy on iOS / Chrome on PC or Android)
+    if (kIsWeb && printer.hasWebBluetooth) {
+      setState(() => _printing = true);
+      final wasReprint = _isReprint;
+      try {
+        final printed = await printer.printViaWebBluetooth(
+          receipt: _receipt!,
+          isReprint: wasReprint,
         );
+        if (printed) {
+          await _recordPrint(_receipt!.saleId, wasReprint);
+          if (mounted) setState(() => _printsThisSession++);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                printed
+                    ? context.loc.posPrintSuccess
+                    : context.loc.posPrintFailed,
+              ),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _printing = false);
       }
-    } finally {
-      if (mounted) setState(() => _printing = false);
+      return;
     }
+
+    // 2. Android Native APK (Bluetooth SPP)
+    if (_canPrintBt) {
+      final printerController = ref.read(printerControllerProvider.notifier);
+      final printerState = ref.read(printerControllerProvider);
+
+      String? address = printerState.address;
+
+      if (address == null) {
+        final device = await FlutterBluetoothPrinter.selectDevice(context);
+        if (device == null) return;
+        address = device.address;
+        await printerController.selectPrinter(
+            device.address, device.name ?? 'Printer');
+      }
+
+      setState(() => _printing = true);
+      final wasReprint = _isReprint;
+      try {
+        final printed = await printer.printToDevice(
+          address: address,
+          receipt: _receipt!,
+          isReprint: wasReprint,
+        );
+        if (printed) {
+          await _recordPrint(_receipt!.saleId, wasReprint);
+          if (mounted) setState(() => _printsThisSession++);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                printed
+                    ? context.loc.posPrintSuccess
+                    : context.loc.posPrintFailed,
+              ),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _printing = false);
+      }
+      return;
+    }
+
+    // 3. Fallback: Browser without Web Bluetooth (Safari on iPhone)
+    _showIosSafariPrintHelpDialog();
+  }
+
+  void _showIosSafariPrintHelpDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.print_outlined, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Uchapishaji wa Risiti'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Kwenye iPhone, Safari huzuia Bluetooth moja kwa moja.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Ili kuchapa kwa Bluetooth ya mkononi:\n'
+              '1. Sakinisha kivinjari cha bure cha "Bluefy" kutoka App Store.\n'
+              '2. Fungua mfumo wako kupitia Bluefy na utachapa papo hapo kwa Bluetooth.\n\n'
+              'Pia unaweza kutuma au kupakua risiti ya PDF sasa.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Funga'),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _share();
+            },
+            icon: const Icon(Icons.share, size: 18),
+            label: const Text('Shiriki WhatsApp / PDF'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Fire-and-forget audit row — never blocks or fails the print UX. Offline

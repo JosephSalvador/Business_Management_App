@@ -10,11 +10,34 @@ import 'package:intl/intl.dart';
 
 import '../../../shared/format/money.dart';
 
-/// Character width of the thermal paper (42 columns for 80 mm stock).
+/// Standard thermal paper widths supported by the printing engine.
+enum ReceiptPaperWidth {
+  /// 58 mm paper stock (standard for handheld Bluetooth POS terminals, 32 columns).
+  mm58(32, 11),
+
+  /// 80 mm paper stock (standard for counter thermal receipt printers, 42 columns).
+  mm80(42, 16);
+
+  const ReceiptPaperWidth(this.lineWidth, this.metaLabelWidth);
+
+  /// Character width of this paper stock.
+  final int lineWidth;
+
+  /// Width allocated for meta labels before the colon separator.
+  final int metaLabelWidth;
+}
+
+/// Character width of the thermal paper (42 columns for 80 mm stock default).
 const int receiptLineWidth = 42;
 
-/// Column width of the receipt meta labels (`Receipt No.`, `Cashier`, …).
+/// Character width for 58 mm stock (portable handheld terminals).
+const int receiptLineWidth58 = 32;
+
+/// Column width of the receipt meta labels (`Receipt No.`, `Cashier`, …) for 80mm.
 const int receiptMetaLabelWidth = 16;
+
+/// Column width of the receipt meta labels for 58mm.
+const int receiptMetaLabelWidth58 = 11;
 
 final NumberFormat _whole = NumberFormat('#,##0');
 

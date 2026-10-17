@@ -4,7 +4,9 @@ namespace BusinessOS.Infrastructure.Security;
 
 public sealed class BcryptPasswordHasher : IPasswordHasher
 {
-    private const int WorkFactor = 12;
+    // WorkFactor 11 provides robust security (~2048 rounds) while cutting
+    // CPU-bound verification time by 50% on shared/cloud vCPUs.
+    private const int WorkFactor = 11;
 
     public string Hash(string password)
         => BCrypt.Net.BCrypt.HashPassword(password, WorkFactor);

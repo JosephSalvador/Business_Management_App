@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using BusinessOS.Api.Http;
+using BusinessOS.Application.Ports;
 using BusinessOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace BusinessOS.Api.Middleware;
 
@@ -25,7 +25,7 @@ public sealed class TenantActiveMiddleware
         HttpContext context,
         RequestContext requestContext,
         BusinessDbContext dbContext,
-        IMemoryCache cache)
+        ICacheService cache)
     {
         // Only authenticated, tenant-scoped requests are gated; anonymous
         // endpoints (health, login, register) pass through untouched.
@@ -36,14 +36,20 @@ public sealed class TenantActiveMiddleware
             return;
         }
 
-        var isActive = await cache.GetOrCreateAsync($"tenant-active:{tenantId}", entry =>
+        var cacheKey = $"tenant-active:{tenantId}";
+        var isActive = await cache.GetAsync<bool?>(cacheKey, context.RequestAborted);
+        if (isActive is null)
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30);
-            return dbContext.Tenants
+            isActive = await dbContext.Tenants
                 .Where(t => t.Id == tenantId)
                 .Select(t => (bool?)t.IsActive)
                 .FirstOrDefaultAsync(context.RequestAborted);
-        });
+
+            if (isActive is not null)
+            {
+                await cache.SetAsync(cacheKey, isActive.Value, TimeSpan.FromSeconds(30), context.RequestAborted);
+            }
+        }
 
         if (isActive != true)
         {

@@ -209,6 +209,79 @@ public sealed class VoucherTests
         Assert.DoesNotContain("1", code);
         Assert.DoesNotContain("I", code);
     }
+
+    [Fact]
+    public void VoucherCodes_GeneratedCodes_AlwaysPassChecksum()
+    {
+        for (var i = 0; i < 50; i++)
+        {
+            var code = VoucherCodes.Generate();
+            Assert.True(VoucherCodes.IsValidChecksum(code), $"Generated code '{code}' failed its own checksum.");
+        }
+    }
+
+    [Fact]
+    public void VoucherCodes_TamperedCode_FailsChecksum()
+    {
+        var validCode = VoucherCodes.Generate();
+        Assert.True(VoucherCodes.IsValidChecksum(validCode));
+
+        // Tamper with the last character (the check-digit)
+        var clean = validCode.Replace("-", string.Empty);
+        var tampered = clean[..^1] + (clean[^1] == 'A' ? 'B' : 'A');
+        Assert.False(VoucherCodes.IsValidChecksum(tampered));
+    }
+
+    [Fact]
+    public void Voucher_TargetTenantBinding_Enforced()
+    {
+        var targetTenant = Guid.NewGuid();
+        var wrongTenant = Guid.NewGuid();
+        var code = VoucherCodes.Generate();
+        var voucher = Voucher.Create(null, null, code, 30, targetTenantId: targetTenant);
+
+        // Wrong tenant fails
+        Assert.Throws<InvalidOperationException>(() => voucher.Redeem(wrongTenant));
+
+        // Correct tenant succeeds
+        voucher.Redeem(targetTenant);
+        Assert.Equal(VoucherStatus.Redeemed, voucher.Status);
+        Assert.Equal(targetTenant, voucher.RedeemedByTenantId);
+    }
+
+    [Fact]
+    public void Plan_Update_AppliesDynamicChanges()
+    {
+        var plan = Plan.Create("test-pkg", "Old Name", 10000m, "TZS", new[] { "pos.enabled" }, isPackage: true);
+        plan.Update(
+            "New Package Name",
+            25000m,
+            "TZS",
+            new[] { "pos.enabled", "invoicing.enabled" },
+            maxBranches: 2,
+            maxUsers: 5,
+            maxProducts: 2000,
+            isPackage: true);
+
+        Assert.Equal("New Package Name", plan.Name);
+        Assert.Equal(25000m, plan.MonthlyPrice);
+        Assert.Contains("invoicing.enabled", plan.FeatureKeys);
+        Assert.Equal(2, plan.MaxBranches);
+    }
+
+    [Fact]
+    public void Subscription_ExtendTrial_And_ChangePlan_Succeed()
+    {
+        var tenantId = Guid.NewGuid();
+        var sub = Subscription.StartTrial(tenantId, "Pro", TimeSpan.FromDays(14));
+        var initialEnd = sub.TrialEndedAtUtc;
+
+        sub.ExtendTrial(TimeSpan.FromDays(7));
+        Assert.True(sub.TrialEndedAtUtc > initialEnd);
+
+        sub.ChangePlan("Scale");
+        Assert.Equal("Scale", sub.PlanCode);
+    }
 }
 
 public sealed class InvoiceTests

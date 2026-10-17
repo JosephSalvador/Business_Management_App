@@ -57,7 +57,7 @@ class OfflineCredentialStore {
   static const _maxAttemptsBeforeLockout = 5;
   static const _initialLockoutDuration = Duration(minutes: 15);
   static const _maxLockoutDuration = Duration(hours: 1);
-  static const _offlineTokenTtl = Duration(hours: 72);
+  static const _offlineTokenTtl = Duration(days: 7); // Supports 4+ days of offline selling
   static const _quickUnlockTtl = Duration(days: 7);
 
   // ------------------------------------------------------------------

@@ -90,17 +90,12 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<SubscriptionItem> SubscriptionItems => Set<SubscriptionItem>();
     public DbSet<Voucher> Vouchers => Set<Voucher>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<PaymentInstruction> PaymentInstructions => Set<PaymentInstruction>();
     public DbSet<CustomerInvoice> CustomerInvoices => Set<CustomerInvoice>();
     public DbSet<CustomerInvoiceLine> CustomerInvoiceLines => Set<CustomerInvoiceLine>();
     public DbSet<AppNotification> Notifications => Set<AppNotification>();
     public DbSet<UserDevice> UserDevices => Set<UserDevice>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
-        base.OnConfiguring(optionsBuilder);
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1059,9 +1054,11 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.HasKey(v => v.Id);
                 entity.Property(v => v.Code).IsRequired().HasMaxLength(50);
                 entity.Property(v => v.ValueDays).IsRequired();
-                entity.Property(v => v.Status).IsRequired();
+                entity.Property(v => v.TargetTenantId);
+                entity.Property(v => v.PlanCode).HasMaxLength(50);
                 entity.HasIndex(v => v.Code).IsUnique();
                 entity.HasIndex(v => v.RedeemedByTenantId);
+                entity.HasIndex(v => v.TargetTenantId);
                 entity.HasIndex(v => v.ExpiresAtUtc);
             });
 
@@ -1078,6 +1075,19 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.HasIndex(i => i.TenantId);
                 entity.HasIndex(i => new { i.TenantId, i.Status });
                 entity.HasIndex(i => i.Number).IsUnique();
+            });
+
+            modelBuilder.Entity<PaymentInstruction>(entity =>
+            {
+                entity.ToTable(Tables.Billing.PaymentInstructions, Schemas.Billing);
+                entity.HasKey(p => p.Id);
+                entity.Property(p => p.MpesaTill).HasMaxLength(100);
+                entity.Property(p => p.AirtelMoney).HasMaxLength(100);
+                entity.Property(p => p.BankName).HasMaxLength(100);
+                entity.Property(p => p.BankAccountNumber).HasMaxLength(100);
+                entity.Property(p => p.BankAccountName).HasMaxLength(150);
+                entity.Property(p => p.WhatsAppContact).HasMaxLength(100);
+                entity.Property(p => p.Notes).HasMaxLength(500);
             });
 
             modelBuilder.Entity<CustomerInvoice>(entity =>

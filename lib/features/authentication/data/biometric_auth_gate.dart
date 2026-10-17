@@ -56,4 +56,20 @@ class BiometricAuthGate {
       return const [];
     }
   }
+
+  /// Returns user-friendly biometric label adapted to the device's hardware.
+  Future<String> biometricLabel() async {
+    final types = await enrolledTypes();
+    if (types.contains(BiometricType.face)) {
+      return 'Utambuzi wa Uso (Face ID)';
+    }
+    if (types.contains(BiometricType.fingerprint)) {
+      return 'Alama ya Kidole (Fingerprint)';
+    }
+    if (types.contains(BiometricType.iris)) {
+      return 'Utambuzi wa Jicho (Iris)';
+    }
+    return 'Alama ya Kidole au Uso';
+  }
 }
+

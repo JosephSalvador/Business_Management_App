@@ -611,6 +611,11 @@ internal sealed class StubProductRepository : IProductRepository
     public Task UpdateAsync(Product p, CancellationToken ct = default) => Task.CompletedTask;
     public Task<Product?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default)
         => Task.FromResult(_seeded.FirstOrDefault(p => p.Id == id));
+    public Task<IReadOnlyList<Product>> GetByIdsAsync(Guid tenantId, IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idSet = ids.ToHashSet();
+        return Task.FromResult<IReadOnlyList<Product>>(_seeded.Where(p => idSet.Contains(p.Id)).ToList());
+    }
     public Task<Product?> GetBySkuAsync(Guid tenantId, string sku, CancellationToken ct = default)
         => Task.FromResult<Product?>(null);
     public Task<Product?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken ct = default)

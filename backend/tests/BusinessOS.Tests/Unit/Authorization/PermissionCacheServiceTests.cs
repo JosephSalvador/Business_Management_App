@@ -65,6 +65,7 @@ public sealed class PermissionCacheServiceTests
             => Task.FromResult<IReadOnlyList<Role>>(Array.Empty<Role>());
 
         public Task AddAsync(Role role, CancellationToken ct = default) => Task.CompletedTask;
+        public Task AddRangeAsync(IEnumerable<Role> roles, CancellationToken ct = default) => Task.CompletedTask;
 
         public Task RemoveAsync(Role role, CancellationToken ct = default) => Task.CompletedTask;
 

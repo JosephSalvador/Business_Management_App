@@ -23,12 +23,18 @@ public static class DependencyInjection
     {
         services.AddHttpContextAccessor();
 
-        services.AddDbContext<BusinessDbContext>((serviceProvider, options) =>
+        services.AddDbContextPool<BusinessDbContext>((serviceProvider, options) =>
         {
             var config = serviceProvider.GetRequiredService<IConfiguration>();
             var connectionString = config.GetConnectionString("Default")
                 ?? throw new InvalidOperationException("Connection string 'Default' is not configured.");
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(connectionString, npgsql =>
+            {
+                npgsql.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(2),
+                    errorCodesToAdd: null);
+            });
             options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
@@ -80,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<ISubscriptionItemRepository, SubscriptionItemRepository>();
         services.AddScoped<IVoucherRepository, VoucherRepository>();
+        services.AddScoped<IPaymentInstructionRepository, PaymentInstructionRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<ICustomerInvoiceRepository, CustomerInvoiceRepository>();
         services.AddScoped<IAppNotificationRepository, AppNotificationRepository>();

@@ -141,6 +141,7 @@ public static class Tables
         public const string SubscriptionItems = "SubscriptionItems";
         public const string Vouchers = "Vouchers";
         public const string Invoices = "Invoices";
+        public const string PaymentInstructions = "PaymentInstructions";
     }
 
     public static class Invoicing

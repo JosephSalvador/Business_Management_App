@@ -83,3 +83,47 @@ public sealed record CapabilitiesDto(
     int? MaxBranches,
     int? MaxUsers,
     int? MaxProducts);
+
+public sealed record PaymentInstructionDto(
+    string MpesaTill,
+    string AirtelMoney,
+    string BankName,
+    string BankAccountNumber,
+    string BankAccountName,
+    string WhatsAppContact,
+    string Notes);
+
+public sealed record PlanAdminDto(
+    Guid Id,
+    string Code,
+    string Name,
+    decimal MonthlyPrice,
+    string Currency,
+    IReadOnlyList<string> FeatureKeys,
+    int? MaxBranches,
+    int? MaxUsers,
+    int? MaxProducts,
+    bool IsPackage,
+    bool IsActive);
+
+public sealed record AdminTenantDto(
+    Guid TenantId,
+    string Name,
+    string PlanCode,
+    SubscriptionStatus Status,
+    DateTime TrialEndedAtUtc,
+    DateTime? PaidUntilUtc,
+    DateTime CreatedAt,
+    IReadOnlyList<string> ActivePackages);
+
+public sealed record VoucherAdminDto(
+    Guid Id,
+    string Code,
+    int ValueDays,
+    VoucherStatus Status,
+    DateTime CreatedAt,
+    DateTime? ExpiresAtUtc,
+    DateTime? RedeemedAtUtc,
+    Guid? RedeemedByTenantId,
+    Guid? TargetTenantId,
+    string? PlanCode);

@@ -342,3 +342,34 @@ DateTime? _optionalDateTime(Map<String, dynamic> json, String field) {
   if (value == null) return null;
   return _requiredDateTime(json, field);
 }
+
+class PaymentInstructions {
+  const PaymentInstructions({
+    required this.mpesaTill,
+    required this.airtelMoney,
+    required this.bankName,
+    required this.bankAccountNumber,
+    required this.bankAccountName,
+    required this.whatsAppContact,
+    required this.notes,
+  });
+
+  final String mpesaTill;
+  final String airtelMoney;
+  final String bankName;
+  final String bankAccountNumber;
+  final String bankAccountName;
+  final String whatsAppContact;
+  final String notes;
+
+  factory PaymentInstructions.fromJson(Map<String, dynamic> json) =>
+      PaymentInstructions(
+        mpesaTill: json['mpesaTill'] as String? ?? '',
+        airtelMoney: json['airtelMoney'] as String? ?? '',
+        bankName: json['bankName'] as String? ?? '',
+        bankAccountNumber: json['bankAccountNumber'] as String? ?? '',
+        bankAccountName: json['bankAccountName'] as String? ?? '',
+        whatsAppContact: json['whatsAppContact'] as String? ?? '',
+        notes: json['notes'] as String? ?? '',
+      );
+}

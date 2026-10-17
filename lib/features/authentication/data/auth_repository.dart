@@ -381,7 +381,7 @@ class AuthRepository {
     return Session(
       user: user,
       accessTokenExpiresAt: DateTime.now().toUtc().add(
-            const Duration(hours: 72),
+            const Duration(days: 7),
           ),
     );
   }

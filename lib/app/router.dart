@@ -61,8 +61,10 @@ import '../features/users/presentation/pages/role_form_page.dart';
 import '../features/users/presentation/pages/roles_page.dart';
 import '../features/users/presentation/pages/user_form_page.dart';
 import '../features/users/presentation/pages/users_page.dart';
+import '../features/onboarding/presentation/pages/app_download_page.dart';
 import '../features/onboarding/presentation/pages/business_setup_page.dart';
 import '../features/onboarding/presentation/pages/create_business_page.dart';
+import '../features/onboarding/presentation/pages/pick_package_page.dart';
 import '../features/onboarding/presentation/pages/splash_page.dart';
 import '../features/onboarding/presentation/pages/verify_email_page.dart';
 import '../features/onboarding/presentation/pages/workspace_picker_page.dart';
@@ -79,10 +81,12 @@ abstract final class Routes {
   static const forgotPassword = '/forgot-password';
   static const resetPassword = '/reset-password';
   static const terms = '/terms';
+  static const download = '/download';
   static const verifyEmail = '/verify-email';
   static const twoFactor = '/two-factor';
   static const zeroWorkspace = '/zero-workspace';
   static const createBusiness = '/create-business';
+  static const pickPackage = '/pick-package';
   static const setup = '/setup';
   static const picker = '/workspaces';
   static const home = '/home';
@@ -187,7 +191,9 @@ String? journeyRedirect({
         return Routes.picker;
       }
       if (!selected.onboardingComplete) {
-        final allowed = path == Routes.createBusiness || path == Routes.setup;
+        final allowed = path == Routes.createBusiness ||
+            path == Routes.pickPackage ||
+            path == Routes.setup;
         return allowed ? null : Routes.createBusiness;
       }
       if (_isJourneyScreen(path)) {
@@ -255,7 +261,8 @@ bool _isPublicScreen(String path) =>
     path == Routes.register ||
     path == Routes.forgotPassword ||
     path == Routes.resetPassword ||
-    path == Routes.terms;
+    path == Routes.terms ||
+    path == Routes.download;
 
 /// Bridges [AuthState] + [WorkspaceState] changes into go_router's
 /// [refreshListenable].
@@ -300,6 +307,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: Routes.terms, builder: (_, __) => const TermsPage()),
       GoRoute(
+        path: Routes.download,
+        builder: (_, __) => const AppDownloadPage(),
+      ),
+      GoRoute(
         path: Routes.verifyEmail,
         builder: (_, __) => const VerifyEmailPage(),
       ),
@@ -314,6 +325,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.createBusiness,
         builder: (_, __) => const CreateBusinessPage(),
+      ),
+      GoRoute(
+        path: Routes.pickPackage,
+        builder: (_, __) => const PickPackagePage(),
       ),
       GoRoute(
         path: Routes.picker,

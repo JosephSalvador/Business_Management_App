@@ -465,6 +465,49 @@ void main() {
             reason: 'line too wide: "$line"');
       }
     });
+
+    test('every rendered line fits the 32 column paper on 58mm preset', () {
+      final renderer58 = Thermal80mmRenderer.mm58();
+      final receipt = _createTestReceipt(
+        lines: [
+          ReceiptLine(
+            productName:
+                'Extremely Long Product Name That Will Not Fit In One Line At All',
+            quantity: 12.5,
+            unitPrice: 1234567.89,
+            discountAmount: 0,
+            taxCode: 'A',
+            taxAmount: 0,
+            lineTotal: 15432098.63,
+          ),
+          const ReceiptLine(
+            productName: 'Sukari ya Tanga Bag 25kg',
+            quantity: 3,
+            unitPrice: 100000,
+            discountAmount: 0,
+            taxCode: 'A',
+            taxAmount: 0,
+            lineTotal: 300000,
+          ),
+        ],
+        subtotal: 99999999.99,
+        discountAmount: 5000000.00,
+        taxAmount: 14250000.00,
+        totalAmount: 109249999.99,
+        amountPaid: 110000000.00,
+        change: 750000.01,
+        customerName:
+            'A Customer Name That Is Far Too Long For The Meta Column',
+        cashierName: 'A Cashier Name That Is Also Far Too Long For The Column',
+      );
+
+      final output = renderer58.render(receipt: receipt, isReprint: true);
+
+      for (final line in output.split('\n')) {
+        expect(line.length, lessThanOrEqualTo(32),
+            reason: 'line too wide for 58mm: "$line"');
+      }
+    });
   });
 
   group('ReceiptLayout', () {

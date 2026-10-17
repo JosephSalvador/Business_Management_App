@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -29,11 +30,46 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   void initState() {
     super.initState();
     _voucherController = TextEditingController();
+    _checkClipboardForVoucher();
     Future.microtask(() {
       if (mounted) {
         ref.read(billingControllerProvider.notifier).load();
       }
     });
+  }
+
+  Future<void> _checkClipboardForVoucher() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim();
+      if (text != null && text.isNotEmpty) {
+        final normalized = VoucherCode.normalize(text);
+        if (VoucherCode.isValidFormat(normalized) && mounted) {
+          _voucherController.text = normalized;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim();
+      if (text != null && text.isNotEmpty) {
+        final normalized = VoucherCode.normalize(text);
+        setState(() {
+          _voucherController.text = normalized;
+        });
+        _showMessage('Vocha imebandikwa kutoka clipboard: $normalized');
+      } else {
+        _showMessage('Hakuna maandishi kwenye clipboard.');
+      }
+    } catch (_) {}
+  }
+
+  void _copyToClipboard(String text, String label) {
+    Clipboard.setData(ClipboardData(text: text));
+    _showMessage('$label imenakiliwa!');
   }
 
   @override
@@ -186,11 +222,19 @@ class _BillingPageState extends ConsumerState<BillingPage> {
                   ref.read(billingControllerProvider.notifier).clearMessage(),
             ),
           ],
+          if (typedState.paymentInstructions != null) ...[
+            const SizedBox(height: 16),
+            _PaymentInstructionsCard(
+              instructions: typedState.paymentInstructions!,
+              onCopy: _copyToClipboard,
+            ),
+          ],
           const SizedBox(height: 20),
           _VoucherCard(
             controller: _voucherController,
             isWorking: typedState.isWorking,
             onSubmit: _redeem,
+            onPaste: _pasteFromClipboard,
             loc: loc,
           ),
           const SizedBox(height: 24),
@@ -423,17 +467,177 @@ class _MessageCard extends StatelessWidget {
   }
 }
 
+class _PaymentInstructionsCard extends StatelessWidget {
+  const _PaymentInstructionsCard({
+    required this.instructions,
+    required this.onCopy,
+  });
+
+  final PaymentInstructions instructions;
+  final void Function(String text, String label) onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMpesa = instructions.mpesaTill.isNotEmpty;
+    final hasAirtel = instructions.airtelMoney.isNotEmpty;
+    final hasBank = instructions.bankAccountNumber.isNotEmpty;
+    final hasWhatsApp = instructions.whatsAppContact.isNotEmpty;
+
+    if (!hasMpesa && !hasAirtel && !hasBank && !hasWhatsApp) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.primary.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.payments_outlined, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Jinsi ya Kulipia na Kuwezesha',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Lipa moja kwa moja kupitia nambari zifuatazo kisha weka vocha au wasiliana nasi kuwezeshwa papo hapo:',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.resolveTextSecondary(context),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (hasMpesa)
+              _PaymentTile(
+                title: 'M-Pesa Buy Goods / Till',
+                value: instructions.mpesaTill,
+                icon: Icons.phone_android,
+                onCopy: () => onCopy(instructions.mpesaTill, 'M-Pesa Till'),
+              ),
+            if (hasAirtel)
+              _PaymentTile(
+                title: 'Airtel Money',
+                value: instructions.airtelMoney,
+                icon: Icons.phone_android,
+                onCopy: () => onCopy(instructions.airtelMoney, 'Airtel Money'),
+              ),
+            if (hasBank)
+              _PaymentTile(
+                title: '${instructions.bankName} (${instructions.bankAccountName})',
+                value: instructions.bankAccountNumber,
+                icon: Icons.account_balance,
+                onCopy: () => onCopy(instructions.bankAccountNumber, 'Akaunti ya Benki'),
+              ),
+            if (hasWhatsApp)
+              _PaymentTile(
+                title: 'WhatsApp Usaidizi / Tuma Risiti',
+                value: instructions.whatsAppContact,
+                icon: Icons.chat_bubble_outline,
+                onCopy: () => onCopy(instructions.whatsAppContact, 'WhatsApp'),
+              ),
+            if (instructions.notes.isNotEmpty) ...[
+              const Divider(height: 16),
+              Text(
+                instructions.notes,
+                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentTile extends StatelessWidget {
+  const _PaymentTile({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.onCopy,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.resolveTextSecondary(context),
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.copy, size: 18),
+              tooltip: 'Nakili',
+              onPressed: onCopy,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _VoucherCard extends StatelessWidget {
   const _VoucherCard({
     required this.controller,
     required this.isWorking,
     required this.onSubmit,
+    required this.onPaste,
     required this.loc,
   });
 
   final TextEditingController controller;
   final bool isWorking;
   final Future<void> Function() onSubmit;
+  final VoidCallback onPaste;
   final AppLocalizations loc;
 
   @override
@@ -465,6 +669,11 @@ class _VoucherCard extends StatelessWidget {
                       labelText: loc.billingVoucherLabel,
                       hintText: loc.billingVoucherHint,
                       border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.paste_rounded),
+                        tooltip: 'Bandika Vocha',
+                        onPressed: isWorking ? null : onPaste,
+                      ),
                     ),
                     onSubmitted: (_) => onSubmit(),
                   ),

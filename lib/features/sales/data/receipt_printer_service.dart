@@ -8,17 +8,20 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:qr/qr.dart' as qr;
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/storage/locale_store.dart';
+import '../../receipts/domain/receipt_format.dart';
 import '../../receipts/domain/receipt_preview.dart';
 import '../../receipts/domain/receipt_qr.dart';
 import '../../receipts/domain/receipt_renderer.dart';
 import '../domain/sale.dart';
+import 'web_bluetooth/web_bluetooth_printer.dart';
 
 class ReceiptPrinterService {
   final Thermal80mmRenderer _renderer;
 
-  ReceiptPrinterService({ReceiptLanguage language = ReceiptLanguage.english})
-      : _renderer = Thermal80mmRenderer(language: language);
+  ReceiptPrinterService({
+    ReceiptLanguage language = ReceiptLanguage.english,
+    ReceiptPaperWidth paperWidth = ReceiptPaperWidth.mm80,
+  }) : _renderer = Thermal80mmRenderer.forWidth(paperWidth, language: language);
 
   /// Encodes a receipt as ESC/POS bytes for a thermal printer.
   ///
@@ -189,7 +192,40 @@ class ReceiptPrinterService {
     }
   }
 
-  bool get canPrintViaBluetooth => Platform.isAndroid;
+  bool get canPrintViaBluetooth => !kIsWeb && Platform.isAndroid;
+
+  bool get hasWebBluetooth => webBluetoothPrinter.isSupported;
+
+  bool get canPrintDirectly => canPrintViaBluetooth || hasWebBluetooth;
+
+  Future<bool> printViaWebBluetooth({
+    required ReceiptPreview receipt,
+    bool isReprint = false,
+  }) async {
+    try {
+      final bytes = buildEscPosBytes(receipt: receipt, isReprint: isReprint);
+      return await webBluetoothPrinter.printBytes(Uint8List.fromList(bytes));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> printUniversal({
+    required ReceiptPreview receipt,
+    String? bluetoothAddress,
+    bool isReprint = false,
+  }) async {
+    if (canPrintViaBluetooth && bluetoothAddress != null) {
+      return printToDevice(
+        address: bluetoothAddress,
+        receipt: receipt,
+        isReprint: isReprint,
+      );
+    } else if (hasWebBluetooth) {
+      return printViaWebBluetooth(receipt: receipt, isReprint: isReprint);
+    }
+    return false;
+  }
 
   String buildReceiptText({
     required ReceiptPreview receipt,
@@ -306,10 +342,12 @@ class ReceiptPrinterService {
 }
 
 /// Printer service for the app locale — the ticket language follows the
-/// language the user is reading the UI in.
+/// language the user is reading the UI in, and width follows the configured paper size.
 final receiptPrinterServiceProvider = Provider<ReceiptPrinterService>((ref) {
   final locale = ref.watch(localeControllerProvider);
+  final paperWidth = ref.watch(receiptPaperWidthProvider);
   return ReceiptPrinterService(
     language: receiptLanguageForCode(locale.languageCode),
+    paperWidth: paperWidth,
   );
 });

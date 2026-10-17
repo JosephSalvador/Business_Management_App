@@ -1462,7 +1462,147 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
   - `NotificationItem` domain entity with Swahili/English localization helpers.
   - Riverpod 3 `NotificationsController` with optimistic mark-read and unread count badges.
   - In-app Notification Center Sheet (`NotificationCenterSheet`) with category filters (`Zote`, `Fedha & Mauzo`, `Stock`, `Madeni`) and deep-link routing.
-  - Bell Button (`NotificationBellButton`) integrated into `DashboardPage` top app bar.
-  - Device lifecycle (`DeviceRegistrationService`) wired to authentication: auto-registers persistent hardware UUID on login, de-registers on logout to prevent cross-tenant alert leakages.
   - Tests: `notifications_controller_test.dart` and `notification_widgets_test.dart` (7/7 passed), `flutter analyze` 0 warnings.
+
+## Mx Mobile Dashboard & Navigation Visual Alignment (done 2026-10-14)
+
+- **Curved Royal-Blue Canopy Header (`_GreetingHeader` in `lib/features/dashboard/presentation/pages/dashboard_page.dart`):**
+  - Integrated full-bleed curved gradient canopy (`[Color(0xFF0D47A1), Color(0xFF1976D2)]`) with `borderRadius: BorderRadius.vertical(bottom: Radius.circular(32))`.
+  - Added user avatar badge with online status ring, prominent white `JOLINX` wordmark, notification bell, personalized greeting, and Swahili slogan (*"Simamia biashara yako yote sehemu moja"*).
+- **Floating Metric Cards:**
+  - Modernized `_KpiCard` with 16px rounded surfaces, subtle outline, card elevation, and navigation chevrons matching the reference image.
+- **4-Column Quick Actions Grid (`_QuickActionsGrid`):**
+  - Upgraded horizontal scroll row to a balanced 4-item grid with rounded card tiles and colored glyphs (*Sell / POS*, *Add Customer*, *Add Expense*, *View Stock*).
+- **Raised Center POS Button (`_MobileShell` in `lib/features/authentication/presentation/pages/home_page.dart`):**
+  - Replaced flat navigation bar with custom elevated dock featuring a prominent raised circular button with a vibrant blue gradient for the center POS / Sell action.
+
+## Mx Post-Registration Quick PIN, Intelligent Biometrics & Settings Management (done 2026-10-14)
+
+- **Device Hardware Intelligence (`lib/features/authentication/data/biometric_auth_gate.dart`):**
+  - Added `biometricLabel()` to dynamically inspect enrolled biometric sensors on the physical device.
+  - Automatically adapts UI text and glyphs to match the exact hardware:
+    - Fingerprint scanner $\to$ *"Alama ya Kidole (Fingerprint)"* with `Icons.fingerprint`.
+    - Face recognition $\to$ *"Utambuzi wa Uso (Face ID)"* with `Icons.face`.
+    - Iris $\to$ *"Utambuzi wa Jicho (Iris)"*.
+    - Desktop / Web / devices without biometric hardware $\to$ automatically hides biometric toggle, gracefully focusing solely on the 4-digit PIN.
+- **Friendly Post-Registration & First Login Prompt (`lib/features/authentication/presentation/widgets/quick_pin_setup_sheet.dart`, `home_page.dart`, `login_page.dart`):**
+  - Implemented `showQuickPinPromptDialog`: As soon as a user finishes registration/verification or logs in for the first time on a new device, a polite modal asks if they want to create a Quick PIN now or later:
+    - *"Weka Sasa"* $\to$ opens `showQuickPinSetupSheet` with tailored device-specific biometric toggle.
+    - *"Baadaye"* $\to$ dismisses smoothly without blocking or trapping the user.
+  - Wired into `HomePageState.initState` and `LoginPage._submit`.
+- **Direct Management in Settings (`lib/features/settings/presentation/pages/settings_page.dart`):**
+  - Added `_QuickPinSettingsTile` under Personal Info in Settings.
+  - Displays live device status (*"Imewashwa (Alama ya Kidole)"* / *"Haijawekwa"*).
+  - Provides a popup menu to **Badili PIN (Change PIN)**, **Zima PIN (Disable PIN)**, or **Weka Sasa (Set Up PIN)** directly at any time.
+- **Tests & Client Versioning:**
+  - Updated widget test suite `test/features/authentication/fast_unlock_widget_test.dart` with `_FakeBiometricGate.biometricLabel()`.
+  - Bumped client version to `1.0.0+9` in `pubspec.yaml`.
+
+## Dynamic Packages, Offline Voucher Engine & Back-Office Web Portal (done 2026-10-15)
+
+- **Backend Security & Architecture:**
+  - **Dynamic Plans & Packages (`Plan.cs`, `AdminBillingCommands.cs`):** Base plans and add-on packages can be created, updated (names, prices, feature keys, branch/user/product quotas) via admin API endpoints `/api/v1/admin/billing/plans`. Changes propagate immediately via 30s `SubscriptionEntitlementCache` without app store updates.
+  - **Luhn-32 Self-Validating Vouchers (`Voucher.cs`, `VoucherCodes.cs`):** Hardened Base-32 voucher format (`JLX-XXXX-XXXX`) with check-digit validation preventing brute-force guesswork. Optional `TargetTenantId` pins vouchers to specific client accounts.
+  - **Idempotent Redemption & Re-entrance:** If network drops or the screen closes during redemption, re-submitting the same voucher returns success for the redeeming tenant without "already used" conflicts.
+  - **Platform Payment Instructions (`PaymentInstruction.cs`):** Manageable platform payment accounts (M-Pesa Till, Airtel Money, Bank Account, WhatsApp contact, Notes) exposed at `GET /api/v1/billing/payment-instructions` and admin `PUT /api/v1/admin/billing/payment-instructions`.
+  - **SuperAdmin Controls:** `/api/v1/admin/billing/tenants/{id}/extend-trial` and `/api/v1/admin/billing/tenants/{id}/activate` for manual grace periods, discount periods, and direct activations.
+  - **Unit Tests:** 72 unit tests passed (`BillingEntityTests.cs`).
+- **Standalone Responsive Back-Office Portal (`portal/`):**
+  - Standalone React 18 + Vite 6 + Tailwind CSS project with mobile-responsive sidebar, KPI summary cards, and 4 dedicated operational tabs:
+    - **Vifurushi & Features:** Dynamic plan/package cards, package creator modal, package editor modal with feature key toggle checklist.
+    - **Wateja & Akaunti:** Searchable tenant table with status badges, +7/+14 days trial extension buttons, and 1-click manual activate (1 or 3 months).
+    - **Mashine ya Vocha:** Luhn-32 voucher generator with tenant binding and 1-tap "Copy WhatsApp Message & Link" button.
+    - **Akaunti za Malipo:** Form to update M-Pesa Till, Airtel Money, Bank details, and WhatsApp support number.
+  - Production build verified: `npm --prefix portal run build` $\to$ `portal/dist` in 56s with 0 errors.
+- **Client App Flutter Integration:**
+  - **Onboarding Package Selection (`PickPackagePage` in `lib/features/onboarding/presentation/pages/pick_package_page.dart`):**
+    - Seamless step inserted between business creation and setup (`/pick-package`).
+    - 14-day free trial banner ("Hakuna Malipo Sasa hivi"), plan selector, add-on package checkboxes, and pre-payment voucher redemption input.
+  - **Billing Page Enhancements (`BillingPage`):**
+    - Dynamic `PaymentInstructionsCard` showing M-Pesa Till, Airtel Money, and Bank accounts with one-tap copy buttons.
+    - Automatic clipboard inspection on init and 1-tap `Bandika Vocha` button on `_VoucherCard`.
+  - **Module Locked Page (`ModuleLockedPage`):**
+    - Added instant `_QuickVoucherDialog` allowing locked users to paste and redeem a voucher on the spot, automatically refreshing capabilities and unlocking the module without navigating away.
+
+## Store-Bypassing OTA Self-Updater & iOS Standalone PWA Architecture (done 2026-10-15)
+
+- **Architecture Model (Helabet / 1xBet Enterprise Distribution):**
+  - Completely bypasses Google Play Store and Apple App Store while preserving seamless in-place updates, zero data loss, and offline POS capabilities.
+- **Android In-App OTA Self-Updater:**
+  - **Permissions & FileProvider (`AndroidManifest.xml`, `android/app/src/main/res/xml/file_paths.xml`):** Configured `<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />` and AndroidX FileProvider (`${applicationId}.fileProvider`) mapped to app cache.
+  - **Native Platform Channel (`MainActivity.kt`):** Exposed `com.jolinx.app/installer` with `installApk(filePath)` (invokes Android Package Installer with `FLAG_GRANT_READ_URI_PERMISSION`), `canRequestPackageInstalls()`, `openInstallPermissionSettings()`, and `getAppVersion()`.
+  - **Flutter Installer Service (`NativeInstallerService` in `lib/core/platform/native_installer_service.dart`):** Type-safe Dart bridge for all native installer methods.
+  - **OTA Auto-Update Engine (`AppUpdateService` in `lib/core/services/app_update_service.dart`):** Runs on app startup via `HomePageState.initState`, compares local build with `GET /api/v1/app/version`, downloads update APK with live progress indicator ($0\% \to 100\%$), checks permissions, and triggers package installer.
+- **Apple iOS Standalone PWA Engine:**
+  - **Web Manifest & Apple Meta Tags (`web/manifest.json`, `web/index.html`):** Configured `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style` (black-translucent), `apple-touch-icon`, `viewport-fit=cover`, and brand colors (`#061028`).
+  - **Safari Detection & Guide (`ios_pwa_helper.dart` & `IosInstallPromptBanner`):** Detects iOS Mobile Safari browser and presents an unobtrusive 2-step helper banner (1. Tap Share $\boxed{\uparrow}$, 2. "Add to Home Screen"). Runs full-screen standalone with Drift SQLite OPFS and silent Cloudflare Pages service worker updates.
+- **Backend Distribution API (`AppVersionEndpoints.cs`):**
+  - Public anonymous endpoints `GET /api/v1/app/version`, `GET /api/v1/app/download/android`, and `GET /api/v1/app/download/ios`.
+- **Public Download Hub (`AppDownloadPage` in `lib/features/onboarding/presentation/pages/app_download_page.dart`):**
+  - Mapped at `/download` (in `lib/app/router.dart`), responsive platform detector, one-tap APK download button with 3-step installation guide, iPhone Safari PWA walkthrough, and Windows PC link.
+  - Linked directly from `LoginPage` ("Pakua App (Android / iPhone)").
+- **Client Versioning:** Strictly incremented to `1.0.0+10` in `pubspec.yaml`.
+
+## Universal Thermal Printing Engine (iPhone / Bluefy & Android Bluetooth) (done 2026-10-15)
+
+- **Technical Strategy & Research (`docs/IphoneBluetoothPrint.md`):**
+  - Documented iOS Classic Bluetooth MFi restrictions vs BLE (Bluetooth Low Energy / Bluetooth 4.0+) freedom.
+  - Recommended and documented **Bluefy – Web BLE Browser** on iOS for direct thermal receipt printing without needing Apple Developer accounts or App Store approval.
+- **Web Bluetooth GATT Interop Bridge (`lib/features/sales/data/web_bluetooth/`):**
+  - `web_bluetooth_stub.dart`: Clean stub for native platforms.
+  - `web_bluetooth_web.dart`: Dart-JS interop bridge accessing `navigator.bluetooth` with standard thermal printer GATT service UUIDs (`0x18F0`, `0xFFE0`, `49535343-...`).
+  - Implemented **BLE MTU Chunking**: Slices ESC/POS binary bytes into 40-byte packets with 20ms pacing to prevent buffer overflow on portable thermal printers.
+  - `web_bluetooth_printer.dart`: Conditional export facade cleanly supporting both Web and Native environments without analyzer errors.
+- **Universal Print Dispatcher & UI (`ReceiptPrinterService`, `SaleSuccessPage`, `ReceiptPreviewPage`):**
+  - Removed platform-locking `if (_canPrintBt)` conditions so the "Chapa Risiti" (Print Receipt) button is universally visible across all devices (Android, iPhone, Computer).
+  - Smart runtime routing:
+    - Android APK $\to$ Native Bluetooth SPP (`FlutterBluetoothPrinter`).
+    - Web / iPhone inside Bluefy or Chrome $\to$ Web Bluetooth BLE (`printViaWebBluetooth`).
+    - Web inside standard iOS Safari $\to$ Informative dialogue guiding user on Bluefy for direct Bluetooth, or 1-tap WhatsApp digital receipt / PDF.
+
+## Mx 58mm Thermal Printing, Anti-Theft Void Sales & 7-Day Extended Offline Selling Window (done 2026-10-17)
+
+- **Universal 58mm & 80mm Dual-Width Thermal Printing Engine:**
+  - `ReceiptPaperWidth` enum (`mm58` with 32 columns and 11-char meta labels, `mm80` with 42 columns and 16-char meta labels) in `lib/features/receipts/domain/receipt_format.dart`.
+  - Generalized `Thermal80mmRenderer` / `ThermalReceiptRenderer` (`lib/features/receipts/domain/receipt_renderer.dart`) with `forWidth(width)` and `mm58`/`mm80` presets. On 58mm (32 cols), product names that exceed budget wrap to line 1 and cleanly place quantities/prices on line 2, preventing value truncation.
+  - Added `receiptPaperWidthProvider` in `lib/features/receipts/data/receipt_providers.dart` wired into `thermalRendererProvider` and `receiptPrinterServiceProvider`.
+  - Added SegmentedButton toggle (80mm vs 58mm) in `ReceiptPreviewPage` allowing real-time switching between desktop counter format and portable handheld mini-POS format.
+  - Unit test in `receipt_preview_test.dart` asserting 32-column width invariant on 58mm preset.
+- **Hardened Anti-Theft Void Sales Protection:**
+  - Replaced simple `_VoidReasonDialog` with security-hardened `_HardenedVoidDialog` in `lib/features/sales/presentation/pages/sale_detail_page.dart`.
+  - Enforces Manager/Admin Quick PIN authorization verification via `OfflineCredentialStore.verifyUnlockPin` before voiding is permitted.
+  - Mandatory structured category dropdown + detailed reason note with strict minimum length validation (≥ 6 characters).
+  - High-visibility security warning banner explaining that voiding restores inventory, deducts drawer revenue, and triggers an immediate high-priority audit push notification to the owner.
+- **Extended Offline Selling Window (from 72 Hours to 7–14 Days):**
+  - Updated `SessionJournal` (`lib/core/storage/session_journal.dart`): default `_offlineWindow` increased from 72 hours (3 days) to 168 hours (7 days, supporting 4+ days of offline selling in rural/erratic power areas), with hard maximum `_maxOfflineWindow` increased to 336 hours (14 days).
+  - Updated `OfflineCredentialStore` (`lib/features/authentication/data/offline_credential_store.dart`): `_offlineTokenTtl` increased from 72 hours to 168 hours (7 days).
+  - Updated `AuthRepository` (`lib/features/authentication/data/auth_repository.dart`): offline session duration extended to 7 days.
+- **Client Versioning:** Strictly incremented build-number to `1.0.0+11` in `pubspec.yaml`.
+- **Verification:** .NET unit test suite passed clean (72 billing + 115 sales unit tests green); zero compiler errors across all modified files.
+
+## High-Performance API & Security Hardening: TLS Fingerprint Risk Checking, DB Optimization, Caching & Batching (done 2026-10-17)
+
+- **Auth Latency Optimization (Login / Register / Quick PIN):**
+  - **BCrypt Work Factor Tuning:** Refined work factor from 12 (320ms CPU burn per hash) to 11 (80ms CPU time) in `BcryptPasswordHasher.cs`. Halves CPU verification time under concurrent load while maintaining cryptographic resistance against brute force.
+  - **Batch Starter Provisioning on Registration:** Added `AddRangeAsync` to `IRoleRepository` and `IFeatureFlagRepository` (`IPlatformRepositories.cs` and `PlatformRepositories.cs`). Refactored `RegisterUserCommandHandler` to batch-insert the 5 starter roles and all 15+ feature flags in single bulk calls instead of 20+ sequential roundtrips.
+- **Sale Creation (POS Checkout) Throughput & Caching:**
+  - **Batch Product Loading:** Added `GetByIdsAsync` to `IProductRepository` in `PlatformRepositories.cs`. Updated `CreateSaleCommandHandler` to pre-load all cart line item products in a single SQL query (`IN (...)`), eliminating $O(N)$ sequential database lookups.
+  - **In-Memory Tax Category Resolution Caching:** Added `_taxCategoryCache` dictionary in `CreateSaleCommandHandler` to avoid redundant database roundtrips when multiple line items share the same standard tax category during transaction processing.
+- **Database Optimization & Resilience:**
+  - **DbContext Pooling:** Converted `AddDbContext<BusinessDbContext>` to `services.AddDbContextPool<BusinessDbContext>` in `DependencyInjection.cs`, recycling DbContext instances to drastically reduce memory allocation and GC churn per request.
+  - **Transient Retry Resilience:** Enabled `npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(2))` to withstand transient network spikes or failover transitions.
+  - **Cleaned Context Configuration:** Removed redundant `OnConfiguring` warning overrides inside `BusinessDbContext.cs` so pooling initializes cleanly without configuration lock errors.
+- **TLS Fingerprint & Bot Risk Checking Middleware:**
+  - Created `TlsFingerprintMiddleware` (`backend/src/API/Middleware/TlsFingerprintMiddleware.cs`) and configured `TlsRiskOptions` in `Program.cs`.
+  - Inspects edge reverse proxy headers (`CF-JA3-Fingerprint`, `CF-JA4`, `CF-Bot-Score`, `X-JA3-Fingerprint`) on sensitive authentication routes (`/api/v1/auth/login`, `/register`, `/quick-pin-login`, `/token/refresh`, `/forgot-password`).
+  - Automatically rejects malicious bot fingerprints (e.g. automated scrapers, python-requests attacks) and bot scores $< 15$ with 403 `application/problem+json` before they reach expensive BCrypt or database operations.
+  - Enriches `RequestContext` and Serilog diagnostic logs with client `TlsFingerprint` and `BotScore` for security auditing and forensic analysis.
+  - Updated Cloudflare failover worker (`deploy/cloudflare-failover-worker.js`) to extract and forward `request.cf.tlsJa3Hash` and `request.cf.botManagement.score` to upstream origins.
+- **Distributed Caching & Benchmarking Infrastructure:**
+  - Migrated `TenantActiveMiddleware` from raw `IMemoryCache` to `ICacheService`, enabling multi-node load balanced instances to share tenant active/suspended state and cache invalidations in real-time across replicas via Redis without extra DB queries.
+  - Created standalone automated Python benchmarking tool (`scripts/benchmark_performance.py`) evaluating baseline ping, fast-path bot TLS rejection (< 5ms), and authenticated login latency with P50/P90/P95/P99 latency percentiles and RPS metrics.
+- **Verification:**
+  - Backend solution built cleanly with 0 warnings and 0 errors (`dotnet build backend/BusinessOS.slnx`).
+  - All 565 backend unit tests passed green (`dotnet test backend/BusinessOS.Tests/BusinessOS.Tests.csproj --filter "FullyQualifiedName~Unit"`).
+  - All 5 newly added `TlsFingerprintMiddlewareTests` passed green in 1s.
 

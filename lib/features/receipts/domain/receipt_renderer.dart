@@ -100,7 +100,7 @@ class ReceiptLabels {
       _labels[lang] ?? _labels[ReceiptLanguage.english]!;
 }
 
-/// Thermal 80mm receipt renderer.
+/// Thermal receipt renderer supporting both 80mm and 58mm paper widths.
 ///
 /// The renderer is the single source of truth for receipt layout: it emits
 /// every line already positioned inside [lineWidth] columns (centered header,
@@ -109,11 +109,38 @@ class ReceiptLabels {
 class Thermal80mmRenderer implements ReceiptRenderer {
   const Thermal80mmRenderer({
     this.lineWidth = receiptLineWidth,
+    this.metaLabelWidth = receiptMetaLabelWidth,
     this.language = ReceiptLanguage.english,
   });
 
-  /// The character width of the thermal paper (42 chars for 80mm standard).
+  /// Factory constructor to configure renderer for a specific [ReceiptPaperWidth].
+  factory Thermal80mmRenderer.forWidth(
+    ReceiptPaperWidth width, {
+    ReceiptLanguage language = ReceiptLanguage.english,
+  }) =>
+      Thermal80mmRenderer(
+        lineWidth: width.lineWidth,
+        metaLabelWidth: width.metaLabelWidth,
+        language: language,
+      );
+
+  /// 58mm preset (32 columns, handheld Bluetooth POS).
+  factory Thermal80mmRenderer.mm58({
+    ReceiptLanguage language = ReceiptLanguage.english,
+  }) =>
+      Thermal80mmRenderer.forWidth(ReceiptPaperWidth.mm58, language: language);
+
+  /// 80mm preset (42 columns, standard counter printer).
+  factory Thermal80mmRenderer.mm80({
+    ReceiptLanguage language = ReceiptLanguage.english,
+  }) =>
+      Thermal80mmRenderer.forWidth(ReceiptPaperWidth.mm80, language: language);
+
+  /// The character width of the thermal paper (42 chars for 80mm, 32 chars for 58mm).
   final int lineWidth;
+
+  /// Width allocated for meta labels before the colon separator.
+  final int metaLabelWidth;
 
   /// The language for receipt labels.
   final ReceiptLanguage language;
@@ -265,9 +292,9 @@ class Thermal80mmRenderer implements ReceiptRenderer {
     return _hasValue(name) ? name!.trim() : labels['walkIn']!;
   }
 
-  /// Label padded to [receiptMetaLabelWidth], then `: value`.
+  /// Label padded to [metaLabelWidth], then `: value`.
   String _metaRow(String label, String value) {
-    final prefix = '${label.padRight(receiptMetaLabelWidth)}: ';
+    final prefix = '${label.padRight(metaLabelWidth)}: ';
     return _fit('$prefix$value');
   }
 
@@ -308,6 +335,11 @@ class Thermal80mmRenderer implements ReceiptRenderer {
         '${qty.padLeft(widths[0])} ${price.padLeft(widths[1])} ${total.padLeft(widths[2])}';
     final nameRoom = lineWidth - money.length - 1;
     if (nameRoom <= 0) return _fit(money);
+    if (name.length > nameRoom && lineWidth <= 32) {
+      final wrappedName = _fit(name);
+      final indentedMoney = money.padLeft(lineWidth);
+      return '$wrappedName\n$indentedMoney';
+    }
     return '${_padOrTruncate(name, nameRoom)} $money';
   }
 
@@ -362,3 +394,6 @@ class Thermal80mmRenderer implements ReceiptRenderer {
     return '${text.substring(0, max - 1)}…';
   }
 }
+
+/// Generalized alias for the thermal receipt renderer supporting multiple widths.
+typedef ThermalReceiptRenderer = Thermal80mmRenderer;

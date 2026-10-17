@@ -57,6 +57,7 @@ builder.Services
     .Configure<SmsOptions>(builder.Configuration.GetSection(SmsOptions.SectionName))
     .Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName))
     .Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName))
+    .Configure<TlsRiskOptions>(builder.Configuration.GetSection(TlsRiskOptions.SectionName))
     .Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 
 builder.Services
@@ -208,6 +209,7 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<TlsFingerprintMiddleware>();
 app.UseExceptionHandler();
 app.UseSecurityHeaders();
 app.UseSerilogRequestLogging(options =>
@@ -219,6 +221,14 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("TenantId", context?.TenantId);
         diagnosticContext.Set("CorrelationId", context?.CorrelationId);
         diagnosticContext.Set("RemoteIp", context?.IpAddress);
+        if (!string.IsNullOrEmpty(context?.TlsFingerprint))
+        {
+            diagnosticContext.Set("TlsFingerprint", context.TlsFingerprint);
+        }
+        if (context?.BotScore.HasValue == true)
+        {
+            diagnosticContext.Set("BotScore", context.BotScore.Value);
+        }
     };
 });
 
@@ -263,13 +273,17 @@ app.MapCapabilitiesEndpoints();
 app.MapInvoiceEndpoints();
 app.MapNotificationEndpoints();
 app.MapTenantProvisioningEndpoints();
+app.MapAppVersionEndpoints();
 
 if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<BusinessDbContext>();
-    await db.Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>().SeedAsync();
+    if (await db.Database.CanConnectAsync())
+    {
+        await db.Database.MigrateAsync();
+        await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>().SeedAsync();
+    }
 }
 else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.IsProduction())
 {

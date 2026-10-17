@@ -63,3 +63,6 @@ backend/run-backend.sh
 
 # Adobe Photoshop Master Binaries (Stored locally in multimedia/branding/logo/master_psd/)
 *.psd
+
+# Node modules
+**/node_modules/

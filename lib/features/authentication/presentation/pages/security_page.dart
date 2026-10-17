@@ -644,9 +644,13 @@ class _DeviceSecuritySectionState
   }
 
   Future<void> _setupOrChangePin() async {
+    final gate = ref.read(biometricAuthGateProvider);
+    final label = await gate.biometricLabel();
+    if (!mounted) return;
     final ok = await showQuickPinSetupSheet(
       context,
       biometricSupported: _biometricHardware,
+      biometricLabel: label,
       onSave: ({required pin, required enableBiometric}) async {
         await ref.read(authControllerProvider.notifier).enableQuickPin(
               pin: pin,

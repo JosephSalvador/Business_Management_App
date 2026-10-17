@@ -109,7 +109,6 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         var allPermissions = await _permissions.ResolveByNamesAsync(PermissionNames.All, cancellationToken);
         var permissionsByName = allPermissions.ToDictionary(p => p.Name, StringComparer.Ordinal);
         adminRole.Grant(allPermissions);
-        await _roles.AddAsync(adminRole, cancellationToken);
 
         var staffPermissions = PermissionNames.Staff
             .Where(permissionsByName.ContainsKey)
@@ -121,8 +120,8 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
             isSystem: true,
             description: "Fanyakazi — catalogue, stock na POS");
         staffRole.Grant(staffPermissions);
-        await _roles.AddAsync(staffRole, cancellationToken);
 
+        var rolesToCreate = new List<Role> { adminRole, staffRole };
         foreach (var template in RoleTemplates.Starter)
         {
             var role = Role.Create(tenant.Id, template.Name, description: template.Description);
@@ -131,8 +130,9 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
                 .Select(name => permissionsByName[name])
                 .ToArray();
             role.Grant(permissions);
-            await _roles.AddAsync(role, cancellationToken);
+            rolesToCreate.Add(role);
         }
+        await _roles.AddRangeAsync(rolesToCreate, cancellationToken);
 
         var user = User.Create(
             Guid.NewGuid(),
@@ -151,12 +151,10 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         // All module flags start enabled; owners narrow them later in settings.
         // Without rows here the entitlement intersection is empty and every
         // module-gated write 403s even during the trial (mirrors provisioning).
-        foreach (var key in FeatureKeys.All)
-        {
-            await _flags.AddAsync(
-                FeatureFlag.Create(tenant.Id, key, isEnabled: true),
-                cancellationToken);
-        }
+        var flagsToCreate = FeatureKeys.All
+            .Select(key => FeatureFlag.Create(tenant.Id, key, isEnabled: true))
+            .ToList();
+        await _flags.AddRangeAsync(flagsToCreate, cancellationToken);
 
         // No session is issued until the email address is verified.
         await _verification.IssueAsync(user, cancellationToken);

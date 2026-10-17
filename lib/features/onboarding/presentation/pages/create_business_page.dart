@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/router.dart';
 import '../../../../app/providers.dart';
 import '../../../../core/network/app_exception.dart';
 import '../../../../shared/design_system/app_colors.dart';
@@ -83,7 +84,7 @@ class _CreateBusinessPageState extends ConsumerState<CreateBusinessPage> {
               taxId: _taxIdController.text,
             ),
           );
-      if (mounted) context.go('/setup');
+      if (mounted) context.go(Routes.pickPackage);
     } on AppException catch (error) {
       setState(() => _error = error.message);
     } finally {

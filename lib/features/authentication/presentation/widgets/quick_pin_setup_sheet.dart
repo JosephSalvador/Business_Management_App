@@ -3,11 +3,73 @@ import 'package:flutter/material.dart';
 import '../../../../core/network/app_exception.dart';
 import 'pin_pad.dart';
 
+/// Friendly post-registration prompt asking user if they want to setup Quick PIN now or later.
+Future<bool?> showQuickPinPromptDialog(
+  BuildContext context, {
+  required String biometricLabel,
+  required bool biometricSupported,
+}) {
+  final theme = Theme.of(context);
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      icon: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primaryContainer,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.pin_outlined,
+          color: theme.colorScheme.primary,
+          size: 28,
+        ),
+      ),
+      title: const Text(
+        'Weka PIN ya Kuingia Haraka?',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      content: Text(
+        biometricSupported
+            ? 'Ili usilazimike kuandika nenosiri kila wakati, weka PIN ya tarakimu 4 au tumia $biometricLabel kufungua app kwa sekunde moja tu.'
+            : 'Ili usilazimike kuandika nenosiri refu kila wakati, weka PIN ya tarakimu 4 kufungua app haraka zaidi.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontSize: 14,
+        ),
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      actions: [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Baadaye'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Weka Sasa'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 /// Modal bottom sheet for setting up or updating a 4-digit Quick PIN.
 /// Includes an optional toggle to enable biometric authentication on supported devices.
 Future<bool> showQuickPinSetupSheet(
   BuildContext context, {
   required bool biometricSupported,
+  String? biometricLabel,
   required Future<void> Function({
     required String pin,
     required bool enableBiometric,
@@ -23,6 +85,7 @@ Future<bool> showQuickPinSetupSheet(
     ),
     builder: (context) => _QuickPinSetupSheet(
       biometricSupported: biometricSupported,
+      biometricLabel: biometricLabel ?? 'alama ya kidole au uso',
       onSave: onSave,
     ),
   ).then((value) => value ?? false);
@@ -31,10 +94,12 @@ Future<bool> showQuickPinSetupSheet(
 class _QuickPinSetupSheet extends StatefulWidget {
   const _QuickPinSetupSheet({
     required this.biometricSupported,
+    required this.biometricLabel,
     required this.onSave,
   });
 
   final bool biometricSupported;
+  final String biometricLabel;
   final Future<void> Function({
     required String pin,
     required bool enableBiometric,
@@ -193,10 +258,12 @@ class _QuickPinSetupSheetState extends State<_QuickPinSetupSheet> {
             SwitchListTile.adaptive(
               value: _enableBiometric,
               onChanged: _busy ? null : (v) => setState(() => _enableBiometric = v),
-              title: const Text('Ruhusu pia alama ya kidole au uso'),
+              title: Text('Ruhusu pia ${widget.biometricLabel}'),
               subtitle: const Text('Kufungua app kwa haraka zaidi'),
               secondary: Icon(
-                Icons.fingerprint,
+                widget.biometricLabel.toLowerCase().contains('uso')
+                    ? Icons.face
+                    : Icons.fingerprint,
                 color: theme.colorScheme.primary,
               ),
               contentPadding: EdgeInsets.zero,

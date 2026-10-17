@@ -97,6 +97,7 @@ public interface IRoleRepository
     Task<IReadOnlyList<string>> GetPermissionsAsync(
         Guid tenantId, Guid roleId, CancellationToken cancellationToken = default);
     Task AddAsync(Role role, CancellationToken cancellationToken = default);
+    Task AddRangeAsync(IEnumerable<Role> roles, CancellationToken cancellationToken = default);
     Task RemoveAsync(Role role, CancellationToken cancellationToken = default);
 }
 
@@ -168,6 +169,7 @@ public interface IFeatureFlagRepository
 {
     Task<FeatureFlag?> GetAsync(Guid tenantId, string key, CancellationToken cancellationToken = default);
     Task AddAsync(FeatureFlag flag, CancellationToken cancellationToken = default);
+    Task AddRangeAsync(IEnumerable<FeatureFlag> flags, CancellationToken cancellationToken = default);
     Task UpdateAsync(FeatureFlag flag, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<FeatureFlag>> ListAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }
@@ -182,6 +184,7 @@ public sealed record ProductListFilter(
 public interface IProductRepository
 {
     Task<Product?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Product>> GetByIdsAsync(Guid tenantId, IEnumerable<Guid> ids, CancellationToken cancellationToken = default);
     Task<Product?> GetBySkuAsync(Guid tenantId, string sku, CancellationToken cancellationToken = default);
     Task<Product?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Product>> ListAsync(
@@ -749,7 +752,9 @@ public interface IPlanRepository
 {
     Task<Plan?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Plan>> ListActiveAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Plan>> ListAllAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Plan plan, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Plan plan, CancellationToken cancellationToken = default);
 }
 
 /// <summary>One active subscription per tenant.</summary>
@@ -774,7 +779,15 @@ public interface ISubscriptionItemRepository
 public interface IVoucherRepository
 {
     Task<Voucher?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Voucher>> ListAsync(int page, int pageSize, VoucherStatus? status = null, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(VoucherStatus? status = null, CancellationToken cancellationToken = default);
     Task AddAsync(Voucher voucher, CancellationToken cancellationToken = default);
+}
+
+public interface IPaymentInstructionRepository
+{
+    Task<PaymentInstruction> GetOrCreateAsync(CancellationToken cancellationToken = default);
+    Task UpdateAsync(PaymentInstruction instruction, CancellationToken cancellationToken = default);
 }
 
 public sealed record DebtView(

@@ -184,12 +184,16 @@ class FakeAuthRepository implements AuthRepository {
 }
 
 class _FakeBiometricGate extends BiometricAuthGate {
-  _FakeBiometricGate({this.available = false});
+  _FakeBiometricGate({this.available = false, this.label = 'Alama ya Kidole'});
 
   final bool available;
+  final String label;
 
   @override
   Future<bool> isAvailable() async => available;
+
+  @override
+  Future<String> biometricLabel() async => label;
 
   @override
   Future<bool> authenticate({required String reason}) async => true;

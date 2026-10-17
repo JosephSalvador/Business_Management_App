@@ -149,6 +149,18 @@ async function forwardRequest(originalRequest, targetUrl, bodyBuffer, timeoutMs)
   headers.set("X-Forwarded-Host", new URL(originalRequest.url).host);
   headers.set("X-Forwarded-Proto", "https");
 
+  if (originalRequest.cf) {
+    if (originalRequest.cf.botManagement?.score !== undefined) {
+      headers.set("CF-Bot-Score", String(originalRequest.cf.botManagement.score));
+    }
+    if (originalRequest.cf.tlsJa3Hash) {
+      headers.set("CF-JA3-Fingerprint", originalRequest.cf.tlsJa3Hash);
+    }
+    if (originalRequest.cf.country) {
+      headers.set("CF-IPCountry", originalRequest.cf.country);
+    }
+  }
+
   return fetch(targetUrl, {
     method: originalRequest.method,
     headers,

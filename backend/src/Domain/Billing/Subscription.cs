@@ -104,4 +104,23 @@ public sealed class Subscription : AggregateRoot
         AddDomainEvent(new SubscriptionDebtTransitionEvent(
             Guid.NewGuid(), now, Id, TenantId, SinceUtc: now));
     }
+
+    /// <summary>Switches or upgrades the base plan of the subscription.</summary>
+    public void ChangePlan(string newPlanCode)
+    {
+        if (string.IsNullOrWhiteSpace(newPlanCode)) return;
+        PlanCode = newPlanCode.Trim();
+    }
+
+    /// <summary>Grants extra free trial days (negotiated or promotional extension).</summary>
+    public void ExtendTrial(TimeSpan extraDuration, DateTime? nowUtc = null)
+    {
+        var now = nowUtc ?? DateTime.UtcNow;
+        var baseDate = TrialEndedAtUtc > now ? TrialEndedAtUtc : now;
+        TrialEndedAtUtc = baseDate.Add(extraDuration);
+        if (Status == SubscriptionStatus.Debt)
+        {
+            Status = SubscriptionStatus.Trial;
+        }
+    }
 }

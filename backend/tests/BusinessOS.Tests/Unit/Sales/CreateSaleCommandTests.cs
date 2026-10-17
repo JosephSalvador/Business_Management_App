@@ -647,6 +647,9 @@ public sealed class CreateSaleCommandTests
 
         public Task<Product?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default)
             => Task.FromResult(_products.GetValueOrDefault(id));
+        public Task<IReadOnlyList<Product>> GetByIdsAsync(Guid tenantId, IEnumerable<Guid> ids, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Product>>(
+                ids.Where(id => _products.ContainsKey(id)).Select(id => _products[id]).ToList());
         public Task<Product?> GetBySkuAsync(Guid tenantId, string sku, CancellationToken ct = default)
             => Task.FromResult(_products.Values.FirstOrDefault(p => p.Sku == sku));
         public Task<Product?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken ct = default)

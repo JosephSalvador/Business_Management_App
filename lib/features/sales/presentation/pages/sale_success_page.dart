@@ -34,7 +34,7 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
   /// original and every one after it is a reprint.
   int _printsThisSession = 0;
 
-  bool get _canPrintBt => Platform.isAndroid;
+  bool get _canPrintBt => !kIsWeb && Platform.isAndroid;
 
   bool get _isReprint => _printsThisSession > 0;
 
@@ -134,24 +134,21 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      // Print via Bluetooth — Android only
-                      if (_canPrintBt) ...[
-                        _printing
-                            ? const SizedBox(
-                                height: 52,
-                                child:
-                                    Center(child: CircularProgressIndicator()),
-                              )
-                            : OutlinedButton.icon(
-                                onPressed: _printViaBluetooth,
-                                icon: const Icon(Icons.print, size: 20),
-                                label: Text(loc.posPrintReceipt),
-                                style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(52),
-                                ),
+                      _printing
+                          ? const SizedBox(
+                              height: 52,
+                              child:
+                                  Center(child: CircularProgressIndicator()),
+                            )
+                          : OutlinedButton.icon(
+                              onPressed: _printReceipt,
+                              icon: const Icon(Icons.print, size: 20),
+                              label: Text(loc.posPrintReceipt),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(52),
                               ),
-                        const SizedBox(height: 8),
-                      ],
+                            ),
+                      const SizedBox(height: 8),
                       OutlinedButton.icon(
                         onPressed: _showShareOptions,
                         icon: const Icon(Icons.share_outlined, size: 20),
@@ -176,6 +173,102 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
     return workspace is WorkspaceReady && workspace.selected != null
         ? workspace.selected!.name
         : 'Business OS';
+  }
+
+  Future<void> _printReceipt() async {
+    if (_printing) return;
+
+    final printer = ref.read(receiptPrinterServiceProvider);
+
+    // 1. Web Bluetooth (Bluefy on iOS / Chrome on PC or Android)
+    if (kIsWeb && printer.hasWebBluetooth) {
+      setState(() => _printing = true);
+      final wasReprint = _isReprint;
+      try {
+        final receipt = printer.saleToReceipt(
+          sale: widget.sale,
+          businessName: _businessName,
+        );
+        final printed = await printer.printViaWebBluetooth(
+          receipt: receipt,
+          isReprint: wasReprint,
+        );
+        if (printed) {
+          await _recordPrint(widget.sale.id, wasReprint);
+          if (mounted) setState(() => _printsThisSession++);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                printed
+                    ? context.loc.posPrintSuccess
+                    : context.loc.posPrintFailed,
+              ),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _printing = false);
+      }
+      return;
+    }
+
+    // 2. Android Native APK (Bluetooth SPP)
+    if (_canPrintBt) {
+      await _printViaBluetooth();
+      return;
+    }
+
+    // 3. Fallback: Browser without Web Bluetooth (e.g. standard Safari on iPhone)
+    _showIosSafariPrintHelpDialog();
+  }
+
+  void _showIosSafariPrintHelpDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.print_outlined, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Uchapishaji wa Risiti'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Kwenye iPhone, Safari huzuia Bluetooth moja kwa moja.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Ili kuchapa kwa Bluetooth ya mkononi:\n'
+              '1. Sakinisha kivinjari cha bure cha "Bluefy" kutoka App Store.\n'
+              '2. Fungua mfumo wako kupitia Bluefy na utachapa papo hapo kwa Bluetooth.\n\n'
+              'Pia unaweza kutuma risiti rasmi ya kidijitali sasa kupitia WhatsApp au PDF.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Funga'),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _showShareOptions();
+            },
+            icon: const Icon(Icons.share, size: 18),
+            label: const Text('Shiriki WhatsApp / PDF'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _printViaBluetooth() async {

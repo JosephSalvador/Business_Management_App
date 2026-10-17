@@ -12,6 +12,7 @@ import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/settings_controller.dart';
 import '../../data/organization_repository.dart';
+import '../../../authentication/presentation/widgets/quick_pin_setup_sheet.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -122,6 +123,7 @@ class SettingsPage extends ConsumerWidget {
               subtitle: loc.securitySessionsIntro,
               onTap: () => context.push(Routes.security),
             ),
+            const _QuickPinSettingsTile(),
           ],
         ),
         const SizedBox(height: 16),
@@ -628,3 +630,148 @@ class _LanguageTile extends ConsumerWidget {
     );
   }
 }
+
+class _QuickPinSettingsTile extends ConsumerStatefulWidget {
+  const _QuickPinSettingsTile();
+
+  @override
+  ConsumerState<_QuickPinSettingsTile> createState() =>
+      _QuickPinSettingsTileState();
+}
+
+class _QuickPinSettingsTileState extends ConsumerState<_QuickPinSettingsTile> {
+  bool _loading = true;
+  bool _hasPin = false;
+  bool _biometricHardware = false;
+  String _biometricLabel = 'Alama ya Kidole au Uso';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadState();
+  }
+
+  Future<void> _loadState() async {
+    final store = ref.read(offlineCredentialStoreProvider);
+    final gate = ref.read(biometricAuthGateProvider);
+    final hasPin = await store.hasUnlockPin();
+    final hardware = await gate.isAvailable();
+    final label = await gate.biometricLabel();
+
+    if (mounted) {
+      setState(() {
+        _hasPin = hasPin;
+        _biometricHardware = hardware;
+        _biometricLabel = label;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _setupOrChangePin() async {
+    final ok = await showQuickPinSetupSheet(
+      context,
+      biometricSupported: _biometricHardware,
+      biometricLabel: _biometricLabel,
+      onSave: ({required pin, required enableBiometric}) async {
+        await ref.read(authControllerProvider.notifier).enableQuickPin(
+              pin: pin,
+              enableBiometric: enableBiometric,
+            );
+      },
+    );
+    if (ok) {
+      await _loadState();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PIN ya haraka imewekwa kikamilifu!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _disablePin() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Zima PIN ya Haraka?'),
+        content: const Text(
+          'Utahitaji kuingiza nenosiri kamili la akaunti yako kila wakati unapoingia kwenye kifaa hiki.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Ghairi'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Zima PIN'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(authControllerProvider.notifier).disableQuickPin();
+      await _loadState();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PIN ya haraka imezimwa.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox.shrink();
+
+    return ListTile(
+      leading: Icon(
+        Icons.pin_outlined,
+        color: _hasPin ? AppColors.success : AppColors.primary,
+        size: 22,
+      ),
+      title: const Text(
+        'PIN ya Haraka na Biometrics',
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        _hasPin
+            ? 'Imewashwa ($_biometricLabel)'
+            : 'Weka PIN ya tarakimu 4 kufungua app haraka',
+        style: TextStyle(
+          color: _hasPin
+              ? AppColors.success
+              : AppColors.resolveTextSecondary(context),
+          fontSize: 13,
+        ),
+      ),
+      trailing: _hasPin
+          ? PopupMenuButton<String>(
+              onSelected: (val) {
+                if (val == 'change') _setupOrChangePin();
+                if (val == 'disable') _disablePin();
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'change',
+                  child: Text('Badili PIN'),
+                ),
+                const PopupMenuItem(
+                  value: 'disable',
+                  child: Text('Zima PIN'),
+                ),
+              ],
+            )
+          : TextButton(
+              onPressed: _setupOrChangePin,
+              child: const Text('Weka Sasa'),
+            ),
+      onTap: _hasPin ? null : _setupOrChangePin,
+    );
+  }
+}
+

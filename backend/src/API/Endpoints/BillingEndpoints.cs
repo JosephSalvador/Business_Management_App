@@ -3,6 +3,7 @@ using BusinessOS.Api.Authorization;
 using BusinessOS.Api.Http;
 using BusinessOS.Application.Features.Billing.Commands;
 using BusinessOS.Application.Features.Billing.Queries;
+using BusinessOS.Domain.Billing;
 using BusinessOS.Domain.Identity;
 using MediatR;
 
@@ -47,6 +48,8 @@ public static class BillingEndpoints
         billing.MapDelete("/packages/{planCode}", RemovePackageAsync)
             .RequirePermission(PermissionNames.BillingManage)
             .WithName("RemovePackage");
+        billing.MapGet("/payment-instructions", GetPaymentInstructionsAsync)
+            .WithName("GetPaymentInstructions");
 
         var admin = api.MapGroup("/admin/billing")
             .WithApiVersionSet(versionSet)
@@ -63,6 +66,33 @@ public static class BillingEndpoints
         admin.MapPost("/vouchers/issue", IssueVouchersAsync)
             .RequirePermission(PermissionNames.BillingManage)
             .WithName("IssueVouchers");
+        admin.MapGet("/vouchers", ListVouchersAdminAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("ListVouchersAdmin");
+
+        admin.MapGet("/plans", ListAllPlansAdminAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("ListAllPlansAdmin");
+        admin.MapPost("/plans", CreatePlanAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("CreatePlan");
+        admin.MapPut("/plans/{code}", UpdatePlanAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("UpdatePlan");
+
+        admin.MapGet("/payment-instructions", GetPaymentInstructionsAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("AdminGetPaymentInstructions");
+        admin.MapPut("/payment-instructions", UpdatePaymentInstructionsAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("UpdatePaymentInstructions");
+
+        admin.MapPost("/tenants/{tenantId:guid}/extend-trial", ExtendTenantTrialAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("ExtendTenantTrial");
+        admin.MapPost("/tenants/{tenantId:guid}/direct-activate", DirectActivateTenantAsync)
+            .RequirePermission(PermissionNames.BillingManage)
+            .WithName("DirectActivateTenant");
 
         return app;
     }
@@ -115,12 +145,89 @@ public static class BillingEndpoints
     private static async Task<IResult> IssueVouchersAsync(
         IssueVouchersRequest request, ISender sender, CancellationToken cancellationToken)
         => (await sender.Send(
-            new IssueVouchersCommand(request.Count, request.ValueDays, request.ExpiresAtUtc),
+            new IssueVouchersCommand(
+                request.Count,
+                request.ValueDays,
+                request.ExpiresAtUtc,
+                request.TargetTenantId,
+                request.PlanCode),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ListVouchersAdminAsync(
+        int page, int pageSize, VoucherStatus? status, ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(
+            new ListVouchersAdminQuery(page > 0 ? page : 1, pageSize > 0 ? pageSize : 50, status),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ListAllPlansAdminAsync(
+        ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(new ListAllPlansAdminQuery(), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> CreatePlanAsync(
+        CreatePlanCommand command, ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(command, cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> UpdatePlanAsync(
+        string code, UpdatePlanRequest request, ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(
+            new UpdatePlanCommand(
+                code,
+                request.Name,
+                request.MonthlyPrice,
+                request.Currency,
+                request.FeatureKeys,
+                request.MaxBranches,
+                request.MaxUsers,
+                request.MaxProducts,
+                request.IsPackage,
+                request.IsActive),
+            cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> GetPaymentInstructionsAsync(
+        ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(new GetPaymentInstructionsQuery(), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> UpdatePaymentInstructionsAsync(
+        UpdatePaymentInstructionsCommand command, ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(command, cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> ExtendTenantTrialAsync(
+        Guid tenantId, ExtendTrialRequest request, ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(
+            new ExtendTenantTrialCommand(tenantId, request.Days), cancellationToken)).ToApiResult();
+
+    private static async Task<IResult> DirectActivateTenantAsync(
+        Guid tenantId, DirectActivateTenantRequest request, ISender sender, CancellationToken cancellationToken)
+        => (await sender.Send(
+            new DirectActivateTenantCommand(tenantId, request.Months, request.PlanCode, request.Reference),
             cancellationToken)).ToApiResult();
 
     private sealed record RedeemVoucherRequest(string Code);
 
     private sealed record MarkInvoicePaidRequest(string Reference);
 
-    private sealed record IssueVouchersRequest(int Count, int ValueDays, DateTime? ExpiresAtUtc);
+    private sealed record IssueVouchersRequest(
+        int Count,
+        int ValueDays,
+        DateTime? ExpiresAtUtc,
+        Guid? TargetTenantId = null,
+        string? PlanCode = null);
+
+    private sealed record UpdatePlanRequest(
+        string Name,
+        decimal MonthlyPrice,
+        string Currency,
+        string[] FeatureKeys,
+        int? MaxBranches,
+        int? MaxUsers,
+        int? MaxProducts,
+        bool IsPackage,
+        bool IsActive);
+
+    private sealed record ExtendTrialRequest(int Days);
+
+    private sealed record DirectActivateTenantRequest(
+        int Months,
+        string? PlanCode,
+        string? Reference);
 }

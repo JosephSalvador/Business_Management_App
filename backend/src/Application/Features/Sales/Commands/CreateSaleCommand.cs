@@ -154,11 +154,14 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         var taxItems = new List<TaxCalculationLineItem>(command.Lines.Count);
         var onDate = command.EffectiveAt;
 
+        var productIds = command.Lines.Select(l => l.ProductId).Distinct();
+        var productList = await _products.GetByIdsAsync(tenantId, productIds, cancellationToken);
+        var productMap = productList.ToDictionary(p => p.Id);
+
         for (var i = 0; i < command.Lines.Count; i++)
         {
             var input = command.Lines[i];
-            var product = await _products.GetByIdAsync(tenantId, input.ProductId, cancellationToken);
-            if (product is null)
+            if (!productMap.TryGetValue(input.ProductId, out var product))
             {
                 return Error.NotFound("Product not found.");
             }
@@ -412,6 +415,8 @@ private async Task<ResolvedPrice?> ResolvePriceAsync(
         candidates, product.Id, input.VariantId, branchId, PriceType.Retail, input.Quantity, onDate);
 }
 
+    private readonly Dictionary<Guid, string> _taxCategoryCache = new();
+
     private async Task<string> ResolveTaxCategoryCodeAsync(
         Product product, CancellationToken cancellationToken)
     {
@@ -420,8 +425,15 @@ private async Task<ResolvedPrice?> ResolvePriceAsync(
             return DefaultTaxCategoryCode;
         }
 
+        if (_taxCategoryCache.TryGetValue(product.TaxCategoryId.Value, out var cachedCode))
+        {
+            return cachedCode;
+        }
+
         var category = await _taxRules.GetCategoryByIdAsync(product.TaxCategoryId.Value, cancellationToken);
-        return category?.Code ?? DefaultTaxCategoryCode;
+        var code = category?.Code ?? DefaultTaxCategoryCode;
+        _taxCategoryCache[product.TaxCategoryId.Value] = code;
+        return code;
     }
 
     private async Task<IReadOnlyDictionary<Guid, string?>> ResolveUnitOfMeasureNamesAsync(

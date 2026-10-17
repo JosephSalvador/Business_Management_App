@@ -262,6 +262,10 @@ public sealed class AdjustStockCommandTests
         public Task<Product?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken ct = default)
             => Task.FromResult(products.TryGetValue(id, out var p) ? p : null);
 
+        public Task<IReadOnlyList<Product>> GetByIdsAsync(Guid tenantId, IEnumerable<Guid> ids, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Product>>(
+                ids.Where(products.ContainsKey).Select(id => products[id]).ToList());
+
         public Task<Product?> GetBySkuAsync(Guid tenantId, string sku, CancellationToken ct = default)
             => Task.FromResult<Product?>(null);
 

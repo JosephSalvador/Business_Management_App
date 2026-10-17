@@ -21,6 +21,7 @@ public sealed class RedeemVoucherCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly IVoucherRepository _vouchers;
     private readonly ISubscriptionRepository _subscriptions;
+    private readonly ISubscriptionItemRepository _subscriptionItems;
     private readonly IPlanRepository _plans;
     private readonly IInvoiceRepository _invoices;
     private readonly ISubscriptionEntitlementService _entitlement;
@@ -30,6 +31,7 @@ public sealed class RedeemVoucherCommandHandler
         ITenantContext tenantContext,
         IVoucherRepository vouchers,
         ISubscriptionRepository subscriptions,
+        ISubscriptionItemRepository subscriptionItems,
         IPlanRepository plans,
         IInvoiceRepository invoices,
         ISubscriptionEntitlementService entitlement,
@@ -38,6 +40,7 @@ public sealed class RedeemVoucherCommandHandler
         _tenantContext = tenantContext;
         _vouchers = vouchers;
         _subscriptions = subscriptions;
+        _subscriptionItems = subscriptionItems;
         _plans = plans;
         _invoices = invoices;
         _entitlement = entitlement;
@@ -61,10 +64,25 @@ public sealed class RedeemVoucherCommandHandler
             return Error.Validation("Voucher code is not valid.");
         }
 
+        // Fast anti-guessing validation for formatted 12-char codes
+        var clean = normalized.Replace("-", string.Empty).Replace(" ", string.Empty);
+        if (clean.Length == 12 && !VoucherCodes.IsValidChecksum(normalized))
+        {
+            return Error.Validation("Voucher code is invalid or corrupted.");
+        }
+
         var voucher = await _vouchers.GetByCodeAsync(normalized, cancellationToken);
         if (voucher is null)
         {
             return Error.NotFound("Voucher not found.");
+        }
+
+        // Idempotent recovery: If this tenant already redeemed this exact voucher,
+        // succeed gracefully so network dropouts/screen closes don't lock out the user.
+        if (voucher.Status == VoucherStatus.Redeemed && voucher.RedeemedByTenantId == tenantId)
+        {
+            var existingEntitlement = await _entitlement.GetEntitlementAsync(tenantId, cancellationToken);
+            return Result.Success(existingEntitlement);
         }
 
         if (voucher.Status != VoucherStatus.Issued)
@@ -77,6 +95,11 @@ public sealed class RedeemVoucherCommandHandler
             return Error.Conflict("This voucher has expired.");
         }
 
+        if (voucher.TargetTenantId is not null && voucher.TargetTenantId.Value != tenantId)
+        {
+            return Error.Forbidden("This voucher was issued for a different workspace.");
+        }
+
         voucher.Redeem(tenantId, now);
 
         var subscription = await _subscriptions.GetForTenantAsync(tenantId, cancellationToken);
@@ -84,6 +107,28 @@ public sealed class RedeemVoucherCommandHandler
         {
             subscription = Subscription.StartTrial(tenantId, nowUtc: now);
             await _subscriptions.AddAsync(subscription, cancellationToken);
+        }
+
+        // If the voucher was tied to a specific plan/package, apply it
+        if (!string.IsNullOrWhiteSpace(voucher.PlanCode))
+        {
+            var targetPlan = await _plans.GetByCodeAsync(voucher.PlanCode, cancellationToken);
+            if (targetPlan is not null)
+            {
+                if (targetPlan.IsPackage)
+                {
+                    var items = await _subscriptionItems.ListForTenantAsync(tenantId, cancellationToken);
+                    if (!items.Any(i => string.Equals(i.PlanCode, targetPlan.Code, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        await _subscriptionItems.AddAsync(
+                            SubscriptionItem.Create(tenantId, targetPlan.Code), cancellationToken);
+                    }
+                }
+                else
+                {
+                    subscription.ChangePlan(targetPlan.Code);
+                }
+            }
         }
 
         var plan = await _plans.GetByCodeAsync(subscription.PlanCode, cancellationToken)
@@ -288,7 +333,12 @@ public sealed class MarkInvoicePaidCommandHandler
 /// Codes are CSPRNG-generated, unambiguously readable, and persisted with the issuing
 /// platform identity for audit.
 /// </summary>
-public sealed record IssueVouchersCommand(int Count, int ValueDays, DateTime? ExpiresAtUtc)
+public sealed record IssueVouchersCommand(
+    int Count,
+    int ValueDays,
+    DateTime? ExpiresAtUtc,
+    Guid? TargetTenantId = null,
+    string? PlanCode = null)
     : IRequest<Result<IReadOnlyList<string>>>;
 
 public sealed class IssueVouchersCommandHandler
@@ -320,7 +370,14 @@ public sealed class IssueVouchersCommandHandler
                 continue; // collision within the batch: regenerate (astronomically unlikely)
             }
 
-            var voucher = Voucher.Create(issuerTenantId, issuedByUserId, code, command.ValueDays, command.ExpiresAtUtc);
+            var voucher = Voucher.Create(
+                issuerTenantId,
+                issuedByUserId,
+                code,
+                command.ValueDays,
+                command.ExpiresAtUtc,
+                command.TargetTenantId,
+                command.PlanCode);
             created.Add(voucher);
         }
 

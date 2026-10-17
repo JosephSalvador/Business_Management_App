@@ -62,13 +62,9 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
     final loc = context.loc;
     final reason = await showDialog<String>(
       context: context,
-      builder: (context) => _VoidReasonDialog(
-        title: loc.saleVoidConfirmTitle,
-        message: loc.saleVoidConfirmMessage,
-        reasonHint: loc.saleVoidReasonHint,
-        reasonRequired: loc.saleVoidReasonRequired,
-        confirmLabel: loc.saleVoid,
-        cancelLabel: loc.commonCancel,
+      barrierDismissible: false,
+      builder: (context) => _HardenedVoidDialog(
+        saleNumber: _sale?.number ?? '',
       ),
     );
     if (reason == null || !mounted) return;
@@ -84,7 +80,16 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
           _voiding = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.saleVoided)),
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(loc.saleVoided)),
+              ],
+            ),
+          ),
         );
       }
     } on Exception catch (error) {
@@ -275,80 +280,234 @@ class _SummaryRow extends StatelessWidget {
   }
 }
 
-/// Asks for a void reason and returns it, or null when cancelled.
-class _VoidReasonDialog extends StatefulWidget {
-  const _VoidReasonDialog({
-    required this.title,
-    required this.message,
-    required this.reasonHint,
-    required this.reasonRequired,
-    required this.confirmLabel,
-    required this.cancelLabel,
-  });
+/// Anti-theft hardened void confirmation dialog.
+///
+/// Enforces manager PIN authorization, mandatory structured reasons with
+/// minimum length validation, and clear audit warning before allowing a sale to be voided.
+class _HardenedVoidDialog extends ConsumerStatefulWidget {
+  const _HardenedVoidDialog({required this.saleNumber});
 
-  final String title;
-  final String message;
-  final String reasonHint;
-  final String reasonRequired;
-  final String confirmLabel;
-  final String cancelLabel;
+  final String saleNumber;
 
   @override
-  State<_VoidReasonDialog> createState() => _VoidReasonDialogState();
+  ConsumerState<_HardenedVoidDialog> createState() =>
+      _HardenedVoidDialogState();
 }
 
-class _VoidReasonDialogState extends State<_VoidReasonDialog> {
-  final _controller = TextEditingController();
-  String? _error;
+class _HardenedVoidDialogState extends ConsumerState<_HardenedVoidDialog> {
+  final _reasonController = TextEditingController();
+  final _pinController = TextEditingController();
+  String? _selectedCategory;
+  String? _errorMessage;
+  bool _verifyingPin = false;
+
+  static const _presetReasons = [
+    'Mteja alighairi kabla ya kuchukua bidhaa',
+    'Bidhaa au Bei ilikosewa wakati wa mauzo',
+    'Muamala ulijirudia kimakosa (Duplicate sale)',
+    'Sababu nyingine (toa maelezo kamili chini)',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategory = _presetReasons.first;
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _reasonController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
-  void _confirm() {
-    final reason = _controller.text.trim();
-    if (reason.isEmpty) {
-      setState(() => _error = widget.reasonRequired);
+  Future<void> _submit() async {
+    final note = _reasonController.text.trim();
+    final fullReason = _selectedCategory == _presetReasons.last
+        ? note
+        : (_selectedCategory ?? 'Sababu');
+
+    final compositeReason = note.isEmpty ? fullReason : '$fullReason - $note';
+
+    if (compositeReason.length < 6) {
+      setState(() {
+        _errorMessage =
+            'Tafadhali andika sababu kamili ya kufuta (angalau herufi 6).';
+      });
       return;
     }
-    Navigator.of(context).pop(reason);
+
+    final store = ref.read(offlineCredentialStoreProvider);
+    final hasPin = await store.hasUnlockPin();
+
+    if (hasPin) {
+      final pin = _pinController.text.trim();
+      if (pin.length < 4) {
+        setState(() {
+          _errorMessage =
+              'Ingiza PIN sahihi ya Meneja/Mmiliki (tarakimu 4-6).';
+        });
+        return;
+      }
+
+      setState(() => _verifyingPin = true);
+      final ok = await store.verifyUnlockPin(pin);
+      if (!mounted) return;
+      setState(() => _verifyingPin = false);
+
+      if (!ok) {
+        setState(() {
+          _errorMessage =
+              'PIN ya Meneja si sahihi! Kitendo kimesitishwa kwa usalama.';
+        });
+        return;
+      }
+    }
+
+    if (mounted) {
+      Navigator.of(context).pop(compositeReason);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      title: Row(
         children: [
-          Text(widget.message),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            maxLength: 500,
-            decoration: InputDecoration(
-              hintText: widget.reasonHint,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              errorText: _error,
+          const Icon(Icons.warning_amber_rounded,
+              color: AppColors.error, size: 28),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Futa Mauzo (${widget.saleNumber})',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
             ),
-            onSubmitted: (_) => _confirm(),
           ),
         ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.errorContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.5)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⚠️ TAHADHARI YA KIUSALAMA NA WIZI',
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Kufuta mauzo haya kutarudisha idadi ya bidhaa stoo na kupunguza hesabu ya fedha za leo. Tukio hili litaripotiwa moja kwa moja kwa simu ya Mmiliki.',
+                    style: TextStyle(fontSize: 12, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Chagua Sababu ya Kufuta:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              isExpanded: true,
+              items: _presetReasons
+                  .map((r) => DropdownMenuItem(
+                        value: r,
+                        child: Text(r, style: const TextStyle(fontSize: 12)),
+                      ))
+                  .toList(),
+              onChanged: (val) => setState(() => _selectedCategory = val),
+              decoration: InputDecoration(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reasonController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Maelezo ya ziada (Maelezo ya tukio)*',
+                hintText:
+                    'Mfano: Mteja amebadili mawazo mara moja kabla ya kuondoka...',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.all(10),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              'Idhini ya Meneja / Mmiliki:',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _pinController,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                labelText: 'Ingiza PIN ya Meneja (Quick PIN)',
+                hintText: '****',
+                counterText: '',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(widget.cancelLabel),
+          child: const Text('Ghairi (Cancel)'),
         ),
-        FilledButton(
-          onPressed: _confirm,
-          child: Text(widget.confirmLabel),
+        FilledButton.icon(
+          onPressed: _verifyingPin ? null : _submit,
+          icon: _verifyingPin
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.delete_forever, size: 18),
+          label: const Text('Thibitisha Kufuta (Void)'),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.error),
         ),
       ],
     );

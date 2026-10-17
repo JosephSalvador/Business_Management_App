@@ -207,6 +207,9 @@ public sealed class RoleRepository : IRoleRepository
     public Task AddAsync(Role role, CancellationToken cancellationToken = default)
         => _db.Roles.AddAsync(role, cancellationToken).AsTask();
 
+    public Task AddRangeAsync(IEnumerable<Role> roles, CancellationToken cancellationToken = default)
+        => _db.Roles.AddRangeAsync(roles, cancellationToken);
+
     public Task RemoveAsync(Role role, CancellationToken cancellationToken = default)
     {
         _db.Roles.Remove(role);
@@ -503,6 +506,9 @@ public sealed class FeatureFlagRepository : IFeatureFlagRepository
     public Task AddAsync(FeatureFlag flag, CancellationToken cancellationToken = default)
         => _db.FeatureFlags.AddAsync(flag, cancellationToken).AsTask();
 
+    public Task AddRangeAsync(IEnumerable<FeatureFlag> flags, CancellationToken cancellationToken = default)
+        => _db.FeatureFlags.AddRangeAsync(flags, cancellationToken);
+
     public Task UpdateAsync(FeatureFlag flag, CancellationToken cancellationToken = default)
     {
         _db.FeatureFlags.Update(flag);
@@ -527,6 +533,19 @@ public sealed class ProductRepository : IProductRepository
             .AsSplitQuery()
             .Include(p => p.Variants)
             .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<Product>> GetByIdsAsync(
+        Guid tenantId, IEnumerable<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0) return Array.Empty<Product>();
+
+        return await _db.Products
+            .AsSplitQuery()
+            .Include(p => p.Variants)
+            .Where(p => p.TenantId == tenantId && idList.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+    }
 
     public Task<Product?> GetBySkuAsync(Guid tenantId, string sku, CancellationToken cancellationToken = default)
         => _db.Products
@@ -2498,8 +2517,21 @@ public sealed class PlanRepository : IPlanRepository
             .OrderBy(p => p.MonthlyPrice)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Plan>> ListAllAsync(CancellationToken cancellationToken = default)
+        => await _db.Plans
+            .AsNoTracking()
+            .OrderBy(p => p.IsPackage)
+            .ThenBy(p => p.MonthlyPrice)
+            .ToListAsync(cancellationToken);
+
     public Task AddAsync(Plan plan, CancellationToken cancellationToken = default)
         => _db.Plans.AddAsync(plan, cancellationToken).AsTask();
+
+    public Task UpdateAsync(Plan plan, CancellationToken cancellationToken = default)
+    {
+        _db.Plans.Update(plan);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class SubscriptionRepository : ISubscriptionRepository
@@ -2568,8 +2600,63 @@ public sealed class VoucherRepository : IVoucherRepository
     public Task<Voucher?> GetByCodeAsync(string code, CancellationToken cancellationToken = default)
         => _db.Vouchers.FirstOrDefaultAsync(v => v.Code == code, cancellationToken);
 
+    public async Task<IReadOnlyList<Voucher>> ListAsync(
+        int page, int pageSize, VoucherStatus? status = null, CancellationToken cancellationToken = default)
+    {
+        var query = _db.Vouchers.AsNoTracking();
+        if (status.HasValue)
+        {
+            query = query.Where(v => v.Status == status.Value);
+        }
+
+        return await query
+            .OrderByDescending(v => v.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountAsync(VoucherStatus? status = null, CancellationToken cancellationToken = default)
+    {
+        var query = _db.Vouchers.AsNoTracking();
+        if (status.HasValue)
+        {
+            query = query.Where(v => v.Status == status.Value);
+        }
+
+        return query.CountAsync(cancellationToken);
+    }
+
     public Task AddAsync(Voucher voucher, CancellationToken cancellationToken = default)
         => _db.Vouchers.AddAsync(voucher, cancellationToken).AsTask();
+}
+
+public sealed class PaymentInstructionRepository : IPaymentInstructionRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public PaymentInstructionRepository(BusinessDbContext db) => _db = db;
+
+    public async Task<PaymentInstruction> GetOrCreateAsync(CancellationToken cancellationToken = default)
+    {
+        var existing = await _db.PaymentInstructions.FirstOrDefaultAsync(
+            p => p.Id == PaymentInstruction.PlatformId, cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var created = PaymentInstruction.CreateDefault();
+        await _db.PaymentInstructions.AddAsync(created, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+        return created;
+    }
+
+    public Task UpdateAsync(PaymentInstruction instruction, CancellationToken cancellationToken = default)
+    {
+        _db.PaymentInstructions.Update(instruction);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class InvoiceRepository : IInvoiceRepository

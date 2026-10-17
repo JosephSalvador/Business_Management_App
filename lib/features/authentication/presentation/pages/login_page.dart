@@ -14,6 +14,7 @@ import '../widgets/auth_error_mapper.dart';
 import '../widgets/auth_form_card.dart';
 import '../widgets/fast_unlock_panel.dart';
 import '../widgets/language_switcher.dart';
+import '../../../../core/platform/ios_install_prompt_banner.dart';
 import '../widgets/password_field.dart';
 import '../widgets/quick_pin_setup_sheet.dart';
 
@@ -162,17 +163,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         if (!hasPin && mounted) {
           final biometricGate = ref.read(biometricAuthGateProvider);
           final biometricHardware = await biometricGate.isAvailable();
+          final biometricLabel = await biometricGate.biometricLabel();
           if (!mounted) return;
-          await showQuickPinSetupSheet(
+
+          final wantSetup = await showQuickPinPromptDialog(
             context,
+            biometricLabel: biometricLabel,
             biometricSupported: biometricHardware,
-            onSave: ({required pin, required enableBiometric}) async {
-              await ref.read(authControllerProvider.notifier).enableQuickPin(
-                    pin: pin,
-                    enableBiometric: enableBiometric,
-                  );
-            },
           );
+
+          if (wantSetup == true && mounted) {
+            await showQuickPinSetupSheet(
+              context,
+              biometricSupported: biometricHardware,
+              biometricLabel: biometricLabel,
+              onSave: ({required pin, required enableBiometric}) async {
+                await ref.read(authControllerProvider.notifier).enableQuickPin(
+                      pin: pin,
+                      enableBiometric: enableBiometric,
+                    );
+              },
+            );
+          }
         }
       }
     } on AppException catch (error) {
@@ -188,10 +200,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 24),
-          child: AuthFormCard(
-            child: _fastMode && _hasFastFactor
-                ? _buildFastUnlock(context)
-                : _buildAccountForm(context),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const IosInstallPromptBanner(),
+              AuthFormCard(
+                child: _fastMode && _hasFastFactor
+                    ? _buildFastUnlock(context)
+                    : _buildAccountForm(context),
+              ),
+            ],
           ),
         ),
       ),
@@ -356,6 +374,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           TextButton(
             onPressed: () => context.go(Routes.register),
             child: Text(loc.noAccount),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => context.push(Routes.download),
+            icon: const Icon(Icons.install_mobile, size: 18),
+            label: const Text('Pakua App (Android / iPhone)'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF00C48C),
+              side: BorderSide(
+                color: const Color(0xFF00C48C).withValues(alpha: 0.4),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ],
       ),

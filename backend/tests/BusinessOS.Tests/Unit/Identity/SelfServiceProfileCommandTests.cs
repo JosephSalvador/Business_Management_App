@@ -75,6 +75,7 @@ public sealed class SelfServiceProfileCommandTests
         public Task<IReadOnlyList<Role>> GetManyByIdsAsync(Guid tenantId, IEnumerable<Guid> ids, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Role>>(Array.Empty<Role>());
         public Task<IReadOnlyList<string>> GetPermissionsAsync(Guid tenantId, Guid roleId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
         public Task AddAsync(Role role, CancellationToken ct = default) => Task.CompletedTask;
+        public Task AddRangeAsync(IEnumerable<Role> roles, CancellationToken ct = default) => Task.CompletedTask;
         public Task RemoveAsync(Role role, CancellationToken ct = default) => Task.CompletedTask;
     }
 

@@ -18,11 +18,11 @@ class SessionJournal {
   SessionJournal(this._db);
 
   static const _lastAuthKey = 'last_auth_success_at';
-  static const _offlineWindow = Duration(hours: 72);
+  static const _offlineWindow = Duration(days: 7); // 168 hours (supports 4+ days of offline selling)
 
   /// Hard maximum offline window — even if the server is never reached again,
   /// the offline window cannot exceed this duration.
-  static const _maxOfflineWindow = Duration(hours: 168); // 7 days
+  static const _maxOfflineWindow = Duration(days: 14); // 14 days
 
   final LocalDatabase _db;
 

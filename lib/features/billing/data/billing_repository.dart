@@ -112,6 +112,17 @@ class BillingRepository {
         .toList(growable: false);
   }
 
+  Future<PaymentInstructions> getPaymentInstructions() async {
+    final response = await _apiClient.get<dynamic>(
+      ApiRoutes.v1('/billing/payment-instructions'),
+    );
+    return _parse(
+      response,
+      PaymentInstructions.fromJson,
+      'Taarifa za malipo hazipatikani.',
+    );
+  }
+
   T _parse<T>(
     dynamic response,
     T Function(Map<String, dynamic>) decoder,

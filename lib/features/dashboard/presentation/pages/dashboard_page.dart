@@ -137,173 +137,182 @@ class _DashboardBody extends StatelessWidget {
     final transactions = trend.fold<int>(0, (s, p) => s + p.saleCount);
 
     return ListView(
-      padding: padding,
+      padding: EdgeInsets.zero,
       children: [
         if (state.isFromCache) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.resolveCardBackground(context),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppColors.resolveOutline(context).withValues(alpha: 0.4),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.cloud_off_rounded,
-                  size: 16,
-                  color: AppColors.warning,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    loc.dashboardCachedBanner,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.resolveTextSecondary(context),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        _GreetingHeader(
-            userName: userName, connectionQuality: connectionQuality),
-        const SizedBox(height: 20),
-        _PeriodSelector(
-          selected: selectedPeriod,
-          onChanged: onPeriodChanged,
-        ),
-        const SizedBox(height: 16),
-        if (isDesktop)
-          Row(
-            children: [
-              Expanded(
-                child: _KpiCard(
-                  label: loc.dashboardRevenueLabel,
-                  value: formatMoney(revenue),
-                  icon: Icons.attach_money_rounded,
-                  color: AppColors.primary,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.resolveCardBackground(context),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.resolveOutline(context).withValues(alpha: 0.4),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _KpiCard(
-                  label: loc.dashboardTransactionsLabel,
-                  value: '$transactions',
-                  icon: Icons.receipt_long_rounded,
-                  color: AppColors.secondary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _KpiCard(
-                  label: loc.dashboardTotalProducts,
-                  value: '${state.summary.totalProducts}',
-                  icon: Icons.inventory_2_outlined,
-                  color: AppColors.warning,
-                ),
-              ),
-            ],
-          )
-        else
-          Column(
-            children: [
-              Row(
+              child: Row(
                 children: [
-                  Expanded(
-                    child: _KpiCard(
-                      label: loc.dashboardRevenueLabel,
-                      value: formatMoney(revenue),
-                      icon: Icons.attach_money_rounded,
-                      color: AppColors.primary,
-                    ),
+                  const Icon(
+                    Icons.cloud_off_rounded,
+                    size: 16,
+                    color: AppColors.warning,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: _KpiCard(
-                      label: loc.dashboardTransactionsLabel,
-                      value: '$transactions',
-                      icon: Icons.receipt_long_rounded,
-                      color: AppColors.secondary,
+                    child: Text(
+                      loc.dashboardCachedBanner,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.resolveTextSecondary(context),
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              _KpiCard(
-                label: loc.dashboardTotalProducts,
-                value: '${state.summary.totalProducts}',
-                icon: Icons.inventory_2_outlined,
-                color: AppColors.warning,
-              ),
-            ],
-          ),
-        const SizedBox(height: 24),
-        _SectionHeader(
-          title: loc.dashboardRevenueTrend,
-          trailing: Text(
-            _periodLabel(loc),
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.resolveTextTertiary(context),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: RevenueLineChart(dataPoints: trend),
-          ),
-        ),
-        const SizedBox(height: 24),
-        _SectionHeader(title: loc.dashboardQuickActions),
-        const SizedBox(height: 12),
-        _QuickActions(loc: loc),
-        const SizedBox(height: 24),
-        if (state.topProducts.isNotEmpty) ...[
-          _SectionHeader(title: loc.dashboardTopProducts),
-          const SizedBox(height: 12),
-          _TopProductsList(products: state.topProducts, loc: loc),
-          const SizedBox(height: 24),
         ],
-        if (state.lowStock.isNotEmpty) ...[
-          _SectionHeader(
-            title: loc.dashboardLowStockAlert,
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.errorContainer,
-                borderRadius: BorderRadius.circular(12),
+        _GreetingHeader(
+          userName: userName,
+          connectionQuality: connectionQuality,
+        ),
+        Padding(
+          padding: padding.copyWith(top: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _PeriodSelector(
+                selected: selectedPeriod,
+                onChanged: onPeriodChanged,
               ),
-              child: Text(
-                '${state.lowStock.length}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.error,
+              const SizedBox(height: 16),
+              if (isDesktop)
+                Row(
+                  children: [
+                    Expanded(
+                      child: _KpiCard(
+                        label: loc.dashboardRevenueLabel,
+                        value: formatMoney(revenue),
+                        icon: Icons.attach_money_rounded,
+                        color: const Color(0xFF1565C0),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _KpiCard(
+                        label: loc.dashboardTransactionsLabel,
+                        value: '$transactions',
+                        icon: Icons.receipt_long_rounded,
+                        color: const Color(0xFF00B894),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _KpiCard(
+                        label: loc.dashboardTotalProducts,
+                        value: '${state.summary.totalProducts}',
+                        icon: Icons.inventory_2_outlined,
+                        color: const Color(0xFFF59E0B),
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _KpiCard(
+                        label: loc.dashboardRevenueLabel,
+                        value: formatMoney(revenue),
+                        icon: Icons.attach_money_rounded,
+                        color: const Color(0xFF1565C0),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _KpiCard(
+                        label: loc.dashboardTotalProducts,
+                        value: '${state.summary.totalProducts}',
+                        icon: Icons.inventory_2_outlined,
+                        color: const Color(0xFF00B894),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _KpiCard(
+                  label: loc.dashboardTransactionsLabel,
+                  value: '$transactions',
+                  icon: Icons.receipt_long_rounded,
+                  color: const Color(0xFFF59E0B),
+                ),
+              ],
+              const SizedBox(height: 24),
+              _SectionHeader(title: loc.dashboardQuickActions),
+              const SizedBox(height: 12),
+              _QuickActions(loc: loc),
+              const SizedBox(height: 24),
+              _SectionHeader(
+                title: loc.dashboardRevenueTrend,
+                trailing: Text(
+                  _periodLabel(loc),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.resolveTextTertiary(context),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: RevenueLineChart(dataPoints: trend),
+                ),
+              ),
+              const SizedBox(height: 24),
+              if (state.topProducts.isNotEmpty) ...[
+                _SectionHeader(title: loc.dashboardTopProducts),
+                const SizedBox(height: 12),
+                _TopProductsList(products: state.topProducts, loc: loc),
+                const SizedBox(height: 24),
+              ],
+              if (state.lowStock.isNotEmpty) ...[
+                _SectionHeader(
+                  title: loc.dashboardLowStockAlert,
+                  trailing: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${state.lowStock.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _LowStockCards(items: state.lowStock, loc: loc),
+                const SizedBox(height: 24),
+              ],
+              if (state.recentActivity.isNotEmpty) ...[
+                _SectionHeader(title: loc.dashboardRecentActivity),
+                const SizedBox(height: 12),
+                _ActivityFeed(items: state.recentActivity, loc: loc),
+                const SizedBox(height: 24),
+              ],
+              if (state.lowStock.isEmpty && state.recentActivity.isEmpty)
+                _EmptyDashboard(loc: loc),
+              const SizedBox(height: 32),
+            ],
           ),
-          const SizedBox(height: 12),
-          _LowStockCards(items: state.lowStock, loc: loc),
-          const SizedBox(height: 24),
-        ],
-        if (state.recentActivity.isNotEmpty) ...[
-          _SectionHeader(title: loc.dashboardRecentActivity),
-          const SizedBox(height: 12),
-          _ActivityFeed(items: state.recentActivity, loc: loc),
-          const SizedBox(height: 24),
-        ],
-        if (state.lowStock.isEmpty && state.recentActivity.isEmpty)
-          _EmptyDashboard(loc: loc),
-        const SizedBox(height: 32),
+        ),
       ],
     );
   }
@@ -324,11 +333,13 @@ class _DashboardBody extends StatelessWidget {
   }
 }
 
-// ── Greeting Header ──────────────────────────────────────────────
+// ── Branded Curved Canopy Header ─────────────────────────────────
 
 class _GreetingHeader extends StatelessWidget {
-  const _GreetingHeader(
-      {required this.userName, required this.connectionQuality});
+  const _GreetingHeader({
+    required this.userName,
+    required this.connectionQuality,
+  });
   final String userName;
   final ConnectionQuality connectionQuality;
 
@@ -342,63 +353,118 @@ class _GreetingHeader extends StatelessWidget {
             ? loc.dashboardGreetingAfternoon
             : loc.dashboardGreetingEvening;
     final name = userName.isNotEmpty ? ', $userName' : '';
-    final dateStr =
-        DateFormat('EEE, d MMM', Localizations.localeOf(context).languageCode)
-            .format(DateTime.now());
-
     final isOnline = connectionQuality == ConnectionQuality.online;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0D47A1), // Deep royal blue
+            Color(0xFF1565C0), // Brand vibrant blue
+            Color(0xFF1976D2),
+          ],
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x330D47A1),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              '$greeting$name 👋',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.resolveTextPrimary(context),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
+          // Top Bar: Avatar, JOLINX title & Notification bell with connection dot
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              // Avatar with online status ring
+              Stack(
+                alignment: Alignment.bottomRight,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: isOnline ? AppColors.success : AppColors.error,
-                          shape: BoxShape.circle,
-                        ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.2),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        width: 1.5,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        dateStr,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.resolveTextTertiary(context),
-                        ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      userName.isNotEmpty ? userName[0].toUpperCase() : 'J',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
                       ),
-                    ],
+                    ),
+                  ),
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isOnline ? const Color(0xFF00E676) : AppColors.error,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(width: 4),
-              const NotificationBellButton(),
+              const SizedBox(width: 12),
+              // Brand Wordmark
+              const Text(
+                'JOLINX',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              // Top Right Actions
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const NotificationBellButton(),
+              ),
             ],
+          ),
+          const SizedBox(height: 22),
+          // Greeting & User Name
+          Text(
+            '$greeting$name',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          // Brand Tagline
+          Text(
+            'Simamia biashara yako yote sehemu moja',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
           ),
         ],
       ),
@@ -469,22 +535,33 @@ class _KpiCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
+    this.trailingIcon,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color color;
+  final Widget? trailingIcon;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.outlineVariant),
+        color: isDark ? AppColors.resolveCardBackground(context) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.resolveOutline(context).withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,43 +569,46 @@ class _KpiCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 alignment: Alignment.center,
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 18),
               ),
               const Spacer(),
-              Icon(
-                Icons.trending_up_rounded,
-                size: 16,
-                color: AppColors.success,
-              ),
+              trailingIcon ??
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: AppColors.resolveTextTertiary(context),
+                  ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Text(
             value,
             style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
               color: AppColors.resolveTextPrimary(context),
-              letterSpacing: -0.5,
+              letterSpacing: -0.4,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               color: AppColors.resolveTextSecondary(context),
               fontWeight: FontWeight.w500,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -571,29 +651,45 @@ class _QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      _ActionData(Icons.point_of_sale_rounded, loc.dashboardSellNow,
-          AppColors.primary, () => context.push('/pos')),
-      _ActionData(Icons.person_add_alt_1_rounded, loc.dashboardAddCustomer,
-          AppColors.secondary, () => context.push('/customers/new')),
-      _ActionData(Icons.receipt_long_rounded, loc.dashboardAddExpense,
-          AppColors.warning, () => context.push('/expenses/new')),
-      _ActionData(Icons.shopping_cart_rounded, loc.dashboardAddPurchase,
-          AppColors.success, () => context.push('/purchases/new')),
-      _ActionData(Icons.inventory_2_rounded, loc.dashboardViewStock,
-          AppColors.primaryDark, () => context.go('/home?tab=1')),
+      _ActionData(
+        Icons.point_of_sale_rounded,
+        loc.dashboardSellNow,
+        const Color(0xFF1565C0), // Blue
+        () => context.push('/pos'),
+      ),
+      _ActionData(
+        Icons.person_add_alt_1_rounded,
+        loc.dashboardAddCustomer,
+        const Color(0xFF00B894), // Teal
+        () => context.push('/customers/new'),
+      ),
+      _ActionData(
+        Icons.receipt_long_rounded,
+        loc.dashboardAddExpense,
+        const Color(0xFFF59E0B), // Amber
+        () => context.push('/expenses/new'),
+      ),
+      _ActionData(
+        Icons.inventory_2_rounded,
+        loc.dashboardViewStock,
+        const Color(0xFF6C5CE7), // Purple
+        () => context.go('/home?tab=1'),
+      ),
     ];
 
-    return SizedBox(
-      height: 90,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: actions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => SizedBox(
-          width: 80,
-          child: _ActionChip(data: actions[i]),
-        ),
-      ),
+    return Row(
+      children: List.generate(actions.length, (i) {
+        final a = actions[i];
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: i == 0 ? 0 : 5,
+              right: i == actions.length - 1 ? 0 : 5,
+            ),
+            child: _ActionGridTile(data: a),
+          ),
+        );
+      }),
     );
   }
 }
@@ -604,6 +700,69 @@ class _ActionData {
   final String label;
   final Color color;
   final VoidCallback onTap;
+}
+
+class _ActionGridTile extends StatelessWidget {
+  const _ActionGridTile({required this.data});
+  final _ActionData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: data.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppColors.resolveCardBackground(context)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.resolveOutline(context).withValues(alpha: 0.35),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: data.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Icon(data.icon, color: data.color, size: 22),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                data.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.resolveTextPrimary(context),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ActionChip extends StatelessWidget {

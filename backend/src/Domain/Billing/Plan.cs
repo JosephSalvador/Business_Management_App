@@ -93,6 +93,26 @@ public sealed class Plan : Entity
 
     public void Reactivate() => IsActive = true;
 
+    public void Update(
+        string name,
+        decimal monthlyPrice,
+        string currency,
+        string[] featureKeys,
+        int? maxBranches,
+        int? maxUsers,
+        int? maxProducts,
+        bool isPackage)
+    {
+        Name = NormalizeName(name);
+        MonthlyPrice = ValidatePrice(monthlyPrice);
+        Currency = NormalizeCurrency(currency);
+        FeatureKeys = NormalizeFeatureKeys(featureKeys);
+        MaxBranches = maxBranches;
+        MaxUsers = maxUsers;
+        MaxProducts = maxProducts;
+        IsPackage = isPackage;
+    }
+
     private static string NormalizeCode(string code) => code.Trim();
 
     private static string NormalizeName(string name)

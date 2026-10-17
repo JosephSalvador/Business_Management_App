@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/storage/locale_store.dart';
 import '../data/receipt_repository.dart';
+import '../domain/receipt_format.dart';
 import '../domain/receipt_preview.dart';
 import '../domain/receipt_renderer.dart';
 
@@ -23,10 +24,16 @@ final receiptPreviewProvider =
   return repo.getPreview(saleId);
 });
 
-/// Provider for the thermal 80mm renderer, in the app's current language.
+/// Configured thermal printer paper width (58mm portable vs 80mm counter).
+final receiptPaperWidthProvider =
+    StateProvider<ReceiptPaperWidth>((ref) => ReceiptPaperWidth.mm80);
+
+/// Provider for the thermal renderer, configured for active language and paper width.
 final thermalRendererProvider = Provider<Thermal80mmRenderer>((ref) {
   final locale = ref.watch(localeControllerProvider);
-  return Thermal80mmRenderer(
+  final paperWidth = ref.watch(receiptPaperWidthProvider);
+  return Thermal80mmRenderer.forWidth(
+    paperWidth,
     language: receiptLanguageForCode(locale.languageCode),
   );
 });

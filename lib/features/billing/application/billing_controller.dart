@@ -11,6 +11,7 @@ class BillingState {
     this.entitlement,
     this.plans = const [],
     this.invoices = const [],
+    this.paymentInstructions,
     this.isLoading = false,
     this.isWorking = false,
     this.message,
@@ -19,6 +20,7 @@ class BillingState {
   final SubscriptionEntitlement? entitlement;
   final List<BillingPlan> plans;
   final List<BillingInvoice> invoices;
+  final PaymentInstructions? paymentInstructions;
   final bool isLoading;
   final bool isWorking;
   final String? message;
@@ -68,11 +70,16 @@ class BillingController extends Notifier<BillingState> {
       _setGlobalEntitlement(entitlement);
       final plans = await _repository.listPlans();
       final invoices = await _repository.listInvoices();
+      PaymentInstructions? paymentInstructions;
+      try {
+        paymentInstructions = await _repository.getPaymentInstructions();
+      } catch (_) {}
       if (revision != _revision) return;
       state = BillingState(
         entitlement: entitlement,
         plans: plans,
         invoices: invoices,
+        paymentInstructions: paymentInstructions ?? previous.paymentInstructions,
       );
     } on AppException catch (error) {
       if (revision != _revision) return;
@@ -101,6 +108,7 @@ class BillingController extends Notifier<BillingState> {
         entitlement: entitlement,
         plans: previous.plans,
         invoices: invoices,
+        paymentInstructions: previous.paymentInstructions,
       );
     } on AppException catch (error) {
       if (revision != _revision) return;
@@ -133,6 +141,7 @@ class BillingController extends Notifier<BillingState> {
         entitlement: entitlement,
         plans: previous.plans,
         invoices: invoices,
+        paymentInstructions: previous.paymentInstructions,
       );
     } on AppException catch (error) {
       if (revision != _revision) return;
@@ -172,6 +181,7 @@ class BillingController extends Notifier<BillingState> {
         entitlement: entitlement,
         plans: previous.plans,
         invoices: previous.invoices,
+        paymentInstructions: previous.paymentInstructions,
       );
     } on AppException catch (error) {
       if (revision != _revision) return;
@@ -235,6 +245,7 @@ class BillingController extends Notifier<BillingState> {
   BillingState _copyState(
     BillingState source, {
     SubscriptionEntitlement? entitlement,
+    PaymentInstructions? paymentInstructions,
     bool? isLoading,
     bool? isWorking,
     Object? message = _notProvided,
@@ -245,6 +256,7 @@ class BillingController extends Notifier<BillingState> {
       entitlement: entitlement ?? source.entitlement,
       plans: source.plans,
       invoices: source.invoices,
+      paymentInstructions: paymentInstructions ?? source.paymentInstructions,
       isLoading: isLoading ?? source.isLoading,
       isWorking: isWorking ?? source.isWorking,
       message: nextMessage,
