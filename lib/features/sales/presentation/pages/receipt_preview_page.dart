@@ -13,7 +13,6 @@ import '../../../../app/providers.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
-import '../../../receipts/data/receipt_providers.dart';
 import '../../../receipts/data/receipt_repository.dart' show PrintType;
 import '../../../receipts/domain/receipt_format.dart';
 import '../../../receipts/domain/receipt_preview.dart';

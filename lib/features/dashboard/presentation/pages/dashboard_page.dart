@@ -535,14 +535,12 @@ class _KpiCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
-    this.trailingIcon,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color color;
-  final Widget? trailingIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -579,12 +577,11 @@ class _KpiCard extends StatelessWidget {
                 child: Icon(icon, color: color, size: 18),
               ),
               const Spacer(),
-              trailingIcon ??
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: AppColors.resolveTextTertiary(context),
-                  ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.resolveTextTertiary(context),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -760,45 +757,6 @@ class _ActionGridTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ActionChip extends StatelessWidget {
-  const _ActionChip({required this.data});
-  final _ActionData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: data.onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: data.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            alignment: Alignment.center,
-            child: Icon(data.icon, color: data.color, size: 24),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            data.label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.resolveTextSecondary(context),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
       ),
     );
   }

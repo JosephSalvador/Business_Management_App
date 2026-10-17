@@ -4,11 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router.dart';
-import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/design_system/responsive.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
-import '../../../billing/application/billing_controller.dart';
 import '../../../billing/application/billing_providers.dart';
 import '../../../billing/data/billing_providers.dart';
 import '../../../billing/domain/billing.dart';
