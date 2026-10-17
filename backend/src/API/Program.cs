@@ -291,6 +291,37 @@ else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.
     // dev credentials are never created outside Development/Testing.
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<BusinessDbContext>();
+
+    try
+    {
+        var tableCount = await db.Database.SqlQueryRaw<int>(
+            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AuditLogs'").FirstOrDefaultAsync();
+
+        if (tableCount > 0)
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                @"CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
+                    ""MigrationId"" character varying(150) NOT NULL,
+                    ""ProductVersion"" character varying(32) NOT NULL,
+                    CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+                  );");
+
+            var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+            foreach (var migrationId in pending)
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    @"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                      VALUES ({0}, '10.0.0')
+                      ON CONFLICT (""MigrationId"") DO NOTHING;",
+                    migrationId);
+            }
+        }
+    }
+    catch
+    {
+        // Fallback to standard migration if information_schema query is not supported
+    }
+
     await db.Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>()
         .SeedAsync(createDemoTenant: false);
