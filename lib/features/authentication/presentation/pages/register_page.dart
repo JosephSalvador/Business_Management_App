@@ -11,6 +11,7 @@ import '../widgets/auth_background.dart';
 import '../widgets/auth_brand_mark.dart';
 import '../widgets/auth_error_mapper.dart';
 import '../widgets/auth_form_card.dart';
+import '../widgets/language_switcher.dart';
 import '../widgets/password_field.dart';
 
 /// Registration page with Owner/Staff toggle.
@@ -103,6 +104,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [LanguageSwitcher()],
+                  ),
+                  const SizedBox(height: 8),
                   const AuthBrandMark(),
                   const SizedBox(height: 16),
                   Text(
@@ -338,6 +344,9 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -345,13 +354,16 @@ class _TabButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? Theme.of(context).colorScheme.surface
+              ? (isDark ? colors.primary.withValues(alpha: 0.25) : colors.surface)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
+          border: selected && isDark
+              ? Border.all(color: colors.primary.withValues(alpha: 0.4), width: 1)
+              : null,
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
                     blurRadius: 4,
                     offset: const Offset(0, 1),
                   ),
@@ -363,9 +375,9 @@ class _TabButton extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 14,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected
-                ? AppColors.primary
+                ? (isDark ? Colors.white : AppColors.primary)
                 : AppColors.resolveTextSecondary(context),
           ),
         ),

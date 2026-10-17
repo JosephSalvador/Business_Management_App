@@ -6,6 +6,7 @@ import '../../../../app/providers.dart';
 import '../../../../core/network/app_exception.dart';
 import '../../../../app/router.dart';
 import '../../../../l10n/loc.dart';
+import '../../../../shared/design_system/app_colors.dart';
 import '../widgets/auth_background.dart';
 import '../widgets/auth_form_card.dart';
 import '../widgets/language_switcher.dart';
@@ -94,27 +95,41 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                     children: [LanguageSwitcher()],
                   ),
                   const SizedBox(height: 16),
-                  const Icon(
-                    Icons.vpn_key_outlined,
-                    size: 40,
-                    color: Colors.black54,
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.key_rounded,
+                        size: 36,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     loc.resetTitle,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.resolveTextPrimary(context),
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     loc.resetIntro,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: Colors.black54,
+                      color: AppColors.resolveTextSecondary(context),
+                      height: 1.4,
                     ),
                     textAlign: TextAlign.center,
                   ),
