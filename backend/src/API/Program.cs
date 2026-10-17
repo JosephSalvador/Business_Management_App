@@ -324,7 +324,7 @@ else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.
 
     await db.Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>()
-        .SeedAsync(createDemoTenant: false);
+        .SeedAsync(cancellationToken: default, createDemoTenant: true);
 }
 
 await app.RunAsync();

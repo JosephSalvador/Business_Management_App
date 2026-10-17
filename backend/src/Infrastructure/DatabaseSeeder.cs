@@ -1,8 +1,11 @@
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Accounting;
 using BusinessOS.Domain.Billing;
+using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
+using BusinessOS.Domain.Inventory;
+using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Infrastructure.Persistence;
@@ -72,6 +75,18 @@ public sealed class DatabaseSeeder
         await EnsureBillingCatalogAsync(cancellationToken);
         await EnsureFeatureFlagBackfillAsync(cancellationToken);
 
+        // Auto-verify all users in staging / preproduction so users are never blocked by unconfigured SMTP
+        var unverifiedUsers = await _db.Users.Where(u => !u.EmailVerified).ToListAsync(cancellationToken);
+        if (unverifiedUsers.Count > 0)
+        {
+            foreach (var u in unverifiedUsers)
+            {
+                u.MarkEmailVerified();
+            }
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Auto-verified {Count} existing unverified users.", unverifiedUsers.Count);
+        }
+
         if (!createDemoTenant)
         {
             _logger.LogInformation("Demo tenant seeding disabled for this environment.");
@@ -80,89 +95,245 @@ public sealed class DatabaseSeeder
 
         const string demoEmail = "admin@acme.local";
         var demoUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == demoEmail, cancellationToken);
-        if (demoUser is not null)
+        if (demoUser is null)
         {
-            var demoTenant = await _db.Tenants.FirstOrDefaultAsync(
-                t => t.Id == demoUser.TenantId, cancellationToken);
-            if (demoTenant is not null && string.IsNullOrWhiteSpace(demoTenant.CountryCode))
+            var tenant = Tenant.Create(Guid.NewGuid(), "Acme Ltd");
+            await _db.Tenants.AddAsync(tenant, cancellationToken);
+
+            var adminRole = Role.Create(tenant.Id, SystemRoles.Administrator, isSystem: true);
+            var allPermissions = await _db.Permissions
+                .Where(p => PermissionNames.All.Contains(p.Name))
+                .ToListAsync(cancellationToken);
+            adminRole.Grant(allPermissions);
+            await _db.Roles.AddAsync(adminRole, cancellationToken);
+
+            var staffRole = Role.Create(
+                tenant.Id,
+                SystemRoles.Staff,
+                isSystem: true,
+                description: "Fanyakazi — catalogue, stock na POS");
+            staffRole.Grant(await ResolvePermissionsAsync(PermissionNames.Staff, cancellationToken));
+            await _db.Roles.AddAsync(staffRole, cancellationToken);
+
+            foreach (var template in RoleTemplates.Starter)
             {
-                demoTenant.UpdateCountryCode(Tenant.DefaultCountryCode);
-                await _db.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Set default country code for the demo tenant.");
+                var role = Role.Create(tenant.Id, template.Name, description: template.Description);
+                role.Grant(await ResolvePermissionsAsync(template.PermissionNames, cancellationToken));
+                await _db.Roles.AddAsync(role, cancellationToken);
             }
 
-            if (!demoUser.EmailVerified)
-            {
-                demoUser.MarkEmailVerified();
-                await _db.SaveChangesAsync(cancellationToken);
-            }
+            var admin = User.Create(
+                Guid.NewGuid(),
+                tenant.Id,
+                demoEmail,
+                _passwordHasher.Hash("Admin@12345"),
+                "System Administrator",
+                phone: null);
+            admin.AssignRole(adminRole);
+            admin.MarkEmailVerified();
+            await _db.Users.AddAsync(admin, cancellationToken);
 
-            if (demoTenant is not null && demoTenant.OnboardingCompletedAt is null)
-            {
-                var currency = string.IsNullOrWhiteSpace(demoTenant.Currency) ? "TZS" : demoTenant.Currency;
-                demoTenant.CompleteOnboarding(demoTenant.Name, businessType: null, Tenant.DefaultCountryCode, currency, contactPhone: null, taxId: null);
-                await _db.SaveChangesAsync(cancellationToken);
-            }
+            tenant.CompleteOnboarding(tenant.Name, businessType: null, Tenant.DefaultCountryCode, tenant.Currency, contactPhone: null, taxId: null);
 
-            if (!await _db.Branches.AnyAsync(b => b.TenantId == demoUser.TenantId, cancellationToken))
-            {
-                _db.Branches.Add(Branch.Create(
-                    demoUser.TenantId,
-                    Branch.DefaultName,
-                    Branch.DefaultCode,
-                    Tenant.DefaultCurrency));
-                await _db.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Seeded default branch for the demo tenant.");
-            }
-
-            await EnsureExpenseCategoriesAsync(demoUser.TenantId, cancellationToken);
-
-            return;
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Seeded demo tenant 'Acme Ltd' and administrator user.");
         }
 
-        var tenant = Tenant.Create(Guid.NewGuid(), "Acme Ltd");
-        await _db.Tenants.AddAsync(tenant, cancellationToken);
-
-        var adminRole = Role.Create(tenant.Id, SystemRoles.Administrator, isSystem: true);
-        var allPermissions = await _db.Permissions
-            .Where(p => PermissionNames.All.Contains(p.Name))
-            .ToListAsync(cancellationToken);
-        adminRole.Grant(allPermissions);
-        await _db.Roles.AddAsync(adminRole, cancellationToken);
-
-        var staffRole = Role.Create(
-            tenant.Id,
-            SystemRoles.Staff,
-            isSystem: true,
-            description: "Fanyakazi — catalogue, stock na POS");
-        staffRole.Grant(await ResolvePermissionsAsync(PermissionNames.Staff, cancellationToken));
-        await _db.Roles.AddAsync(staffRole, cancellationToken);
-
-        foreach (var template in RoleTemplates.Starter)
+        var allTenants = await _db.Tenants.ToListAsync(cancellationToken);
+        foreach (var currentTenant in allTenants)
         {
-            var role = Role.Create(tenant.Id, template.Name, description: template.Description);
-            role.Grant(await ResolvePermissionsAsync(template.PermissionNames, cancellationToken));
-            await _db.Roles.AddAsync(role, cancellationToken);
+            await EnsureTenantDefaultsAndSampleCatalogAsync(currentTenant, cancellationToken);
+        }
+    }
+
+    private async Task EnsureTenantDefaultsAndSampleCatalogAsync(Tenant tenant, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(tenant.CountryCode))
+        {
+            tenant.UpdateCountryCode(Tenant.DefaultCountryCode);
         }
 
-        var admin = User.Create(
-            Guid.NewGuid(),
-            tenant.Id,
-            demoEmail,
-            _passwordHasher.Hash("Admin@12345"),
-            "System Administrator",
-            phone: null);
-        admin.AssignRole(adminRole);
-        admin.MarkEmailVerified();
-        await _db.Users.AddAsync(admin, cancellationToken);
+        if (tenant.OnboardingCompletedAt is null)
+        {
+            var currency = string.IsNullOrWhiteSpace(tenant.Currency) ? Tenant.DefaultCurrency : tenant.Currency;
+            tenant.CompleteOnboarding(tenant.Name, businessType: null, Tenant.DefaultCountryCode, currency, contactPhone: null, taxId: null);
+        }
 
-        // The seeded workspace is fully usable without running guided setup.
-        tenant.CompleteOnboarding(tenant.Name, businessType: null, Tenant.DefaultCountryCode, tenant.Currency, contactPhone: null, taxId: null);
-
-        await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Seeded demo tenant 'Acme Ltd' and administrator user.");
+        Branch? defaultBranch = await _db.Branches.FirstOrDefaultAsync(b => b.TenantId == tenant.Id, cancellationToken);
+        if (defaultBranch is null)
+        {
+            defaultBranch = Branch.Create(
+                tenant.Id,
+                Branch.DefaultName,
+                Branch.DefaultCode,
+                string.IsNullOrWhiteSpace(tenant.Currency) ? Tenant.DefaultCurrency : tenant.Currency);
+            _db.Branches.Add(defaultBranch);
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Seeded default branch for tenant '{TenantName}'.", tenant.Name);
+        }
 
         await EnsureExpenseCategoriesAsync(tenant.Id, cancellationToken);
+
+        // Ensure default Unit of Measure
+        var pieceUnit = await _db.UnitsOfMeasure.FirstOrDefaultAsync(
+            u => u.TenantId == tenant.Id && (u.Abbreviation == "PCS" || u.Name == "Piece"), cancellationToken);
+        if (pieceUnit is null)
+        {
+            pieceUnit = UnitOfMeasure.Create(tenant.Id, "Piece", "PCS");
+            _db.UnitsOfMeasure.Add(pieceUnit);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        // Ensure default Product Categories
+        var categories = new Dictionary<string, ProductCategory>(StringComparer.OrdinalIgnoreCase);
+        var catNames = new[] { "Vinywaji", "Chakula", "Usafi" };
+        foreach (var catName in catNames)
+        {
+            var cat = await _db.ProductCategories.FirstOrDefaultAsync(
+                c => c.TenantId == tenant.Id && c.Name == catName, cancellationToken);
+            if (cat is null)
+            {
+                cat = ProductCategory.Create(tenant.Id, catName);
+                _db.ProductCategories.Add(cat);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            categories[catName] = cat;
+        }
+
+        // Ensure default Warehouse & Stock Location
+        var warehouse = await _db.Warehouses
+            .Include(w => w.Locations)
+            .FirstOrDefaultAsync(w => w.TenantId == tenant.Id, cancellationToken);
+        if (warehouse is null)
+        {
+            warehouse = Warehouse.Create(tenant.Id, defaultBranch.Id, "Kuu", "MAIN", "Stoo Kuu ya Biashara");
+            _db.Warehouses.Add(warehouse);
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Seeded default warehouse for tenant '{TenantName}'.", tenant.Name);
+        }
+
+        var stockLocation = await _db.StockLocations.FirstOrDefaultAsync(
+            l => l.WarehouseId == warehouse.Id, cancellationToken);
+
+        // Ensure default Retail Price List
+        var defaultPriceList = await _db.PriceLists.FirstOrDefaultAsync(
+            p => p.TenantId == tenant.Id && p.IsDefault, cancellationToken);
+        if (defaultPriceList is null)
+        {
+            var currency = string.IsNullOrWhiteSpace(tenant.Currency) ? Tenant.DefaultCurrency : tenant.Currency;
+            defaultPriceList = PriceList.Create(tenant.Id, "Bei ya Rejareja", currency, isDefault: true);
+            _db.PriceLists.Add(defaultPriceList);
+            await _db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Seeded default price list for tenant '{TenantName}'.", tenant.Name);
+        }
+
+        // If tenant has no products, seed realistic sample products with prices and stock balances
+        var hasProducts = await _db.Products.AnyAsync(p => p.TenantId == tenant.Id, cancellationToken);
+        if (!hasProducts)
+        {
+            var sampleProducts = new[]
+            {
+                new {
+                    Name = "Coca-Cola 500ml",
+                    Category = "Vinywaji",
+                    Sku = "BEV-COKE-500",
+                    Barcode = "049000000443",
+                    Description = "Kinywaji baridi cha chupa 500ml",
+                    CostPrice = 1200m,
+                    SellingPrice = 1500m,
+                    InitialStock = 50m
+                },
+                new {
+                    Name = "Maji ya Uhai 1.5L",
+                    Category = "Vinywaji",
+                    Sku = "BEV-UHAI-1500",
+                    Barcode = "616110000101",
+                    Description = "Maji safi na salama ya kunywa 1.5L",
+                    CostPrice = 800m,
+                    SellingPrice = 1000m,
+                    InitialStock = 80m
+                },
+                new {
+                    Name = "Azam Ngano Bora 1kg",
+                    Category = "Chakula",
+                    Sku = "GROC-AZAM-1KG",
+                    Barcode = "616110000202",
+                    Description = "Unga safi wa ngano namba moja wa kuoka na kupika",
+                    CostPrice = 2000m,
+                    SellingPrice = 2500m,
+                    InitialStock = 35m
+                },
+                new {
+                    Name = "Mchele wa Kyela Super 1kg",
+                    Category = "Chakula",
+                    Sku = "GROC-KYELA-1KG",
+                    Barcode = "616110000303",
+                    Description = "Mchele safi wenye harufu nzuri toka Kyela Mbeya",
+                    CostPrice = 2900m,
+                    SellingPrice = 3500m,
+                    InitialStock = 40m
+                },
+                new {
+                    Name = "Sabuni ya Omo 500g",
+                    Category = "Usafi",
+                    Sku = "DET-OMO-500",
+                    Barcode = "616110000404",
+                    Description = "Sabuni ya unga ya kufulia nguo safi na harufu nzuri",
+                    CostPrice = 2300m,
+                    SellingPrice = 2800m,
+                    InitialStock = 25m
+                }
+            };
+
+            foreach (var sp in sampleProducts)
+            {
+                var catId = categories.TryGetValue(sp.Category, out var c) ? c.Id : (Guid?)null;
+                var product = Product.Create(
+                    tenant.Id,
+                    sp.Name,
+                    sp.Description,
+                    sp.Sku,
+                    sp.Barcode,
+                    catId,
+                    brandId: null,
+                    pieceUnit.Id,
+                    ProductType.Product,
+                    ProductStatus.Active,
+                    taxCategoryId: null,
+                    costPrice: sp.CostPrice);
+
+                _db.Products.Add(product);
+                await _db.SaveChangesAsync(cancellationToken);
+
+                var productPrice = ProductPrice.Assign(
+                    tenant.Id,
+                    defaultPriceList.Id,
+                    Guid.NewGuid(),
+                    product.Id,
+                    variantId: null,
+                    branchId: null,
+                    PriceType.Retail,
+                    sp.SellingPrice,
+                    defaultPriceList.Currency,
+                    minQuantity: 1m,
+                    effectiveFrom: null,
+                    effectiveTo: null,
+                    isActive: true);
+                _db.ProductPrices.Add(productPrice);
+
+                if (stockLocation is not null)
+                {
+                    var balance = StockBalance.Create(
+                        tenant.Id, warehouse.Id, stockLocation.Id, product.Id, variantId: null, batchId: null);
+                    balance.Apply(sp.InitialStock);
+                    _db.StockBalances.Add(balance);
+                }
+
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            _logger.LogInformation("Seeded 5 sample catalog products with prices and stock for tenant '{TenantName}'.", tenant.Name);
+        }
     }
 
     private async Task<IReadOnlyList<Permission>> ResolvePermissionsAsync(

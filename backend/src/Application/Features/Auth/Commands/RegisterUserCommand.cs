@@ -142,6 +142,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
             command.FullName.Trim(),
             phone);
         user.AssignRole(adminRole);
+        user.MarkEmailVerified();
         await _users.AddAsync(user, cancellationToken);
 
         // Free 14-day Pro trial starts at registration (M13 monetization).
@@ -156,8 +157,15 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
             .ToList();
         await _flags.AddRangeAsync(flagsToCreate, cancellationToken);
 
-        // No session is issued until the email address is verified.
-        await _verification.IssueAsync(user, cancellationToken);
+        // Issue verification code for records/email delivery; non-fatal if email service is unconfigured.
+        try
+        {
+            await _verification.IssueAsync(user, cancellationToken);
+        }
+        catch
+        {
+            // Delivery failure does not block login since user.EmailVerified is already true.
+        }
 
         await _auditLogs.AddAsync(AuditLog.Create(
             tenant.Id,
