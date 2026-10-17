@@ -12,7 +12,7 @@
  *      BACKUP_ORIGIN (if configured) or retries PRIMARY_ORIGIN once more.
  */
 
-const DEFAULT_PRIMARY_ORIGIN = "https://local.joberthix.xyz";
+const DEFAULT_PRIMARY_ORIGIN = "https://jolinx-api.onrender.com";
 const DEFAULT_BACKUP_ORIGIN = "https://jolinx-api.onrender.com";
 const FAILOVER_STATUS_CODES = new Set([502, 503, 504, 520, 521, 522, 523, 524, 530]);
 const PRIMARY_TIMEOUT_MS = 25000;

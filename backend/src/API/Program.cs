@@ -174,20 +174,19 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddCors(options =>
 {
     var cors = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
-    if (cors.AllowedOrigins.Length > 0)
-    {
-        options.AddDefaultPolicy(policy => policy
-            .WithOrigins(cors.AllowedOrigins)
-            .AllowAnyHeader()
-            .AllowAnyMethod());
-    }
-    else
-    {
-        options.AddDefaultPolicy(policy => policy
-            .WithOrigins("http://localhost:3000", "http://localhost:8080", "https://localhost:5001")
-            .AllowAnyHeader()
-            .AllowAnyMethod());
-    }
+    options.AddDefaultPolicy(policy => policy
+        .SetIsOriginAllowed(origin =>
+        {
+            if (cors.AllowedOrigins.Contains(origin)) return true;
+            if (origin.EndsWith(".pages.dev", StringComparison.OrdinalIgnoreCase)) return true;
+            if (origin.EndsWith(".joberthix.xyz", StringComparison.OrdinalIgnoreCase)) return true;
+            if (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
+                origin.StartsWith("https://localhost:", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        })
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
 });
 
 builder.Services.AddPlatformHealthChecks(builder.Configuration);

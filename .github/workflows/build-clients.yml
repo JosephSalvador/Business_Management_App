@@ -114,8 +114,8 @@ jobs:
           else
             CF_BRANCH="staging"
             APP_ENV="staging"
-            API_URL="https://staging-api.joberthix.xyz"
-            FALLBACK_URL="https://local.joberthix.xyz"
+            API_URL="https://api.joberthix.xyz"
+            FALLBACK_URL="https://jolinx-api.onrender.com"
           fi
 
           echo "target=$TARGET" >> $GITHUB_OUTPUT
