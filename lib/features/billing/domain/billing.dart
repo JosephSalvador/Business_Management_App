@@ -284,6 +284,11 @@ class BillingInvoice {
 
 abstract final class VoucherCode {
   static String normalize(String value) => value.trim().toUpperCase();
+
+  static bool isValidFormat(String value) {
+    final clean = normalize(value);
+    return clean.length >= 6;
+  }
 }
 
 int _requiredInt(Object? value, String field) {

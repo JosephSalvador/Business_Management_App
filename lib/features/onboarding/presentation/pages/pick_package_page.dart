@@ -9,6 +9,7 @@ import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/design_system/responsive.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../billing/application/billing_controller.dart';
+import '../../../billing/application/billing_providers.dart';
 import '../../../billing/data/billing_providers.dart';
 import '../../../billing/domain/billing.dart';
 
@@ -22,7 +23,6 @@ class PickPackagePage extends ConsumerStatefulWidget {
 class _PickPackagePageState extends ConsumerState<PickPackagePage> {
   final _voucherController = TextEditingController();
   List<BillingPlan> _plans = const [];
-  PaymentInstructions? _paymentInstructions;
   bool _isLoading = true;
   String? _selectedPlanCode;
   final Set<String> _selectedPackages = {};
@@ -49,15 +49,10 @@ class _PickPackagePageState extends ConsumerState<PickPackagePage> {
     try {
       final repo = ref.read(billingRepositoryProvider);
       final plans = await repo.listPlans();
-      PaymentInstructions? instructions;
-      try {
-        instructions = await repo.getPaymentInstructions();
-      } catch (_) {}
 
       if (!mounted) return;
       setState(() {
         _plans = plans;
-        _paymentInstructions = instructions;
         final basePlans = plans.where((p) => !p.isPackage).toList();
         if (basePlans.isNotEmpty) {
           _selectedPlanCode = basePlans.first.code;

@@ -25,8 +25,20 @@ final receiptPreviewProvider =
 });
 
 /// Configured thermal printer paper width (58mm portable vs 80mm counter).
+class ReceiptPaperWidthNotifier extends Notifier<ReceiptPaperWidth> {
+  @override
+  ReceiptPaperWidth build() => ReceiptPaperWidth.mm80;
+
+  @override
+  set state(ReceiptPaperWidth value) => super.state = value;
+
+  void setWidth(ReceiptPaperWidth width) => state = width;
+}
+
 final receiptPaperWidthProvider =
-    StateProvider<ReceiptPaperWidth>((ref) => ReceiptPaperWidth.mm80);
+    NotifierProvider<ReceiptPaperWidthNotifier, ReceiptPaperWidth>(
+  ReceiptPaperWidthNotifier.new,
+);
 
 /// Provider for the thermal renderer, configured for active language and paper width.
 final thermalRendererProvider = Provider<Thermal80mmRenderer>((ref) {

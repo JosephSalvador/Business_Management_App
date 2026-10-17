@@ -76,6 +76,18 @@ class FakeBillingRepository implements BillingRepository {
   @override
   Future<List<String>> removePackage(String planCode) async =>
       throw UnimplementedError();
+
+  @override
+  Future<PaymentInstructions> getPaymentInstructions() async =>
+      const PaymentInstructions(
+        mpesaTill: '123456',
+        airtelMoney: '654321',
+        bankName: 'CRDB',
+        bankAccountNumber: '0150...',
+        bankAccountName: 'Jolinx',
+        whatsAppContact: '+2557...',
+        notes: 'Lipa kwa simu',
+      );
 }
 
 ProviderContainer containerWith(FakeBillingRepository repository) {

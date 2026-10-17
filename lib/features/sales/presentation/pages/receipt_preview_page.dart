@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer.dart';
@@ -10,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../app/providers.dart';
 import '../../../../l10n/loc.dart';
+import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../receipts/data/receipt_providers.dart';
 import '../../../receipts/data/receipt_repository.dart' show PrintType;

@@ -8,6 +8,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:qr/qr.dart' as qr;
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/storage/locale_store.dart';
+import '../../receipts/data/receipt_providers.dart';
 import '../../receipts/domain/receipt_format.dart';
 import '../../receipts/domain/receipt_preview.dart';
 import '../../receipts/domain/receipt_qr.dart';

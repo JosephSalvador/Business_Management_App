@@ -66,3 +66,6 @@ backend/run-backend.sh
 
 # Node modules
 **/node_modules/
+**/node_modules
+node_modules
+portal/node_modules

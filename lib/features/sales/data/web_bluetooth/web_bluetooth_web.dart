@@ -48,10 +48,8 @@ class WebBluetoothPrinterWeb implements WebBluetoothPrinterPlatform {
       final options = JSObject();
       options.setProperty('acceptAllDevices'.toJS, true.toJS);
 
-      final servicesList = JSArray();
-      for (final uuid in _printerServiceUuids) {
-        servicesList.add(uuid.toJS);
-      }
+      final servicesList =
+          [for (final uuid in _printerServiceUuids) uuid.toJS].toJS;
       options.setProperty('optionalServices'.toJS, servicesList);
 
       // 2. Request device (user picks their thermal printer in browser dialog)
@@ -75,7 +73,7 @@ class WebBluetoothPrinterWeb implements WebBluetoothPrinterPlatform {
             uuid.toJS,
           ) as JSPromise<JSObject>;
           targetService = await getServicePromise.toDart;
-          if (targetService != null) break;
+          break;
         } catch (_) {}
       }
 
@@ -100,7 +98,7 @@ class WebBluetoothPrinterWeb implements WebBluetoothPrinterPlatform {
             charUuid.toJS,
           ) as JSPromise<JSObject>;
           targetCharacteristic = await getCharPromise.toDart;
-          if (targetCharacteristic != null) break;
+          break;
         } catch (_) {}
       }
 

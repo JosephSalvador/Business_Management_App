@@ -424,7 +424,7 @@ class _HardenedVoidDialogState extends ConsumerState<_HardenedVoidDialog> {
             ),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               isExpanded: true,
               items: _presetReasons
                   .map((r) => DropdownMenuItem(

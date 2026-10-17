@@ -64,6 +64,8 @@ Future<bool?> showQuickPinPromptDialog(
       ],
     ),
   );
+}
+
 /// Modal bottom sheet for setting up or updating a 4-digit Quick PIN.
 /// Includes an optional toggle to enable biometric authentication on supported devices.
 Future<bool> showQuickPinSetupSheet(

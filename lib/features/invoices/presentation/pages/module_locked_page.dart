@@ -8,7 +8,6 @@ import '../../../../app/router.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../authentication/application/auth_controller.dart';
-import '../../../billing/application/billing_controller.dart';
 import '../../../billing/domain/billing.dart';
 
 class ModuleLockedPage extends ConsumerWidget {
