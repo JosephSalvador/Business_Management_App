@@ -94,31 +94,18 @@ class DashboardController extends Notifier<DashboardState> {
 
   Future<void> _fetch({int trendDays = 30}) async {
     try {
-      // 1. Fetch summary safely
-      DashboardSummary summary;
-      try {
-        summary = await _repository.summary();
-      } catch (_) {
-        summary = const DashboardSummary(
-          branchName: '',
-          revenueToday: 0,
-          totalProducts: 0,
-        );
-      }
+      final summary = await _repository.summary();
 
-      // 2. Fetch low stock safely
       List<Map<String, dynamic>> lowStock = const [];
       try {
         lowStock = await _repository.lowStock();
       } catch (_) {}
 
-      // 3. Fetch recent activity safely
       List<Map<String, dynamic>> recentActivity = const [];
       try {
         recentActivity = await _repository.recentActivity();
       } catch (_) {}
 
-      // 4. Fetch trend data safely
       List<SalesTrendPoint> trendData = const [];
       try {
         final rawTrend = await _loadTrendRaw(days: trendDays);
@@ -127,7 +114,6 @@ class DashboardController extends Notifier<DashboardState> {
             .toList();
       } catch (_) {}
 
-      // 5. Fetch top products safely
       List<Map<String, dynamic>> topProducts = const [];
       try {
         final rawTop = await _repository.topProducts(limit: 5);

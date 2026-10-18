@@ -24,7 +24,7 @@ final fullBillingAccessProvider = Provider<bool>((ref) {
 final billingFeatureAccessProvider = Provider.family<bool, String>((ref, key) {
   final entitlement = ref.watch(subscriptionEntitlementControllerProvider);
   if (entitlement != null) return entitlement.hasFeature(key);
-  return true;
+  return key == BillingFeatureKeys.pos || key == BillingFeatureKeys.inventory;
 });
 
 final posFeatureAccessProvider = Provider<bool>((ref) {

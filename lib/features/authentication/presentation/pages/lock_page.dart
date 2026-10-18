@@ -149,9 +149,7 @@ class _LockPageState extends ConsumerState<LockPage> {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: _busy ? null : _logoutToLogin,
-                    child: Text(
-                      isSw ? 'Ingia kwa nenosiri' : 'Sign in with password',
-                    ),
+                    child: const Text('Ingia kwa nenosiri'),
                   ),
                 ] else
                   FilledButton.icon(
@@ -160,9 +158,7 @@ class _LockPageState extends ConsumerState<LockPage> {
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                     ),
-                    label: Text(
-                      isSw ? 'Endelea Kuingia' : 'Continue to Sign In',
-                    ),
+                    label: const Text('Endelea Kuingia'),
                   ),
               ],
             ),
