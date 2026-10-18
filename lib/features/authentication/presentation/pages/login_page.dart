@@ -399,7 +399,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               borderRadius: BorderRadius.circular(20),
               onTap: () => context.push(Routes.download),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
                   color: const Color(0xFF00C48C).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(20),
@@ -412,9 +412,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.install_mobile_rounded, size: 16, color: Color(0xFF00C48C)),
-                    SizedBox(width: 8),
+                    SizedBox(width: 6),
                     Text(
-                      'Pakua App (Android / iPhone)',
+                      'Pakua App ya Simu',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
