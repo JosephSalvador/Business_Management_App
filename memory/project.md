@@ -1606,3 +1606,20 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
   - All 565 backend unit tests passed green (`dotnet test backend/BusinessOS.Tests/BusinessOS.Tests.csproj --filter "FullyQualifiedName~Unit"`).
   - All 5 newly added `TlsFingerprintMiddlewareTests` passed green in 1s.
 
+## Page Loading Freeze & Web WebAssembly SQLite Resolution (Build 30, done 2026-10-18)
+
+- **Root Causes Diagnosed from Live Logs:**
+  - **Missing WebAssembly SQLite binary on Web:** `web/sqlite3.wasm` was not present in the web build output. Cloudflare Pages served `index.html` (MIME `text/html`) on requests for `sqlite3.wasm`, causing `TypeError: Failed to execute 'compile' on 'WebAssembly': Incorrect response MIME type`. Any database or offline cache access hung or threw uncaught errors.
+  - **Sequential Dashboard API calls:** `DashboardController._fetch` sequentially awaited 5 network endpoints (`summary`, `lowStock`, `recentActivity`, `salesTrend`, `topProducts`). When the backend was slow or cold-starting, cumulative latency exceeded 30 seconds.
+  - **Eager Tab Rendering:** `HomePage`'s `IndexedStack` eagerly mounted all 5 tabs on login simultaneously, firing 12+ parallel API calls at once and overwhelming the staging backend.
+  - **POS Catalog 2*N Query Bottleneck & Cache Emit Hang:** `PosCatalogController` executed 2 SQL queries per product row for projected quantities and lacked timeout guards and try-catch fallbacks.
+- **Implemented Fixes:**
+  - **`web/_headers` & `.github/workflows/build-clients.yml`:** Added explicit `Content-Type: application/wasm` header rule in `web/_headers`. Added automated download of official `sqlite3.wasm` (`simolus3/sqlite3.dart` release) prior to `flutter build web --release` in CI.
+  - **`lib/core/storage/offline_cache_dao.dart`:** Wrapped `load`, `save`, `getLastUpdated`, and `clear` with strict timeout guards (1.5s - 2.0s) and try/catch blocks so database failures or uncompiled WebAssembly never crash or freeze the app.
+  - **`lib/core/storage/cached_catalog_dao.dart`:** Added `projectedQuantities(tenantId)` to batch-compute projected available balances for all cached products in 2 aggregated queries instead of $2 \times N$ roundtrips.
+  - **`lib/features/sales/application/pos_catalog_controller.dart`:** Refactored `_emitFromCache` to use batch quantity projection with timeouts, added `finally` guard to ensure `state.loading` is always cleared, and wrapped cache reads in safe fallbacks.
+  - **`lib/features/dashboard/application/dashboard_controller.dart`:** Parallelized secondary queries (`lowStock`, `recentActivity`, `salesTrend`, `topProducts`) with `Future.wait` and individual 10s timeouts; guarded `summary` with a 15s timeout.
+  - **`lib/features/authentication/presentation/pages/home_page.dart`:** Implemented lazy tab mounting with `_visitedTabs` set so only the active tab (Dashboard on login) initializes, preserving state once visited and eliminating 12+ concurrent login requests.
+  - **Client Versioning:** Incremented `version` in `pubspec.yaml` to `1.0.0+30`.
+
+
