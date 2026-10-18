@@ -220,7 +220,7 @@ class AppDownloadPage extends StatelessWidget {
       case DetectedOs.macos:
         return Icons.apple;
       case DetectedOs.linux:
-        return CupertinoIcons.terminal;
+        return Icons.terminal;
       case DetectedOs.unknown:
         return CupertinoIcons.device_phone_portrait;
     }
