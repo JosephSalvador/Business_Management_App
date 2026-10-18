@@ -250,10 +250,24 @@ class SalesTrendPoint {
   final double revenue;
 
   factory SalesTrendPoint.fromJson(Map<String, dynamic> json) {
+    num parsedRevenue = 0;
+    if (json['revenue'] is num) {
+      parsedRevenue = json['revenue'] as num;
+    } else if (json['revenue'] is String) {
+      parsedRevenue = num.tryParse(json['revenue'] as String) ?? 0;
+    }
+
+    num parsedCount = 0;
+    if (json['saleCount'] is num) {
+      parsedCount = json['saleCount'] as num;
+    } else if (json['saleCount'] is String) {
+      parsedCount = num.tryParse(json['saleCount'] as String) ?? 0;
+    }
+
     return SalesTrendPoint(
       label: json['label'] as String? ?? '',
-      saleCount: (json['saleCount'] as num?)?.toInt() ?? 0,
-      revenue: (json['revenue'] as num?)?.toDouble() ?? 0,
+      saleCount: parsedCount.toInt(),
+      revenue: parsedRevenue.toDouble(),
     );
   }
 

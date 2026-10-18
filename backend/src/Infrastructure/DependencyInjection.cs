@@ -28,13 +28,7 @@ public static class DependencyInjection
             var config = serviceProvider.GetRequiredService<IConfiguration>();
             var connectionString = config.GetConnectionString("Default")
                 ?? throw new InvalidOperationException("Connection string 'Default' is not configured.");
-            options.UseNpgsql(connectionString, npgsql =>
-            {
-                npgsql.EnableRetryOnFailure(
-                    maxRetryCount: 3,
-                    maxRetryDelay: TimeSpan.FromSeconds(2),
-                    errorCodesToAdd: null);
-            });
+            options.UseNpgsql(connectionString);
             options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 

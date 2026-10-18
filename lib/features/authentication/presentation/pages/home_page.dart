@@ -43,6 +43,13 @@ class _HomePageState extends ConsumerState<HomePage> {
       _tab = i;
       _visitedTabs.add(i);
     });
+    if (i == 0) {
+      ref.read(dashboardControllerProvider.notifier).refresh();
+    } else if (i == 1) {
+      ref.read(productsControllerProvider.notifier).load();
+    } else if (i == 2) {
+      ref.read(posCatalogControllerProvider.notifier).load();
+    }
   }
 
   @override

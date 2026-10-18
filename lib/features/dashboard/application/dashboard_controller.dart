@@ -1,6 +1,9 @@
+import 'dart:async' as async;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/core_providers.dart' show offlineCacheDaoProvider;
 import '../../../core/storage/offline_cache_dao.dart';
+import '../../../core/storage/tables.dart' show LocalSaleStatus;
+import '../../../core/sync/local_sales_service.dart';
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../data/dashboard_repository.dart';
@@ -92,33 +95,75 @@ class DashboardController extends Notifier<DashboardState> {
     await _fetch(trendDays: trendDays);
   }
 
+  LocalSalesService get _salesService => ref.read(localSalesServiceProvider);
+
   Future<void> _fetch({int trendDays = 30}) async {
     try {
-      final summary = await _repository.summary().timeout(const Duration(seconds: 15));
+      final summaryFuture =
+          _repository.summary().timeout(const Duration(seconds: 15));
+      final lowStockFuture = _loadLowStockSafe();
+      final recentActivityFuture = _loadRecentActivitySafe();
+      final trendFuture = _loadTrendRawSafe(trendDays);
+      final topProductsFuture = _loadTopProductsSafe();
 
-      final secondaryResults = await Future.wait([
-        _repository
-            .lowStock()
-            .timeout(const Duration(seconds: 10))
-            .catchError((_) => <Map<String, dynamic>>[]),
-        _repository
-            .recentActivity()
-            .timeout(const Duration(seconds: 10))
-            .catchError((_) => <Map<String, dynamic>>[]),
-        _loadTrendRaw(days: trendDays)
-            .timeout(const Duration(seconds: 10))
-            .catchError((_) => <Map<String, dynamic>>[]),
-        _loadTopProductsSafe(),
-      ]);
+      final summary = await summaryFuture;
+      final lowStock = await lowStockFuture;
+      final recentActivity = await recentActivityFuture;
+      final rawTrend = await trendFuture;
+      final topProducts = await topProductsFuture;
 
-      final lowStock = secondaryResults[0];
-      final recentActivity = secondaryResults[1];
-      final rawTrend = secondaryResults[2];
-      final trendData = rawTrend.map((e) => SalesTrendPoint.fromJson(e)).toList();
-      final topProducts = secondaryResults[3];
+      final trendData =
+          rawTrend.map((e) => SalesTrendPoint.fromJson(e)).toList();
+
+      // Incorporate local pending sales from today for instant UI reflection
+      var pendingRevenue = 0.0;
+      var pendingCount = 0;
+      try {
+        final pendingSales =
+            await _salesService.sales.byStatus(LocalSaleStatus.pending);
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final todayEnd = todayStart.add(const Duration(days: 1));
+        for (final s in pendingSales) {
+          final localEffective = s.effectiveAt.toLocal();
+          if (localEffective.isAfter(todayStart) &&
+              localEffective.isBefore(todayEnd)) {
+            pendingRevenue += s.totalEstimate;
+            pendingCount += 1;
+          }
+        }
+      } catch (_) {}
+
+      final effectiveSummary = pendingRevenue > 0
+          ? DashboardSummary(
+              branchName: summary.branchName,
+              revenueToday: summary.revenueToday + pendingRevenue,
+              totalProducts: summary.totalProducts,
+            )
+          : summary;
+
+      if (pendingRevenue > 0 && trendData.isNotEmpty) {
+        final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+        final todayIndex =
+            trendData.indexWhere((p) => p.label.startsWith(todayStr));
+        if (todayIndex >= 0) {
+          final current = trendData[todayIndex];
+          trendData[todayIndex] = SalesTrendPoint(
+            label: current.label,
+            saleCount: current.saleCount + pendingCount,
+            revenue: current.revenue + pendingRevenue,
+          );
+        } else {
+          trendData.add(SalesTrendPoint(
+            label: todayStr,
+            saleCount: pendingCount,
+            revenue: pendingRevenue,
+          ));
+        }
+      }
 
       state = DashboardLoaded(
-        summary: summary,
+        summary: effectiveSummary,
         lowStock: lowStock,
         recentActivity: recentActivity,
         trendData: trendData,
@@ -130,7 +175,7 @@ class DashboardController extends Notifier<DashboardState> {
       // Persist snapshot to local encrypted cache
       try {
         await _cacheDao.save('dashboard', {
-          'summary': summary.toJson(),
+          'summary': effectiveSummary.toJson(),
           'lowStock': lowStock,
           'recentActivity': recentActivity,
           'trendData': trendData.map((e) => e.toJson()).toList(),
@@ -139,10 +184,73 @@ class DashboardController extends Notifier<DashboardState> {
       } catch (_) {}
     } catch (error) {
       if (state is! DashboardLoaded) {
-        state = DashboardFailure(
-          error is AppException ? error.message : 'Imeshindwa kupakia dashibodi.',
-        );
+        // Try restoring from offline cache if not already loaded
+        final cached = await _cacheDao.load('dashboard');
+        if (cached != null) {
+          try {
+            final summary = DashboardSummary.fromJson(
+                cached['summary'] as Map<String, dynamic>);
+            final lowStock =
+                (cached['lowStock'] as List).cast<Map<String, dynamic>>();
+            final recentActivity =
+                (cached['recentActivity'] as List).cast<Map<String, dynamic>>();
+            final trendData = (cached['trendData'] as List)
+                .map((e) => SalesTrendPoint.fromJson(e as Map<String, dynamic>))
+                .toList();
+            final topProducts =
+                (cached['topProducts'] as List).cast<Map<String, dynamic>>();
+            final lastUpdated = await _cacheDao.getLastUpdated('dashboard');
+
+            state = DashboardLoaded(
+              summary: summary,
+              lowStock: lowStock,
+              recentActivity: recentActivity,
+              trendData: trendData,
+              topProducts: topProducts,
+              isFromCache: true,
+              lastUpdated: lastUpdated,
+            );
+            return;
+          } catch (_) {}
+        }
+
+        final message = error is AppException
+            ? error.message
+            : error is async.TimeoutException
+                ? 'Muunganisho ulikwama. Jaribu tena.'
+                : 'Imeshindwa kupakia dashibodi.';
+        state = DashboardFailure(message);
       }
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadLowStockSafe() async {
+    try {
+      return await _repository
+          .lowStock()
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadRecentActivitySafe() async {
+    try {
+      return await _repository
+          .recentActivity()
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadTrendRawSafe(int days) async {
+    try {
+      return await _repository
+          .salesTrend(days: days)
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -164,19 +272,13 @@ class DashboardController extends Notifier<DashboardState> {
     return const [];
   }
 
-  Future<List<Map<String, dynamic>>> _loadTrendRaw({int days = 30}) async {
-    try {
-      return await _repository.salesTrend(days: days);
-    } on AppException catch (_) {
-      return [];
-    }
-  }
-
   Future<List<SalesTrendPoint>> loadSalesTrend({int days = 7}) async {
     try {
-      final items = await _repository.salesTrend(days: days);
+      final items = await _repository
+          .salesTrend(days: days)
+          .timeout(const Duration(seconds: 10));
       return items.map((e) => SalesTrendPoint.fromJson(e)).toList();
-    } on AppException catch (_) {
+    } catch (_) {
       final now = DateTime.now();
       return List.generate(
         days,

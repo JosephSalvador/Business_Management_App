@@ -107,12 +107,20 @@ class SyncEngine {
       if (branchId == null || paidAmount == null) {
         return true; // Let the backend decide anything unusual.
       }
+      final localSale = await _salesService.sales.byClientSaleId(op.aggregateId);
+      final targetTotal = localSale?.totalEstimate ?? paidAmount;
+
       var expected = 0.0;
       for (final raw in payload['lines'] as List? ?? []) {
         final line = raw as Map<String, dynamic>;
+        final qty = (line['quantity'] as num).toDouble();
+        if (line['unitPrice'] != null) {
+          expected += (line['unitPrice'] as num).toDouble() * qty;
+          continue;
+        }
         final resolved = await _repository.resolvePrice(
           line['productId'] as String,
-          quantity: (line['quantity'] as num).toDouble(),
+          quantity: qty,
           branchId: branchId,
         );
         if (resolved == null) {
@@ -120,9 +128,9 @@ class SyncEngine {
               op, outcome, 'PRODUCT', 'Bidhaa haipatikani tena kwenye mfumo.');
           return false;
         }
-        expected += resolved.price * (line['quantity'] as num).toDouble();
+        expected += resolved.price * qty;
       }
-      if ((expected - paidAmount).abs() > 0.01) {
+      if ((expected - targetTotal).abs() > 0.01) {
         await _conflict(op, outcome, 'PRICE',
             'Bei imebadilika kwenye mfumo. Muamala unahitaji kuangaliwa.');
         return false;

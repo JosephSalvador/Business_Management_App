@@ -80,10 +80,11 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
   void _onCheckoutStateChanged(CheckoutState? previous, CheckoutState next) {
     if (next is CheckoutSuccess && mounted) {
       ref.read(cartControllerProvider.notifier).clear();
-      // Reload only the POS-facing data the next sale needs immediately; the
-      // history, dashboard, reports and products pages refresh when opened.
       ref.read(stockControllerProvider.notifier).load();
       ref.read(posCatalogControllerProvider.notifier).load();
+      ref.read(syncStatusProvider.notifier).refresh();
+      ref.read(dashboardControllerProvider.notifier).refresh();
+      ref.read(salesHistoryControllerProvider.notifier).load();
       Navigator.of(context).pop();
       context.pushReplacement(Routes.posSuccess, extra: next.sale);
     }

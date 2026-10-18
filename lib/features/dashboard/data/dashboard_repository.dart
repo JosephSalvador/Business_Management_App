@@ -14,12 +14,25 @@ class DashboardSummary {
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
     final catalog =
         json['catalog'] is Map ? (json['catalog'] as Map) : const {};
+    num parsedRevenue = 0;
+    if (json['revenueToday'] is num) {
+      parsedRevenue = json['revenueToday'] as num;
+    } else if (json['revenueToday'] is String) {
+      parsedRevenue = num.tryParse(json['revenueToday'] as String) ?? 0;
+    }
+
+    int parsedTotalProducts = 0;
+    final rawProducts = catalog['totalProducts'] ?? json['totalProducts'];
+    if (rawProducts is num) {
+      parsedTotalProducts = (rawProducts as num).toInt();
+    } else if (rawProducts is String) {
+      parsedTotalProducts = int.tryParse(rawProducts as String) ?? 0;
+    }
+
     return DashboardSummary(
       branchName: json['branchName'] as String? ?? '',
-      revenueToday: json['revenueToday'] as num? ?? 0,
-      totalProducts: (catalog['totalProducts'] as num?)?.toInt() ??
-          (json['totalProducts'] as num?)?.toInt() ??
-          0,
+      revenueToday: parsedRevenue,
+      totalProducts: parsedTotalProducts,
     );
   }
 

@@ -261,11 +261,24 @@ class ApiClient {
       final replay = err.requestOptions
         ..headers['Authorization'] = 'Bearer ${tokens.accessToken}'
         ..extra['skip_retry'] = true;
-      final resolved = await _dio.fetch<dynamic>(replay);
-      handler.resolve(resolved);
-    } on AppException {
+      try {
+        final resolved = await _dio.fetch<dynamic>(replay);
+        handler.resolve(resolved);
+      } on DioException catch (replayErr) {
+        handler.reject(replayErr);
+      } catch (replayErr) {
+        handler.next(err);
+      }
+    } on UnauthorizedException {
       await _tokenStore.clear();
       onSessionExpired?.call();
+      handler.next(err);
+    } on ForbiddenException {
+      await _tokenStore.clear();
+      onSessionExpired?.call();
+      handler.next(err);
+    } catch (_) {
+      // Transient error during token rotation: forward original error without logging out
       handler.next(err);
     } finally {
       _refreshInFlight = null;

@@ -14,6 +14,7 @@ import '../application/cart_controller.dart';
 import '../application/checkout_controller.dart';
 import '../application/pos_catalog_controller.dart';
 import '../application/sales_history_controller.dart';
+import '../../dashboard/data/dashboard_providers.dart';
 import 'offline_sale_recorder.dart';
 import 'sale_repository.dart';
 
@@ -52,20 +53,28 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   Timer? timer;
 
   Future<void> drainIfOnline() async {
-    if (ref.read(connectivityMonitorProvider) == ConnectionQuality.online ||
-        ref.read(connectivityMonitorProvider) == ConnectionQuality.unknown) {
-      await engine.drain();
-    }
+    try {
+      if (ref.read(connectivityMonitorProvider) == ConnectionQuality.online ||
+          ref.read(connectivityMonitorProvider) == ConnectionQuality.unknown) {
+        await engine.drain();
+      }
+    } catch (_) {}
   }
 
   engine.onDrained = (outcome) async {
     try {
       await ref.read(posCatalogControllerProvider.notifier).refresh();
-    } on Exception {
+    } catch (_) {
       // Offline again — the next cycle retries.
     }
     if (outcome.synced > 0) {
       ref.read(syncStatusProvider.notifier).noteSyncCompleted();
+      try {
+        await ref.read(dashboardControllerProvider.notifier).refresh();
+      } catch (_) {}
+      try {
+        ref.read(salesHistoryControllerProvider.notifier).load();
+      } catch (_) {}
     }
     ref.read(syncStatusProvider.notifier).refresh();
   };
@@ -115,12 +124,14 @@ class SyncStatusController extends Notifier<SyncStatusState> {
   LocalSalesService get _service => ref.read(localSalesServiceProvider);
 
   Future<void> refresh() async {
-    final pending = await _service.pendingSaleCount();
-    final conflicts = await _service.conflictedSaleCount();
-    state = state.copyWith(
-      pendingCount: pending,
-      conflictCount: conflicts,
-    );
+    try {
+      final pending = await _service.pendingSaleCount();
+      final conflicts = await _service.conflictedSaleCount();
+      state = state.copyWith(
+        pendingCount: pending,
+        conflictCount: conflicts,
+      );
+    } catch (_) {}
   }
 
   void noteSyncCompleted() {
