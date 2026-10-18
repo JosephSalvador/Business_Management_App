@@ -30,6 +30,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
   DateTime? _customStart;
   DateTime? _customEnd;
   bool _loadingMore = false;
+  String _filter = '';
 
   @override
   void initState() {
@@ -44,11 +45,11 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
     super.dispose();
   }
 
-  Future<void> _reload() {
+  Future<void> _reload({bool silent = false}) {
     final controller = ref.read(expensesControllerProvider.notifier);
     switch (_range) {
       case _ExpenseRange.all:
-        return controller.load(search: _search.text);
+        return controller.load(search: _search.text, silent: silent);
       case _ExpenseRange.today:
       case _ExpenseRange.yesterday:
       case _ExpenseRange.month:
@@ -57,6 +58,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
           search: _search.text,
           fromDate: _from(),
           toDate: _to(),
+          silent: silent,
         );
     }
   }
@@ -119,10 +121,11 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
   }
 
   void _onQueryChanged(String value) {
+    setState(() => _filter = value.trim().toLowerCase());
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
+    _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
-      _reload();
+      _reload(silent: true);
     });
   }
 
@@ -137,7 +140,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(expensesControllerProvider);
     final loc = context.loc;
-    final searching = state is ExpensesLoaded && state.search.trim().isNotEmpty;
+    final searching = _filter.isNotEmpty ||
+        (state is ExpensesLoaded && state.search.trim().isNotEmpty);
 
     return Scaffold(
       appBar: AppBar(
@@ -162,7 +166,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                   TextField(
                     controller: _search,
                     onChanged: _onQueryChanged,
-                    onSubmitted: (_) => _reload(),
+                    onSubmitted: (_) => _reload(silent: true),
                     decoration: InputDecoration(
                       hintText: loc.expenseSearchHint,
                       prefixIcon: const Icon(Icons.search),
@@ -173,6 +177,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                               onPressed: () {
                                 _debounce?.cancel();
                                 _search.clear();
+                                setState(() => _filter = '');
                                 _reload();
                               },
                             )
@@ -261,60 +266,81 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
             ],
           ),
         ),
-      ExpensesLoaded(:final items) when items.isEmpty => RefreshIndicator(
-          onRefresh: _reload,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              SizedBox(
-                height: 240,
-                child: searching
-                    ? Center(
-                        child: Text(
-                          loc.expenseEmptySearch,
-                          style: TextStyle(
-                              color: AppColors.resolveTextTertiary(context)),
-                        ),
-                      )
-                    : EmptyState(
-                        icon: Icons.receipt_long_outlined,
-                        title: loc.expenseEmpty,
-                        message: loc.expenseEmptyMessage,
-                        actionLabel: loc.expenseAdd,
-                        onAction: () => context.push('/expenses/new'),
-                      ),
+      ExpensesLoaded(:final items, :final hasMore) => () {
+          final filtered = _filter.isEmpty
+              ? items
+              : items.where((e) {
+                  final cat = (e['categoryName'] ?? e['category'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  final desc =
+                      (e['description'] ?? '').toString().toLowerCase();
+                  final amt = (e['amount'] ?? '').toString();
+                  return cat.contains(_filter) ||
+                      desc.contains(_filter) ||
+                      amt.contains(_filter);
+                }).toList();
+
+          if (filtered.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: _reload,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: 240,
+                    child: _filter.isNotEmpty || searching
+                        ? Center(
+                            child: Text(
+                              _filter.isNotEmpty
+                                  ? 'Hakuna matumizi yaliyopatikana kwa "$_filter"'
+                                  : loc.expenseEmptySearch,
+                              style: TextStyle(
+                                  color: AppColors.resolveTextTertiary(context)),
+                            ),
+                          )
+                        : EmptyState(
+                            icon: Icons.receipt_long_outlined,
+                            title: loc.expenseEmpty,
+                            message: loc.expenseEmptyMessage,
+                            actionLabel: loc.expenseAdd,
+                            onAction: () => context.push('/expenses/new'),
+                          ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ExpensesLoaded(:final items, :final hasMore) => RefreshIndicator(
-          onRefresh: _reload,
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            itemCount: items.length + (hasMore ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index >= items.length) {
-                if (hasMore) {
-                  WidgetsBinding.instance
-                      .addPostFrameCallback((_) => _onLoadMore());
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(
-                      child: SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: _reload,
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              itemCount: filtered.length + (hasMore && _filter.isEmpty ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index >= filtered.length) {
+                  if (hasMore && _filter.isEmpty) {
+                    WidgetsBinding.instance
+                        .addPostFrameCallback((_) => _onLoadMore());
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(
+                        child: SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
+                  return const SizedBox.shrink();
                 }
-                return const SizedBox.shrink();
-              }
-              return _buildExpenseTile(items[index], loc);
-            },
-          ),
-        ),
+                return _buildExpenseTile(filtered[index], loc);
+              },
+            ),
+          );
+        }(),
     };
   }
 

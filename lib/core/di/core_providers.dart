@@ -60,5 +60,5 @@ final branchCacheProvider = Provider<BranchCache>(
 
 /// Idle/background auto-lock policy (theft mitigation). Overridable in tests.
 final appLockPolicyProvider = Provider<AppLockPolicy>(
-  (ref) => const AppLockPolicy(),
+  (ref) => const AppLockPolicy(enabled: false),
 );

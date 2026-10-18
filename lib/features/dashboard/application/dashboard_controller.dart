@@ -94,26 +94,53 @@ class DashboardController extends Notifier<DashboardState> {
 
   Future<void> _fetch({int trendDays = 30}) async {
     try {
-      final results = await Future.wait<dynamic>([
-        _repository.summary(),
-        _repository.lowStock(),
-        _repository.recentActivity(),
-        _loadTrendRaw(days: trendDays),
-        _repository.topProducts(limit: 5),
-      ]);
-      final summary = results[0] as DashboardSummary;
-      final lowStock = (results[1] as List).cast<Map<String, dynamic>>();
-      final recentActivity = (results[2] as List).cast<Map<String, dynamic>>();
-      final trendData = (results[3] as List)
-          .map((e) => SalesTrendPoint.fromJson(e as Map<String, dynamic>))
-          .toList();
-      final topProducts = ((results[4] as Map<String, dynamic>)['products']
-                  as List<dynamic>?)
-              ?.cast<Map<String, dynamic>>() ??
-          ((results[4] as Map<String, dynamic>)['items']
-                  as List<dynamic>?)
-              ?.cast<Map<String, dynamic>>() ??
-          [];
+      // 1. Fetch summary safely
+      DashboardSummary summary;
+      try {
+        summary = await _repository.summary();
+      } catch (_) {
+        summary = const DashboardSummary(
+          branchName: '',
+          revenueToday: 0,
+          totalProducts: 0,
+        );
+      }
+
+      // 2. Fetch low stock safely
+      List<Map<String, dynamic>> lowStock = const [];
+      try {
+        lowStock = await _repository.lowStock();
+      } catch (_) {}
+
+      // 3. Fetch recent activity safely
+      List<Map<String, dynamic>> recentActivity = const [];
+      try {
+        recentActivity = await _repository.recentActivity();
+      } catch (_) {}
+
+      // 4. Fetch trend data safely
+      List<SalesTrendPoint> trendData = const [];
+      try {
+        final rawTrend = await _loadTrendRaw(days: trendDays);
+        trendData = rawTrend
+            .map((e) => SalesTrendPoint.fromJson(e))
+            .toList();
+      } catch (_) {}
+
+      // 5. Fetch top products safely
+      List<Map<String, dynamic>> topProducts = const [];
+      try {
+        final rawTop = await _repository.topProducts(limit: 5);
+        final list = (rawTop['products'] as List<dynamic>?) ??
+            (rawTop['items'] as List<dynamic>?) ??
+            (rawTop['data'] as List<dynamic>?);
+        if (list != null) {
+          topProducts = list
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {}
 
       state = DashboardLoaded(
         summary: summary,
@@ -126,17 +153,20 @@ class DashboardController extends Notifier<DashboardState> {
       );
 
       // Persist snapshot to local encrypted cache
-      await _cacheDao.save('dashboard', {
-        'summary': summary.toJson(),
-        'lowStock': lowStock,
-        'recentActivity': recentActivity,
-        'trendData': trendData.map((e) => e.toJson()).toList(),
-        'topProducts': topProducts,
-      });
-    } on AppException catch (error) {
-      // If we already have a loaded state (from cache or previous fetch), don't wipe it out!
+      try {
+        await _cacheDao.save('dashboard', {
+          'summary': summary.toJson(),
+          'lowStock': lowStock,
+          'recentActivity': recentActivity,
+          'trendData': trendData.map((e) => e.toJson()).toList(),
+          'topProducts': topProducts,
+        });
+      } catch (_) {}
+    } catch (error) {
       if (state is! DashboardLoaded) {
-        state = DashboardFailure(error.message);
+        state = DashboardFailure(
+          error is AppException ? error.message : 'Imeshindwa kupakia dashibodi.',
+        );
       }
     }
   }

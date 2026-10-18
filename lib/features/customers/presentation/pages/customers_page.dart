@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,10 +19,29 @@ class CustomersPage extends ConsumerStatefulWidget {
 }
 
 class _CustomersPageState extends ConsumerState<CustomersPage> {
+  Timer? _debounce;
+  String _filter = '';
+
   @override
   void initState() {
     super.initState();
     ref.read(customersControllerProvider.notifier).load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String v) {
+    setState(() => _filter = v.trim().toLowerCase());
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      ref
+          .read(customersControllerProvider.notifier)
+          .load(search: v.trim(), silent: true);
+    });
   }
 
   @override
@@ -50,11 +71,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
               padding: const EdgeInsets.all(16),
               child: AppSearchBar(
                 hintText: loc.customersSearch,
-                onChanged: (v) {
-                  ref
-                      .read(customersControllerProvider.notifier)
-                      .load(search: v);
-                },
+                onChanged: _onSearchChanged,
               ),
             ),
             Expanded(child: _buildBody(state)),
@@ -74,26 +91,39 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
             style: TextStyle(color: AppColors.resolveTextSecondary(context)),
           ),
         ),
-      CustomersLoaded(:final items, :final isEmpty) => isEmpty
-          ? EmptyState(
-              icon: Icons.people_outline,
-              title: loc.customersEmpty,
-              message: loc.customersEmptyMessage,
-              actionLabel: loc.customersAdd,
-              onAction: () => context.push('/customers/new'),
-            )
-          : RefreshIndicator(
-              onRefresh: () =>
-                  ref.read(customersControllerProvider.notifier).load(),
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final customer = items[index];
-                  return _CustomerTile(customer: customer);
-                },
-              ),
-            ),
+      CustomersLoaded(:final items) => () {
+          final filtered = _filter.isEmpty
+              ? items
+              : items.where((c) {
+                  final name = (c['name'] ?? '').toString().toLowerCase();
+                  final phone = (c['phone'] ?? '').toString().toLowerCase();
+                  final email = (c['email'] ?? '').toString().toLowerCase();
+                  return name.contains(_filter) ||
+                      phone.contains(_filter) ||
+                      email.contains(_filter);
+                }).toList();
+
+          return filtered.isEmpty
+              ? EmptyState(
+                  icon: Icons.people_outline,
+                  title: loc.customersEmpty,
+                  message: loc.customersEmptyMessage,
+                  actionLabel: loc.customersAdd,
+                  onAction: () => context.push('/customers/new'),
+                )
+              : RefreshIndicator(
+                  onRefresh: () =>
+                      ref.read(customersControllerProvider.notifier).load(),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final customer = filtered[index];
+                      return _CustomerTile(customer: customer);
+                    },
+                  ),
+                );
+        }(),
     };
   }
 }

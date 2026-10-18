@@ -51,7 +51,9 @@ class _PickPackagePageState extends ConsumerState<PickPackagePage> {
       if (!mounted) return;
       setState(() {
         _plans = plans;
-        final basePlans = plans.where((p) => !p.isPackage).toList();
+        final basePlans = _plans
+            .where((p) => !p.isPackage && p.code.toLowerCase() != 'free')
+            .toList();
         if (basePlans.isNotEmpty) {
           _selectedPlanCode = basePlans.first.code;
         }
@@ -121,8 +123,12 @@ class _PickPackagePageState extends ConsumerState<PickPackagePage> {
 
   @override
   Widget build(BuildContext context) {
-    final basePlans = _plans.where((p) => !p.isPackage).toList();
-    final packages = _plans.where((p) => p.isPackage).toList();
+    final basePlans = _plans
+        .where((p) => !p.isPackage && p.code.toLowerCase() != 'free')
+        .toList();
+    final packages = _plans
+        .where((p) => p.isPackage && p.code.toLowerCase() != 'free')
+        .toList();
 
     return Scaffold(
       appBar: AppBar(

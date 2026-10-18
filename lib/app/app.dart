@@ -97,7 +97,7 @@ class _BusinessOsAppState extends ConsumerState<BusinessOsApp>
 
   void _startIdleTimer() {
     _idleTimer?.cancel();
-    if (!_isAuthenticated) return;
+    if (!_isAuthenticated || !_policy.enabled) return;
     _idleTimer = Timer(_policy.idleTimeout, () {
       if (!mounted) return;
       if (!_isAuthenticated) return;

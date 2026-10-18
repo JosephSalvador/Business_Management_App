@@ -12,11 +12,14 @@ class DashboardSummary {
   final int totalProducts;
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
-    final catalog = json['catalog'] as Map<String, dynamic>? ?? {};
+    final catalog =
+        json['catalog'] is Map ? (json['catalog'] as Map) : const {};
     return DashboardSummary(
       branchName: json['branchName'] as String? ?? '',
       revenueToday: json['revenueToday'] as num? ?? 0,
-      totalProducts: (catalog['totalProducts'] as num?)?.toInt() ?? 0,
+      totalProducts: (catalog['totalProducts'] as num?)?.toInt() ??
+          (json['totalProducts'] as num?)?.toInt() ??
+          0,
     );
   }
 
@@ -36,6 +39,13 @@ class DashboardRepository {
     final response = await _apiClient.get<dynamic>(
       '/api/v1/dashboard/summary',
     );
+    if (response.data is! Map) {
+      return const DashboardSummary(
+        branchName: '',
+        revenueToday: 0,
+        totalProducts: 0,
+      );
+    }
     return DashboardSummary.fromJson(
       Map<String, dynamic>.from(response.data as Map),
     );
@@ -46,9 +56,12 @@ class DashboardRepository {
       '/api/v1/dashboard/low-stock',
       query: {'limit': limit},
     );
+    if (response.data is! Map) return const [];
     final data = Map<String, dynamic>.from(response.data as Map);
-    return (data['items'] as List<dynamic>? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
+    final rawItems = data['items'] as List<dynamic>? ?? [];
+    return rawItems
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList();
   }
 
@@ -57,9 +70,12 @@ class DashboardRepository {
       '/api/v1/dashboard/recent-activity',
       query: {'limit': limit},
     );
+    if (response.data is! Map) return const [];
     final data = Map<String, dynamic>.from(response.data as Map);
-    return (data['items'] as List<dynamic>? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
+    final rawItems = data['items'] as List<dynamic>? ?? [];
+    return rawItems
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList();
   }
 
@@ -68,9 +84,12 @@ class DashboardRepository {
       '/api/v1/reports/sales-trend',
       query: {'days': days},
     );
+    if (response.data is! Map) return const [];
     final data = Map<String, dynamic>.from(response.data as Map);
-    return (data['dataPoints'] as List<dynamic>? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
+    final rawPoints = data['dataPoints'] as List<dynamic>? ?? [];
+    return rawPoints
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList();
   }
 
@@ -89,6 +108,7 @@ class DashboardRepository {
         'limit': limit,
       },
     );
+    if (response.data is! Map) return const {};
     return Map<String, dynamic>.from(response.data as Map);
   }
 }

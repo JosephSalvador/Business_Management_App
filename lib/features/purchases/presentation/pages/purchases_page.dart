@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../app/providers.dart';
 import '../../application/purchases_controller.dart';
+import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/app_search_bar.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -19,11 +22,32 @@ class PurchasesPage extends ConsumerStatefulWidget {
 }
 
 class _PurchasesPageState extends ConsumerState<PurchasesPage> {
+  final _searchController = TextEditingController();
+  Timer? _debounce;
+  String _filter = '';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(purchasesControllerProvider.notifier).load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String v) {
+    setState(() => _filter = v.trim().toLowerCase());
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      ref
+          .read(purchasesControllerProvider.notifier)
+          .load(search: v.trim(), silent: true);
     });
   }
 
@@ -47,12 +71,9 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: AppSearchBar(
+                controller: _searchController,
                 hintText: context.loc.purchasesSearchHint,
-                onChanged: (v) {
-                  ref
-                      .read(purchasesControllerProvider.notifier)
-                      .load(search: v);
-                },
+                onChanged: _onSearchChanged,
               ),
             ),
             Expanded(
@@ -72,7 +93,28 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
       return Center(child: Text(state.message));
     }
     final loaded = state as PurchasesLoaded;
-    if (loaded.isEmpty) {
+    final filtered = _filter.isEmpty
+        ? loaded.items
+        : loaded.items.where((p) {
+            final ref = (p['reference'] ?? '').toString().toLowerCase();
+            final supplier = (p['supplierName'] ?? '').toString().toLowerCase();
+            final status = (p['status'] ?? '').toString().toLowerCase();
+            final total = (p['totalAmount'] ?? '').toString();
+            return ref.contains(_filter) ||
+                supplier.contains(_filter) ||
+                status.contains(_filter) ||
+                total.contains(_filter);
+          }).toList();
+
+    if (filtered.isEmpty) {
+      if (_filter.isNotEmpty) {
+        return Center(
+          child: Text(
+            'Hakuna manunuzi yaliyopatikana kwa "$_filter"',
+            style: TextStyle(color: AppColors.resolveTextSecondary(context)),
+          ),
+        );
+      }
       return EmptyState(
         icon: Icons.shopping_cart_outlined,
         title: context.loc.purchasesEmpty,
@@ -85,9 +127,9 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
       onRefresh: () => ref.read(purchasesControllerProvider.notifier).load(),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: loaded.items.length,
+        itemCount: filtered.length,
         itemBuilder: (context, index) {
-          final purchase = loaded.items[index];
+          final purchase = filtered[index];
           return _buildPurchaseTile(purchase);
         },
       ),

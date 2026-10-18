@@ -42,11 +42,13 @@ class PurchasesController extends Notifier<PurchasesState> {
 
   PurchaseRepository get _repository => ref.read(purchaseRepositoryProvider);
 
-  Future<void> load({String? search}) async {
+  Future<void> load({String? search, bool silent = false}) async {
     if (search != null) {
       _search = search;
     }
-    state = PurchasesLoading(search: _search);
+    if (!silent || state is! PurchasesLoaded) {
+      state = PurchasesLoading(search: _search);
+    }
     try {
       final page = await _repository.list(search: _search);
       state = PurchasesLoaded(
@@ -55,7 +57,9 @@ class PurchasesController extends Notifier<PurchasesState> {
         search: _search,
       );
     } on AppException catch (error) {
-      state = PurchasesFailure(error.message);
+      if (state is! PurchasesLoaded) {
+        state = PurchasesFailure(error.message);
+      }
     }
   }
 

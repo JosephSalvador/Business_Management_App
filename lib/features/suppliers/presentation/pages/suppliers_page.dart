@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/providers.dart';
 import '../../application/suppliers_controller.dart';
+import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/app_search_bar.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
@@ -17,11 +20,32 @@ class SuppliersPage extends ConsumerStatefulWidget {
 }
 
 class _SuppliersPageState extends ConsumerState<SuppliersPage> {
+  final _searchController = TextEditingController();
+  Timer? _debounce;
+  String _filter = '';
+
   @override
   void initState() {
     super.initState();
     Future.microtask(
         () => ref.read(suppliersControllerProvider.notifier).load());
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String v) {
+    setState(() => _filter = v.trim().toLowerCase());
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      ref
+          .read(suppliersControllerProvider.notifier)
+          .load(search: v.trim(), silent: true);
+    });
   }
 
   @override
@@ -44,10 +68,9 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: AppSearchBar(
+                controller: _searchController,
                 hintText: context.loc.suppliersSearchHint,
-                onChanged: (v) => ref
-                    .read(suppliersControllerProvider.notifier)
-                    .load(search: v),
+                onChanged: _onSearchChanged,
               ),
             ),
             Expanded(
@@ -85,7 +108,28 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
       );
     }
     final loaded = state as SuppliersLoaded;
-    if (loaded.isEmpty) {
+    final filtered = _filter.isEmpty
+        ? loaded.items
+        : loaded.items.where((s) {
+            final name = (s['name'] ?? '').toString().toLowerCase();
+            final phone = (s['phone'] ?? '').toString().toLowerCase();
+            final email = (s['email'] ?? '').toString().toLowerCase();
+            final contact = (s['contactPerson'] ?? '').toString().toLowerCase();
+            return name.contains(_filter) ||
+                phone.contains(_filter) ||
+                email.contains(_filter) ||
+                contact.contains(_filter);
+          }).toList();
+
+    if (filtered.isEmpty) {
+      if (_filter.isNotEmpty) {
+        return Center(
+          child: Text(
+            'Hakuna msambazaji aliyepatikana kwa "$_filter"',
+            style: TextStyle(color: AppColors.resolveTextSecondary(context)),
+          ),
+        );
+      }
       return EmptyState(
         icon: Icons.local_shipping_outlined,
         title: context.loc.suppliersEmpty,
@@ -98,9 +142,9 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
       onRefresh: () => ref.read(suppliersControllerProvider.notifier).load(),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: loaded.items.length,
+        itemCount: filtered.length,
         itemBuilder: (context, index) {
-          final supplier = loaded.items[index];
+          final supplier = filtered[index];
           return _buildSupplierTile(supplier);
         },
       ),

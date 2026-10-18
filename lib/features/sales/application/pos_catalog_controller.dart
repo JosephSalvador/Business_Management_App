@@ -10,6 +10,7 @@ import '../../../core/storage/local_database.dart'
         CachedWarehousesCompanion;
 import '../../../core/network/app_exception.dart';
 import '../../products/data/product_repository.dart';
+import '../../products/domain/catalog.dart' show StockBalance;
 import '../../products/domain/product.dart';
 
 /// One sellable row on the POS grid, served from the local cache with a
@@ -87,7 +88,7 @@ class PosCatalogController extends Notifier<PosCatalogState> {
   /// refresh that swaps in fresher data if it succeeds.
   Future<void> load({String? search}) async {
     state = state.copyWith(
-      loading: true,
+      loading: state.items.isEmpty,
       search: search ?? state.search,
       hasLoadedOnce: true,
     );
@@ -103,6 +104,9 @@ class PosCatalogController extends Notifier<PosCatalogState> {
     } on AppException {
       // Server reachable but unhappy (5xx/auth) — keep serving cache and
       // let the connectivity layer escalate session problems.
+      state = state.copyWith(loading: false, stale: true);
+      return;
+    } catch (_) {
       state = state.copyWith(loading: false, stale: true);
       return;
     }
@@ -143,7 +147,10 @@ class PosCatalogController extends Notifier<PosCatalogState> {
       // server-side either way.
     }
 
-    final balances = await _repository.balances();
+    List<StockBalance> balances = const [];
+    try {
+      balances = await _repository.balances();
+    } catch (_) {}
 
     final now = DateTime.now().toUtc();
     List<CachedWarehousesCompanion> warehouseRows = const [];
@@ -174,8 +181,7 @@ class PosCatalogController extends Notifier<PosCatalogState> {
             barcode: Value(p.barcode),
             status: p.status,
             sellable: p.status == LocalProductCodes.statusActive &&
-                p.productType == LocalProductCodes.typeGoods &&
-                (prices[p.id] ?? 0) > 0,
+                p.productType == LocalProductCodes.typeGoods,
             productType: p.productType,
             retailPrice: prices[p.id] ?? 0,
             currency: currency,

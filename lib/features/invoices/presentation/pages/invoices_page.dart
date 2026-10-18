@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,10 +22,31 @@ class InvoicesPage extends ConsumerStatefulWidget {
 }
 
 class _InvoicesPageState extends ConsumerState<InvoicesPage> {
+  final _searchController = TextEditingController();
+  Timer? _debounce;
+  String _filter = '';
+
   @override
   void initState() {
     super.initState();
     ref.read(invoicesControllerProvider.notifier).load();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _filter = value.trim().toLowerCase());
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      ref
+          .read(invoicesControllerProvider.notifier)
+          .load(search: value.trim(), silent: true);
+    });
   }
 
   @override
@@ -48,10 +71,9 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: AppSearchBar(
+                controller: _searchController,
                 hintText: loc.invoicesSearch,
-                onChanged: (value) => ref
-                    .read(invoicesControllerProvider.notifier)
-                    .load(search: value),
+                onChanged: _onSearchChanged,
               ),
             ),
             _StatusFilters(state: state),
@@ -72,24 +94,48 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
             style: TextStyle(color: AppColors.resolveTextSecondary(context)),
           ),
         ),
-      InvoicesLoaded(:final items, :final isEmpty) => isEmpty
-          ? EmptyState(
+      InvoicesLoaded(:final items) => () {
+          final filtered = _filter.isEmpty
+              ? items
+              : items.where((inv) {
+                  final num = inv.number.toLowerCase();
+                  final name = (inv.customerName ?? '').toLowerCase();
+                  final amount = inv.totalAmount.toString();
+                  return num.contains(_filter) ||
+                      name.contains(_filter) ||
+                      amount.contains(_filter);
+                }).toList();
+
+          if (filtered.isEmpty) {
+            if (_filter.isNotEmpty) {
+              return Center(
+                child: Text(
+                  'Hakuna ankara iliyopatikana kwa "$_filter"',
+                  style:
+                      TextStyle(color: AppColors.resolveTextSecondary(context)),
+                ),
+              );
+            }
+            return EmptyState(
               icon: Icons.receipt_long_outlined,
               title: loc.invoicesEmpty,
               message: loc.invoicesEmptyMessage,
               actionLabel: loc.invoicesAdd,
               onAction: () => context.push(Routes.invoiceNew),
-            )
-          : RefreshIndicator(
-              onRefresh: () =>
-                  ref.read(invoicesControllerProvider.notifier).refresh(),
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: items.length,
-                itemBuilder: (context, index) =>
-                    _InvoiceTile(invoice: items[index]),
-              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () =>
+                ref.read(invoicesControllerProvider.notifier).refresh(),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) =>
+                  _InvoiceTile(invoice: filtered[index]),
             ),
+          );
+        }(),
     };
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../billing/application/billing_providers.dart';
-import '../../billing/domain/billing.dart';
 import '../../sales/data/sales_providers.dart' show sessionContextProvider;
 import '../data/capabilities_providers.dart';
 import '../data/capabilities_repository.dart';
@@ -117,10 +116,9 @@ class CapabilitiesController extends Notifier<CapabilitiesState> {
 final enabledModulesProvider = Provider<Set<WorkspaceModule>>((ref) {
   final entitlement = ref.watch(subscriptionEntitlementControllerProvider);
   if (entitlement == null) {
-    return {
-      for (final module in WorkspaceModule.values)
-        if (module.isBackstop) module,
-    };
+    // Fail-open: with no loaded entitlement (e.g. initial load, trial, or backend authoritative mode),
+    // allow standard business modules so the business is not artificially hard-locked.
+    return WorkspaceModule.values.toSet();
   }
   return {
     for (final module in WorkspaceModule.values)
@@ -145,7 +143,7 @@ final capabilitiesStateProvider =
 final capabilityKeyProvider = Provider.family<bool, String>((ref, key) {
   final entitlement = ref.watch(subscriptionEntitlementControllerProvider);
   if (entitlement == null) {
-    return key == BillingFeatureKeys.pos || key == BillingFeatureKeys.inventory;
+    return true;
   }
   return entitlement.hasFeature(key);
 });

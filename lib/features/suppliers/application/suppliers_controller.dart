@@ -42,11 +42,13 @@ class SuppliersController extends Notifier<SuppliersState> {
 
   SupplierRepository get _repository => ref.read(supplierRepositoryProvider);
 
-  Future<void> load({String? search}) async {
+  Future<void> load({String? search, bool silent = false}) async {
     if (search != null) {
       _search = search;
     }
-    state = SuppliersLoading(search: _search);
+    if (!silent || state is! SuppliersLoaded) {
+      state = SuppliersLoading(search: _search);
+    }
     try {
       final page = await _repository.list(search: _search);
       state = SuppliersLoaded(
@@ -55,7 +57,9 @@ class SuppliersController extends Notifier<SuppliersState> {
         search: _search,
       );
     } on AppException catch (error) {
-      state = SuppliersFailure(error.message);
+      if (state is! SuppliersLoaded) {
+        state = SuppliersFailure(error.message);
+      }
     }
   }
 

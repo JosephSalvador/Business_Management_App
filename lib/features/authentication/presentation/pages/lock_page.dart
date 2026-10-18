@@ -98,6 +98,12 @@ class _LockPageState extends ConsumerState<LockPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
+    final title = isSw ? 'Kipindi Kimesitishwa' : 'Session Paused';
+    final subtitle = isSw
+        ? 'Thibitisha utambulisho wako ili kuendelea na kazi yako'
+        : 'Confirm your identity to resume your work';
+
     return AuthBackground(
       child: Center(
         child: SingleChildScrollView(
@@ -110,17 +116,17 @@ class _LockPageState extends ConsumerState<LockPage> {
                 const AuthBrandMark(),
                 const SizedBox(height: 20),
                 Text(
-                  'App imefungwa kwa usalama',
+                  title,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.resolveTextPrimary(context),
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  'Thibitisha utambulisho wako ili kuendelea',
+                  subtitle,
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.resolveTextSecondary(context),
@@ -128,29 +134,36 @@ class _LockPageState extends ConsumerState<LockPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                if (_hasFastFactor)
+                if (_hasFastFactor) ...[
                   FastUnlockPanel(
                     biometricAvailable: _biometricAvailable,
                     showPinPad: _hasUnlockPin,
-                    label: 'Ingiza PIN yako ya tarakimu 4',
+                    label: isSw
+                        ? 'Ingiza PIN yako ya tarakimu 4'
+                        : 'Enter your 4-digit PIN',
                     busy: _busy,
                     errorMessage: _message,
                     onFingerprint: _unlockWithBiometric,
                     onPin: _unlockWithPin,
-                  )
-                else
-                  OutlinedButton(
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
                     onPressed: _busy ? null : _logoutToLogin,
-                    style: OutlinedButton.styleFrom(
+                    child: Text(
+                      isSw ? 'Ingia kwa nenosiri' : 'Sign in with password',
+                    ),
+                  ),
+                ] else
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _logoutToLogin,
+                    icon: const Icon(Icons.login, size: 18),
+                    style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                     ),
-                    child: const Text('Ingia kwa nenosiri'),
+                    label: Text(
+                      isSw ? 'Endelea Kuingia' : 'Continue to Sign In',
+                    ),
                   ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: _busy ? null : _logoutToLogin,
-                  child: const Text('Ingia kwa nenosiri'),
-                ),
               ],
             ),
           ),

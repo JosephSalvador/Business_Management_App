@@ -70,6 +70,7 @@ class ExpensesController extends Notifier<ExpensesState> {
     String? search,
     DateTime? fromDate,
     DateTime? toDate,
+    bool silent = false,
   }) async {
     if (search != null) {
       _search = search;
@@ -78,11 +79,15 @@ class ExpensesController extends Notifier<ExpensesState> {
       _fromDate = fromDate ?? _fromDate;
       _toDate = toDate ?? _toDate;
     }
-    state = ExpensesLoading(search: _search);
+    if (!silent || state is! ExpensesLoaded) {
+      state = ExpensesLoading(search: _search);
+    }
     try {
       state = await _fetchPage(1);
     } on AppException catch (e) {
-      state = ExpensesFailure(e.message);
+      if (state is! ExpensesLoaded) {
+        state = ExpensesFailure(e.message);
+      }
     }
   }
 

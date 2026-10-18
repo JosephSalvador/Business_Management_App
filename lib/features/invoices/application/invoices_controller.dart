@@ -53,19 +53,26 @@ class InvoicesController extends Notifier<InvoicesState> {
 
   InvoiceRepository get _repository => ref.read(invoiceRepositoryProvider);
 
-  Future<void> load(
-      {String? search, InvoiceStatus? status, bool clearStatus = false}) {
+  Future<void> load({
+    String? search,
+    InvoiceStatus? status,
+    bool clearStatus = false,
+    bool silent = false,
+  }) {
     if (search != null) _search = search;
     if (clearStatus) {
       _status = null;
     } else if (status != null) {
       _status = status;
     }
-    return _run(() => _repository.list(
-          page: 1,
-          search: _search,
-          status: _status,
-        ));
+    return _run(
+      () => _repository.list(
+        page: 1,
+        search: _search,
+        status: _status,
+      ),
+      silent: silent,
+    );
   }
 
   Future<void> refresh() => load();
@@ -161,14 +168,17 @@ class InvoicesController extends Notifier<InvoicesState> {
     }
   }
 
-  Future<void> _run(Future<InvoicePage> Function() fetch) async {
+  Future<void> _run(Future<InvoicePage> Function() fetch,
+      {bool silent = false}) async {
     final active = _inFlight;
     if (active != null) {
       await active;
       return;
     }
     final request = () async {
-      state = InvoicesLoading(search: _search, status: _status);
+      if (!silent || state is! InvoicesLoaded) {
+        state = InvoicesLoading(search: _search, status: _status);
+      }
       try {
         final result = await fetch();
         state = InvoicesLoaded(
@@ -179,7 +189,9 @@ class InvoicesController extends Notifier<InvoicesState> {
           status: _status,
         );
       } on AppException catch (error) {
-        state = InvoicesFailure(error.message);
+        if (state is! InvoicesLoaded) {
+          state = InvoicesFailure(error.message);
+        }
       }
     }();
     _inFlight = request;

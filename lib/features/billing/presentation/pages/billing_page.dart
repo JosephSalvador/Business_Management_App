@@ -30,25 +30,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   void initState() {
     super.initState();
     _voucherController = TextEditingController();
-    _checkClipboardForVoucher();
     Future.microtask(() {
       if (mounted) {
         ref.read(billingControllerProvider.notifier).load();
       }
     });
-  }
-
-  Future<void> _checkClipboardForVoucher() async {
-    try {
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      final text = data?.text?.trim();
-      if (text != null && text.isNotEmpty) {
-        final normalized = VoucherCode.normalize(text);
-        if (VoucherCode.isValidFormat(normalized) && mounted) {
-          _voucherController.text = normalized;
-        }
-      }
-    } catch (_) {}
   }
 
   Future<void> _pasteFromClipboard() async {
@@ -240,7 +226,10 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           const SizedBox(height: 24),
           _SectionTitle(title: loc.billingPlans),
           const SizedBox(height: 8),
-          ...typedState.plans.where((plan) => !plan.isPackage).map(
+          ...typedState.plans
+              .where((plan) =>
+                  !plan.isPackage && plan.code.toLowerCase() != 'free')
+              .map(
                 (plan) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: _PlanCard(
@@ -254,7 +243,10 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           _SectionTitle(title: loc.packagesTitle),
           const SizedBox(height: 8),
           _PackagesCard(
-            plans: typedState.plans.where((plan) => plan.isPackage).toList(),
+            plans: typedState.plans
+                .where((plan) =>
+                    plan.isPackage && plan.code.toLowerCase() != 'free')
+                .toList(),
             activeCodes:
                 entitlement.packages.map((code) => code.toLowerCase()).toSet(),
             isWorking: typedState.isWorking,
@@ -341,7 +333,7 @@ class _EntitlementCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              entitlement.planCode ?? loc.billingFree,
+              entitlement.planCode ?? 'Pro (Trial)',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),

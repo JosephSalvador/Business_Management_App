@@ -13,9 +13,13 @@
 /// through this policy.
 class AppLockPolicy {
   const AppLockPolicy({
+    this.enabled = true,
     this.idleTimeout = const Duration(minutes: 5),
     this.backgroundGrace = const Duration(seconds: 45),
   });
+
+  /// Whether auto-lock is currently active.
+  final bool enabled;
 
   /// Foreground idle duration before the app locks.
   final Duration idleTimeout;
@@ -28,7 +32,7 @@ class AppLockPolicy {
     required DateTime? backgroundedAt,
     required DateTime now,
   }) {
-    if (backgroundedAt == null) return false;
+    if (!enabled || backgroundedAt == null) return false;
     return now.difference(backgroundedAt) >= backgroundGrace;
   }
 
@@ -37,6 +41,7 @@ class AppLockPolicy {
     required DateTime lastInteraction,
     required DateTime now,
   }) {
+    if (!enabled) return false;
     return now.difference(lastInteraction) >= idleTimeout;
   }
 }

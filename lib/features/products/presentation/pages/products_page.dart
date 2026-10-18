@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -108,33 +110,81 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   }
 }
 
-class _ProductList extends ConsumerWidget {
+class _ProductList extends ConsumerStatefulWidget {
   const _ProductList({
     required this.state,
     required this.searchController,
   });
+
   final ProductsLoaded state;
   final TextEditingController searchController;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProductList> createState() => _ProductListState();
+}
+
+class _ProductListState extends ConsumerState<_ProductList> {
+  Timer? _debounce;
+  String _filter = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _filter = widget.searchController.text.trim().toLowerCase();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String text) {
+    setState(() => _filter = text.trim().toLowerCase());
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      ref
+          .read(productsControllerProvider.notifier)
+          .load(search: text.trim(), silent: true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final loc = context.loc;
+    final items = widget.state.items;
+    final filtered = _filter.isEmpty
+        ? items
+        : items.where((p) {
+            final q = _filter;
+            final name = p.name.toLowerCase();
+            final sku = p.sku?.toLowerCase() ?? '';
+            final barcode = p.barcode?.toLowerCase() ?? '';
+            final desc = p.description?.toLowerCase() ?? '';
+            return name.contains(q) ||
+                sku.contains(q) ||
+                barcode.contains(q) ||
+                desc.contains(q);
+          }).toList();
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: TextField(
-            controller: searchController,
+            controller: widget.searchController,
+            onChanged: _onSearchChanged,
             decoration: InputDecoration(
               hintText: loc.productsSearch,
               prefixIcon: Icon(Icons.search,
                   size: 20, color: AppColors.resolveTextTertiary(context)),
-              suffixIcon: state.search.isEmpty
+              suffixIcon: widget.searchController.text.isEmpty
                   ? null
                   : IconButton(
                       icon: const Icon(Icons.close, size: 18),
                       onPressed: () {
-                        searchController.clear();
+                        widget.searchController.clear();
+                        setState(() => _filter = '');
                         ref.read(productsControllerProvider.notifier).load();
                       },
                     ),
@@ -142,27 +192,27 @@ class _ProductList extends ConsumerWidget {
             textInputAction: TextInputAction.search,
             onSubmitted: (term) => ref
                 .read(productsControllerProvider.notifier)
-                .load(search: term),
+                .load(search: term, silent: true),
           ),
         ),
         Expanded(
-          child: state.isEmpty
+          child: filtered.isEmpty
               ? Center(
                   child: Text(
-                    '${loc.productsNoResults} "${state.search}"',
+                    '${loc.productsNoResults} "${_filter.isNotEmpty ? _filter : widget.state.search}"',
                     style: TextStyle(
                         color: AppColors.resolveTextSecondary(context)),
                   ),
                 )
               : ListView.separated(
-                  itemCount: state.items.length,
+                  itemCount: filtered.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
-                    final product = state.items[index];
+                    final product = filtered[index];
                     return _ProductTile(
                       product: product,
-                      price: state.prices[product.id],
-                      stock: state.stockByProduct[product.id],
+                      price: widget.state.prices[product.id],
+                      stock: widget.state.stockByProduct[product.id],
                     );
                   },
                 ),

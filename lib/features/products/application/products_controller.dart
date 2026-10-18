@@ -59,16 +59,20 @@ class ProductsController extends Notifier<ProductsState> {
 
   /// Reloads the list. Pass [search] to change the filter; omit it to keep
   /// the current one (e.g. after create/update).
-  Future<void> load({String? search}) async {
+  Future<void> load({String? search, bool silent = false}) async {
     if (search != null) {
       _search = search;
     }
-    state = ProductsLoading(search: _search);
+    if (!silent || state is! ProductsLoaded) {
+      state = ProductsLoading(search: _search);
+    }
     try {
       final page = await _repository.list(search: _search);
       state = await _enrich(page);
     } on AppException catch (error) {
-      state = ProductsFailure(error.message);
+      if (state is! ProductsLoaded) {
+        state = ProductsFailure(error.message);
+      }
     }
   }
 

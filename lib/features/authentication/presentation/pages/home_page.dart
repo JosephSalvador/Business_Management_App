@@ -18,6 +18,7 @@ import '../../../onboarding/application/workspace_controller.dart';
 import '../../application/auth_controller.dart';
 import '../../../../core/platform/ios_install_prompt_banner.dart';
 import '../../../../core/services/app_update_service.dart';
+import '../../../billing/presentation/widgets/module_upgrade_sheet.dart';
 import '../widgets/quick_pin_setup_sheet.dart';
 
 /// The authenticated Business OS shell.
@@ -206,7 +207,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   ) {
     final module = dest.module;
     if (module == null) return;
-    context.push(canManageBilling ? Routes.billing : Routes.moduleLocked);
+    if (canManageBilling) {
+      ModuleUpgradeSheet.show(context, module: module);
+    } else {
+      context.push(Routes.moduleLocked);
+    }
   }
 }
 
@@ -585,7 +590,7 @@ class _MoreTab extends ConsumerWidget {
       return;
     }
     if (canManageBilling) {
-      context.push(Routes.billing);
+      ModuleUpgradeSheet.show(context, module: module);
       return;
     }
     context.push(Routes.moduleLocked);
@@ -718,64 +723,71 @@ class _MoreTab extends ConsumerWidget {
             title: loc.navDashboard,
             onTap: () => onNavigateToTab(0),
           ),
-          _menuTile(
-            context: context,
-            icon: Icons.point_of_sale_outlined,
-            title: loc.navPOS,
-            locked: !_isEnabled(WorkspaceModule.pos),
-            onTap: () => _openModule(context, WorkspaceModule.pos, Routes.pos),
-          ),
-          _menuTile(
-            context: context,
-            icon: Icons.people_outline,
-            title: loc.navCustomers,
-            locked: !_isEnabled(WorkspaceModule.crm),
-            onTap: () =>
-                _openModule(context, WorkspaceModule.crm, Routes.customers),
-          ),
-          _menuTile(
-            context: context,
-            icon: Icons.receipt_long_outlined,
-            title: loc.navInvoices,
-            locked: !_isEnabled(WorkspaceModule.invoicing),
-            onTap: () => _openModule(
-                context, WorkspaceModule.invoicing, Routes.invoices),
-          ),
-          _menuTile(
-            context: context,
-            icon: Icons.local_shipping_outlined,
-            title: loc.navSuppliers,
-            locked: !_isEnabled(WorkspaceModule.purchasing),
-            onTap: () => _openModule(
-                context, WorkspaceModule.purchasing, Routes.suppliers),
-          ),
-          _menuTile(
-            context: context,
-            icon: Icons.shopping_cart_outlined,
-            title: loc.navPurchases,
-            locked: !_isEnabled(WorkspaceModule.purchasing),
-            onTap: () => _openModule(
-              context,
-              WorkspaceModule.purchasing,
-              Routes.purchases,
+          if (_isEnabled(WorkspaceModule.pos) || canManageBilling)
+            _menuTile(
+              context: context,
+              icon: Icons.point_of_sale_outlined,
+              title: loc.navPOS,
+              locked: !_isEnabled(WorkspaceModule.pos),
+              onTap: () => _openModule(context, WorkspaceModule.pos, Routes.pos),
             ),
-          ),
-          _menuTile(
-            context: context,
-            icon: Icons.account_balance_wallet_outlined,
-            title: loc.navExpenses,
-            locked: !_isEnabled(WorkspaceModule.finance),
-            onTap: () =>
-                _openModule(context, WorkspaceModule.finance, Routes.expenses),
-          ),
-          _menuTile(
-            context: context,
-            icon: Icons.bar_chart_outlined,
-            title: loc.navReports,
-            locked: !_isEnabled(WorkspaceModule.reports),
-            onTap: () =>
-                _openModule(context, WorkspaceModule.reports, Routes.reports),
-          ),
+          if (_isEnabled(WorkspaceModule.crm) || canManageBilling)
+            _menuTile(
+              context: context,
+              icon: Icons.people_outline,
+              title: loc.navCustomers,
+              locked: !_isEnabled(WorkspaceModule.crm),
+              onTap: () =>
+                  _openModule(context, WorkspaceModule.crm, Routes.customers),
+            ),
+          if (_isEnabled(WorkspaceModule.invoicing) || canManageBilling)
+            _menuTile(
+              context: context,
+              icon: Icons.receipt_long_outlined,
+              title: loc.navInvoices,
+              locked: !_isEnabled(WorkspaceModule.invoicing),
+              onTap: () => _openModule(
+                  context, WorkspaceModule.invoicing, Routes.invoices),
+            ),
+          if (_isEnabled(WorkspaceModule.purchasing) || canManageBilling) ...[
+            _menuTile(
+              context: context,
+              icon: Icons.local_shipping_outlined,
+              title: loc.navSuppliers,
+              locked: !_isEnabled(WorkspaceModule.purchasing),
+              onTap: () => _openModule(
+                  context, WorkspaceModule.purchasing, Routes.suppliers),
+            ),
+            _menuTile(
+              context: context,
+              icon: Icons.shopping_cart_outlined,
+              title: loc.navPurchases,
+              locked: !_isEnabled(WorkspaceModule.purchasing),
+              onTap: () => _openModule(
+                context,
+                WorkspaceModule.purchasing,
+                Routes.purchases,
+              ),
+            ),
+          ],
+          if (_isEnabled(WorkspaceModule.finance) || canManageBilling)
+            _menuTile(
+              context: context,
+              icon: Icons.account_balance_wallet_outlined,
+              title: loc.navExpenses,
+              locked: !_isEnabled(WorkspaceModule.finance),
+              onTap: () =>
+                  _openModule(context, WorkspaceModule.finance, Routes.expenses),
+            ),
+          if (_isEnabled(WorkspaceModule.reports) || canManageBilling)
+            _menuTile(
+              context: context,
+              icon: Icons.bar_chart_outlined,
+              title: loc.navReports,
+              locked: !_isEnabled(WorkspaceModule.reports),
+              onTap: () =>
+                  _openModule(context, WorkspaceModule.reports, Routes.reports),
+            ),
 
           const SizedBox(height: 20),
           _sectionTitle(context, loc.moreManagement),
@@ -902,11 +914,30 @@ class _MoreTab extends ConsumerWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        trailing: Icon(
-          locked ? Icons.lock_outline : Icons.chevron_right,
-          color: AppColors.resolveTextTertiary(context),
-          size: 20,
-        ),
+        trailing: locked
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00C48C), Color(0xFF38BDF8)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'PRO',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF061028),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              )
+            : Icon(
+                Icons.chevron_right,
+                color: AppColors.resolveTextTertiary(context),
+                size: 20,
+              ),
         onTap: onTap,
       ),
     );

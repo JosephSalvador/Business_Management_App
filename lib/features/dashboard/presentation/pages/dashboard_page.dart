@@ -874,7 +874,8 @@ class _LowStockCards extends StatelessWidget {
     return Column(
       children: items.map((item) {
         final name = item['productName'] ?? item['name'] ?? '';
-        final qty = (item['quantity'] ?? 0).toDouble();
+        final qty =
+            (item['onHand'] ?? item['quantity'] ?? 0).toDouble();
         final stockLevel = qty <= 0 ? 0.0 : (qty / 10).clamp(0.0, 1.0);
 
         final color = qty <= 0

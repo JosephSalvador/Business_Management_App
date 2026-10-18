@@ -109,20 +109,6 @@ class _QuickVoucherDialogState extends State<_QuickVoucherDialog> {
   void initState() {
     super.initState();
     _controller = TextEditingController();
-    _checkClipboard();
-  }
-
-  Future<void> _checkClipboard() async {
-    try {
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      final text = data?.text?.trim();
-      if (text != null && text.isNotEmpty) {
-        final normalized = VoucherCode.normalize(text);
-        if (VoucherCode.isValidFormat(normalized) && mounted) {
-          _controller.text = normalized;
-        }
-      }
-    } catch (_) {}
   }
 
   Future<void> _paste() async {

@@ -42,11 +42,13 @@ class CustomersController extends Notifier<CustomersState> {
 
   CustomerRepository get _repository => ref.read(customerRepositoryProvider);
 
-  Future<void> load({String? search}) async {
+  Future<void> load({String? search, bool silent = false}) async {
     if (search != null) {
       _search = search;
     }
-    state = CustomersLoading(search: _search);
+    if (!silent || state is! CustomersLoaded) {
+      state = CustomersLoading(search: _search);
+    }
     try {
       final result = await _repository.list(search: _search);
       state = CustomersLoaded(
@@ -55,7 +57,9 @@ class CustomersController extends Notifier<CustomersState> {
         search: _search,
       );
     } on AppException catch (e) {
-      state = CustomersFailure(e.message);
+      if (state is! CustomersLoaded) {
+        state = CustomersFailure(e.message);
+      }
     }
   }
 
