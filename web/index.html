@@ -120,17 +120,25 @@
   </div>
 
   <script>
-    // Smoothly remove splash once Flutter renders its first frame
+    var splashMountedTime = Date.now();
+    var minDisplayMs = 1200;
+
+    // Smoothly remove splash once Flutter renders its first frame and minDisplayMs has elapsed
     window.addEventListener('flutter-first-frame', function () {
-      var splash = document.getElementById('loading-splash');
-      if (splash) {
-        splash.style.opacity = '0';
-        setTimeout(function () {
-          if (splash && splash.parentNode) {
-            splash.parentNode.removeChild(splash);
-          }
-        }, 400);
-      }
+      var elapsed = Date.now() - splashMountedTime;
+      var remaining = Math.max(0, minDisplayMs - elapsed);
+
+      setTimeout(function () {
+        var splash = document.getElementById('loading-splash');
+        if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(function () {
+            if (splash && splash.parentNode) {
+              splash.parentNode.removeChild(splash);
+            }
+          }, 400);
+        }
+      }, remaining);
     });
   </script>
   <script src="flutter_bootstrap.js" async></script>
