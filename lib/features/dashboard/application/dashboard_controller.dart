@@ -111,11 +111,11 @@ class DashboardController extends Notifier<DashboardState> {
         _loadTopProductsSafe(),
       ]);
 
-      final lowStock = secondaryResults[0] as List<Map<String, dynamic>>;
-      final recentActivity = secondaryResults[1] as List<Map<String, dynamic>>;
-      final rawTrend = secondaryResults[2] as List<Map<String, dynamic>>;
+      final lowStock = secondaryResults[0];
+      final recentActivity = secondaryResults[1];
+      final rawTrend = secondaryResults[2];
       final trendData = rawTrend.map((e) => SalesTrendPoint.fromJson(e)).toList();
-      final topProducts = secondaryResults[3] as List<Map<String, dynamic>>;
+      final topProducts = secondaryResults[3];
 
       state = DashboardLoaded(
         summary: summary,
