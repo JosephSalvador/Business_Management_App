@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/platform/ios_pwa_helper.dart';
+import '../../../../core/platform/device_os_detector.dart';
 
 /// Public landing and download hub enabling store-bypassing client downloads
 /// for Android devices and Safari standalone PWA installation on iOS.
@@ -10,14 +10,14 @@ class AppDownloadPage extends StatelessWidget {
   const AppDownloadPage({super.key});
 
   static const String directApkUrl =
-      'https://github.com/josephsalvador662/business_app/releases/download/latest/jolinx-android.apk';
+      'https://github.com/JosephSalvador/Business_Management_App/releases/download/latest/jolinx-android.apk';
   static const String webPwaUrl = 'https://staging.jolinx-app.pages.dev';
   static const String windowsZipUrl =
-      'https://github.com/josephsalvador662/business_app/releases/download/latest/jolinx-windows-x64.zip';
+      'https://github.com/JosephSalvador/Business_Management_App/releases/download/latest/jolinx-windows-x64.zip';
 
   @override
   Widget build(BuildContext context) {
-    final isIos = isIosSafariBrowser();
+    final os = detectDeviceOs();
 
     return Scaffold(
       backgroundColor: const Color(0xFF061028),
@@ -104,22 +104,47 @@ class AppDownloadPage extends StatelessWidget {
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
 
-              // Primary platform card (Android or iOS)
-              if (isIos) ...[
-                _buildIosCard(context),
-                const SizedBox(height: 20),
-                _buildAndroidCard(context, isPromoted: false),
-              ] else ...[
-                _buildAndroidCard(context, isPromoted: true),
-                const SizedBox(height: 20),
-                _buildIosCard(context),
-              ],
+              // Intelligent Detected Device pill
+              if (os != DetectedOs.unknown)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00C48C).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF00C48C).withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getOsIcon(os),
+                          color: const Color(0xFF00C48C),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Kifaa Chako: ${_getOsDisplayName(os)}',
+                          style: const TextStyle(
+                            color: Color(0xFF00C48C),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 24),
 
-              const SizedBox(height: 20),
-              // Desktop & Web section
-              _buildDesktopCard(context),
+              // Dynamically ordered download cards based on detected OS
+              ..._buildOrderedCards(context, os),
+
               const SizedBox(height: 28),
 
               // Trust badge
@@ -133,11 +158,13 @@ class AppDownloadPage extends StatelessWidget {
                       size: 16,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'Data zote zinabaki salama kwenye kifaa chako hata bila mtandao.',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Colors.white.withValues(alpha: 0.6),
+                    Flexible(
+                      child: Text(
+                        'Data zote zinabaki salama kwenye kifaa chako hata bila mtandao.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
                       ),
                     ),
                   ],
@@ -149,6 +176,71 @@ class AppDownloadPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildOrderedCards(BuildContext context, DetectedOs os) {
+    if (os == DetectedOs.ios) {
+      return [
+        _buildIosCard(context, isPromoted: true),
+        const SizedBox(height: 20),
+        _buildAndroidCard(context, isPromoted: false),
+        const SizedBox(height: 20),
+        _buildDesktopCard(context, isPromoted: false),
+      ];
+    } else if (os == DetectedOs.windows ||
+        os == DetectedOs.macos ||
+        os == DetectedOs.linux) {
+      return [
+        _buildDesktopCard(context, isPromoted: true),
+        const SizedBox(height: 20),
+        _buildAndroidCard(context, isPromoted: false),
+        const SizedBox(height: 20),
+        _buildIosCard(context, isPromoted: false),
+      ];
+    } else {
+      // Android or unknown default
+      return [
+        _buildAndroidCard(context, isPromoted: true),
+        const SizedBox(height: 20),
+        _buildIosCard(context, isPromoted: false),
+        const SizedBox(height: 20),
+        _buildDesktopCard(context, isPromoted: false),
+      ];
+    }
+  }
+
+  IconData _getOsIcon(DetectedOs os) {
+    switch (os) {
+      case DetectedOs.android:
+        return Icons.android;
+      case DetectedOs.ios:
+        return Icons.apple;
+      case DetectedOs.windows:
+        return CupertinoIcons.desktopcomputer;
+      case DetectedOs.macos:
+        return Icons.apple;
+      case DetectedOs.linux:
+        return CupertinoIcons.terminal;
+      case DetectedOs.unknown:
+        return CupertinoIcons.device_phone_portrait;
+    }
+  }
+
+  String _getOsDisplayName(DetectedOs os) {
+    switch (os) {
+      case DetectedOs.android:
+        return 'Android';
+      case DetectedOs.ios:
+        return 'Apple iOS (iPhone/iPad)';
+      case DetectedOs.windows:
+        return 'Windows PC';
+      case DetectedOs.macos:
+        return 'macOS';
+      case DetectedOs.linux:
+        return 'Linux';
+      case DetectedOs.unknown:
+        return 'Kifaa cha Simu/Kompyuta';
+    }
   }
 
   Widget _buildAndroidCard(BuildContext context, {required bool isPromoted}) {
@@ -233,7 +325,7 @@ class AppDownloadPage extends StatelessWidget {
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              // Direct download link
+              openExternalDownloadUrl(directApkUrl);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Upakuaji wa faili ya APK unaanza sasa...'),
@@ -243,7 +335,7 @@ class AppDownloadPage extends StatelessWidget {
             },
             icon: const Icon(CupertinoIcons.arrow_down_circle_fill, size: 20),
             label: const Text(
-              'Pakua APK ya Android (34 MB)',
+              'Pakua APK ya Android (Moja kwa moja)',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
             ),
             style: ElevatedButton.styleFrom(
@@ -275,7 +367,7 @@ class AppDownloadPage extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  '1. Bonyeza kitufe cha "Pakua APK".\n'
+                  '1. Bonyeza kitufe cha "Pakua APK ya Android".\n'
                   '2. Simu ikikuuliza, chagua "Ruhusu kutoka chanzo hiki" (Allow unknown apps).\n'
                   '3. Bonyeza "Sakinisha" na ufungue app mara moja.',
                   style: TextStyle(
@@ -292,16 +384,27 @@ class AppDownloadPage extends StatelessWidget {
     );
   }
 
-  Widget _buildIosCard(BuildContext context) {
+  Widget _buildIosCard(BuildContext context, {required bool isPromoted}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: isPromoted ? const Color(0xFF0F172A) : const Color(0xFF0B132B),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
-          width: 1.5,
+          color: isPromoted
+              ? const Color(0xFF38BDF8).withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.08),
+          width: isPromoted ? 1.5 : 1,
         ),
+        boxShadow: isPromoted
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.1),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,6 +446,23 @@ class AppDownloadPage extends StatelessWidget {
                   ],
                 ),
               ),
+              if (isPromoted)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Kifaa Chako',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF38BDF8),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -360,7 +480,8 @@ class AppDownloadPage extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(CupertinoIcons.share, color: Color(0xFF38BDF8), size: 18),
+                    Icon(CupertinoIcons.share,
+                        color: Color(0xFF38BDF8), size: 18),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -373,7 +494,8 @@ class AppDownloadPage extends StatelessWidget {
                 SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(CupertinoIcons.plus_square, color: Color(0xFF00C48C), size: 18),
+                    Icon(CupertinoIcons.plus_square,
+                        color: Color(0xFF00C48C), size: 18),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -386,7 +508,8 @@ class AppDownloadPage extends StatelessWidget {
                 SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(CupertinoIcons.check_mark_circled, color: Color(0xFF38BDF8), size: 18),
+                    Icon(CupertinoIcons.check_mark_circled,
+                        color: Color(0xFF38BDF8), size: 18),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -418,66 +541,113 @@ class AppDownloadPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDesktopCard(BuildContext context) {
+  Widget _buildDesktopCard(BuildContext context, {required bool isPromoted}) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(18),
+        color: isPromoted ? const Color(0xFF0F172A) : const Color(0xFF0B132B),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: isPromoted
+              ? const Color(0xFF00C48C).withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.08),
+          width: isPromoted ? 1.5 : 1,
         ),
+        boxShadow: isPromoted
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF00C48C).withValues(alpha: 0.1),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : null,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              CupertinoIcons.desktopcomputer,
-              color: Color(0xFF94A3B8),
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Windows PC & Laptop',
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00C48C).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  CupertinoIcons.desktopcomputer,
+                  color: Color(0xFF00C48C),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Windows PC & Laptop',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Inafaa kwa cashier desk na ripoti za back-office',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isPromoted)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00C48C).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Kifaa Chako',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF00C48C),
+                    ),
                   ),
                 ),
-                Text(
-                  'Inafaa kwa cashier desk na ripoti za back-office',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-          TextButton(
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
             onPressed: () {
+              openExternalDownloadUrl(windowsZipUrl);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Kiungo cha Windows kitafunguliwa...'),
+                  content:
+                      Text('Upakuaji wa faili ya Windows (.zip) unaanza sasa...'),
+                  backgroundColor: Color(0xFF00C48C),
                 ),
               );
             },
-            child: const Text(
-              'Pakua .zip',
-              style: TextStyle(
-                color: Color(0xFF00C48C),
-                fontWeight: FontWeight.bold,
+            icon: const Icon(CupertinoIcons.arrow_down_circle_fill, size: 20),
+            label: const Text(
+              'Pakua kwa Windows (PC .zip)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isPromoted
+                  ? const Color(0xFF00C48C)
+                  : const Color(0xFF1E293B),
+              foregroundColor:
+                  isPromoted ? const Color(0xFF061028) : Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
           ),

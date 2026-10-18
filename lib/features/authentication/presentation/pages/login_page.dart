@@ -15,6 +15,7 @@ import '../widgets/auth_form_card.dart';
 import '../widgets/fast_unlock_panel.dart';
 import '../widgets/language_switcher.dart';
 import '../../../../core/platform/ios_install_prompt_banner.dart';
+import '../../../../core/platform/device_os_detector.dart';
 import '../widgets/password_field.dart';
 import '../widgets/quick_pin_setup_sheet.dart';
 
@@ -394,39 +395,87 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
           ),
           const SizedBox(height: 4),
-          Center(
-            child: InkWell(
+          _buildDownloadAppPill(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDownloadAppPill(BuildContext context) {
+    if (isAppInstalledPwa()) {
+      return const SizedBox.shrink();
+    }
+
+    final os = detectDeviceOs();
+    final (IconData icon, String label, String tooltip) = switch (os) {
+      DetectedOs.android => (
+        Icons.android_rounded,
+        'Pakua App ya Android (APK)',
+        'Sakinisha moja kwa moja kwenye simu ya Android',
+      ),
+      DetectedOs.ios => (
+        Icons.apple,
+        'Sakinisha Kwenye iPhone / iPad',
+        'Weka kwenye Home Screen bila App Store',
+      ),
+      DetectedOs.windows => (
+        Icons.desktop_windows_rounded,
+        'Pakua App ya Windows (PC)',
+        'Toleo la kompyuta ya Windows',
+      ),
+      DetectedOs.macos => (
+        Icons.laptop_mac_rounded,
+        'Pakua App ya Mac',
+        'Toleo la Apple macOS',
+      ),
+      DetectedOs.linux => (
+        Icons.terminal_rounded,
+        'Pakua App ya Linux',
+        'Toleo la Linux desktop',
+      ),
+      DetectedOs.unknown => (
+        Icons.install_mobile_rounded,
+        'Pakua App (Android / PC / iOS)',
+        'Chagua toleo la kifaa chako',
+      ),
+    };
+
+    return Center(
+      child: Tooltip(
+        message: tooltip,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => context.push(Routes.download),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00C48C).withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
-              onTap: () => context.push(Routes.download),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00C48C).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFF00C48C).withValues(alpha: 0.35),
-                    width: 1,
-                  ),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.install_mobile_rounded, size: 16, color: Color(0xFF00C48C)),
-                    SizedBox(width: 6),
-                    Text(
-                      'Pakua App ya Simu',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF00C48C),
-                      ),
-                    ),
-                  ],
-                ),
+              border: Border.all(
+                color: const Color(0xFF00C48C).withValues(alpha: 0.35),
+                width: 1,
               ),
             ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: const Color(0xFF00C48C)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF00C48C),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

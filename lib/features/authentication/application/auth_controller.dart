@@ -89,15 +89,30 @@ class AuthController extends Notifier<AuthState> {
   /// Falls back to offline session restore if the backend is unreachable
   /// and a valid offline token exists.
   Future<void> bootstrap() async {
+    final stopwatch = Stopwatch()..start();
     try {
       final session =
           await _repository.restore().timeout(const Duration(seconds: 10));
+
+      if (!const bool.fromEnvironment('flutter.test')) {
+        final remaining = 1200 - stopwatch.elapsedMilliseconds;
+        if (remaining > 0) {
+          await Future.delayed(Duration(milliseconds: remaining));
+        }
+      }
+
       if (session != null) {
         state = AuthAuthenticated(session);
       } else {
         state = const AuthUnauthenticated();
       }
     } catch (_) {
+      if (!const bool.fromEnvironment('flutter.test')) {
+        final remaining = 1200 - stopwatch.elapsedMilliseconds;
+        if (remaining > 0) {
+          await Future.delayed(Duration(milliseconds: remaining));
+        }
+      }
       state = const AuthUnauthenticated();
     }
   }

@@ -1,19 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -35,8 +22,117 @@
 
   <title>Jolinx Business OS</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #061028;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #loading-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at 50% 38%, #0C1D42 0%, #061028 85%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999999;
+      transition: opacity 0.4s ease-out;
+    }
+
+    .splash-logo-card {
+      width: 84px;
+      height: 84px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+      border: 1.5px solid rgba(0, 196, 140, 0.4);
+      box-shadow: 0 0 45px rgba(0, 196, 140, 0.28), 0 12px 32px rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .splash-logo-card img {
+      width: 80px;
+      height: 80px;
+      border-radius: 22px;
+      object-fit: cover;
+    }
+
+    .splash-title {
+      margin-top: 22px;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: #FFFFFF;
+      text-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .splash-pill {
+      margin-top: 8px;
+      padding: 4px 14px;
+      border-radius: 20px;
+      background: rgba(0, 196, 140, 0.12);
+      border: 1px solid rgba(0, 196, 140, 0.35);
+      color: #00C48C;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .splash-spinner {
+      margin-top: 36px;
+      width: 26px;
+      height: 26px;
+      border: 2.5px solid rgba(255, 255, 255, 0.08);
+      border-top-color: #00C48C;
+      border-radius: 50%;
+      animation: spin 0.85s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
+  <div id="loading-splash">
+    <div class="splash-logo-card">
+      <img src="assets/images/jolinx_logo.png" alt="Jolinx" onerror="this.style.display='none'">
+    </div>
+    <div class="splash-title">JOLINX</div>
+    <div class="splash-pill">BUSINESS OS</div>
+    <div class="splash-spinner"></div>
+  </div>
+
+  <script>
+    // Smoothly remove splash once Flutter renders its first frame
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('loading-splash');
+      if (splash) {
+        splash.style.opacity = '0';
+        setTimeout(function () {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 400);
+      }
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
