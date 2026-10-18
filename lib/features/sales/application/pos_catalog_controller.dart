@@ -109,6 +109,10 @@ class PosCatalogController extends Notifier<PosCatalogState> {
     } catch (_) {
       state = state.copyWith(loading: false, stale: true);
       return;
+    } finally {
+      if (state.loading) {
+        state = state.copyWith(loading: false);
+      }
     }
     state = state.copyWith(loading: false);
   }
@@ -209,25 +213,35 @@ class PosCatalogController extends Notifier<PosCatalogState> {
       state = state.copyWith(items: const [], stale: true, loading: false);
       return;
     }
-    final query = state.search.trim();
-    final found = query.isEmpty
-        ? await _dao.list(tenantId)
-        : await _dao.search(tenantId, query);
-    final items = <PosProduct>[];
-    for (final row in found) {
-      items.add(PosProduct(
-        productId: row.productId,
-        name: row.name,
-        sku: row.sku,
-        price: row.retailPrice,
-        projectedQuantity:
-            await _dao.projectedQuantity(tenantId, row.productId),
-      ));
+    try {
+      final query = state.search.trim();
+      final found = await (query.isEmpty
+              ? _dao.list(tenantId)
+              : _dao.search(tenantId, query))
+          .timeout(const Duration(milliseconds: 2500));
+      final quantities = await _dao
+          .projectedQuantities(tenantId)
+          .timeout(const Duration(milliseconds: 2000));
+      final items = <PosProduct>[
+        for (final row in found)
+          PosProduct(
+            productId: row.productId,
+            name: row.name,
+            sku: row.sku,
+            price: row.retailPrice,
+            projectedQuantity: quantities[row.productId] ?? 0.0,
+          ),
+      ];
+      state = state.copyWith(
+        items: items,
+        loading: false,
+        stale: staleOverride ?? state.stale,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        loading: false,
+        stale: staleOverride ?? state.stale,
+      );
     }
-    state = state.copyWith(
-      items: items,
-      loading: false,
-      stale: staleOverride ?? state.stale,
-    );
   }
 }

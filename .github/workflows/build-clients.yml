@@ -131,6 +131,11 @@ jobs:
           echo "fallback_url=$FALLBACK_URL" >> $GITHUB_OUTPUT
           echo "::notice title=Deployment Environment::Target: $TARGET | API: $API_URL | CF Branch: $CF_BRANCH"
 
+      - name: Download sqlite3.wasm for Web
+        run: |
+          curl -fSLo web/sqlite3.wasm https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.5.2/sqlite3.wasm || \
+          curl -fSLo web/sqlite3.wasm https://github.com/simolus3/sqlite3.dart/releases/latest/download/sqlite3.wasm
+
       - name: Build Flutter Web Release
         run: |
           flutter build web --release \
@@ -139,6 +144,7 @@ jobs:
             --dart-define=APP_ENV=${{ steps.cf_env.outputs.app_env }} \
             --dart-define=API_BASE_URL=${{ steps.cf_env.outputs.api_url }} \
             --dart-define=API_FALLBACK_URL=${{ steps.cf_env.outputs.fallback_url }}
+          cp web/sqlite3.wasm build/web/sqlite3.wasm 2>/dev/null || true
           cp web/_redirects build/web/_redirects 2>/dev/null || true
           cp web/_headers build/web/_headers 2>/dev/null || true
           cd build/web && zip -r ../../jolinx-web.zip .

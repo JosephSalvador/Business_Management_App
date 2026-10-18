@@ -142,6 +142,47 @@ class CachedCatalogDao {
     return balance - pendingQty.fold(0.0, (a, b) => a + b);
   }
 
+  /// Batch computes projected available quantities for all cached products
+  /// in the given tenant in 2 fast queries instead of 2*N individual queries.
+  Future<Map<String, double>> projectedQuantities(String tenantId) async {
+    final balances = <String, double>{};
+    try {
+      final stockRows = await (_db.selectOnly(_db.cachedStock)
+            ..addColumns([_db.cachedStock.productId, _db.cachedStock.quantity])
+            ..where(_db.cachedStock.tenantId.equals(tenantId)))
+          .get()
+          .timeout(const Duration(milliseconds: 2000));
+      for (final row in stockRows) {
+        final pid = row.read(_db.cachedStock.productId);
+        final qty = row.read(_db.cachedStock.quantity) ?? 0.0;
+        if (pid != null) {
+          balances[pid] = (balances[pid] ?? 0.0) + qty;
+        }
+      }
+
+      final pendingRows = await (_db.selectOnly(_db.localSaleLines).join([
+        innerJoin(
+            _db.localSales,
+            _db.localSales.clientSaleId
+                .equalsExp(_db.localSaleLines.clientSaleId)),
+      ])
+            ..addColumns(
+                [_db.localSaleLines.productId, _db.localSaleLines.quantity])
+            ..where(_db.localSales.tenantId.equals(tenantId) &
+                _db.localSales.status.equals(LocalSaleStatus.pending)))
+          .get()
+          .timeout(const Duration(milliseconds: 2000));
+      for (final row in pendingRows) {
+        final pid = row.read(_db.localSaleLines.productId);
+        final qty = row.read(_db.localSaleLines.quantity) ?? 0.0;
+        if (pid != null) {
+          balances[pid] = (balances[pid] ?? 0.0) - qty;
+        }
+      }
+    } catch (_) {}
+    return balances;
+  }
+
   /// Per-product, per-warehouse balances with product names attached (the
   /// stock hub's cache-first read). Instant and offline OK; the enriched
   /// names ride along in the projection so the hub never does N+1 lookups.

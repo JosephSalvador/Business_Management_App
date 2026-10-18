@@ -94,39 +94,28 @@ class DashboardController extends Notifier<DashboardState> {
 
   Future<void> _fetch({int trendDays = 30}) async {
     try {
-      final summary = await _repository.summary();
+      final summary = await _repository.summary().timeout(const Duration(seconds: 15));
 
-      List<Map<String, dynamic>> lowStock = const [];
-      try {
-        lowStock = await _repository.lowStock();
-      } catch (_) {}
+      final secondaryResults = await Future.wait([
+        _repository
+            .lowStock()
+            .timeout(const Duration(seconds: 10))
+            .catchError((_) => <Map<String, dynamic>>[]),
+        _repository
+            .recentActivity()
+            .timeout(const Duration(seconds: 10))
+            .catchError((_) => <Map<String, dynamic>>[]),
+        _loadTrendRaw(days: trendDays)
+            .timeout(const Duration(seconds: 10))
+            .catchError((_) => <Map<String, dynamic>>[]),
+        _loadTopProductsSafe(),
+      ]);
 
-      List<Map<String, dynamic>> recentActivity = const [];
-      try {
-        recentActivity = await _repository.recentActivity();
-      } catch (_) {}
-
-      List<SalesTrendPoint> trendData = const [];
-      try {
-        final rawTrend = await _loadTrendRaw(days: trendDays);
-        trendData = rawTrend
-            .map((e) => SalesTrendPoint.fromJson(e))
-            .toList();
-      } catch (_) {}
-
-      List<Map<String, dynamic>> topProducts = const [];
-      try {
-        final rawTop = await _repository.topProducts(limit: 5);
-        final list = (rawTop['products'] as List<dynamic>?) ??
-            (rawTop['items'] as List<dynamic>?) ??
-            (rawTop['data'] as List<dynamic>?);
-        if (list != null) {
-          topProducts = list
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-      } catch (_) {}
+      final lowStock = secondaryResults[0] as List<Map<String, dynamic>>;
+      final recentActivity = secondaryResults[1] as List<Map<String, dynamic>>;
+      final rawTrend = secondaryResults[2] as List<Map<String, dynamic>>;
+      final trendData = rawTrend.map((e) => SalesTrendPoint.fromJson(e)).toList();
+      final topProducts = secondaryResults[3] as List<Map<String, dynamic>>;
 
       state = DashboardLoaded(
         summary: summary,
@@ -155,6 +144,24 @@ class DashboardController extends Notifier<DashboardState> {
         );
       }
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadTopProductsSafe() async {
+    try {
+      final rawTop = await _repository
+          .topProducts(limit: 5)
+          .timeout(const Duration(seconds: 10));
+      final list = (rawTop['products'] as List<dynamic>?) ??
+          (rawTop['items'] as List<dynamic>?) ??
+          (rawTop['data'] as List<dynamic>?);
+      if (list != null) {
+        return list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+    } catch (_) {}
+    return const [];
   }
 
   Future<List<Map<String, dynamic>>> _loadTrendRaw({int days = 30}) async {

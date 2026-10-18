@@ -36,6 +36,14 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   late int _tab = widget.initialTab.clamp(0, 4);
+  late final Set<int> _visitedTabs = {widget.initialTab.clamp(0, 4)};
+
+  void _onTabChanged(int i) {
+    setState(() {
+      _tab = i;
+      _visitedTabs.add(i);
+    });
+  }
 
   @override
   void initState() {
@@ -91,7 +99,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   void didUpdateWidget(HomePage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialTab != widget.initialTab) {
-      setState(() => _tab = widget.initialTab.clamp(0, 4));
+      _onTabChanged(widget.initialTab.clamp(0, 4));
     }
   }
 
@@ -147,34 +155,42 @@ class _HomePageState extends ConsumerState<HomePage> {
         session?.user.hasPermission('Billing.Manage') ?? false;
 
     final pages = [
-      const DashboardPage(),
-      _isDestEnabled(_productsDest, enabledModules)
-          ? const ProductsPage()
-          : const _LockedModulePlaceholder(),
-      _isDestEnabled(_posDest, enabledModules)
-          ? const PosPage()
-          : const _LockedModulePlaceholder(),
-      _isDestEnabled(_reportsDest, enabledModules)
-          ? const ReportsPage()
-          : const _LockedModulePlaceholder(),
-      _MoreTab(
-        businessName: business,
-        email: session?.user.email,
-        isOwner: session?.user.hasPermission('Users.Create') ?? false,
-        canViewBilling: session?.user.hasPermission('Billing.View') ?? false,
-        canManageBilling: canManageBilling,
-        enabledModules: enabledModules,
-        capabilitiesAreStale: capabilities.isStale,
-        isInDebt: entitlement?.isInDebt ?? false,
-        onNavigateToTab: (i) => setState(() => _tab = i),
-      ),
+      _visitedTabs.contains(0) ? const DashboardPage() : const SizedBox.shrink(),
+      _visitedTabs.contains(1)
+          ? (_isDestEnabled(_productsDest, enabledModules)
+              ? const ProductsPage()
+              : const _LockedModulePlaceholder())
+          : const SizedBox.shrink(),
+      _visitedTabs.contains(2)
+          ? (_isDestEnabled(_posDest, enabledModules)
+              ? const PosPage()
+              : const _LockedModulePlaceholder())
+          : const SizedBox.shrink(),
+      _visitedTabs.contains(3)
+          ? (_isDestEnabled(_reportsDest, enabledModules)
+              ? const ReportsPage()
+              : const _LockedModulePlaceholder())
+          : const SizedBox.shrink(),
+      _visitedTabs.contains(4)
+          ? _MoreTab(
+              businessName: business,
+              email: session?.user.email,
+              isOwner: session?.user.hasPermission('Users.Create') ?? false,
+              canViewBilling: session?.user.hasPermission('Billing.View') ?? false,
+              canManageBilling: canManageBilling,
+              enabledModules: enabledModules,
+              capabilitiesAreStale: capabilities.isStale,
+              isInDebt: entitlement?.isInDebt ?? false,
+              onNavigateToTab: _onTabChanged,
+            )
+          : const SizedBox.shrink(),
     ];
 
     if (isDesktop) {
       return WaveBackground(
         child: _DesktopShell(
           tab: _tab,
-          onTabChanged: (i) => setState(() => _tab = i),
+          onTabChanged: _onTabChanged,
           onLockedDest: (d) => _onLockedModule(context, d, canManageBilling),
           isEnabled: (d) => _isDestEnabled(d, enabledModules),
           destinations: _destinations,
@@ -186,7 +202,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     return WaveBackground(
       child: _MobileShell(
         tab: _tab,
-        onTabChanged: (i) => setState(() => _tab = i),
+        onTabChanged: _onTabChanged,
         onLockedDest: (d) => _onLockedModule(context, d, canManageBilling),
         isEnabled: (d) => _isDestEnabled(d, enabledModules),
         destinations: _destinations,
