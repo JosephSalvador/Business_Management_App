@@ -1639,5 +1639,26 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
   - **`lib/features/authentication/presentation/pages/home_page.dart`:** Added background refresh triggers in `_onTabChanged` when switching back to Dashboard, Products, or POS tabs.
   - **Client Versioning:** Strictly incremented build-number/version to `1.0.0+31` in `pubspec.yaml`.
 
+## Purchases Overview 400, Expense LINQ 500, Web Auth Persistence, Form Redesigns & Universal Printing (Build 32, done 2026-10-19)
 
-
+- **Root Causes Diagnosed from Live Logs & Browser Traces:**
+  - **Expense Report EF Core Translation 500:** `ExpenseRepository.GetExpenseByPaymentMethodAsync` grouped by `PaymentMethod` inside the EF Core LINQ query on PostgreSQL. EF Core 10 failed to translate the grouping with `Sum(e => e.Amount.Amount)`.
+  - **Purchases Overview Validation 400:** `GET /api/v1/reports/purchases-summary` and `purchases-by-supplier` delegated to `ListPurchaseOrdersQuery`, which failed validation because `PageSize` exceeded the max of 200 or `Page` was 0. Additionally, `ReportingQueries.cs` needed direct supplier name resolution.
+  - **Web Page Refresh Session Loss:** Web Chrome page reload forced logout because `AuthRepository.restore()` called `/users/me` which failed if the user record wasn't cached or rehydrated from token payload.
+  - **Biometric Web Exception:** `local_auth` threw `MissingPluginException` on Flutter Web startup when attempting native biometric authentication.
+  - **Timezone UTC Discrepancy:** Transaction, expense, and order timestamps were displayed in raw UTC instead of the user's local timezone (UTC+3, EAT).
+- **Implemented Fixes:**
+  - **`backend/src/Infrastructure/Repositories/PlatformRepositories.cs` & `IPlatformRepositories.cs`:** Refactored `ExpenseRepository.GetExpenseByPaymentMethodAsync` to project `(PaymentMethod, Amount)` from the database and aggregate sums in-memory. Added `ListByDateRangeAsync` to `IPurchaseOrderRepository` and `PlatformRepositories.cs`.
+  - **`backend/src/Application/Features/Reports/ReportingQueries.cs` & `PurchasingValidators.cs`:** Refactored `PurchasesSummaryQueryHandler`, `PurchasesBySupplierQueryHandler`, and `MoneyMovementQueryHandler` to query `IPurchaseOrderRepository.ListByDateRangeAsync` and resolve supplier names directly via `ISupplierRepository`. Increased `ListPurchaseOrdersQueryValidator.PageSize` maximum to 1000.
+  - **`backend/tests/BusinessOS.Tests/Unit/Purchasing/PurchasingCommandTests.cs`:** Added `ListByDateRangeAsync` implementation in `StubPurchaseOrderRepository`.
+  - **`lib/core/network/api_client.dart` & `lib/features/authentication/data/auth_repository.dart`:** Captured user profile in `TokenPair` and updated `AuthRepository.restore()` to rehydrate the active `Session` directly from `pair.user`, preserving web sessions across page refreshes.
+  - **`lib/features/authentication/data/biometric_auth_gate.dart`:** Added `kIsWeb` guards to bypass native biometric hardware calls on web browsers.
+  - **Timezone `.toLocal()`:** Updated timestamps across finance, purchases, dashboard, and chart widgets.
+  - **East African SME Expense Form Redesign (`lib/features/finance/presentation/pages/expense_form_page.dart`):** Hero amount display, one-tap quick amount chips (5k, 10k, 20k, 50k, 100k TSh), quick-select category pills (Kodi, Umeme/LUKU, Usafiri/Mafuta, Chakula cha Wafanyakazi, Mishahara, Vifaa/Matumizi, Matengenezo, Nyinginezo), payment method chips, receipt attachment option, and instant keypad input.
+  - **Purchase Order Form Redesign (`lib/features/purchases/presentation/pages/purchase_form_page.dart`):** Automatic warehouse pre-selection from `warehousesProvider`, real product catalog picker bottom sheet with live search, SKU/barcode matching, cost price autofill, line item cards with `-`/`+` quantity steppers and editable unit cost, and sticky bottom summary bar.
+  - **Universal Web Browser Printing (`lib/features/sales/data/browser_printer/` & `receipt_printer_service.dart`):** Implemented cross-platform browser print fallback using hidden iframe and `window.print()` (with fallback to new window on popup blockers). Integrated into `ReceiptPreviewPage` and `SaleSuccessPage` as "Chapa Risiti (Kivinjari / AirPrint)" for desktop and mobile browsers lacking Web Bluetooth.
+  - **Client Versioning:** Strictly incremented build-number/version to `1.0.0+32` in `pubspec.yaml`.
+  - **Verification:**
+    - Backend built clean with 0 warnings, 0 errors (`dotnet build --warnaserror`).
+    - 565/565 backend unit tests passed (`dotnet test --filter "FullyQualifiedName~Unit"`).
+    - Flutter analyze clean with 0 issues.
