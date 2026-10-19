@@ -101,7 +101,7 @@ class PurchaseDetailPage extends ConsumerWidget {
 
   Widget _buildInfoCard(BuildContext context, Map<String, dynamic> purchase) {
     final dateStr = purchase['orderDate'] ?? '';
-    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
 
     return Card(
       child: Padding(

@@ -207,22 +207,20 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
         if (printed) {
           await _recordPrint(_receipt!.saleId, wasReprint);
           if (mounted) setState(() => _printsThisSession++);
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                printed
-                    ? context.loc.posPrintSuccess
-                    : context.loc.posPrintFailed,
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(context.loc.posPrintSuccess),
               ),
-            ),
-          );
+            );
+          }
+          return;
         }
+      } catch (_) {
+        // Fall back to browser print
       } finally {
         if (mounted) setState(() => _printing = false);
       }
-      return;
     }
 
     // 2. Android Native APK (Bluetooth SPP)
@@ -233,11 +231,13 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
       String? address = printerState.address;
 
       if (address == null) {
+        if (!mounted) return;
         final device = await FlutterBluetoothPrinter.selectDevice(context);
-        if (device == null) return;
+        if (!mounted || device == null) return;
         address = device.address;
         await printerController.selectPrinter(
             device.address, device.name ?? 'Printer');
+        if (!mounted) return;
       }
 
       setState(() => _printing = true);
@@ -269,8 +269,33 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
       return;
     }
 
-    // 3. Fallback: Browser without Web Bluetooth (Safari on iPhone)
+    // 3. Web Universal Browser Print (Firefox, Safari, Chrome, desktop, AirPrint)
+    if (kIsWeb && printer.hasBrowserPrinting) {
+      await _printViaBrowser();
+      return;
+    }
+
+    // 4. Fallback dialog
     _showIosSafariPrintHelpDialog();
+  }
+
+  Future<void> _printViaBrowser() async {
+    if (_printing || _receipt == null) return;
+    final printer = ref.read(receiptPrinterServiceProvider);
+    setState(() => _printing = true);
+    final wasReprint = _isReprint;
+    try {
+      final printed = await printer.printViaBrowser(
+        receipt: _receipt!,
+        isReprint: wasReprint,
+      );
+      if (printed) {
+        await _recordPrint(_receipt!.saleId, wasReprint);
+        if (mounted) setState(() => _printsThisSession++);
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
   }
 
   void _showIosSafariPrintHelpDialog() {
@@ -289,15 +314,12 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Kwenye iPhone, Safari huzuia Bluetooth moja kwa moja.',
+              'Kwenye iPhone, Safari huzuia Bluetooth ya mkononi moja kwa moja.',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
             Text(
-              'Ili kuchapa kwa Bluetooth ya mkononi:\n'
-              '1. Sakinisha kivinjari cha bure cha "Bluefy" kutoka App Store.\n'
-              '2. Fungua mfumo wako kupitia Bluefy na utachapa papo hapo kwa Bluetooth.\n\n'
-              'Pia unaweza kutuma au kupakua risiti ya PDF sasa.',
+              'Unaweza kuchapa kupitia AirPrint/Kivinjari moja kwa moja, au kutumia kivinjari cha "Bluefy" kuunganisha mashine ya Bluetooth moja kwa moja.',
               style: TextStyle(fontSize: 13),
             ),
           ],
@@ -307,13 +329,21 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
             onPressed: () => Navigator.of(dialogCtx).pop(),
             child: const Text('Funga'),
           ),
-          FilledButton.tonalIcon(
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _printViaBrowser();
+            },
+            icon: const Icon(Icons.print, size: 18),
+            label: const Text('Chapa Risiti'),
+          ),
+          OutlinedButton.icon(
             onPressed: () {
               Navigator.of(dialogCtx).pop();
               _share();
             },
             icon: const Icon(Icons.share, size: 18),
-            label: const Text('Shiriki WhatsApp / PDF'),
+            label: const Text('Shiriki PDF'),
           ),
         ],
       ),

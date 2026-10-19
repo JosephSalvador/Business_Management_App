@@ -15,14 +15,16 @@ import '../../receipts/domain/receipt_preview.dart';
 import '../../receipts/domain/receipt_qr.dart';
 import '../../receipts/domain/receipt_renderer.dart';
 import '../domain/sale.dart';
+import 'browser_printer/browser_printer.dart';
 import 'web_bluetooth/web_bluetooth_printer.dart';
 
 class ReceiptPrinterService {
   final Thermal80mmRenderer _renderer;
+  final ReceiptPaperWidth paperWidth;
 
   ReceiptPrinterService({
     ReceiptLanguage language = ReceiptLanguage.english,
-    ReceiptPaperWidth paperWidth = ReceiptPaperWidth.mm80,
+    this.paperWidth = ReceiptPaperWidth.mm80,
   }) : _renderer = Thermal80mmRenderer.forWidth(paperWidth, language: language);
 
   /// Encodes a receipt as ESC/POS bytes for a thermal printer.
@@ -198,7 +200,10 @@ class ReceiptPrinterService {
 
   bool get hasWebBluetooth => webBluetoothPrinter.isSupported;
 
-  bool get canPrintDirectly => canPrintViaBluetooth || hasWebBluetooth;
+  bool get hasBrowserPrinting => browserPrinter.isSupported;
+
+  bool get canPrintDirectly =>
+      canPrintViaBluetooth || hasWebBluetooth || hasBrowserPrinting;
 
   Future<bool> printViaWebBluetooth({
     required ReceiptPreview receipt,
@@ -207,6 +212,202 @@ class ReceiptPrinterService {
     try {
       final bytes = buildEscPosBytes(receipt: receipt, isReprint: isReprint);
       return await webBluetoothPrinter.printBytes(Uint8List.fromList(bytes));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _buildQrSvg(String data, {int size = 150}) {
+    if (data.isEmpty) return '';
+    try {
+      final qrCode = qr.QrCode.fromData(
+        data: data,
+        errorCorrectLevel: qr.QrErrorCorrectLevel.M,
+      );
+      final qrImage = qr.QrImage(qrCode);
+      final count = qrImage.moduleCount;
+      final cellSize = (size / count).toDouble();
+      final buf = StringBuffer();
+      buf.write(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="$size" height="$size" viewBox="0 0 $size $size">');
+      buf.write('<rect width="100%" height="100%" fill="#fff"/>');
+      for (var r = 0; r < count; r++) {
+        for (var c = 0; c < count; c++) {
+          if (qrImage.isDark(r, c)) {
+            final x = (c * cellSize).toStringAsFixed(2);
+            final y = (r * cellSize).toStringAsFixed(2);
+            final w = cellSize.toStringAsFixed(2);
+            final h = cellSize.toStringAsFixed(2);
+            buf.write(
+                '<rect x="$x" y="$y" width="$w" height="$h" fill="#000"/>');
+          }
+        }
+      }
+      buf.write('</svg>');
+      return buf.toString();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String buildReceiptHtml({
+    required ReceiptPreview receipt,
+    bool isReprint = false,
+  }) {
+    final qrSvg = _buildQrSvg(receipt.qrPayload);
+    final widthMm =
+        paperWidth == ReceiptPaperWidth.mm58 ? '58mm' : '80mm';
+    final contentWidthMm =
+        paperWidth == ReceiptPaperWidth.mm58 ? '48mm' : '72mm';
+
+    final buffer = StringBuffer();
+    buffer.write('''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Receipt ${receipt.saleNumber}</title>
+<style>
+  @page {
+    margin: 0;
+    size: $widthMm auto;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    line-height: 1.35;
+    color: #000;
+    background: #fff;
+    width: $contentWidthMm;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 8px 4px;
+  }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .bold { font-weight: bold; }
+  .title { font-size: 16px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; }
+  .dashed { border-top: 1px dashed #000; margin: 6px 0; }
+  .solid { border-top: 2px solid #000; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; margin: 2px 0; }
+  .row .col-left { flex: 1; text-align: left; }
+  .row .col-right { text-align: right; font-weight: 500; }
+  .item-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+  .item-table th { text-align: left; font-size: 12px; border-bottom: 1px dashed #000; padding-bottom: 4px; }
+  .item-table td { padding: 3px 0; font-size: 12px; vertical-align: top; }
+  .grand-total { font-size: 15px; font-weight: bold; }
+  .qr-box { display: flex; justify-content: center; margin: 10px 0 6px 0; }
+  .footer-text { text-align: center; font-size: 11px; margin-top: 4px; }
+  .watermark { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 6px; }
+  @media print {
+    body { width: 100%; max-width: 100%; padding: 0; }
+  }
+</style>
+</head>
+<body>
+''');
+
+    if (isReprint) {
+      buffer.write('<div class="watermark center">*** REPRINT ***</div>');
+    }
+    if (receipt.isVoided) {
+      buffer.write('<div class="watermark center">*** SALE VOIDED ***</div>');
+    }
+
+    buffer.write('<div class="title center">${receipt.businessName}</div>');
+    if (receipt.tin != null && receipt.tin!.isNotEmpty) {
+      buffer.write('<div class="center">TIN: ${receipt.tin}</div>');
+    }
+    if (receipt.address != null && receipt.address!.isNotEmpty) {
+      buffer.write('<div class="center">${receipt.address}</div>');
+    }
+    if (receipt.phone != null && receipt.phone!.isNotEmpty) {
+      buffer.write('<div class="center">Tel: ${receipt.phone}</div>');
+    }
+    if (receipt.branchName != null && receipt.branchName!.isNotEmpty) {
+      buffer.write('<div class="center">${receipt.branchName}</div>');
+    }
+
+    buffer.write('<div class="dashed"></div>');
+    buffer.write(
+        '<div class="row"><span class="col-left">Receipt:</span><span class="col-right bold">${receipt.saleNumber}</span></div>');
+    buffer.write(
+        '<div class="row"><span class="col-left">Date:</span><span class="col-right">${receipt.saleDate.toLocal().toString().substring(0, 16)}</span></div>');
+    if (receipt.cashierName != null && receipt.cashierName!.isNotEmpty) {
+      buffer.write(
+          '<div class="row"><span class="col-left">Cashier:</span><span class="col-right">${receipt.cashierName}</span></div>');
+    }
+    if (receipt.customerName != null && receipt.customerName!.isNotEmpty) {
+      buffer.write(
+          '<div class="row"><span class="col-left">Customer:</span><span class="col-right">${receipt.customerName}</span></div>');
+    }
+
+    buffer.write('<div class="dashed"></div>');
+    buffer.write(
+        '<table class="item-table"><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th class="right">Total</th></tr></thead><tbody>');
+    for (final line in receipt.lines) {
+      buffer.write(
+          '<tr><td><b>${line.productName}</b><br><small>${line.quantity} x ${line.unitPrice.toStringAsFixed(0)}</small></td><td style="text-align:center">${line.quantity}</td><td class="right">${line.lineTotal.toStringAsFixed(0)}</td></tr>');
+    }
+    buffer.write('</tbody></table>');
+
+    buffer.write('<div class="dashed"></div>');
+    buffer.write(
+        '<div class="row"><span class="col-left">Subtotal:</span><span class="col-right">${receipt.subtotal.toStringAsFixed(0)}</span></div>');
+    if (receipt.discountAmount > 0) {
+      buffer.write(
+          '<div class="row"><span class="col-left">Discount:</span><span class="col-right">-${receipt.discountAmount.toStringAsFixed(0)}</span></div>');
+    }
+    if (receipt.taxAmount > 0) {
+      buffer.write(
+          '<div class="row"><span class="col-left">Tax:</span><span class="col-right">${receipt.taxAmount.toStringAsFixed(0)}</span></div>');
+    }
+
+    buffer.write('<div class="solid"></div>');
+    buffer.write(
+        '<div class="row grand-total"><span class="col-left">TOTAL:</span><span class="col-right">${receipt.currency} ${receipt.totalAmount.toStringAsFixed(0)}</span></div>');
+    buffer.write('<div class="solid"></div>');
+
+    for (final p in receipt.payments) {
+      buffer.write(
+          '<div class="row"><span class="col-left">${p.method}:</span><span class="col-right">${p.amount.toStringAsFixed(0)}</span></div>');
+    }
+    if (receipt.change > 0) {
+      buffer.write(
+          '<div class="row"><span class="col-left">Change:</span><span class="col-right">${receipt.change.toStringAsFixed(0)}</span></div>');
+    }
+
+    if (qrSvg.isNotEmpty) {
+      buffer.write('<div class="dashed"></div>');
+      buffer.write('<div class="qr-box">$qrSvg</div>');
+      buffer.write(
+          '<div class="footer-text">Scan to verify receipt</div>');
+    }
+
+    buffer.write('<div class="dashed"></div>');
+    buffer.write(
+        '<div class="footer-text">Thank you for shopping with us!</div>');
+    buffer.write(
+        '<div class="footer-text">Goods once sold will not be accepted back.</div>');
+    buffer.write(
+        '<div class="footer-text bold" style="margin-top:6px">Powered by Jolinx ERP</div>');
+
+    buffer.write('</body></html>');
+    return buffer.toString();
+  }
+
+  Future<bool> printViaBrowser({
+    required ReceiptPreview receipt,
+    bool isReprint = false,
+  }) async {
+    try {
+      final html = buildReceiptHtml(receipt: receipt, isReprint: isReprint);
+      return await browserPrinter.printHtml(html);
     } catch (_) {
       return false;
     }
@@ -225,6 +426,8 @@ class ReceiptPrinterService {
       );
     } else if (hasWebBluetooth) {
       return printViaWebBluetooth(receipt: receipt, isReprint: isReprint);
+    } else if (hasBrowserPrinting) {
+      return printViaBrowser(receipt: receipt, isReprint: isReprint);
     }
     return false;
   }

@@ -385,18 +385,18 @@ public sealed class MoneyMovementQueryHandler
     private readonly IReportRepository _reports;
     private readonly IExpenseRepository _expenses;
     private readonly IMoneyAccountRepository _moneyAccounts;
-    private readonly ISender _sender;
+    private readonly IPurchaseOrderRepository _purchaseOrders;
 
     public MoneyMovementQueryHandler(
         ITenantContext tenantContext, IReportRepository reports,
         IExpenseRepository expenses, IMoneyAccountRepository moneyAccounts,
-        ISender sender)
+        IPurchaseOrderRepository purchaseOrders)
     {
         _tenantContext = tenantContext;
         _reports = reports;
         _expenses = expenses;
         _moneyAccounts = moneyAccounts;
-        _sender = sender;
+        _purchaseOrders = purchaseOrders;
     }
 
     public async Task<Result<MoneyMovementDto>> Handle(
@@ -413,13 +413,9 @@ public sealed class MoneyMovementQueryHandler
         var expenseSummary = await _expenses.GetSummaryAsync(
             tenantId, query.From, query.To, cancellationToken);
 
-        var ordersResult = await _sender.Send(
-            new ListPurchaseOrdersQuery(1, 1000), cancellationToken);
-        var totalPurchases = ordersResult.IsSuccess
-            ? ordersResult.Value.Items
-                .Where(po => po.CreatedAt >= query.From && po.CreatedAt <= query.To)
-                .Sum(po => po.TotalAmount)
-            : 0m;
+        var orders = await _purchaseOrders.ListByDateRangeAsync(
+            tenantId, query.From, query.To, cancellationToken);
+        var totalPurchases = orders.Sum(po => po.TotalAmount);
 
         var startingBalance = currentBalance - totalRevenue + totalPurchases + expenseSummary.Total;
 
@@ -446,35 +442,42 @@ public sealed class PurchasesSummaryQueryHandler
     : IRequestHandler<PurchasesSummaryQuery, Result<PurchasesSummaryDto>>
 {
     private readonly ITenantContext _tenantContext;
-    private readonly ISender _sender;
+    private readonly IPurchaseOrderRepository _purchaseOrders;
+    private readonly ISupplierRepository _suppliers;
 
-    public PurchasesSummaryQueryHandler(ITenantContext tenantContext, ISender sender)
+    public PurchasesSummaryQueryHandler(
+        ITenantContext tenantContext,
+        IPurchaseOrderRepository purchaseOrders,
+        ISupplierRepository suppliers)
     {
         _tenantContext = tenantContext;
-        _sender = sender;
+        _purchaseOrders = purchaseOrders;
+        _suppliers = suppliers;
     }
 
     public async Task<Result<PurchasesSummaryDto>> Handle(
         PurchasesSummaryQuery query, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
-        var result = await _sender.Send(
-            new ListPurchaseOrdersQuery(1, 1000), cancellationToken);
-        if (result.IsFailure)
-            return Result.Failure<PurchasesSummaryDto>(result.Error);
+        var orders = await _purchaseOrders.ListByDateRangeAsync(
+            tenantId, query.From, query.To, cancellationToken);
 
-        var filtered = result.Value.Items
-            .Where(po => po.CreatedAt >= query.From && po.CreatedAt <= query.To)
-            .ToList();
+        var totalPurchased = orders.Sum(po => po.TotalAmount);
+        var supplierCount = orders.Select(po => po.SupplierId).Distinct().Count();
+        var itemsReceived = orders.Count(po => po.Status == Domain.Purchasing.PurchaseOrderStatus.Received);
+        var pendingCount = orders.Count(po => po.Status == Domain.Purchasing.PurchaseOrderStatus.Draft || po.Status == Domain.Purchasing.PurchaseOrderStatus.Submitted);
 
-        var totalPurchased = filtered.Sum(po => po.TotalAmount);
-        var supplierCount = filtered.Select(po => po.SupplierName).Distinct().Count();
-        var itemsReceived = filtered.Count(po => po.Status == Domain.Purchasing.PurchaseOrderStatus.Received);
-        var pendingCount = filtered.Count(po => po.Status == Domain.Purchasing.PurchaseOrderStatus.Draft || po.Status == Domain.Purchasing.PurchaseOrderStatus.Submitted);
-        var topSupplier = filtered
-            .GroupBy(po => po.SupplierName)
+        var topSupplierGroup = orders
+            .GroupBy(po => po.SupplierId)
             .OrderByDescending(g => g.Sum(po => po.TotalAmount))
-            .FirstOrDefault()?.Key;
+            .FirstOrDefault();
+
+        string? topSupplier = null;
+        if (topSupplierGroup is not null)
+        {
+            var supplier = await _suppliers.GetByIdAsync(tenantId, topSupplierGroup.Key, cancellationToken);
+            topSupplier = supplier?.Name ?? "Unknown";
+        }
 
         return Result.Success(new PurchasesSummaryDto(
             totalPurchased, supplierCount, itemsReceived, topSupplier, pendingCount, itemsReceived));
@@ -788,31 +791,40 @@ public sealed class PurchasesBySupplierQueryHandler
     : IRequestHandler<PurchasesBySupplierQuery, Result<PurchasesBySupplierReportDto>>
 {
     private readonly ITenantContext _tenantContext;
-    private readonly ISender _sender;
+    private readonly IPurchaseOrderRepository _purchaseOrders;
+    private readonly ISupplierRepository _suppliers;
 
-    public PurchasesBySupplierQueryHandler(ITenantContext tenantContext, ISender sender)
+    public PurchasesBySupplierQueryHandler(
+        ITenantContext tenantContext,
+        IPurchaseOrderRepository purchaseOrders,
+        ISupplierRepository suppliers)
     {
         _tenantContext = tenantContext;
-        _sender = sender;
+        _purchaseOrders = purchaseOrders;
+        _suppliers = suppliers;
     }
 
     public async Task<Result<PurchasesBySupplierReportDto>> Handle(
         PurchasesBySupplierQuery query, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
-        var result = await _sender.Send(
-            new ListPurchaseOrdersQuery(1, 1000), cancellationToken);
-        if (result.IsFailure)
-            return Result.Failure<PurchasesBySupplierReportDto>(result.Error);
+        var orders = await _purchaseOrders.ListByDateRangeAsync(
+            tenantId, query.From, query.To, cancellationToken);
 
-        var items = result.Value.Items
-            .Where(po => po.CreatedAt >= query.From && po.CreatedAt <= query.To)
-            .GroupBy(po => po.SupplierName)
-            .Select(g => new PurchasesBySupplierDto(
-                Guid.Empty, g.Key,
-                g.Sum(po => po.TotalAmount), g.Count()))
-            .OrderByDescending(x => x.TotalAmount)
-            .ToList();
+        var groups = orders.GroupBy(po => po.SupplierId).ToList();
+        var items = new List<PurchasesBySupplierDto>();
+        foreach (var g in groups)
+        {
+            var supplier = await _suppliers.GetByIdAsync(tenantId, g.Key, cancellationToken);
+            var supplierName = supplier?.Name ?? "Unknown";
+            items.Add(new PurchasesBySupplierDto(
+                g.Key,
+                supplierName,
+                g.Sum(po => po.TotalAmount),
+                g.Count()));
+        }
+
+        items = items.OrderByDescending(x => x.TotalAmount).ToList();
 
         return Result.Success(new PurchasesBySupplierReportDto(query.From, query.To, items));
     }

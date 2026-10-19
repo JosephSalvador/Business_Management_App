@@ -543,10 +543,8 @@ public interface IPurchaseOrderRepository
     Task UpdateAsync(PurchaseOrder order, CancellationToken cancellationToken = default);
     Task<PurchaseOrder?> GetByIdAsync(Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PurchaseOrder>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PurchaseOrder>> ListByDateRangeAsync(Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default);
     Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default);
-    // Note: IPurchasingRepository may not exist as a separate interface.
-    // If purchase order listing is done through a different interface, add there.
-    // The PurchasesSummaryQuery uses IPurchasingRepository with ListPurchaseOrdersAsync.
 }
 
 public interface ISupplierBillRepository

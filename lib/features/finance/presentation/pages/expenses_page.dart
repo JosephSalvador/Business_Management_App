@@ -348,7 +348,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
     final description = expense['description'] ?? '';
     final amount = (expense['amount'] ?? 0).toDouble();
     final dateStr = expense['expenseDate'] ?? '';
-    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
     final category = expense['categoryName'] as String?;
 
     final detail = <String>[

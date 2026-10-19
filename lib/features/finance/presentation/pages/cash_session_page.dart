@@ -157,7 +157,7 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
                   const SizedBox(height: 8),
                   Text(
                     context.loc.cashOpenedAt(
-                        DateFormat('dd/MM/yyyy HH:mm').format(openedAt)),
+                        DateFormat('dd/MM/yyyy HH:mm').format(openedAt.toLocal())),
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
                 ],
@@ -242,7 +242,7 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
               const SizedBox(height: 8),
               Text(
                 context.loc.cashClosedAt(
-                    DateFormat('dd/MM/yyyy HH:mm').format(closedAt)),
+                    DateFormat('dd/MM/yyyy HH:mm').format(closedAt.toLocal())),
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
             ],

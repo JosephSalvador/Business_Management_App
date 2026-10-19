@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../l10n/payment_labels.dart';
 import '../../../../shared/design_system/app_colors.dart';
+import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../data/expense_providers.dart';
 import '../../data/expense_repository.dart';
-
-const String _addCategoryValue = '__add_category__';
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
   const ExpenseFormPage({super.key, this.expenseId});
@@ -25,7 +25,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
-  final _paymentMethodController = TextEditingController();
+  final _paymentMethodController = TextEditingController(text: 'Pesa Taslimu');
   final _referenceController = TextEditingController();
   final _notesController = TextEditingController();
   DateTime _expenseDate = DateTime.now();
@@ -33,12 +33,31 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   ExpenseCategory? _createdCategory;
   bool _saving = false;
   bool _loading = false;
+  bool _showMoreDetails = false;
 
   final List<String> _paymentMethods = [
     'Pesa Taslimu',
     'M-Pesa',
     'Benki',
     'Nyingine',
+  ];
+
+  static const List<String> _quickSuggestions = [
+    'Kodi ya Pango',
+    'Umeme / Luku',
+    'Maji',
+    'Usafiri / Nauli',
+    'Chakula cha Wafanyakazi',
+    'Mawasiliano / Vocha',
+    'Ukarabati / Matengenezo',
+  ];
+
+  static const List<int> _quickAmounts = [
+    5000,
+    10000,
+    20000,
+    50000,
+    100000,
   ];
 
   bool get isEdit => widget.expenseId != null;
@@ -60,13 +79,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       if (mounted) {
         _descriptionController.text = expense['description'] ?? '';
         _amountController.text = (expense['amount'] ?? 0).toString();
-        _paymentMethodController.text = expense['paymentMethod'] ?? '';
+        _paymentMethodController.text = expense['paymentMethod'] ?? 'Pesa Taslimu';
         _referenceController.text = expense['reference'] ?? '';
         _notesController.text = expense['notes'] ?? '';
         _categoryId = expense['categoryId'] as String? ?? '';
         final dateStr = expense['expenseDate'];
         if (dateStr != null) {
-          _expenseDate = DateTime.parse(dateStr);
+          _expenseDate = DateTime.parse(dateStr).toLocal();
+        }
+        if (_referenceController.text.isNotEmpty || _notesController.text.isNotEmpty) {
+          _showMoreDetails = true;
         }
         setState(() => _loading = false);
       }
@@ -90,10 +112,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     super.dispose();
   }
 
+  void _addQuickAmount(int value) {
+    final current = double.tryParse(_amountController.text) ?? 0.0;
+    final updated = current + value;
+    _amountController.text = updated % 1 == 0 ? updated.toInt().toString() : updated.toStringAsFixed(0);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
-    final categories = ref.watch(expenseCategoriesProvider);
+    final categoriesAsync = ref.watch(expenseCategoriesProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -113,148 +143,405 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             : Form(
                 key: _formKey,
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   children: [
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration:
-                          InputDecoration(labelText: loc.expenseDescription),
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? loc.expenseDescriptionRequired
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _amountController,
-                      decoration: InputDecoration(
-                          labelText: loc.expenseAmount, prefixText: 'TSh '),
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return loc.expenseAmountRequired;
-                        }
-                        final amount = double.tryParse(v);
-                        if (amount == null || amount <= 0) {
-                          return loc.expenseAmountInvalid;
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(loc.expenseDate),
-                      subtitle: Text(
-                        '${_expenseDate.day}/${_expenseDate.month}/${_expenseDate.year}',
+                    // ── Amount Card (Hero) ──────────────────────────
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                       ),
-                      trailing: const Icon(Icons.calendar_today),
-                      onTap: _pickDate,
-                    ),
-                    const SizedBox(height: 16),
-                    categories.when(
-                      data: (cats) {
-                        final items = <DropdownMenuItem<String>>[
-                          DropdownMenuItem(
-                            value: '',
-                            child: Text(loc.expenseCategoryNone),
-                          ),
-                          ...cats.map<DropdownMenuItem<String>>(
-                            (c) => DropdownMenuItem(
-                                value: c.id, child: Text(c.name)),
-                          ),
-                          if (_createdCategory != null &&
-                              !cats.any((c) => c.id == _createdCategory!.id))
-                            DropdownMenuItem(
-                              value: _createdCategory!.id,
-                              child: Text(_createdCategory!.name),
+                      color: theme.colorScheme.surface,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.expenseAmount,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: AppColors.resolveTextSecondary(context),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          DropdownMenuItem(
-                            value: _addCategoryValue,
-                            child: Text(loc.expenseCategoryAdd),
-                          ),
-                        ].where((it) => it.value != null).toList();
-                        return DropdownButtonFormField<String>(
-                          key: ValueKey('category-$_categoryId-${cats.length}'),
-                          initialValue:
-                              items.any((it) => it.value == _categoryId)
-                                  ? _categoryId
-                                  : '',
-                          decoration:
-                              InputDecoration(labelText: loc.expenseCategory),
-                          items: items,
-                          onChanged: (v) async {
-                            if (v == _addCategoryValue) {
-                              final created = await _addCategory(loc);
-                              if (created != null) {
-                                setState(() {
-                                  _createdCategory = created;
-                                  _categoryId = created.id;
-                                });
-                              }
-                            } else {
-                              setState(() => _categoryId = v ?? '');
-                            }
-                          },
-                        );
-                      },
-                      loading: () => const SizedBox(
-                        height: 56,
-                        child: Center(
-                          child: SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _amountController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                              decoration: InputDecoration(
+                                prefixText: 'TSh  ',
+                                prefixStyle: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.resolveTextSecondary(context),
+                                ),
+                                hintText: '0',
+                                border: InputBorder.none,
+                                isDense: true,
+                              ),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return loc.expenseAmountRequired;
+                                }
+                                final amount = double.tryParse(v.trim());
+                                if (amount == null || amount <= 0) {
+                                  return loc.expenseAmountInvalid;
+                                }
+                                return null;
+                              },
+                            ),
+                            const Divider(height: 20),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: _quickAmounts.map((val) {
+                                return ActionChip(
+                                  label: Text('+${formatMoney(val)}'),
+                                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  onPressed: () => _addQuickAmount(val),
+                                );
+                              }).toList(),
+                            ),
+                          ],
                         ),
                       ),
-                      error: (_, __) => OutlinedButton.icon(
-                        icon: const Icon(Icons.refresh),
-                        label: Text(loc.commonRetry),
-                        onPressed: () =>
-                            ref.invalidate(expenseCategoriesProvider),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── Description Card ───────────────────────────
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      color: theme.colorScheme.surface,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.expenseDescription,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: AppColors.resolveTextSecondary(context),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _descriptionController,
+                              textCapitalization: TextCapitalization.sentences,
+                              decoration: InputDecoration(
+                                hintText: 'Mfano: Kodi ya mwezi, Luku ya duka...',
+                                filled: true,
+                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                                isDense: true,
+                              ),
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? loc.expenseDescriptionRequired
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Chaguzi za Haraka:',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.resolveTextTertiary(context),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: _quickSuggestions.map((suggestion) {
+                                return ActionChip(
+                                  label: Text(suggestion),
+                                  labelStyle: const TextStyle(fontSize: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  onPressed: () {
+                                    setState(() {
+                                      _descriptionController.text = suggestion;
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _paymentMethods
-                              .contains(_paymentMethodController.text)
-                          ? _paymentMethodController.text
-                          : null,
-                      decoration:
-                          InputDecoration(labelText: loc.expensePaymentMethod),
-                      items: _paymentMethods.map<DropdownMenuItem<String>>((m) {
-                        return DropdownMenuItem(
-                          value: m,
-                          child: Text(storedPaymentMethodLabel(loc, m)),
-                        );
-                      }).toList(),
-                      onChanged: (v) => setState(
-                          () => _paymentMethodController.text = v ?? ''),
+                    const SizedBox(height: 12),
+
+                    // ── Category Card ──────────────────────────────
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      color: theme.colorScheme.surface,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  loc.expenseCategory,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: AppColors.resolveTextSecondary(context),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  onPressed: () async {
+                                    final created = await _addCategory(loc);
+                                    if (created != null) {
+                                      setState(() {
+                                        _createdCategory = created;
+                                        _categoryId = created.id;
+                                      });
+                                    }
+                                  },
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: Text(loc.expenseCategoryAdd),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            categoriesAsync.when(
+                              data: (cats) {
+                                final allCats = [
+                                  if (_createdCategory != null &&
+                                      !cats.any((c) => c.id == _createdCategory!.id))
+                                    _createdCategory!,
+                                  ...cats,
+                                ];
+
+                                return Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    ChoiceChip(
+                                      label: Text(loc.expenseCategoryNone),
+                                      selected: _categoryId.isEmpty,
+                                      onSelected: (selected) {
+                                        if (selected) setState(() => _categoryId = '');
+                                      },
+                                    ),
+                                    ...allCats.map((cat) {
+                                      final isSelected = _categoryId == cat.id;
+                                      return ChoiceChip(
+                                        label: Text(cat.name),
+                                        selected: isSelected,
+                                        onSelected: (selected) {
+                                          setState(() => _categoryId = selected ? cat.id : '');
+                                        },
+                                      );
+                                    }),
+                                  ],
+                                );
+                              },
+                              loading: () => const SizedBox(
+                                height: 40,
+                                child: Center(
+                                  child: SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              ),
+                              error: (_, __) => OutlinedButton.icon(
+                                icon: const Icon(Icons.refresh),
+                                label: Text(loc.commonRetry),
+                                onPressed: () => ref.invalidate(expenseCategoriesProvider),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _referenceController,
-                      decoration:
-                          InputDecoration(labelText: loc.expenseReference),
+                    const SizedBox(height: 12),
+
+                    // ── Payment Method & Date Card ─────────────────
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      color: theme.colorScheme.surface,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.expensePaymentMethod,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: AppColors.resolveTextSecondary(context),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _paymentMethods.map((method) {
+                                final isSelected = _paymentMethodController.text == method;
+                                return ChoiceChip(
+                                  label: Text(storedPaymentMethodLabel(loc, method)),
+                                  selected: isSelected,
+                                  onSelected: (selected) {
+                                    if (selected) {
+                                      setState(() => _paymentMethodController.text = method);
+                                    }
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                            const Divider(height: 24),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
+                              ),
+                              title: Text(
+                                loc.expenseDate,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                DateFormat('dd/MM/yyyy').format(_expenseDate),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.resolveTextSecondary(context),
+                                ),
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: _pickDate,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _notesController,
-                      decoration: InputDecoration(labelText: loc.expenseNotes),
-                      maxLines: 3,
+                    const SizedBox(height: 12),
+
+                    // ── More Details (Collapsible) ─────────────────
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      color: theme.colorScheme.surface,
+                      child: ExpansionTile(
+                        initiallyExpanded: _showMoreDetails,
+                        shape: const Border(),
+                        leading: const Icon(Icons.more_horiz, color: AppColors.primary),
+                        title: const Text(
+                          'Maelezo Zaidi (Hiari)',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Namba ya risiti, kumbukumbu, au dokezo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.resolveTextTertiary(context),
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: Column(
+                              children: [
+                                TextFormField(
+                                  controller: _referenceController,
+                                  decoration: InputDecoration(
+                                    labelText: loc.expenseReference,
+                                    hintText: 'Namba ya risiti au rejea',
+                                    filled: true,
+                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    isDense: true,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _notesController,
+                                  decoration: InputDecoration(
+                                    labelText: loc.expenseNotes,
+                                    hintText: 'Maelezo ya ziada kuhusu gharama hii...',
+                                    filled: true,
+                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    isDense: true,
+                                  ),
+                                  maxLines: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 32),
-                    ElevatedButton(
+                    const SizedBox(height: 24),
+
+                    // ── Save Button ────────────────────────────────
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                       onPressed: _saving ? null : _save,
-                      child: _saving
+                      icon: _saving
                           ? const SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
-                          : Text(isEdit ? loc.commonSave : loc.expenseAdd),
+                          : const Icon(Icons.check_circle_outline),
+                      label: Text(
+                        isEdit ? loc.commonSave : loc.expenseAdd,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -341,7 +628,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     try {
       final body = {
         'description': _descriptionController.text.trim(),
-        'amount': double.parse(_amountController.text),
+        'amount': double.parse(_amountController.text.trim()),
         'expenseDate': _expenseDate.toUtc().toIso8601String(),
         if (_categoryId.isNotEmpty) 'categoryId': _categoryId,
         if (_paymentMethodController.text.isNotEmpty)

@@ -193,7 +193,7 @@ class RevenueLineChart extends StatelessWidget {
 
   String _formatLabel(String isoDate) {
     try {
-      final date = DateTime.parse(isoDate);
+      final date = DateTime.parse(isoDate).toLocal();
       return DateFormat('d/M').format(date);
     } catch (_) {
       return isoDate;
@@ -202,7 +202,7 @@ class RevenueLineChart extends StatelessWidget {
 
   String _formatFullDate(String isoDate) {
     try {
-      final date = DateTime.parse(isoDate);
+      final date = DateTime.parse(isoDate).toLocal();
       return DateFormat('d MMM yyyy', 'sw').format(date);
     } catch (_) {
       return isoDate;

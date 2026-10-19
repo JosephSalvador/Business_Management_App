@@ -558,6 +558,8 @@ internal sealed class StubPurchaseOrderRepository : IPurchaseOrderRepository
         => Task.FromResult(_seeded.FirstOrDefault(o => o.Id == id));
     public Task<IReadOnlyList<PurchaseOrder>> ListAsync(Guid tenantId, int page, int pageSize, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<PurchaseOrder>>(_seeded.Skip((page - 1) * pageSize).Take(pageSize).ToList());
+    public Task<IReadOnlyList<PurchaseOrder>> ListByDateRangeAsync(Guid tenantId, DateTime from, DateTime to, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<PurchaseOrder>>(_seeded.Where(o => o.CreatedAt >= from && o.CreatedAt <= to).ToList());
     public Task<int> CountAsync(Guid tenantId, CancellationToken ct = default)
         => Task.FromResult(_seeded.Count);
 }

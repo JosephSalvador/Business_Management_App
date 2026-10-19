@@ -1989,6 +1989,13 @@ public sealed class PurchaseOrderRepository : IPurchaseOrderRepository
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<PurchaseOrder>> ListByDateRangeAsync(
+        Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
+        => await _db.PurchaseOrders
+            .Where(o => o.TenantId == tenantId && o.CreatedAt >= from && o.CreatedAt <= to)
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync(cancellationToken);
+
     public Task<int> CountAsync(Guid tenantId, CancellationToken cancellationToken = default)
         => _db.PurchaseOrders.CountAsync(o => o.TenantId == tenantId, cancellationToken);
 }
@@ -2246,13 +2253,17 @@ public sealed class ExpenseRepository : IExpenseRepository
     public async Task<IReadOnlyList<ExpenseByPaymentMethodRow>> GetExpenseByPaymentMethodAsync(
         Guid tenantId, DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
-        return await _db.Expenses
+        var items = await _db.Expenses
             .Where(e => e.TenantId == tenantId && e.ExpenseDate >= from && e.ExpenseDate <= to)
-            .GroupBy(e => e.PaymentMethod ?? "Other")
+            .Select(e => new { e.PaymentMethod, e.Amount })
+            .ToListAsync(cancellationToken);
+
+        return items
+            .GroupBy(e => string.IsNullOrWhiteSpace(e.PaymentMethod) ? "Other" : e.PaymentMethod)
             .Select(g => new ExpenseByPaymentMethodRow(
                 g.Key, g.Sum(e => e.Amount)))
             .OrderByDescending(x => x.Amount)
-            .ToListAsync(cancellationToken);
+            .ToList();
     }
 }
 

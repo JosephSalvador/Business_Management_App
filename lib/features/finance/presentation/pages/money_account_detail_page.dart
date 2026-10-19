@@ -247,7 +247,7 @@ class MoneyAccountDetailPage extends ConsumerWidget {
     final amount = (tx['amount'] ?? 0).toDouble();
     final description = tx['description'] ?? '';
     final dateStr = tx['createdAt'] ?? '';
-    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
 
     final (icon, color, label) = switch (type) {
       0 => (

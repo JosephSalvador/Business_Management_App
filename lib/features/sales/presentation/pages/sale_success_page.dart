@@ -197,22 +197,20 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
         if (printed) {
           await _recordPrint(widget.sale.id, wasReprint);
           if (mounted) setState(() => _printsThisSession++);
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                printed
-                    ? context.loc.posPrintSuccess
-                    : context.loc.posPrintFailed,
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(context.loc.posPrintSuccess),
               ),
-            ),
-          );
+            );
+          }
+          return;
         }
+      } catch (_) {
+        // Fall back to browser print
       } finally {
         if (mounted) setState(() => _printing = false);
       }
-      return;
     }
 
     // 2. Android Native APK (Bluetooth SPP)
@@ -221,8 +219,37 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
       return;
     }
 
-    // 3. Fallback: Browser without Web Bluetooth (e.g. standard Safari on iPhone)
+    // 3. Web Universal Browser Print (Firefox, Safari, desktop, AirPrint)
+    if (kIsWeb && printer.hasBrowserPrinting) {
+      await _printViaBrowser();
+      return;
+    }
+
+    // 4. Fallback dialog
     _showIosSafariPrintHelpDialog();
+  }
+
+  Future<void> _printViaBrowser() async {
+    if (_printing) return;
+    final printer = ref.read(receiptPrinterServiceProvider);
+    setState(() => _printing = true);
+    final wasReprint = _isReprint;
+    try {
+      final receipt = printer.saleToReceipt(
+        sale: widget.sale,
+        businessName: _businessName,
+      );
+      final printed = await printer.printViaBrowser(
+        receipt: receipt,
+        isReprint: wasReprint,
+      );
+      if (printed) {
+        await _recordPrint(widget.sale.id, wasReprint);
+        if (mounted) setState(() => _printsThisSession++);
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
   }
 
   void _showIosSafariPrintHelpDialog() {
@@ -246,10 +273,7 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
             ),
             SizedBox(height: 8),
             Text(
-              'Ili kuchapa kwa Bluetooth ya mkononi:\n'
-              '1. Sakinisha kivinjari cha bure cha "Bluefy" kutoka App Store.\n'
-              '2. Fungua mfumo wako kupitia Bluefy na utachapa papo hapo kwa Bluetooth.\n\n'
-              'Pia unaweza kutuma risiti rasmi ya kidijitali sasa kupitia WhatsApp au PDF.',
+              'Unaweza kuchapa kupitia AirPrint/Kivinjari moja kwa moja, au kutumia kivinjari cha "Bluefy" kuunganisha mashine ya Bluetooth moja kwa moja.',
               style: TextStyle(fontSize: 13),
             ),
           ],
@@ -259,13 +283,21 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
             onPressed: () => Navigator.of(dialogCtx).pop(),
             child: const Text('Funga'),
           ),
-          FilledButton.tonalIcon(
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _printViaBrowser();
+            },
+            icon: const Icon(Icons.print, size: 18),
+            label: const Text('Chapa Risiti'),
+          ),
+          OutlinedButton.icon(
             onPressed: () {
               Navigator.of(dialogCtx).pop();
               _showShareOptions();
             },
             icon: const Icon(Icons.share, size: 18),
-            label: const Text('Shiriki WhatsApp / PDF'),
+            label: const Text('Shiriki'),
           ),
         ],
       ),
@@ -283,10 +315,11 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
     // If no saved printer, show device selector
     if (address == null) {
       final device = await FlutterBluetoothPrinter.selectDevice(context);
-      if (device == null) return;
+      if (!mounted || device == null) return;
       address = device.address;
       await printerController.selectPrinter(
           device.address, device.name ?? 'Printer');
+      if (!mounted) return;
     }
 
     setState(() => _printing = true);

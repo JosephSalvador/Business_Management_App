@@ -25,11 +25,13 @@ class TokenPair {
     required this.accessToken,
     required this.refreshToken,
     required this.expiresAt,
+    this.user,
   });
 
   final String accessToken;
   final String refreshToken;
   final DateTime expiresAt;
+  final Map<String, dynamic>? user;
 }
 
 /// Performs the refresh-token exchange against `/api/v1/auth/refresh`.

@@ -142,7 +142,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
     final total = (purchase['totalAmount'] ?? 0).toDouble();
     final status = purchase['status'] ?? '';
     final dateStr = purchase['orderDate'] ?? '';
-    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
 
     Color statusColor;
     switch (status.toLowerCase()) {

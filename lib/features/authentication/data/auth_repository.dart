@@ -475,6 +475,10 @@ class AuthRepository {
     if (refreshToken != null && refreshToken.isNotEmpty) {
       try {
         final pair = await refresh(refreshToken);
+        if (pair.user != null) {
+          final user = AuthUser.fromJson(pair.user!);
+          return Session(user: user, accessTokenExpiresAt: pair.expiresAt);
+        }
         final meResponse = await _apiClient.get<dynamic>('/api/v1/users/me');
         if (meResponse.statusCode == 200 && meResponse.data is Map) {
           final user = AuthUser.fromJson(
@@ -532,11 +536,16 @@ class AuthRepository {
       refreshToken: nextRefreshToken,
     );
 
+    final userData = data['user'] is Map
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : null;
+
     _onSessionEstablished?.call();
     return TokenPair(
       accessToken: accessToken,
       refreshToken: nextRefreshToken,
       expiresAt: Session.parseDate(expiresAtRaw),
+      user: userData,
     );
   }
 

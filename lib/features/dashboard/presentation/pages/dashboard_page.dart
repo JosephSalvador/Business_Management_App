@@ -1127,7 +1127,7 @@ class _ActivityTile extends StatelessWidget {
   String? _relativeTime(String? isoDate) {
     if (isoDate == null) return null;
     try {
-      final date = DateTime.parse(isoDate);
+      final date = DateTime.parse(isoDate).toLocal();
       final diff = DateTime.now().difference(date);
       if (diff.inSeconds < 60) return 'Sasa hivi';
       if (diff.inMinutes < 60) return '${diff.inMinutes} dk';

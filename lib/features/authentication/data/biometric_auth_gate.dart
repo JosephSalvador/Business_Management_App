@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -15,11 +16,12 @@ class BiometricAuthGate {
 
   /// Whether the device has biometric hardware AND enrolled credentials.
   Future<bool> isAvailable() async {
+    if (kIsWeb) return false;
     try {
       final canCheck = await _auth.canCheckBiometrics;
       final isSupported = await _auth.isDeviceSupported();
       return canCheck && isSupported;
-    } on PlatformException {
+    } on Object {
       return false;
     }
   }
@@ -32,6 +34,7 @@ class BiometricAuthGate {
   /// Returns true only on a genuine biometric match. On platforms without
   /// biometrics or when the user cancels, returns false.
   Future<bool> authenticate({required String reason}) async {
+    if (kIsWeb) return false;
     try {
       final available = await isAvailable();
       if (!available) return false;
@@ -43,16 +46,17 @@ class BiometricAuthGate {
           useErrorDialogs: true,
         ),
       );
-    } on PlatformException {
+    } on Object {
       return false;
     }
   }
 
   /// Returns the list of enrolled biometric types (fingerprint, face, iris).
   Future<List<BiometricType>> enrolledTypes() async {
+    if (kIsWeb) return const [];
     try {
       return await _auth.getAvailableBiometrics();
-    } on PlatformException {
+    } on Object {
       return const [];
     }
   }
