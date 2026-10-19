@@ -13,7 +13,6 @@ import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/settings_controller.dart';
 import '../../data/organization_repository.dart';
 import '../../../authentication/presentation/widgets/quick_pin_setup_sheet.dart';
-import '../../../receipts/data/receipt_providers.dart';
 import '../../../receipts/domain/receipt_format.dart';
 
 class SettingsPage extends ConsumerWidget {

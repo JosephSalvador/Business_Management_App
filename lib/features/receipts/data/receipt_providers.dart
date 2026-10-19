@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/storage/locale_store.dart';
-import '../../../core/storage/printer_store.dart';
 import '../data/receipt_repository.dart';
 import '../domain/receipt_format.dart';
 import '../domain/receipt_preview.dart';
