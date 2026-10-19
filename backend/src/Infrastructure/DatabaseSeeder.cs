@@ -71,6 +71,33 @@ public sealed class DatabaseSeeder
             _logger.LogInformation("Re-granted permissions to {Count} system administrator roles.", adminRoles.Count);
         }
 
+        var staffAndCashierRoles = await _db.Roles
+            .Include(r => r.Permissions)
+            .Where(r => r.Name == SystemRoles.Staff || r.Name == "Cashier")
+            .ToListAsync(cancellationToken);
+
+        var pricingViewPerm = await _db.Permissions
+            .FirstOrDefaultAsync(p => p.Name == PermissionNames.PricingView, cancellationToken);
+
+        if (pricingViewPerm is not null && staffAndCashierRoles.Count > 0)
+        {
+            var updated = 0;
+            foreach (var role in staffAndCashierRoles)
+            {
+                if (!role.Permissions.Any(p => p.Name == PermissionNames.PricingView))
+                {
+                    role.Grant(new[] { pricingViewPerm });
+                    updated++;
+                }
+            }
+
+            if (updated > 0)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Granted PricingView to {Count} existing Staff/Cashier roles.", updated);
+            }
+        }
+
         await EnsureTaxCatalogAsync(cancellationToken);
         await EnsureBillingCatalogAsync(cancellationToken);
         await EnsureFeatureFlagBackfillAsync(cancellationToken);

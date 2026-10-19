@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../network/app_exception.dart';
 import '../../features/sales/data/sale_repository.dart';
+import '../../features/sales/domain/sale.dart' show QuickSaleDefaults;
 import '../storage/sync_queue_dao.dart' show QueuedOperation;
 import 'local_sales_service.dart';
 
@@ -166,8 +167,37 @@ class SyncEngine {
     SyncOutcome outcome,
   ) async {
     try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final lines = (body['lines'] as List?)?.cast<Map<String, dynamic>>();
+      if (lines != null &&
+          lines.any((l) =>
+              l['productId'] == QuickSaleDefaults.provisionalProductId)) {
+        try {
+          final realQuickSaleId =
+              await _repository.getOrCreateQuickSaleProduct();
+          for (final line in lines) {
+            if (line['productId'] ==
+                QuickSaleDefaults.provisionalProductId) {
+              line['productId'] = realQuickSaleId;
+            }
+          }
+        } on AppException {
+          // If resolving real ID fails due to network/session, retry later
+          await _salesService.releaseUnattempted(op.operationId);
+          outcome.wentOffline = true;
+          return _DeliveryResult.stop;
+        }
+      }
+
+      if (body['branchId'] == null) {
+        final realBranchId = await _repository.defaultBranchId();
+        if (realBranchId != null) {
+          body['branchId'] = realBranchId;
+        }
+      }
+
       final sale = await _repository.create(
-        body: jsonDecode(op.payload) as Map<String, dynamic>,
+        body: body,
         idempotencyKey: op.operationId,
       );
       await _salesService.markSaleSynced(

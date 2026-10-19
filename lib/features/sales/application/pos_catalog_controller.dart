@@ -22,6 +22,7 @@ class PosProduct {
     required this.sku,
     required this.price,
     required this.projectedQuantity,
+    this.isService = false,
   });
 
   final String productId;
@@ -30,10 +31,11 @@ class PosProduct {
   final double price;
 
   /// Last-known server balance minus pending offline deductions. The POS
-  /// blocks selling beyond zero of this number (M5.5).
+  /// blocks selling beyond zero of this number (M5.5) for physical goods.
   final double projectedQuantity;
+  final bool isService;
 
-  bool get outOfStock => projectedQuantity <= 0;
+  bool get outOfStock => !isService && projectedQuantity <= 0;
 }
 
 class PosCatalogState {
@@ -184,10 +186,9 @@ class PosCatalogController extends Notifier<PosCatalogState> {
             sku: Value(p.sku),
             barcode: Value(p.barcode),
             status: p.status,
-            sellable: p.status == LocalProductCodes.statusActive &&
-                p.productType == LocalProductCodes.typeGoods,
+            sellable: p.status == LocalProductCodes.statusActive,
             productType: p.productType,
-            retailPrice: prices[p.id] ?? 0,
+            retailPrice: prices[p.id] ?? (p.costPrice ?? 0),
             currency: currency,
             fetchedAt: now,
           ),
@@ -230,6 +231,7 @@ class PosCatalogController extends Notifier<PosCatalogState> {
             sku: row.sku,
             price: row.retailPrice,
             projectedQuantity: quantities[row.productId] ?? 0.0,
+            isService: row.productType == LocalProductCodes.typeService,
           ),
       ];
       state = state.copyWith(

@@ -142,4 +142,19 @@ class SaleRepository {
     );
     return SaleDto.fromJson(response.data!);
   }
+
+  /// Fetches the default or primary branch id from `/api/v1/branches`.
+  Future<String?> defaultBranchId() async {
+    try {
+      final response = await _api.get<Map<String, dynamic>>(
+        '/api/v1/branches',
+        query: {'page': 1, 'pageSize': 1},
+      );
+      final items = response.data?['items'] as List? ?? [];
+      if (items.isNotEmpty) {
+        return (items.first as Map<String, dynamic>)['id'] as String?;
+      }
+    } catch (_) {}
+    return null;
+  }
 }

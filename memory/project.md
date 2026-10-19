@@ -1662,3 +1662,60 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
     - Backend built clean with 0 warnings, 0 errors (`dotnet build --warnaserror`).
     - 565/565 backend unit tests passed (`dotnet test --filter "FullyQualifiedName~Unit"`).
     - Flutter analyze clean with 0 issues.
+
+## Modern Two-Line Receipt Layout (Build 34, done 2026-10-19)
+
+- **Problem & Root Cause:**
+  - On narrow thermal paper (58mm / 32 columns and 80mm / 42 columns), the 4-column item table (`Item`, `Qty`, `Price`, `Total`) crammed the product name into 10–14 characters, causing awkward truncation or word wrapping, while redundantly displaying both `Price` and `Total` when `Qty = 1`.
+- **Implemented Fixes:**
+  - **`lib/features/receipts/domain/receipt_renderer.dart` (`Thermal80mmRenderer`):**
+    - Transitioned to the industry-standard two-line retail layout:
+      - Line 1: Full product name with word wrapping (never truncated).
+      - Line 2: `  {Qty} x {UnitPrice}` aligned left, line total aligned far right.
+    - Cleaned up obsolete 4-column budget and character calculation routines (`_itemWidths`, `_itemRow`).
+  - **`lib/features/receipts/presentation/widgets/receipt_ticket_card.dart` (`ReceiptTicketCard`):**
+    - Updated on-screen preview ticket to match: full bold product name on line 1, subtext `  {Qty} x {UnitPrice}` and right-aligned line total on line 2 with clean theme coloring.
+  - **Tests:**
+    - Updated `test/features/receipts/receipt_ticket_card_test.dart` and `test/features/receipts/receipt_preview_test.dart`.
+  - **Client Versioning:** Strictly incremented build-number/version to `1.0.0+34` in `pubspec.yaml`.
+
+## Staff & Cashier "Hakuna Bei" (No Price Set) Resolution (done 2026-10-19)
+
+- **Problem & Root Cause:**
+  - When logging in as an Owner (`Administrator`), product prices were displayed properly on both the Sales (POS) page and Products page. However, when logging in as `Staff` or `Cashier`, all products showed "Hakuna bei" (No price set) and `0.0`.
+  - In `PricingEndpoints.cs`, `GET /api/v1/price-lists` and `GET /api/v1/price-lists/{id}/prices` required `.RequirePermission(PermissionNames.PricingView)`.
+  - `PermissionNames.Staff` and `RoleTemplates.Cashier` omitted `PricingView`. The frontend caught the resulting 403 Forbidden gracefully and defaulted to an empty prices map, displaying "Hakuna bei".
+- **Implemented Fixes:**
+  - **`backend/src/Domain/Identity/PermissionNames.cs`:** Added `PermissionNames.PricingView` to `PermissionNames.Staff`.
+  - **`backend/src/Domain/Identity/RoleTemplates.cs`:** Added `PermissionNames.PricingView` to the `Cashier` starter role template (read-only price access; `PricingManage` remains restricted to Owners and Managers).
+  - **`backend/src/Infrastructure/DatabaseSeeder.cs`:** Added automated backfill in `SeedAsync` that queries existing `Staff` and `Cashier` roles across all tenants on startup and grants `PricingView` if missing.
+  - **Tests:** Added unit tests in `backend/tests/BusinessOS.Tests/Unit/Identity/RoleManagementCommandTests.cs` asserting that `PermissionNames.Staff` and `RoleTemplates.Starter["Cashier"]` always contain `PermissionNames.PricingView`.
+- **Verification:**
+  - Backend solution built cleanly with 0 warnings and 0 errors (`dotnet build backend/BusinessOS.slnx`).
+  - Full backend unit test suite passed clean with 567/567 tests green (`dotnet test --filter "FullyQualifiedName~Unit"`).
+
+## Offline POS Resilience, Provisional Quick Sale, Auth Persistence & PWA Hardening (Build 35, done 2026-10-19)
+
+- **Problem & Root Cause:**
+  - When merchants operated offline, they encountered an empty "Haupo Kwenye Mtandao / Products will appear when online" screen on the POS view with no way to sell.
+  - Quick Sale ("Uza Haraka") threw a network exception on first offline use (`posQuickSaleNetFirstTime`) if the device had not yet resolved the hidden server quick-sale product online.
+  - POS sales required a valid `branchId`, and if the merchant opened the app offline without previous branch caching, checkout failed with "Tawi la biashara halipatikani".
+  - Offline session tokens were not automatically generated during online login/refresh in `AuthRepository`, meaning a cold start while offline could fail to restore the session.
+  - Products loaded in the Products module were not automatically synchronized into Drift's `CachedCatalogDao`.
+  - PWA Web Manifest on `staging.jolinx-app.pages.dev` logged an icon size error (`Icon-192.png` was 128x128 instead of 192x192).
+- **Implemented Fixes:**
+  - **`lib/features/sales/domain/sale.dart` & `sync_engine.dart`:** Added `QuickSaleDefaults.provisionalProductId` (`00000000-0000-0000-0000-000000000099`). In `SyncEngine._deliverSale`, when syncing pending offline sales, any line items with the provisional product ID or provisional branch ID are lazily resolved/created on the backend before the sale is finalized.
+  - **`lib/features/sales/presentation/pages/pos_page.dart`:**
+    - Updated `_startQuickSale()` to seamlessly catch network errors and fall back to `provisionalProductId`, eliminating the blocking snackbar.
+    - Updated `_EmptyView` to display an encouraging offline banner with a direct, primary `+ Uza Haraka (Weka Bei)` button so merchants can immediately sell even with an empty local catalog.
+  - **`lib/features/sales/data/sales_providers.dart`:** Updated `posBranchIdProvider` with multi-tier fallback: memory/disk cache → backend fetch → local warehouse cache ID → tenant ID fallback.
+  - **`lib/features/sales/data/sale_repository.dart`:** Added `defaultBranchId()` resolving the first available branch.
+  - **`lib/features/products/application/products_controller.dart`:** Added non-blocking opportunistic background synchronization of loaded products into Drift's `CachedCatalogDao` via `_syncToOfflineCatalog`.
+  - **`lib/features/authentication/data/auth_repository.dart`:** Automatically generate and renew 7-day HMAC offline tokens in `_storeOfflineCredentials`, `completeTwoFactorChallenge`, `restore`, and `refresh`.
+  - **`lib/core/services/startup_warmup_service.dart`:** Pre-warm `getOrCreateQuickSaleProduct()` online.
+  - **`web/icons/Icon-192.png` & `.github/workflows/build-clients.yml`:** Resized `Icon-192.png` to true 192x192 RGBA and added `--pwa-strategy=offline-first` to web release builds.
+  - **Client Versioning:** Strictly incremented build-number/version to `1.0.0+35` in `pubspec.yaml`.
+- **Verification:**
+  - `flutter analyze` clean: 0 errors, 0 warnings, 0 lints.
+  - `flutter test` clean: 510/510 tests passed (100% green).
+  - `dotnet build --warnaserror backend/BusinessOS.slnx` clean: 0 warnings, 0 errors.

@@ -26,6 +26,7 @@ abstract final class LocalSaleStatus {
 abstract final class LocalProductCodes {
   static const statusActive = 1;
   static const typeGoods = 0;
+  static const typeService = 1;
 }
 
 /// Small key/value store for device-local operational metadata

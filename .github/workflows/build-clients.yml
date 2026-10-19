@@ -139,6 +139,7 @@ jobs:
       - name: Build Flutter Web Release
         run: |
           flutter build web --release \
+            --pwa-strategy=offline-first \
             --build-number=${{ github.run_number }} \
             --build-name=1.0.${{ github.run_number }} \
             --dart-define=APP_ENV=${{ steps.cf_env.outputs.app_env }} \

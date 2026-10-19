@@ -1,7 +1,10 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
+import '../../../core/storage/cached_catalog_dao.dart' show LocalProductCodes;
+import '../../../core/storage/local_database.dart' show CachedProductsCompanion;
 import '../data/product_repository.dart';
 import '../domain/catalog.dart';
 import '../domain/product.dart';
@@ -110,6 +113,10 @@ class ProductsController extends Notifier<ProductsState> {
       // Stock badges are optional decoration on this screen.
     }
 
+    if (_search.isEmpty) {
+      _syncToOfflineCatalog(page.items, prices);
+    }
+
     return ProductsLoaded(
       items: page.items,
       total: page.total,
@@ -117,6 +124,42 @@ class ProductsController extends Notifier<ProductsState> {
       prices: prices,
       stockByProduct: stock,
     );
+  }
+
+  void _syncToOfflineCatalog(
+    List<Product> products,
+    Map<String, double> prices,
+  ) {
+    try {
+      final tenantId = ref.read(sessionContextProvider).$1;
+      if (tenantId == null || products.isEmpty) return;
+      final dao = ref.read(localSalesServiceProvider).catalog;
+      final now = DateTime.now().toUtc();
+      dao.replaceCatalog(
+        tenantId: tenantId,
+        products: [
+          for (final p in products)
+            CachedProductsCompanion.insert(
+              tenantId: tenantId,
+              productId: p.id,
+              name: p.name,
+              sku: Value(p.sku),
+              barcode: Value(p.barcode),
+              status: p.status,
+              sellable: p.status == LocalProductCodes.statusActive,
+              productType: p.productType,
+              retailPrice: prices[p.id] ?? (p.costPrice ?? 0),
+              currency: 'TZS',
+              fetchedAt: now,
+            ),
+        ],
+        stock: const [],
+      ).then((_) {
+        try {
+          ref.read(posCatalogControllerProvider.notifier).load();
+        } catch (_) {}
+      }).ignore();
+    } catch (_) {}
   }
 
   Future<void> _ensureDefaultPriceList() async {

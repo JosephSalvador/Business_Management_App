@@ -302,6 +302,7 @@ class AuthRepository {
       Map<String, dynamic>.from(response.data as Map),
     );
 
+    unawaited(_offlineCredentialStore.generateOfflineToken(session.user));
     _onSessionEstablished?.call();
     return session;
   }
@@ -477,6 +478,7 @@ class AuthRepository {
         final pair = await refresh(refreshToken);
         if (pair.user != null) {
           final user = AuthUser.fromJson(pair.user!);
+          unawaited(_offlineCredentialStore.generateOfflineToken(user));
           return Session(user: user, accessTokenExpiresAt: pair.expiresAt);
         }
         final meResponse = await _apiClient.get<dynamic>('/api/v1/users/me');
@@ -484,6 +486,7 @@ class AuthRepository {
           final user = AuthUser.fromJson(
             Map<String, dynamic>.from(meResponse.data as Map<dynamic, dynamic>),
           );
+          unawaited(_offlineCredentialStore.generateOfflineToken(user));
           return Session(user: user, accessTokenExpiresAt: pair.expiresAt);
         }
       } on AppException {
@@ -539,6 +542,13 @@ class AuthRepository {
     final userData = data['user'] is Map
         ? Map<String, dynamic>.from(data['user'] as Map)
         : null;
+
+    if (userData != null) {
+      try {
+        final user = AuthUser.fromJson(userData);
+        unawaited(_offlineCredentialStore.generateOfflineToken(user));
+      } catch (_) {}
+    }
 
     _onSessionEstablished?.call();
     return TokenPair(
@@ -620,6 +630,7 @@ class AuthRepository {
         password: password,
         user: user,
       );
+      await _offlineCredentialStore.generateOfflineToken(user);
       final isPinEnabled = await _offlineCredentialStore.isQuickPinEnabled();
       final isBiometric = await _offlineCredentialStore.isBiometricEnabled();
       if (isPinEnabled || isBiometric) {

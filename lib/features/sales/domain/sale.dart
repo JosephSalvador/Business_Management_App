@@ -37,6 +37,11 @@ abstract final class QuickSaleDefaults {
   /// Reserved SKU of the hidden "Quick Sale" product, kept in sync with
   /// `EnsureQuickSaleProductCommand.QuickSaleSku` on the server.
   static const sku = 'QS-BILA-JINA';
+
+  /// Deterministic provisional GUID used locally for offline quick sales
+  /// before the device has communicated with the backend. Replaced with the
+  /// authoritative server product ID during sync drain.
+  static const provisionalProductId = '00000000-0000-0000-0000-000000000099';
 }
 
 /// One row in the POS cart: a product snapshot plus the chosen quantity.

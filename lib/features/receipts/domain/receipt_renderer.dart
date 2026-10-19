@@ -309,43 +309,6 @@ class Thermal80mmRenderer implements ReceiptRenderer {
     return '${fittedLabel.padRight(free)}$fittedValue';
   }
 
-  /// Character budget of each money column: qty, price, total. The name column
-  /// takes whatever is left, so a long money figure can never truncate a value.
-  List<int> _itemWidths(ReceiptPreview receipt, Map<String, String> labels) {
-    var qtyW = labels['colQty']!.length;
-    var priceW = labels['colPrice']!.length;
-    var totalW = labels['colTotal']!.length;
-    for (final line in receipt.lines) {
-      qtyW = max(qtyW, receiptQuantity(line.quantity).length);
-      priceW = max(priceW, receiptMoneyBare(line.unitPrice).length);
-      totalW = max(totalW, receiptMoneyBare(line.lineTotal).length);
-    }
-    return [qtyW, priceW, totalW];
-  }
-
-  /// One item line (or the column header) using [widths] = qty, price, total.
-  String _itemRow({
-    required String name,
-    required String qty,
-    required String price,
-    required String total,
-    required List<int> widths,
-  }) {
-    final money =
-        '${qty.padLeft(widths[0])} ${price.padLeft(widths[1])} ${total.padLeft(widths[2])}';
-    final nameRoom = lineWidth - money.length - 1;
-    if (nameRoom <= 0) return _fit(money);
-    if (name.length > nameRoom && lineWidth <= 32) {
-      final wrappedName = _fit(name);
-      final indentedMoney = money.padLeft(lineWidth);
-      return '$wrappedName\n$indentedMoney';
-    }
-    return '${_padOrTruncate(name, nameRoom)} $money';
-  }
-
-  String _padOrTruncate(String text, int width) =>
-      text.length > width ? _truncate(text, width) : text.padRight(width);
-
   String _center(String text) {
     if (text.length >= lineWidth) return _fit(text);
     final padding = (lineWidth - text.length) ~/ 2;
@@ -386,6 +349,38 @@ class Thermal80mmRenderer implements ReceiptRenderer {
   String _fit(String line) => line.length > lineWidth
       ? _truncate(line, lineWidth)
       : line.padRight(lineWidth);
+
+  /// Computes [qty, price, total] column widths for the item table. The name
+  /// takes whatever is left, so a long money figure can never truncate a value.
+  List<int> _itemWidths(ReceiptPreview receipt, Map<String, String> labels) {
+    var qtyW = labels['colQty']!.length;
+    var priceW = labels['colPrice']!.length;
+    var totalW = labels['colTotal']!.length;
+    for (final line in receipt.lines) {
+      qtyW = max(qtyW, receiptQuantity(line.quantity).length);
+      priceW = max(priceW, receiptMoneyBare(line.unitPrice).length);
+      totalW = max(totalW, receiptMoneyBare(line.lineTotal).length);
+    }
+    return [qtyW, priceW, totalW];
+  }
+
+  /// One item line (or the column header) using [widths] = qty, price, total.
+  String _itemRow({
+    required String name,
+    required String qty,
+    required String price,
+    required String total,
+    required List<int> widths,
+  }) {
+    final money =
+        '${qty.padLeft(widths[0])} ${price.padLeft(widths[1])} ${total.padLeft(widths[2])}';
+    final nameRoom = lineWidth - money.length - 1;
+    if (nameRoom <= 0) return _fit(money);
+    return '${_padOrTruncate(name, nameRoom)} $money';
+  }
+
+  String _padOrTruncate(String text, int width) =>
+      text.length > width ? _truncate(text, width) : text.padRight(width);
 
   static String _truncate(String text, int max) {
     if (max <= 0) return '';

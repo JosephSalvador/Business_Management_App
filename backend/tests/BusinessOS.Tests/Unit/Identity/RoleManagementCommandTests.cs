@@ -204,4 +204,18 @@ public sealed class RoleManagementCommandTests
         Assert.True(result.IsSuccess);
         Assert.Equal(new[] { "Sales.View", "Users.View" }, result.Value.PermissionNames);
     }
+
+    [Fact]
+    public void StaffRole_IncludesPricingViewPermission()
+    {
+        Assert.Contains(PermissionNames.PricingView, PermissionNames.Staff);
+    }
+
+    [Fact]
+    public void CashierTemplate_IncludesPricingViewPermission()
+    {
+        var cashier = RoleTemplates.Starter.FirstOrDefault(t => t.Name == "Cashier");
+        Assert.NotNull(cashier);
+        Assert.Contains(PermissionNames.PricingView, cashier.PermissionNames);
+    }
 }

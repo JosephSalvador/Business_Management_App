@@ -38,13 +38,10 @@ void main() {
       expect(find.text('Customer'), findsOneWidget);
       expect(find.text('Walk-in Customer'), findsOneWidget);
 
-      expect(find.text('Item'), findsOneWidget);
-      expect(find.text('Qty'), findsOneWidget);
-      expect(find.text('Price'), findsOneWidget);
-      expect(find.text('Total'), findsOneWidget);
       expect(find.text('Paracetamol 500mg'), findsOneWidget);
-      // unit price and line total of the first row
-      expect(find.text('2.50'), findsOneWidget);
+      expect(find.text('Vitamin C 1000mg'), findsOneWidget);
+      expect(find.text('  4 x 2.50'), findsOneWidget);
+      expect(find.text('  2 x 5.00'), findsOneWidget);
       expect(find.text('10.00'), findsNWidgets(2));
     });
 

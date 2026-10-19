@@ -60,6 +60,13 @@ class StartupWarmupService {
       } catch (e) {
         debugPrint('StartupWarmup: Entitlements warmup skipped: $e');
       }
+
+      // 6. Pre-warm Quick Sale product ID online so quick sales are instantaneous
+      try {
+        await _ref.read(saleRepositoryProvider).getOrCreateQuickSaleProduct();
+      } catch (e) {
+        debugPrint('StartupWarmup: QuickSale product warmup skipped: $e');
+      }
     } else {
       // Offline mode: restore cached capabilities & local sync status
       try {

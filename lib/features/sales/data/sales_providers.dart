@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/core_providers.dart'
-    show localSalesServiceProvider, deviceIdentityProvider, branchCacheProvider;
+    show
+        localSalesServiceProvider,
+        deviceIdentityProvider,
+        branchCacheProvider,
+        localDatabaseProvider;
 import '../../../core/network/api_routes.dart';
 import '../../../core/network/connectivity_monitor.dart';
 import '../../../core/sync/local_sales_service.dart';
@@ -158,24 +162,48 @@ final posBranchIdProvider = Provider<Future<String?> Function()>((ref) {
     }
 
     // Fetch from API
-    final response =
-        await ref.watch(apiClientProvider).get<Map<String, dynamic>>(
-      ApiRoutes.v1('/branches'),
-      query: {'page': 1, 'pageSize': 1},
-    );
-    final items = response.data?['items'] as List? ?? [];
-    if (items.isEmpty) {
-      return null;
-    }
-    final branchId = (items.first as Map<String, dynamic>)['id'] as String?;
-    final branchName = (items.first as Map<String, dynamic>)['name'] as String?;
+    try {
+      final response =
+          await ref.read(apiClientProvider).get<Map<String, dynamic>>(
+        ApiRoutes.v1('/branches'),
+        query: {'page': 1, 'pageSize': 1},
+      );
+      final items = response.data?['items'] as List? ?? [];
+      if (items.isNotEmpty) {
+        final branchId = (items.first as Map<String, dynamic>)['id'] as String?;
+        final branchName =
+            (items.first as Map<String, dynamic>)['name'] as String?;
 
-    // Cache for offline use
-    if (branchId != null) {
-      await branchCache.store(branchId: branchId, branchName: branchName);
+        // Cache for offline use
+        if (branchId != null) {
+          await branchCache.store(branchId: branchId, branchName: branchName);
+        }
+
+        return branchId;
+      }
+    } catch (_) {
+      // Offline fallback
     }
 
-    return branchId;
+    // Secondary fallback: if warehouse cache exists, use its warehouse id
+    try {
+      final db = ref.read(localDatabaseProvider);
+      final tenantId = auth.session.user.tenantId;
+      final cachedWarehouse = await (db.select(db.cachedWarehouses)
+            ..where((t) => t.tenantId.equals(tenantId))
+            ..limit(1))
+          .getSingleOrNull();
+      if (cachedWarehouse != null) {
+        await branchCache.store(
+          branchId: cachedWarehouse.warehouseId,
+          branchName: cachedWarehouse.name,
+        );
+        return cachedWarehouse.warehouseId;
+      }
+    } catch (_) {}
+
+    // Tertiary fallback: use tenant ID as provisional branch ID
+    return auth.session.user.tenantId;
   };
 });
 

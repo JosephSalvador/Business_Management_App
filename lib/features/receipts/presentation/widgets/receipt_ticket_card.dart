@@ -221,81 +221,47 @@ class ReceiptTicketCard extends StatelessWidget {
 
   Widget _items(BuildContext context, Map<String, String> labels) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _itemRow(
-          context,
-          name: labels['colItem']!,
-          qty: labels['colQty']!,
-          price: labels['colPrice']!,
-          total: labels['colTotal']!,
-          header: true,
-        ),
-        for (final line in receipt.lines)
-          _itemRow(
-            context,
-            name: line.productName,
-            qty: receiptQuantity(line.quantity),
-            price: receiptMoneyBare(line.unitPrice),
-            total: receiptMoneyBare(line.lineTotal),
-          ),
+        for (var i = 0; i < receipt.lines.length; i++) ...[
+          if (i > 0) SizedBox(height: dense ? 6 : 8),
+          _itemTwoLine(context, receipt.lines[i]),
+        ],
       ],
     );
   }
 
-  Widget _itemRow(
-    BuildContext context, {
-    required String name,
-    required String qty,
-    required String price,
-    required String total,
-    bool header = false,
-  }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: dense ? 1 : 2),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 6,
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: _body(context, bold: header),
+  Widget _itemTwoLine(BuildContext context, ReceiptLine line) {
+    final qtyStr = receiptQuantity(line.quantity);
+    final unitPriceStr = receiptMoneyBare(line.unitPrice);
+    final lineTotalStr = receiptMoneyBare(line.lineTotal);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Line 1: Full product name (never truncated by columns)
+        Text(
+          line.productName,
+          style: _body(context, bold: true),
+        ),
+        const SizedBox(height: 2),
+        // Line 2: "1 x 1,000.00" on left, line total on right
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '  $qtyStr x $unitPriceStr',
+              style: _body(context).copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          SizedBox(
-            width: dense ? 36 : 44,
-            child: Text(
-              qty,
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              style: _body(context, bold: header),
+            Text(
+              lineTotalStr,
+              style: _body(context),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: Text(
-              price,
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: _body(context, bold: header),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: Text(
-              total,
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: _body(context, bold: header),
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 

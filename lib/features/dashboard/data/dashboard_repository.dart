@@ -24,9 +24,9 @@ class DashboardSummary {
     int parsedTotalProducts = 0;
     final rawProducts = catalog['totalProducts'] ?? json['totalProducts'];
     if (rawProducts is num) {
-      parsedTotalProducts = (rawProducts as num).toInt();
+      parsedTotalProducts = rawProducts.toInt();
     } else if (rawProducts is String) {
-      parsedTotalProducts = int.tryParse(rawProducts as String) ?? 0;
+      parsedTotalProducts = int.tryParse(rawProducts) ?? 0;
     }
 
     return DashboardSummary(

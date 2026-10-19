@@ -126,6 +126,7 @@ public static class PermissionNames
         UnitsView,
         InventoryView, InventoryManage,
         WarehousesView,
+        PricingView,
         ReceiptsView, ReceiptsPrint,
         NotificationsView,
     };

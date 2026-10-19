@@ -197,7 +197,6 @@ class _PosPageState extends ConsumerState<PosPage> {
   /// the local cache (bySku) or the persisted id first — both work offline;
   /// the server lazily creates it the first time.
   Future<void> _startQuickSale() async {
-    final loc = context.loc;
     final quickMemory = ref.read(localSalesServiceProvider).quickMemory;
 
     String? quickProductId;
@@ -218,17 +217,12 @@ class _PosPageState extends ConsumerState<PosPage> {
         if (tenantId != null) {
           await quickMemory.rememberProductId(tenantId, quickProductId);
         }
-      } on AppException {
-        if (!mounted) {
-          return;
+      } catch (_) {
+        // Resilient offline fallback: never block an offline sale!
+        quickProductId = QuickSaleDefaults.provisionalProductId;
+        if (tenantId != null) {
+          await quickMemory.rememberProductId(tenantId, quickProductId);
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(loc.posQuickSaleNetFirstTime),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
       }
     }
 
@@ -488,6 +482,7 @@ Widget _buildProductArea({
   required void Function(PosProduct) onTap,
   required void Function(PosProduct) onQuantityTap,
   required AppLocalizations loc,
+  required VoidCallback onQuickSale,
 }) {
   return switch (catalog) {
     _ when catalog.loading && catalog.items.isEmpty =>
@@ -497,6 +492,8 @@ Widget _buildProductArea({
         icon: catalog.stale
             ? Icons.wifi_off_outlined
             : Icons.inventory_2_outlined,
+        isOffline: catalog.stale,
+        onQuickSale: onQuickSale,
       ),
     _ when catalog.items.isEmpty =>
       _EmptyView(message: loc.posNoSearchResults, icon: Icons.search_off),
@@ -553,7 +550,8 @@ class _MobileLayout extends StatelessWidget {
               catalog: catalog,
               onTap: onAddToCart,
               onQuantityTap: onQuickQuantity,
-              loc: loc),
+              loc: loc,
+              onQuickSale: onQuickSale),
         ),
       ],
     );
@@ -612,7 +610,8 @@ class _DesktopLayout extends StatelessWidget {
                         catalog: catalog,
                         onTap: onAddToCart,
                         onQuantityTap: onQuickQuantity,
-                        loc: loc),
+                        loc: loc,
+                        onQuickSale: onQuickSale),
                   ),
                 ],
               ),
@@ -1132,13 +1131,122 @@ class _CartItemRow extends StatelessWidget {
 // ── Empty View ────────────────────────────────────────────────────
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView(
-      {required this.message, this.icon = Icons.inventory_2_outlined});
+  const _EmptyView({
+    required this.message,
+    this.icon = Icons.inventory_2_outlined,
+    this.isOffline = false,
+    this.onQuickSale,
+  });
+
   final String message;
   final IconData icon;
+  final bool isOffline;
+  final VoidCallback? onQuickSale;
 
   @override
   Widget build(BuildContext context) {
+    if (isOffline) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.wifi_off_rounded,
+                  size: 34,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.successContainer.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppColors.success.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_outline,
+                        size: 14, color: AppColors.success),
+                    SizedBox(width: 6),
+                    Text(
+                      'Uuzaji wa Nje ya Mtandao Umewezeshwa',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Endelea Kuuza Bila Mtandao',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.resolveTextPrimary(context),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Text(
+                  'Hakuna orodha ya bidhaa zilizopakuliwa awali, lakini unaweza kuuza kwa '
+                  'kuweka jina na bei moja kwa moja. Mauzo yote yanahifadhiwa salama kwenye kifaa hiki '
+                  'na yatasawazishwa kiotomatiki mtandao ukirudi.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: AppColors.resolveTextSecondary(context),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 24),
+              if (onQuickSale != null)
+                FilledButton.icon(
+                  onPressed: onQuickSale,
+                  icon: const Icon(Icons.bolt, size: 20),
+                  label: const Text(
+                    'Uza Haraka (Weka Bei)',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

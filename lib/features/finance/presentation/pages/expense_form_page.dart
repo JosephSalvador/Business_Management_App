@@ -200,7 +200,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               runSpacing: 6,
                               children: _quickAmounts.map((val) {
                                 return ActionChip(
-                                  label: Text('+${formatMoney(val)}'),
+                                  label: Text('+${formatMoney(val.toDouble())}'),
                                   labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                                   backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                                   padding: const EdgeInsets.symmetric(horizontal: 4),

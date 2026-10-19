@@ -41,6 +41,7 @@ public static class RoleTemplates
                 PermissionNames.SalesCreate, PermissionNames.SalesView,
                 PermissionNames.ProductsView, PermissionNames.CategoriesView, PermissionNames.BrandsView, PermissionNames.UnitsView,
                 PermissionNames.InventoryView, PermissionNames.WarehousesView,
+                PermissionNames.PricingView,
                 PermissionNames.CustomersView, PermissionNames.CustomersCreate, PermissionNames.CustomersUpdate,
                 PermissionNames.ReceiptsView, PermissionNames.ReceiptsPrint,
                 PermissionNames.NotificationsView,
