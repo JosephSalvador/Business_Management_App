@@ -13,7 +13,9 @@ import '../../../../l10n/loc.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../onboarding/application/workspace_controller.dart';
+import '../../../receipts/data/receipt_providers.dart';
 import '../../../receipts/data/receipt_repository.dart' show PrintType;
+import '../../../receipts/domain/receipt_format.dart';
 import '../../../receipts/presentation/widgets/receipt_ticket_card.dart';
 import '../../data/receipt_printer_service.dart';
 import '../../domain/sale.dart';
@@ -43,7 +45,7 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
   Widget build(BuildContext context) {
     final loc = context.loc;
     final sale = widget.sale;
-    final printerService = ref.read(receiptPrinterServiceProvider);
+    final printerService = ref.watch(receiptPrinterServiceProvider);
     final receipt = printerService.saleToReceipt(
       sale: sale,
       businessName: _businessName,
@@ -109,7 +111,33 @@ class _SaleSuccessPageState extends ConsumerState<SaleSuccessPage> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+
+                      Center(
+                        child: SegmentedButton<ReceiptPaperWidth>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ReceiptPaperWidth.mm80,
+                              label: Text('80 mm'),
+                              icon: Icon(Icons.receipt_long, size: 16),
+                            ),
+                            ButtonSegment(
+                              value: ReceiptPaperWidth.mm58,
+                              label: Text('58 mm'),
+                              icon: Icon(Icons.receipt, size: 16),
+                            ),
+                          ],
+                          selected: {ref.watch(receiptPaperWidthProvider)},
+                          onSelectionChanged: (set) {
+                            if (set.isNotEmpty) {
+                              ref
+                                  .read(receiptPaperWidthProvider.notifier)
+                                  .setWidth(set.first);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
 
                       Flexible(
                         child: SingleChildScrollView(

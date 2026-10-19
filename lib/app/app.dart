@@ -7,8 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers.dart';
 import '../core/session/app_lock.dart';
 import '../core/storage/locale_store.dart';
-import '../core/storage/theme_store.dart';
+import '../core/storage/printer_store.dart';
 import '../features/authentication/application/auth_controller.dart';
+import '../features/receipts/data/receipt_providers.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -17,11 +18,13 @@ class BusinessOsApp extends ConsumerStatefulWidget {
   const BusinessOsApp({
     required this.savedLanguageCode,
     this.savedThemeMode,
+    this.savedPaperWidth,
     super.key,
   });
 
   final String? savedLanguageCode;
   final String? savedThemeMode;
+  final String? savedPaperWidth;
 
   @override
   ConsumerState<BusinessOsApp> createState() => _BusinessOsAppState();
@@ -46,6 +49,10 @@ class _BusinessOsAppState extends ConsumerState<BusinessOsApp>
       ref
           .read(themeModeControllerProvider.notifier)
           .restore(widget.savedThemeMode);
+      ref
+          .read(receiptPaperWidthProvider.notifier)
+          .restore(widget.savedPaperWidth);
+      ref.read(printerControllerProvider.notifier).restore();
       ref.read(localSalesServiceProvider).recoverFromRestart();
       ref.read(syncEngineProvider);
       ref.read(syncStatusProvider.notifier).refresh();

@@ -1719,3 +1719,22 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
   - `flutter analyze` clean: 0 errors, 0 warnings, 0 lints.
   - `flutter test` clean: 510/510 tests passed (100% green).
   - `dotnet build --warnaserror backend/BusinessOS.slnx` clean: 0 warnings, 0 errors.
+
+## Configurable Receipt Paper Width (58mm/80mm) & Staging APK CI Publishing (Build 36, done 2026-10-19)
+
+- **Problem & Root Cause:**
+  - Users could not configure their preferred printer paper size (58mm vs 80mm) from app settings, and choices were reset on app restart.
+  - During sales completion (`SaleSuccessPage`), receipt rendering and printing did not react to user-selected paper widths.
+  - In GitHub Actions CI (`.github/workflows/build-clients.yml`), the Android APK compilation ran before `Determine Target Environment & API Routing`, hardcoding production API URLs into staging APKs. Staging pushes also never published APK releases, only saving them as internal workflow artifacts.
+  - In `AppDownloadPage` and `AppVersionEndpoints.cs`, download links hardcoded `latest` production releases and had an obsolete repo owner URL.
+- **Implemented Fixes:**
+  - **`lib/core/storage/printer_store.dart`:** Added `_keyPaperWidth`, `getPaperWidth()`, `savePaperWidth()` to persist paper width preference via secure storage.
+  - **`lib/features/receipts/data/receipt_providers.dart`:** Added `restore(String? saved)` and automatic persistence in `ReceiptPaperWidthNotifier` whenever `state` or `setWidth` is called.
+  - **`lib/app/bootstrap.dart` & `lib/app/app.dart`:** Pre-loaded saved paper width preference before first frame and restored in `BusinessOsApp`.
+  - **`lib/features/settings/presentation/pages/settings_page.dart`:** Added `_PrinterPaperSizeTile` with bottom sheet picker allowing 1-tap switching between 80mm (Counter) and 58mm (Handheld POS) with Swahili & English descriptions.
+  - **`lib/features/sales/presentation/pages/sale_success_page.dart`:** Watched `receiptPrinterServiceProvider` and added an on-screen `SegmentedButton` to preview/print receipts in the merchant's configured paper size.
+  - **`lib/features/onboarding/presentation/pages/app_download_page.dart`:** Made `directApkUrl` dynamic, pointing to `staging-latest` release on staging and `latest` on production.
+  - **`backend/src/API/Endpoints/AppVersionEndpoints.cs`:** Corrected fallback repository URL to `JosephSalvador/Business_Management_App`.
+  - **`.github/workflows/build-clients.yml`:** Reordered `Determine Target Environment & API Routing` before Android compilation, injected dynamic staging `--dart-define` parameters, and added automatic `staging-latest` pre-release publishing for staging pushes.
+  - **Client Versioning:** Strictly incremented build-number/version to `1.0.0+36` in `pubspec.yaml`.
+

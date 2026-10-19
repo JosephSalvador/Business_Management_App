@@ -42,7 +42,7 @@ public static class AppVersionEndpoints
             Version: section["LatestVersion"] ?? "1.0.0",
             BuildNumber: int.TryParse(section["BuildNumber"], out var b) ? b : 10,
             MinSupportedBuild: int.TryParse(section["MinSupportedBuild"], out var m) ? m : 8,
-            AndroidApkUrl: section["AndroidApkUrl"] ?? "https://github.com/josephsalvador662/business_app/releases/download/latest/jolinx-android.apk",
+            AndroidApkUrl: section["AndroidApkUrl"] ?? "https://github.com/JosephSalvador/Business_Management_App/releases/download/latest/jolinx-android.apk",
             WebPwaUrl: section["WebPwaUrl"] ?? "https://staging.jolinx-app.pages.dev",
             ReleaseNotesSw: section["ReleaseNotesSw"] ?? "Maboresho ya mfumo wa mauzo, risiti za Bluetooth, na usasishaji wa haraka wa ndani kwa ndani bila Google Play Store.",
             ReleaseNotesEn: section["ReleaseNotesEn"] ?? "System enhancements, Bluetooth receipt printing, and instant in-place auto-updates without app stores.",
@@ -56,7 +56,7 @@ public static class AppVersionEndpoints
     private static IResult DownloadAndroidApkAsync(IConfiguration config)
     {
         var url = config["AppDistribution:AndroidApkUrl"] 
-            ?? "https://github.com/josephsalvador662/business_app/releases/download/latest/jolinx-android.apk";
+            ?? "https://github.com/JosephSalvador/Business_Management_App/releases/download/latest/jolinx-android.apk";
         return Results.Redirect(url);
     }
 

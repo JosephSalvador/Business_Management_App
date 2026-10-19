@@ -8,6 +8,7 @@ import '../core/network/api_client.dart';
 import '../core/storage/db_key_store.dart';
 import '../core/storage/local_database.dart';
 import '../core/storage/locale_store.dart';
+import '../core/storage/printer_store.dart';
 import '../core/storage/theme_store.dart';
 import '../features/authentication/data/secure_token_store.dart';
 import 'app.dart';
@@ -33,6 +34,10 @@ Future<void> main() async {
   final themeStore = ThemeStore();
   final savedThemeMode = await themeStore.read();
 
+  // Printer paper width preference (58mm vs 80mm).
+  final printerStore = PrinterStore();
+  final savedPaperWidth = await printerStore.getPaperWidth();
+
   final tokenStore = SecureTokenStore();
 
   runApp(
@@ -55,6 +60,7 @@ Future<void> main() async {
       child: BusinessOsApp(
         savedLanguageCode: savedLocale,
         savedThemeMode: savedThemeMode,
+        savedPaperWidth: savedPaperWidth,
       ),
     ),
   );

@@ -13,6 +13,8 @@ import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/settings_controller.dart';
 import '../../data/organization_repository.dart';
 import '../../../authentication/presentation/widgets/quick_pin_setup_sheet.dart';
+import '../../../receipts/data/receipt_providers.dart';
+import '../../../receipts/domain/receipt_format.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -132,6 +134,7 @@ class SettingsPage extends ConsumerWidget {
           children: [
             _ThemeModeTile(),
             _LanguageTile(),
+            const _PrinterPaperSizeTile(),
             _SettingsTile(
               icon: Icons.access_time_outlined,
               title: loc.settingsTimezone,
@@ -624,6 +627,138 @@ class _LanguageTile extends ConsumerWidget {
                 },
               ),
             const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrinterPaperSizeTile extends ConsumerWidget {
+  const _PrinterPaperSizeTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(receiptPaperWidthProvider);
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
+
+    final label = switch (current) {
+      ReceiptPaperWidth.mm58 => isSw
+          ? '58 mm (POS / Handheld ya Mkononi)'
+          : '58 mm (Handheld POS)',
+      ReceiptPaperWidth.mm80 => isSw
+          ? '80 mm (Printi ya Kaunta / Desktop)'
+          : '80 mm (Counter / Desktop)',
+    };
+
+    return ListTile(
+      leading:
+          const Icon(Icons.print_outlined, color: AppColors.primary, size: 22),
+      title: Text(
+        isSw ? 'Ukubwa wa Karatasi ya Risiti' : 'Receipt Paper Size',
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        label,
+        style: TextStyle(
+          color: AppColors.resolveTextSecondary(context),
+          fontSize: 13,
+        ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: AppColors.resolveTextTertiary(context),
+        size: 20,
+      ),
+      onTap: () => _showPicker(context, ref, current, isSw),
+    );
+  }
+
+  void _showPicker(
+    BuildContext context,
+    WidgetRef ref,
+    ReceiptPaperWidth current,
+    bool isSw,
+  ) {
+    final options = [
+      (
+        width: ReceiptPaperWidth.mm80,
+        name: isSw ? '80 mm (Printi ya Kaunta)' : '80 mm (Counter Printer)',
+        desc: isSw
+            ? 'Printi ya kawaida ya mezani/kaunta (safu 42 za herufi)'
+            : 'Standard counter thermal printer (42 columns)',
+        icon: Icons.receipt_long,
+      ),
+      (
+        width: ReceiptPaperWidth.mm58,
+        name: isSw ? '58 mm (POS ya Mkononi)' : '58 mm (Handheld POS)',
+        desc: isSw
+            ? 'Printi ndogo ya Bluetooth ya mkononi (safu 32 za herufi)'
+            : 'Portable handheld Bluetooth printer (32 columns)',
+        icon: Icons.receipt,
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  isSw
+                      ? 'Chagua Ukubwa wa Karatasi ya Risiti'
+                      : 'Choose Receipt Paper Size',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.resolveTextPrimary(context),
+                  ),
+                ),
+              ),
+            ),
+            for (final option in options)
+              ListTile(
+                leading: Icon(
+                  option.icon,
+                  color: current == option.width
+                      ? AppColors.primary
+                      : AppColors.resolveTextSecondary(context),
+                  size: 22,
+                ),
+                title: Text(
+                  option.name,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: current == option.width
+                        ? AppColors.primary
+                        : AppColors.resolveTextPrimary(context),
+                  ),
+                ),
+                subtitle: Text(
+                  option.desc,
+                  style: TextStyle(
+                    color: AppColors.resolveTextSecondary(context),
+                    fontSize: 12.5,
+                  ),
+                ),
+                trailing: current == option.width
+                    ? const Icon(Icons.check_circle,
+                        color: AppColors.primary, size: 20)
+                    : null,
+                onTap: () {
+                  ref
+                      .read(receiptPaperWidthProvider.notifier)
+                      .setWidth(option.width);
+                  Navigator.pop(context);
+                },
+              ),
+            const SizedBox(height: 12),
           ],
         ),
       ),

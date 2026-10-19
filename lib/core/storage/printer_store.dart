@@ -14,20 +14,27 @@ class PrinterStore {
 
   static const _keyAddress = 'jolinx.printerAddress';
   static const _keyName = 'jolinx.printerName';
+  static const _keyPaperWidth = 'jolinx.printerPaperWidth';
 
   final FlutterSecureStorage _storage;
 
   Future<String?> getAddress() => _storage.read(key: _keyAddress);
   Future<String?> getName() => _storage.read(key: _keyName);
+  Future<String?> getPaperWidth() => _storage.read(key: _keyPaperWidth);
 
   Future<void> save(String address, String name) async {
     await _storage.write(key: _keyAddress, value: address);
     await _storage.write(key: _keyName, value: name);
   }
 
+  Future<void> savePaperWidth(String width) async {
+    await _storage.write(key: _keyPaperWidth, value: width);
+  }
+
   Future<void> clear() async {
     await _storage.delete(key: _keyAddress);
     await _storage.delete(key: _keyName);
+    await _storage.delete(key: _keyPaperWidth);
   }
 }
 

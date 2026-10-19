@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/platform/device_os_detector.dart';
 
 /// Public landing and download hub enabling store-bypassing client downloads
@@ -9,8 +10,17 @@ import '../../../../core/platform/device_os_detector.dart';
 class AppDownloadPage extends StatelessWidget {
   const AppDownloadPage({super.key});
 
-  static const String directApkUrl =
-      'https://github.com/JosephSalvador/Business_Management_App/releases/download/latest/jolinx-android.apk';
+  static String get directApkUrl {
+    AppEnvironment env = AppEnvironment.production;
+    try {
+      env = AppConfig.instance.environment;
+    } catch (_) {
+      // In tests or headless runners where AppConfig is uninitialized, default to production.
+    }
+    final tag = env == AppEnvironment.staging ? 'staging-latest' : 'latest';
+    return 'https://github.com/JosephSalvador/Business_Management_App/releases/download/$tag/jolinx-android.apk';
+  }
+
   static const String webPwaUrl = 'https://staging.jolinx-app.pages.dev';
   static const String windowsZipUrl =
       'https://github.com/JosephSalvador/Business_Management_App/releases/download/latest/jolinx-windows-x64.zip';

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/storage/locale_store.dart';
+import '../../../core/storage/printer_store.dart';
 import '../data/receipt_repository.dart';
 import '../domain/receipt_format.dart';
 import '../domain/receipt_preview.dart';
@@ -30,9 +31,27 @@ class ReceiptPaperWidthNotifier extends Notifier<ReceiptPaperWidth> {
   ReceiptPaperWidth build() => ReceiptPaperWidth.mm80;
 
   @override
-  set state(ReceiptPaperWidth value) => super.state = value;
+  set state(ReceiptPaperWidth value) {
+    super.state = value;
+    ref
+        .read(printerStoreProvider)
+        .savePaperWidth(value == ReceiptPaperWidth.mm58 ? '58' : '80');
+  }
 
   void setWidth(ReceiptPaperWidth width) => state = width;
+
+  void restore(String? saved) {
+    if (saved == '58' || saved == 'mm58') {
+      super.state = ReceiptPaperWidth.mm58;
+    } else if (saved == '80' || saved == 'mm80') {
+      super.state = ReceiptPaperWidth.mm80;
+    }
+  }
+
+  Future<void> loadFromStore() async {
+    final saved = await ref.read(printerStoreProvider).getPaperWidth();
+    restore(saved);
+  }
 }
 
 final receiptPaperWidthProvider =
