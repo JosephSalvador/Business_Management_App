@@ -11,6 +11,7 @@ import 'package:jolinx_app/core/sync/local_sales_service.dart';
 import 'package:jolinx_app/core/storage/tables.dart';
 import 'package:jolinx_app/core/network/app_exception.dart';
 import 'package:jolinx_app/core/network/connectivity_monitor.dart';
+import 'package:jolinx_app/core/platform/device_info.dart';
 import 'package:jolinx_app/app/router.dart';
 import 'package:jolinx_app/features/inventory/application/stock_controller.dart';
 import 'package:jolinx_app/features/products/data/product_repository.dart';
@@ -54,6 +55,11 @@ class _FakeStockController extends StockController {
   Future<void> load() async {}
 }
 
+class _FakeDeviceIdentity extends DeviceIdentity {
+  @override
+  Future<String> get() async => 'device-test';
+}
+
 Widget _app({
   required FakeProductRepository products,
   required FakeSaleRepository sales,
@@ -93,6 +99,7 @@ Widget _app({
       connectionQualityProvider.overrideWithValue(ConnectionQuality.online),
       posBranchIdProvider.overrideWithValue(() async => 'branch-1'),
       stockControllerProvider.overrideWith(() => _FakeStockController()),
+      deviceIdentityProvider.overrideWithValue(_FakeDeviceIdentity()),
     ],
     child: MaterialApp.router(routerConfig: router),
   );

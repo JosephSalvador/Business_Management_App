@@ -1,0 +1,48 @@
+name: Flutter Check (Analyze & Test)
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/flutter-check.yml'
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-test:
+    name: Flutter Analyze & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.3'
+          channel: 'stable'
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+
+      - name: Setup Environment & Dependencies
+        run: |
+          printf "APP_ENV=test\nAPI_BASE_URL=https://api.test.local\nAPI_FALLBACK_URL=https://api.test.local\n" > .env
+          flutter pub get
+          flutter gen-l10n
+
+      - name: Run Flutter Analyze
+        run: flutter analyze --no-pub
+
+      - name: Run Flutter Tests
+        run: flutter test --no-pub

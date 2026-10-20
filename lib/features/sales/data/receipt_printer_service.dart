@@ -9,7 +9,9 @@ import 'package:qr/qr.dart' as qr;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/storage/locale_store.dart';
+import '../../../core/storage/receipt_customization_store.dart';
 import '../../receipts/data/receipt_providers.dart';
+import '../../receipts/domain/receipt_customization.dart';
 import '../../receipts/domain/receipt_format.dart';
 import '../../receipts/domain/receipt_preview.dart';
 import '../../receipts/domain/receipt_qr.dart';
@@ -21,10 +23,12 @@ import 'web_bluetooth/web_bluetooth_printer.dart';
 class ReceiptPrinterService {
   final Thermal80mmRenderer _renderer;
   final ReceiptPaperWidth paperWidth;
+  final ReceiptCustomization? customization;
 
   ReceiptPrinterService({
     ReceiptLanguage language = ReceiptLanguage.english,
     this.paperWidth = ReceiptPaperWidth.mm80,
+    this.customization,
   }) : _renderer = Thermal80mmRenderer.forWidth(paperWidth, language: language);
 
   /// Encodes a receipt as ESC/POS bytes for a thermal printer.
@@ -38,8 +42,13 @@ class ReceiptPrinterService {
     bool isReprint = false,
   }) {
     final bytes = <int>[];
-    final lines =
-        _renderer.render(receipt: receipt, isReprint: isReprint).split('\n');
+    final lines = _renderer
+        .render(
+          receipt: receipt,
+          isReprint: isReprint,
+          customization: customization,
+        )
+        .split('\n');
 
     bytes.addAll([0x1B, 0x40]); // Initialize
     bytes.addAll([0x1B, 0x61, 0x00]); // Left align — layout is renderer-owned
@@ -66,7 +75,9 @@ class ReceiptPrinterService {
           trimmed.startsWith('TOTAL') ||
           trimmed.startsWith('JUMLA');
       final isWatermark = trimmed.startsWith('***');
-      final isItemHeader = trimmed.contains('Qty') || trimmed.contains('Kiasi');
+      final isItemHeader =
+          (trimmed.startsWith('ITEM') && trimmed.contains('TOTAL')) ||
+              (trimmed.startsWith('BIDHAA') && trimmed.contains('JUMLA'));
       final isBusinessName = !businessNamePrinted &&
           !isWatermark &&
           !isSeparator &&
@@ -320,7 +331,13 @@ class ReceiptPrinterService {
     }
 
     buffer.write('<div class="title center">${receipt.businessName}</div>');
-    if (receipt.tin != null && receipt.tin!.isNotEmpty) {
+    final tagline = customization?.headerTagline?.trim();
+    if (tagline != null && tagline.isNotEmpty) {
+      buffer.write(
+          '<div class="center" style="font-style:italic;margin-bottom:3px">$tagline</div>');
+    }
+    final showTin = customization?.showTin ?? true;
+    if (showTin && receipt.tin != null && receipt.tin!.isNotEmpty) {
       buffer.write('<div class="center">TIN: ${receipt.tin}</div>');
     }
     if (receipt.address != null && receipt.address!.isNotEmpty) {
@@ -338,23 +355,33 @@ class ReceiptPrinterService {
         '<div class="row"><span class="col-left">Receipt:</span><span class="col-right bold">${receipt.saleNumber}</span></div>');
     buffer.write(
         '<div class="row"><span class="col-left">Date:</span><span class="col-right">${receipt.saleDate.toLocal().toString().substring(0, 16)}</span></div>');
-    if (receipt.cashierName != null && receipt.cashierName!.isNotEmpty) {
+    final showCashier = customization?.showCashier ?? true;
+    if (showCashier && receipt.cashierName != null && receipt.cashierName!.isNotEmpty) {
       buffer.write(
           '<div class="row"><span class="col-left">Cashier:</span><span class="col-right">${receipt.cashierName}</span></div>');
     }
-    if (receipt.customerName != null && receipt.customerName!.isNotEmpty) {
+    final showCustomer = customization?.showCustomer ?? true;
+    if (showCustomer && receipt.customerName != null && receipt.customerName!.isNotEmpty) {
       buffer.write(
           '<div class="row"><span class="col-left">Customer:</span><span class="col-right">${receipt.customerName}</span></div>');
     }
 
     buffer.write('<div class="dashed"></div>');
     buffer.write(
-        '<table class="item-table"><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th class="right">Total</th></tr></thead><tbody>');
+        '<div class="row bold" style="font-size:12px;margin-bottom:4px"><span class="col-left">ITEM</span><span class="col-right">TOTAL</span></div>');
+    buffer.write('<div class="dashed"></div>');
     for (final line in receipt.lines) {
+      final qtyStr = receiptQuantity(line.quantity);
+      final unitPriceStr = line.unitPrice.toStringAsFixed(0);
+      final lineTotalStr = line.lineTotal.toStringAsFixed(0);
+      buffer.write('<div style="margin:4px 0">');
       buffer.write(
-          '<tr><td><b>${line.productName}</b><br><small>${line.quantity} x ${line.unitPrice.toStringAsFixed(0)}</small></td><td style="text-align:center">${line.quantity}</td><td class="right">${line.lineTotal.toStringAsFixed(0)}</td></tr>');
+          '<div class="bold" style="font-size:13px;word-break:break-word">${line.productName}</div>');
+      buffer.write(
+          '<div class="row" style="font-size:12px;color:#333"><span class="col-left">&nbsp;&nbsp;$qtyStr x $unitPriceStr</span><span class="col-right">$lineTotalStr</span></div>');
+      buffer.write('</div>');
     }
-    buffer.write('</tbody></table>');
+    buffer.write('<div class="dashed"></div>');
 
     buffer.write('<div class="dashed"></div>');
     buffer.write(
@@ -390,10 +417,17 @@ class ReceiptPrinterService {
     }
 
     buffer.write('<div class="dashed"></div>');
+    final thanks = customization?.footerThanks?.trim();
     buffer.write(
-        '<div class="footer-text">Thank you for shopping with us!</div>');
+        '<div class="footer-text">${(thanks != null && thanks.isNotEmpty) ? thanks : 'Thank you for shopping with us!'}</div>');
+    final policy = customization?.footerPolicy?.trim();
     buffer.write(
-        '<div class="footer-text">Goods once sold will not be accepted back.</div>');
+        '<div class="footer-text">${(policy != null && policy.isNotEmpty) ? policy : 'Goods once sold will not be accepted back.'}</div>');
+    final contact = customization?.footerContact?.trim();
+    if (contact != null && contact.isNotEmpty) {
+      buffer.write(
+          '<div class="footer-text">$contact</div>');
+    }
     buffer.write(
         '<div class="footer-text bold" style="margin-top:6px">Powered by Jolinx ERP</div>');
 
@@ -436,7 +470,11 @@ class ReceiptPrinterService {
     required ReceiptPreview receipt,
     bool isReprint = false,
   }) {
-    return _renderer.render(receipt: receipt, isReprint: isReprint);
+    return _renderer.render(
+      receipt: receipt,
+      isReprint: isReprint,
+      customization: customization,
+    );
   }
 
   /// Builds a minimal ReceiptPreview from a SaleDto for backward compatibility.
@@ -509,8 +547,54 @@ class ReceiptPrinterService {
     required ReceiptPreview receipt,
     bool isReprint = false,
   }) async {
-    final text = _renderer.render(receipt: receipt, isReprint: isReprint);
+    final text = _renderer.render(
+      receipt: receipt,
+      isReprint: isReprint,
+      customization: customization,
+    );
     await SharePlus.instance.share(ShareParams(text: text));
+    return true;
+  }
+
+  Future<bool> shareReceiptPdf({
+    required ReceiptPreview receipt,
+    bool isReprint = false,
+  }) async {
+    final pdf = await buildReceiptPdf(receipt: receipt, isReprint: isReprint);
+    final bytes = await pdf.save();
+    final safeNumber =
+        receipt.saleNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile.fromData(
+            bytes,
+            mimeType: 'application/pdf',
+            name: 'receipt-$safeNumber.pdf',
+          ),
+        ],
+      ),
+    );
+    return true;
+  }
+
+  Future<bool> shareReceiptImage({
+    required Uint8List pngBytes,
+    required String saleNumber,
+  }) async {
+    final safeNumber =
+        saleNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile.fromData(
+            pngBytes,
+            mimeType: 'image/png',
+            name: 'receipt-$safeNumber.png',
+          ),
+        ],
+      ),
+    );
     return true;
   }
 
@@ -519,13 +603,19 @@ class ReceiptPrinterService {
     bool isReprint = false,
   }) async {
     final pdf = pw.Document();
-    final receiptText =
-        _renderer.render(receipt: receipt, isReprint: isReprint);
+    final receiptText = _renderer.render(
+      receipt: receipt,
+      isReprint: isReprint,
+      customization: customization,
+    );
     final lines = receiptText.split('\n');
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.roll57,
+        pageFormat: paperWidth == ReceiptPaperWidth.mm58
+            ? PdfPageFormat.roll57
+            : PdfPageFormat.roll80,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         build: (context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -534,7 +624,7 @@ class ReceiptPrinterService {
                 line,
                 style: pw.TextStyle(
                   font: pw.Font.courier(),
-                  fontSize: 9,
+                  fontSize: paperWidth == ReceiptPaperWidth.mm58 ? 8 : 9,
                 ),
               ),
           ],
@@ -551,8 +641,10 @@ class ReceiptPrinterService {
 final receiptPrinterServiceProvider = Provider<ReceiptPrinterService>((ref) {
   final locale = ref.watch(localeControllerProvider);
   final paperWidth = ref.watch(receiptPaperWidthProvider);
+  final customization = ref.watch(receiptCustomizationProvider);
   return ReceiptPrinterService(
     language: receiptLanguageForCode(locale.languageCode),
     paperWidth: paperWidth,
+    customization: customization,
   );
 });

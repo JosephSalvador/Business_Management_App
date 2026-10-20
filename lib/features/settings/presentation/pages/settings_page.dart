@@ -135,6 +135,16 @@ class SettingsPage extends ConsumerWidget {
             _LanguageTile(),
             const _PrinterPaperSizeTile(),
             _SettingsTile(
+              icon: Icons.receipt_long_outlined,
+              title: Localizations.localeOf(context).languageCode == 'sw'
+                  ? 'Muundo na Maneno ya Risiti'
+                  : 'Receipt Header & Footer',
+              subtitle: Localizations.localeOf(context).languageCode == 'sw'
+                  ? 'Kaulimbiu, shukrani, na sera ya duka'
+                  : 'Tagline, thank-you note & store policy',
+              onTap: () => context.push(Routes.receiptSettings),
+            ),
+            _SettingsTile(
               icon: Icons.access_time_outlined,
               title: loc.settingsTimezone,
               subtitle: AppConfig.instance.timezone,

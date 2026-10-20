@@ -38,6 +38,8 @@ void main() {
       expect(find.text('Customer'), findsOneWidget);
       expect(find.text('Walk-in Customer'), findsOneWidget);
 
+      expect(find.text('ITEM'), findsOneWidget);
+      expect(find.text('TOTAL'), findsOneWidget);
       expect(find.text('Paracetamol 500mg'), findsOneWidget);
       expect(find.text('Vitamin C 1000mg'), findsOneWidget);
       expect(find.text('  4 x 2.50'), findsOneWidget);

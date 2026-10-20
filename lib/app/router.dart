@@ -54,6 +54,7 @@ import '../features/sales/presentation/pages/receipt_preview_page.dart';
 import '../features/sales/presentation/pages/sale_detail_page.dart';
 import '../features/sales/presentation/pages/sale_success_page.dart';
 import '../features/sales/presentation/pages/sales_history_page.dart';
+import '../features/settings/presentation/pages/receipt_settings_page.dart';
 import '../features/settings/presentation/pages/settings_page.dart';
 import '../features/suppliers/presentation/pages/supplier_form_page.dart';
 import '../features/suppliers/presentation/pages/suppliers_page.dart';
@@ -116,6 +117,7 @@ abstract final class Routes {
   static const users = '/users';
   static const roles = '/roles';
   static const settings = '/settings';
+  static const receiptSettings = '/settings/receipt';
   static const security = '/settings/security';
   static const billing = '/billing';
   static const profile = '/profile';
@@ -612,6 +614,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (_, __) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: Routes.receiptSettings,
+        builder: (_, __) => const ReceiptSettingsPage(),
       ),
       // Own-account security: second-factor enrolment and device list. Nested
       // under settings so it is reached the same way as password and profile

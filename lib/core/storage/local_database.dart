@@ -14,6 +14,7 @@ part 'local_database.g.dart';
   LocalSaleLines,
   LocalPayments,
   SyncQueue,
+  LocalReceipts,
 ])
 class LocalDatabase extends _$LocalDatabase {
   LocalDatabase(super.e);
@@ -26,7 +27,7 @@ class LocalDatabase extends _$LocalDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -34,6 +35,9 @@ class LocalDatabase extends _$LocalDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.createTable(cachedWarehouses);
+          }
+          if (from < 3) {
+            await m.createTable(localReceipts);
           }
         },
       );

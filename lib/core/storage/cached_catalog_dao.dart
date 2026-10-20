@@ -69,6 +69,28 @@ class CachedCatalogDao {
     });
   }
 
+  /// Replaces product cache only without deleting cached stock balances.
+  Future<void> replaceProductsOnly({
+    required String tenantId,
+    required List<CachedProductsCompanion> products,
+  }) {
+    return _db.transaction(() async {
+      await (_db.delete(_db.cachedProducts)
+            ..where((t) => t.tenantId.equals(tenantId)))
+          .go();
+      if (products.isNotEmpty) {
+        await _db.batch((b) => b.insertAll(_db.cachedProducts, products));
+      }
+      await _db
+          .into(_db.metaEntries)
+          .insertOnConflictUpdate(MetaEntriesCompanion(
+            key: const Value('last_catalog_refresh'),
+            value: Value(DateTime.now().toUtc().toIso8601String()),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ));
+    });
+  }
+
   /// Offline POS search: name/sku/barcode substring match over active,
   /// sellable goods, newest fetch first. Never touches the network.
   Future<List<CachedProduct>> search(String tenantId, String query,

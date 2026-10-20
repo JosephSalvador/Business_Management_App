@@ -1,8 +1,7 @@
 /// Receipt rendering engine. Renders receipt data into printable text formats.
 library;
 
-import 'dart:math';
-
+import 'receipt_customization.dart';
 import 'receipt_format.dart';
 import 'receipt_preview.dart';
 
@@ -14,6 +13,7 @@ abstract class ReceiptRenderer {
   String render({
     required ReceiptPreview receipt,
     bool isReprint = false,
+    ReceiptCustomization? customization,
   });
 }
 
@@ -47,10 +47,10 @@ class ReceiptLabels {
       'cashier': 'Cashier',
       'customer': 'Customer',
       'walkIn': 'Walk-in Customer',
-      'colItem': 'Item',
+      'colItem': 'ITEM',
       'colQty': 'Qty',
       'colPrice': 'Price',
-      'colTotal': 'Total',
+      'colTotal': 'TOTAL',
       'subtotal': 'Subtotal',
       'discount': 'Discount',
       'grandTotal': 'GRAND TOTAL',
@@ -76,10 +76,10 @@ class ReceiptLabels {
       'cashier': 'Muuzaji',
       'customer': 'Mteja',
       'walkIn': 'Mteja wa kupita-njia',
-      'colItem': 'Bidhaa',
+      'colItem': 'BIDHAA',
       'colQty': 'Kiasi',
       'colPrice': 'Bei',
-      'colTotal': 'Jumla',
+      'colTotal': 'JUMLA',
       'subtotal': 'Jumla ndogo',
       'discount': 'Punguzo',
       'grandTotal': 'JUMLA',
@@ -149,6 +149,7 @@ class Thermal80mmRenderer implements ReceiptRenderer {
   String render({
     required ReceiptPreview receipt,
     bool isReprint = false,
+    ReceiptCustomization? customization,
   }) {
     final labels = ReceiptLabels.of(language);
     final out = <String>[];
@@ -156,11 +157,11 @@ class Thermal80mmRenderer implements ReceiptRenderer {
     final currency = receipt.currency;
 
     if (isReprint) {
-      out.add(labels['reprint']!);
+      out.add(_center(labels['reprint']!));
       out.add(rule);
     }
     if (receipt.isVoided) {
-      out.add(labels['voided']!);
+      out.add(_center(labels['voided']!));
       out.add(rule);
     }
 
@@ -172,6 +173,9 @@ class Thermal80mmRenderer implements ReceiptRenderer {
     }
 
     center(receipt.businessName);
+    if (_hasValue(customization?.headerTagline)) {
+      center(customization!.headerTagline!);
+    }
     if (_hasValue(receipt.branchName)) center(receipt.branchName!);
     if (_hasValue(receipt.address)) center(receipt.address!);
     if (_hasValue(receipt.phone)) {
@@ -180,7 +184,8 @@ class Thermal80mmRenderer implements ReceiptRenderer {
     if (_hasValue(receipt.email)) {
       center('${labels['email']}: ${receipt.email}');
     }
-    if (_hasValue(receipt.tin)) {
+    final showTin = customization?.showTin ?? true;
+    if (showTin && _hasValue(receipt.tin)) {
       center('${labels['taxNo']}: ${receipt.tin}');
     }
 
@@ -188,31 +193,30 @@ class Thermal80mmRenderer implements ReceiptRenderer {
     out.add(rule);
     out.add(_metaRow(labels['receiptNo']!, receipt.saleNumber));
     out.add(_metaRow(labels['dateTime']!, receiptDate(receipt.saleDate)));
-    if (_hasValue(receipt.cashierName)) {
+    final showCashier = customization?.showCashier ?? true;
+    if (showCashier && _hasValue(receipt.cashierName)) {
       out.add(_metaRow(labels['cashier']!, receipt.cashierName!));
     }
-    out.add(_metaRow(labels['customer']!, _customerName(receipt, labels)));
+    final showCustomer = customization?.showCustomer ?? true;
+    if (showCustomer) {
+      out.add(_metaRow(labels['customer']!, _customerName(receipt, labels)));
+    }
 
-    // Item table — dynamic column widths so the 4 columns always fit.
+    // Item section — 2-column header (ITEM / TOTAL) and 2-line wrapped items.
     out.add(rule);
     if (receipt.lines.isNotEmpty) {
-      final widths = _itemWidths(receipt, labels);
-      out.add(_itemRow(
-        name: labels['colItem']!,
-        qty: labels['colQty']!,
-        price: labels['colPrice']!,
-        total: labels['colTotal']!,
-        widths: widths,
-      ));
+      out.add(_row(labels['colItem']!, labels['colTotal']!));
       out.add(rule);
       for (final line in receipt.lines) {
-        out.add(_itemRow(
-          name: line.productName,
-          qty: receiptQuantity(line.quantity),
-          price: receiptMoneyBare(line.unitPrice),
-          total: receiptMoneyBare(line.lineTotal),
-          widths: widths,
-        ));
+        // Line 1: Full product name word-wrapped across lineWidth
+        for (final part in _wrap(line.productName, lineWidth)) {
+          out.add(_fit(part));
+        }
+        // Line 2: Indented "  qty x price" on left, line total on right
+        final qtyStr = receiptQuantity(line.quantity);
+        final unitPriceStr = receiptMoneyBare(line.unitPrice);
+        final lineTotalStr = receiptMoneyBare(line.lineTotal);
+        out.add(_row('  $qtyStr x $unitPriceStr', lineTotalStr));
       }
       out.add(rule);
     }
@@ -270,15 +274,33 @@ class Thermal80mmRenderer implements ReceiptRenderer {
       out.add(rule);
     }
     if (receipt.qrPayload.isNotEmpty) {
-      out.add('[QR CODE]');
+      out.add(_center('[QR CODE]'));
       out.add(_center(receipt.saleNumber));
       out.add(rule);
     }
 
-    out.add(labels['footerThanks']!);
-    out.add(labels['footerPolicy1']!);
-    out.add(labels['footerPolicy2']!);
-    out.add(labels['footerBrand']!);
+    // Footer section — uses tenant custom messages when configured
+    final thanksNote = _hasValue(customization?.footerThanks)
+        ? customization!.footerThanks!
+        : labels['footerThanks']!;
+    out.add(_center(thanksNote));
+
+    final policyNote = _hasValue(customization?.footerPolicy)
+        ? customization!.footerPolicy!
+        : labels['footerPolicy1']!;
+    for (final line in _wrap(policyNote, lineWidth)) {
+      out.add(_center(line));
+    }
+
+    if (_hasValue(customization?.footerContact)) {
+      for (final line in _wrap(customization!.footerContact!, lineWidth)) {
+        out.add(_center(line));
+      }
+    } else {
+      out.add(_center(labels['footerPolicy2']!));
+    }
+
+    out.add(_center(labels['footerBrand']!));
 
     return out.map(_fit).join('\n');
   }
@@ -349,38 +371,6 @@ class Thermal80mmRenderer implements ReceiptRenderer {
   String _fit(String line) => line.length > lineWidth
       ? _truncate(line, lineWidth)
       : line.padRight(lineWidth);
-
-  /// Computes [qty, price, total] column widths for the item table. The name
-  /// takes whatever is left, so a long money figure can never truncate a value.
-  List<int> _itemWidths(ReceiptPreview receipt, Map<String, String> labels) {
-    var qtyW = labels['colQty']!.length;
-    var priceW = labels['colPrice']!.length;
-    var totalW = labels['colTotal']!.length;
-    for (final line in receipt.lines) {
-      qtyW = max(qtyW, receiptQuantity(line.quantity).length);
-      priceW = max(priceW, receiptMoneyBare(line.unitPrice).length);
-      totalW = max(totalW, receiptMoneyBare(line.lineTotal).length);
-    }
-    return [qtyW, priceW, totalW];
-  }
-
-  /// One item line (or the column header) using [widths] = qty, price, total.
-  String _itemRow({
-    required String name,
-    required String qty,
-    required String price,
-    required String total,
-    required List<int> widths,
-  }) {
-    final money =
-        '${qty.padLeft(widths[0])} ${price.padLeft(widths[1])} ${total.padLeft(widths[2])}';
-    final nameRoom = lineWidth - money.length - 1;
-    if (nameRoom <= 0) return _fit(money);
-    return '${_padOrTruncate(name, nameRoom)} $money';
-  }
-
-  String _padOrTruncate(String text, int width) =>
-      text.length > width ? _truncate(text, width) : text.padRight(width);
 
   static String _truncate(String text, int max) {
     if (max <= 0) return '';

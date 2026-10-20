@@ -52,14 +52,35 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
   }
 
   /// Loads one local calendar day (midnight → next midnight). Pass [search] to
-  /// filter by receipt number or customer name.
+  /// filter by receipt number or customer name. Reads local SQLite first for offline readiness.
   Future<void> load({DateTime? day, String? search}) async {
     state = const SalesHistoryLoading();
+    final target = day ?? DateTime.now();
+    final start = DateTime(target.year, target.month, target.day);
+    final end = start.add(const Duration(days: 1));
+    final term = _cleanSearch(search);
+
+    // 1. Load from local SQLite first (100% offline ready)
     try {
-      final target = day ?? DateTime.now();
-      final start = DateTime(target.year, target.month, target.day);
-      final end = start.add(const Duration(days: 1));
-      final term = _cleanSearch(search);
+      final localSales = await ref.read(localSalesServiceProvider).sales.listSales(
+        from: start,
+        to: end,
+        search: term,
+        limit: _pageSize,
+      );
+      if (localSales.isNotEmpty) {
+        state = SalesHistoryLoaded(
+          sales: localSales,
+          total: localSales.length,
+          searchActive: term != null,
+        );
+      }
+    } catch (_) {
+      // Local read degraded — continue to remote fetch
+    }
+
+    // 2. Fetch from server when online to capture multi-terminal sales
+    try {
       final page = await _repository.list(
         from: start,
         to: end,
@@ -72,7 +93,9 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
         searchActive: term != null,
       );
     } on AppException catch (error) {
-      state = SalesHistoryFailure(error.message);
+      if (state is! SalesHistoryLoaded) {
+        state = SalesHistoryFailure(error.message);
+      }
     }
   }
 

@@ -1738,3 +1738,35 @@ billing/money/receipts-dashboard/lifecycle) instead of one multi-hour run.
   - **`.github/workflows/build-clients.yml`:** Reordered `Determine Target Environment & API Routing` before Android compilation, injected dynamic staging `--dart-define` parameters, and added automatic `staging-latest` pre-release publishing for staging pushes.
   - **Client Versioning:** Strictly incremented build-number/version to `1.0.0+36` in `pubspec.yaml`.
 
+## 2-Column Receipt Layout (58mm/80mm), Centered Headers/Footers, & Multi-Format Sharing (Build 37, done 2026-10-20)
+
+- **Problem & Root Cause:**
+  - Receipts printed on thermal POS printers still displayed the legacy 4-column layout (`Item Qty Price Total`) where item names were truncated to 10-14 characters, because `Thermal80mmRenderer.render()` in `receipt_renderer.dart` and `buildReceiptHtml()` in `receipt_printer_service.dart` were still producing the 4-column format while only the on-screen card had been partially touched.
+  - Receipt sharing in `SaleSuccessPage` and `ReceiptPreviewPage` only shared plain monospace text, which looked like raw copy-pasting instead of a professional receipt when shared via WhatsApp, Email, or chat apps.
+  - Very long product names were truncated with an ellipsis instead of word-wrapping naturally across lines.
+- **Implemented Fixes:**
+  - **`lib/features/receipts/domain/receipt_renderer.dart`:**
+    - Replaced the 4-column table with a clean 2-column ledger header (`ITEM` on the far left, `TOTAL` on the far right; in Swahili: `BIDHAA` and `JUMLA`).
+    - Added multi-line word wrapping (`_wrap(line.productName, lineWidth)`) for long product names so words never break awkwardly and full product descriptions are preserved.
+    - Rendered the second item line with an indent: `  Qty x Price` on the left, right-aligned line total on the paper edge.
+    - Centered business header, watermarks, QR code block, verification hash, and footer policy/branding across both 58mm (32 cols) and 80mm (42 cols).
+  - **`lib/features/sales/data/receipt_printer_service.dart`:**
+    - Updated ESC/POS bold detection in `buildEscPosBytes()` to recognize the 2-column header row (`ITEM ... TOTAL` / `BIDHAA ... JUMLA`).
+    - Updated `buildReceiptHtml()` to output the 2-column layout with centered headers/footers for web/browser/AirPrint printing.
+    - Added `shareReceiptPdf(receipt)` generating structured PDF receipts (`receipt-S-xxx.pdf`) via `SharePlus` and `XFile.fromData`.
+    - Added `shareReceiptImage(pngBytes, saleNumber)` sharing high-resolution PNG receipt card snapshots directly to WhatsApp/chat apps.
+  - **`lib/features/receipts/presentation/widgets/receipt_ticket_card.dart`:**
+    - Added the 2-column header (`ITEM` / `TOTAL`) matching the thermal paper slip.
+    - Wrapped long item names smoothly with full styling.
+  - **`lib/features/sales/presentation/pages/sale_success_page.dart` & `receipt_preview_page.dart`:**
+    - Wrapped receipt cards with `RepaintBoundary` and attached global keys for crisp pixel-ratio 2.5 PNG snapshot rendering.
+    - Replaced raw text sharing with a modern share sheet offering 3 distinct options:
+      1. 🖼️ **Receipt Image (WhatsApp)** (`Picha ya Risiti (WhatsApp)`): Shares an image that displays directly in WhatsApp chats with inline preview.
+      2. 📄 **PDF Document** (`Faili la PDF`): Generates and shares an official PDF receipt.
+      3. 💬 **Text (SMS)** (`Maandishi (SMS / Text)`): Plain text message for quick SMS delivery.
+  - **Client Versioning:** Strictly incremented build-number/version to `1.0.0+37` in `pubspec.yaml`.
+- **Verification:**
+  - `flutter analyze`: 0 issues found!
+  - `flutter test test/features/receipts/`: 51/51 tests passed (100% green).
+  - `flutter test test/features/sales/cart_and_receipt_test.dart`: 12/12 tests passed (100% green).
+

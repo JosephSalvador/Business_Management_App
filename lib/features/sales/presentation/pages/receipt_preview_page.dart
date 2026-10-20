@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,9 +12,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../app/providers.dart';
+import '../../../../core/storage/receipt_customization_store.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../../onboarding/application/workspace_controller.dart';
 import '../../../receipts/data/receipt_repository.dart' show PrintType;
 import '../../../receipts/domain/receipt_format.dart';
 import '../../../receipts/domain/receipt_preview.dart';
@@ -30,6 +34,7 @@ class ReceiptPreviewPage extends ConsumerStatefulWidget {
 }
 
 class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
+  final _receiptCardKey = GlobalKey();
   ReceiptPreview? _receipt;
   SaleDto? _sale;
   String? _error;
@@ -65,8 +70,28 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
           setState(() => _sale = sale);
         }
       } on Exception catch (_) {
+        // Fallback: reconstruct from local SQLite sale record if available
+        final local = await ref
+            .read(localSalesServiceProvider)
+            .findProvisionalDto(widget.saleId);
         if (mounted) {
-          setState(() => _error = context.loc.saleDetailLoadFailed);
+          setState(() {
+            if (local != null) {
+              _sale = local;
+              final printerService = ref.read(receiptPrinterServiceProvider);
+              final workspace = ref.read(workspaceControllerProvider);
+              final businessName = workspace is WorkspaceReady &&
+                      workspace.selected != null
+                  ? workspace.selected!.name
+                  : 'Business OS';
+              _receipt = printerService.saleToReceipt(
+                sale: local,
+                businessName: businessName,
+              );
+            } else {
+              _error = context.loc.saleDetailLoadFailed;
+            }
+          });
         }
       }
     }
@@ -159,10 +184,14 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
               },
             ),
           ),
-          Card(
-            child: ReceiptTicketCard(
-              receipt: receipt,
-              isReprint: _isReprint,
+          RepaintBoundary(
+            key: _receiptCardKey,
+            child: Card(
+              child: ReceiptTicketCard(
+                receipt: receipt,
+                isReprint: _isReprint,
+                customization: ref.watch(receiptCustomizationProvider),
+              ),
             ),
           ),
         ],
@@ -373,7 +402,155 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
     }
   }
 
-  Future<void> _share() async {
+  void _share() {
+    _showShareOptions();
+  }
+
+  void _showShareOptions() {
+    final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                isSwahili ? 'Chagua Njia ya Kushiriki' : 'Choose Share Option',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.image_outlined, color: Colors.green),
+                ),
+                title: Text(
+                  isSwahili ? 'Picha ya Risiti (WhatsApp)' : 'Receipt Image (WhatsApp)',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isSwahili
+                      ? 'Inatuma picha safi ya risiti kwenye chat'
+                      : 'Share as image directly to chats',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _shareAsImage();
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.picture_as_pdf_outlined, color: Colors.red),
+                ),
+                title: Text(
+                  isSwahili ? 'Faili la PDF' : 'PDF Document',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isSwahili
+                      ? 'Hati rasmi ya PDF ya risiti'
+                      : 'Official PDF receipt document',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _shareAsPdf();
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.textsms_outlined, color: Colors.blue),
+                ),
+                title: Text(
+                  isSwahili ? 'Maandishi (SMS / Text)' : 'Text Message (SMS)',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  isSwahili
+                      ? 'Maandishi ya kawaida ya risiti'
+                      : 'Plain text receipt message',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _shareAsText();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareAsImage() async {
+    try {
+      final boundary = _receiptCardKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        _shareAsText();
+        return;
+      }
+      final image = await boundary.toImage(pixelRatio: 2.5);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) {
+        _shareAsText();
+        return;
+      }
+      final bytes = byteData.buffer.asUint8List();
+      final saleNum = _receipt?.saleNumber ?? _sale?.number ?? 'receipt';
+      final printerService = ref.read(receiptPrinterServiceProvider);
+      await printerService.shareReceiptImage(
+        pngBytes: bytes,
+        saleNumber: saleNum,
+      );
+    } catch (_) {
+      _shareAsText();
+    }
+  }
+
+  Future<void> _shareAsPdf() async {
+    final printerService = ref.read(receiptPrinterServiceProvider);
+    if (_receipt != null) {
+      await printerService.shareReceiptPdf(
+        receipt: _receipt!,
+        isReprint: _isReprint,
+      );
+    } else {
+      _shareAsText();
+    }
+  }
+
+  Future<void> _shareAsText() async {
     final text = _buildReceiptText();
     await SharePlus.instance.share(
       ShareParams(text: text),

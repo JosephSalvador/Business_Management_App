@@ -6,6 +6,7 @@ import '../platform/device_info.dart';
 import '../session/app_lock.dart';
 import '../storage/db_key_store.dart';
 import '../storage/local_database.dart';
+import '../storage/local_receipt_dao.dart';
 import '../storage/offline_cache_dao.dart';
 import '../storage/session_journal.dart';
 import '../../features/authentication/data/biometric_auth_gate.dart';
@@ -30,6 +31,10 @@ final deviceIdentityProvider =
 
 final sessionJournalProvider = Provider<SessionJournal>(
   (ref) => SessionJournal(ref.watch(localDatabaseProvider)),
+);
+
+final localReceiptDaoProvider = Provider<LocalReceiptDao>(
+  (ref) => LocalReceiptDao(ref.watch(localDatabaseProvider)),
 );
 
 final localSalesServiceProvider = Provider<LocalSalesService>(

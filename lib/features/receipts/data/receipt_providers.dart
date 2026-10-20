@@ -4,6 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/di/core_providers.dart' show localReceiptDaoProvider;
 import '../../../core/storage/locale_store.dart';
 import '../data/receipt_repository.dart';
 import '../domain/receipt_format.dart';
@@ -14,7 +15,8 @@ import '../domain/receipt_renderer.dart';
 final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
   final client = ref.watch(apiClientProvider);
   final cache = ref.watch(receiptCacheProvider);
-  return ReceiptRepository(client, cache);
+  final localReceiptDao = ref.watch(localReceiptDaoProvider);
+  return ReceiptRepository(client, cache, localReceiptDao: localReceiptDao);
 });
 
 /// Provider for the receipt preview data.

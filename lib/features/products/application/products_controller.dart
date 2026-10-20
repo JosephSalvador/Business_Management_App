@@ -135,7 +135,7 @@ class ProductsController extends Notifier<ProductsState> {
       if (tenantId == null || products.isEmpty) return;
       final dao = ref.read(localSalesServiceProvider).catalog;
       final now = DateTime.now().toUtc();
-      dao.replaceCatalog(
+      dao.replaceProductsOnly(
         tenantId: tenantId,
         products: [
           for (final p in products)
@@ -153,7 +153,6 @@ class ProductsController extends Notifier<ProductsState> {
               fetchedAt: now,
             ),
         ],
-        stock: const [],
       ).then((_) {
         try {
           ref.read(posCatalogControllerProvider.notifier).load();

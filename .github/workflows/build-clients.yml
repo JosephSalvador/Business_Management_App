@@ -26,7 +26,6 @@ on:
         type: boolean
   push:
     branches:
-      - feature/mobile-pos-foundation
       - main
     paths:
       - 'lib/**'

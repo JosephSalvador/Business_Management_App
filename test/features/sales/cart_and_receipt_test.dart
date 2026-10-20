@@ -306,9 +306,11 @@ void main() {
 
       expect(text, contains('Mchele wa Tanga'));
       expect(text, contains('Sukari'));
-      // qty, unit price and line total columns on one row.
-      expect(text, matches(RegExp(r'2\s+2,500\.00\s+5,000\.00')));
-      expect(text, matches(RegExp(r'1\s+3,000\.00\s+3,000\.00')));
+      // two-line layout: indented calculation on left, line total on right.
+      expect(text, contains('  2 x 2,500.00'));
+      expect(text, contains('5,000.00'));
+      expect(text, contains('  1 x 3,000.00'));
+      expect(text, contains('3,000.00'));
 
       expect(text, contains('Jumla ndogo'));
       expect(text, contains('TZS 7,394.92'));

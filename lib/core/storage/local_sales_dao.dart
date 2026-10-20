@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../features/sales/domain/sale.dart';
 import 'local_database.dart';
 import 'tables.dart';
 
@@ -168,7 +169,9 @@ class LocalSalesDao {
 
   Future<LocalSale?> byClientSaleId(String clientSaleId) {
     return (_db.select(_db.localSales)
-          ..where((t) => t.clientSaleId.equals(clientSaleId)))
+          ..where((t) =>
+              t.clientSaleId.equals(clientSaleId) |
+              t.serverSaleId.equals(clientSaleId)))
         .getSingleOrNull();
   }
 
@@ -178,6 +181,142 @@ class LocalSalesDao {
           ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
         .get();
   }
+
+  Future<List<LocalPayment>> paymentsOf(String clientSaleId) {
+    return (_db.select(_db.localPayments)
+          ..where((t) => t.clientSaleId.equals(clientSaleId))
+          ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+        .get();
+  }
+
+  /// Saves a sale that succeeded online into the local database so it is
+  /// retained permanently on the device and available offline.
+  Future<void> recordConfirmedOnlineSale({
+    required SaleDto sale,
+    required String tenantId,
+    required String branchId,
+    required String deviceId,
+    required String userId,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await _db.transaction(() async {
+      await _db.into(_db.localSales).insertOnConflictUpdate(
+            LocalSalesCompanion(
+              clientSaleId: Value(sale.id),
+              tenantId: Value(tenantId),
+              branchId: Value(branchId),
+              deviceId: Value(deviceId),
+              userId: Value(userId),
+              status: const Value(LocalSaleStatus.synced),
+              currency: Value(sale.currency),
+              effectiveAt: Value(sale.saleDate),
+              createdAt: Value(now),
+              syncedAt: Value(now),
+              subtotalEstimate: Value(sale.subtotal),
+              taxEstimate: Value(sale.taxAmount),
+              totalEstimate: Value(sale.totalAmount),
+              paymentMethod: Value(sale.payments.firstOrNull?.method ?? 0),
+              paymentAmount: Value(sale.amountPaid),
+              serverSaleId: Value(sale.id),
+              serverNumber: Value(sale.number),
+            ),
+          );
+
+      for (var i = 0; i < sale.lines.length; i++) {
+        final line = sale.lines[i];
+        await _db.into(_db.localSaleLines).insertOnConflictUpdate(
+              LocalSaleLinesCompanion(
+                clientSaleId: Value(sale.id),
+                orderIndex: Value(i),
+                productId: Value(''),
+                productName: Value(line.productName),
+                quantity: Value(line.quantity),
+                unitPriceSnapshot: Value(line.unitPrice),
+                lineTotalEstimate: Value(line.lineTotal),
+                sku: Value(line.sku),
+              ),
+            );
+      }
+
+      for (var i = 0; i < sale.payments.length; i++) {
+        final p = sale.payments[i];
+        await _db.into(_db.localPayments).insertOnConflictUpdate(
+              LocalPaymentsCompanion(
+                clientSaleId: Value(sale.id),
+                orderIndex: Value(i),
+                method: Value(p.method),
+                amount: Value(p.amount),
+                reference: Value(p.reference),
+              ),
+            );
+      }
+    });
+  }
+
+  /// Lists sales recorded locally on this device.
+  Future<List<SaleDto>> listSales({
+    DateTime? from,
+    DateTime? to,
+    String? search,
+    int limit = 100,
+  }) async {
+    var query = _db.select(_db.localSales);
+    if (from != null) {
+      query = query..where((t) => t.effectiveAt.isBiggerOrEqualValue(from));
+    }
+    if (to != null) {
+      query = query..where((t) => t.effectiveAt.isSmallerOrEqualValue(to));
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      final term = '%${search.trim()}%';
+      query = query..where((t) => t.serverNumber.like(term) | t.clientSaleId.like(term));
+    }
+    final rows = await (query
+          ..orderBy([(t) => OrderingTerm(expression: t.effectiveAt, mode: OrderingMode.desc)])
+          ..limit(limit))
+        .get();
+
+    final result = <SaleDto>[];
+    for (final sale in rows) {
+      final lines = await linesOf(sale.clientSaleId);
+      final payments = await paymentsOf(sale.clientSaleId);
+      result.add(SaleDto(
+        id: sale.serverSaleId ?? sale.clientSaleId,
+        number: sale.serverNumber ?? (sale.status == LocalSaleStatus.pending ? 'OFFLINE' : ''),
+        status: sale.status,
+        saleDate: sale.effectiveAt,
+        currency: sale.currency,
+        subtotal: sale.subtotalEstimate,
+        discountAmount: 0,
+        taxAmount: sale.taxEstimate,
+        totalAmount: sale.totalEstimate,
+        amountPaid: sale.paymentAmount,
+        change: 0,
+        customerName: null,
+        lines: [
+          for (final l in lines)
+            SaleLineData(
+              productName: l.productName,
+              sku: l.sku,
+              quantity: l.quantity,
+              unitPrice: l.unitPriceSnapshot,
+              discountAmount: 0,
+              taxCode: '',
+              taxAmount: 0,
+              lineTotal: l.lineTotalEstimate,
+              unitOfMeasureName: null,
+            ),
+        ],
+        payments: [
+          for (final p in payments)
+            SalePaymentData(method: p.method, amount: p.amount, reference: p.reference),
+        ],
+        pendingLocally: sale.status == LocalSaleStatus.pending,
+      ));
+    }
+    return result;
+  }
+
 
   Future<List<LocalSale>> byStatus(int status, {int limit = 100}) {
     return (_db.select(_db.localSales)

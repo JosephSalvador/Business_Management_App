@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/di/core_providers.dart' show localReceiptDaoProvider;
 import '../../../core/network/app_exception.dart';
 import '../../authentication/application/auth_controller.dart';
+import '../../onboarding/application/workspace_controller.dart';
+import '../data/offline_sale_recorder.dart';
+import '../data/receipt_printer_service.dart';
 import '../data/sale_repository.dart';
 import '../domain/sale.dart';
-import '../data/offline_sale_recorder.dart';
 
 sealed class CheckoutState {
   const CheckoutState();
@@ -128,6 +131,7 @@ class CheckoutController extends Notifier<CheckoutState> {
         sale = await online;
       }
 
+      await _persistConfirmedSaleLocally(sale);
       state = CheckoutSuccess(sale);
       _clientSaleId = null;
       return sale;
@@ -219,6 +223,7 @@ class CheckoutController extends Notifier<CheckoutState> {
         paymentAmount: amountTendered,
         customerName: customerName,
       );
+      await _persistReceiptLocally(provisional);
       state = CheckoutSuccess(provisional);
       // Identity now lives in the persistent queue row.
       _clientSaleId = null;
@@ -365,4 +370,65 @@ class CheckoutController extends Notifier<CheckoutState> {
       _ => message.isEmpty ? 'Imeshindikana kukamilisha mauzo.' : message,
     };
   }
+
+  Future<void> _persistConfirmedSaleLocally(SaleDto sale) async {
+    try {
+      final tenantId = ref.read(sessionContextProvider).$1 ?? '';
+      final branchId = _branchId ?? '';
+      final deviceId = await ref
+          .read(deviceIdentityProvider)
+          .get()
+          .timeout(const Duration(milliseconds: 200), onTimeout: () => '');
+      final auth = ref.read(authControllerProvider);
+      final userId = auth is AuthAuthenticated ? auth.session.user.id : '';
+
+      final salesService = ref.read(localSalesServiceProvider);
+      await salesService.sales.recordConfirmedOnlineSale(
+        sale: sale,
+        tenantId: tenantId,
+        branchId: branchId,
+        deviceId: deviceId,
+        userId: userId,
+      );
+
+      await _persistReceiptLocally(sale);
+    } catch (_) {
+      // Best-effort local persistence — does not block online checkout success.
+    }
+  }
+
+  Future<void> _persistReceiptLocally(SaleDto sale) async {
+    try {
+      final tenantId = ref.read(sessionContextProvider).$1 ?? '';
+      final printerService = ref.read(receiptPrinterServiceProvider);
+      final businessName = _getBusinessName();
+      final receipt = printerService.saleToReceipt(
+        sale: sale,
+        businessName: businessName,
+      );
+      final receiptText = printerService.buildReceiptText(receipt: receipt);
+      final receiptDao = ref.read(localReceiptDaoProvider);
+      await receiptDao.saveReceipt(
+        saleId: sale.id,
+        tenantId: tenantId,
+        receiptNumber: sale.number,
+        receipt: receipt,
+        receiptText: receiptText,
+      );
+    } catch (_) {
+      // Best-effort local persistence — non-fatal.
+    }
+  }
+
+  String _getBusinessName() {
+    try {
+      final workspace = ref.read(workspaceControllerProvider);
+      return workspace is WorkspaceReady && workspace.selected != null
+          ? workspace.selected!.name
+          : 'Business OS';
+    } catch (_) {
+      return 'Business OS';
+    }
+  }
 }
+

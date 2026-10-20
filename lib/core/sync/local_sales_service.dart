@@ -1,4 +1,5 @@
 import '../storage/cached_catalog_dao.dart';
+import '../storage/local_receipt_dao.dart';
 import '../../features/sales/domain/sale.dart';
 import '../storage/local_database.dart' show LocalDatabase;
 import '../storage/local_sales_dao.dart';
@@ -12,12 +13,14 @@ class LocalSalesService {
       : sales = LocalSalesDao(database),
         queue = SyncQueueDao(database),
         catalog = CachedCatalogDao(database),
-        quickMemory = QuickSaleMemoryDao(database);
+        quickMemory = QuickSaleMemoryDao(database),
+        receipts = LocalReceiptDao(database);
 
   final LocalSalesDao sales;
   final SyncQueueDao queue;
   final CachedCatalogDao catalog;
   final QuickSaleMemoryDao quickMemory;
+  final LocalReceiptDao receipts;
 
   Future<QueuedOperation?> claimNext({
     required DateTime now,
@@ -54,6 +57,10 @@ class LocalSalesService {
       serverNumber: serverNumber,
     );
     await queue.markSynced(clientSaleId, serverSaleId);
+    await receipts.updateServerNumber(
+      saleId: clientSaleId,
+      serverNumber: serverNumber,
+    );
   }
 
   Future<void> markSaleConflict({
@@ -117,14 +124,11 @@ class LocalSalesService {
     if (sale == null) {
       return null;
     }
-    if (sale.status == LocalSaleStatus.synced) {
-      // A confirmed sale must come from the server (authoritative totals).
-      return null;
-    }
-    final lines = await sales.linesOf(clientSaleId);
+    final lines = await sales.linesOf(sale.clientSaleId);
+    final payments = await sales.paymentsOf(sale.clientSaleId);
     return SaleDto(
-      id: sale.clientSaleId,
-      number: sale.serverNumber ?? '',
+      id: sale.serverSaleId ?? sale.clientSaleId,
+      number: sale.serverNumber ?? (sale.status == LocalSaleStatus.pending ? 'OFFLINE' : ''),
       status: sale.status,
       saleDate: sale.effectiveAt,
       currency: sale.currency,
@@ -150,7 +154,11 @@ class LocalSalesService {
           ),
       ],
       payments: [
-        SalePaymentData(method: sale.paymentMethod, amount: sale.paymentAmount),
+        if (payments.isNotEmpty)
+          for (final p in payments)
+            SalePaymentData(method: p.method, amount: p.amount, reference: p.reference)
+        else
+          SalePaymentData(method: sale.paymentMethod, amount: sale.paymentAmount),
       ],
       pendingLocally: sale.status == LocalSaleStatus.pending,
     );

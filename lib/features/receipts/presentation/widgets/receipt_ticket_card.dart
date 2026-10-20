@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../shared/design_system/app_colors.dart';
+import '../../domain/receipt_customization.dart';
 import '../../domain/receipt_format.dart';
 import '../../domain/receipt_preview.dart';
 import '../../domain/receipt_renderer.dart';
@@ -16,6 +17,7 @@ class ReceiptTicketCard extends StatelessWidget {
   const ReceiptTicketCard({
     super.key,
     required this.receipt,
+    this.customization,
     this.language = ReceiptLanguage.english,
     this.isReprint = false,
     this.dense = false,
@@ -23,6 +25,9 @@ class ReceiptTicketCard extends StatelessWidget {
 
   /// Receipt data to display.
   final ReceiptPreview receipt;
+
+  /// Optional tenant customization for header tagline and footer notes.
+  final ReceiptCustomization? customization;
 
   /// Label language for this ticket.
   final ReceiptLanguage language;
@@ -157,6 +162,16 @@ class ReceiptTicketCard extends StatelessWidget {
       ),
     ];
 
+    if (_hasValue(customization?.headerTagline)) {
+      rows.add(Text(
+        customization!.headerTagline!,
+        textAlign: TextAlign.center,
+        style: _body(context, size: dense ? 12.0 : 13.5).copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ));
+    }
+
     void addIfPresent(String? value, String prefix) {
       if (!_hasValue(value)) return;
       rows.add(prefix.isEmpty
@@ -168,7 +183,10 @@ class ReceiptTicketCard extends StatelessWidget {
     addIfPresent(receipt.address, '');
     addIfPresent(receipt.phone, labels['phone']!);
     addIfPresent(receipt.email, labels['email']!);
-    addIfPresent(receipt.tin, labels['taxNo']!);
+    final showTin = customization?.showTin ?? true;
+    if (showTin) {
+      addIfPresent(receipt.tin, labels['taxNo']!);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -182,17 +200,20 @@ class ReceiptTicketCard extends StatelessWidget {
   }
 
   Widget _meta(BuildContext context, Map<String, String> labels) {
+    final showCashier = customization?.showCashier ?? true;
+    final showCustomer = customization?.showCustomer ?? true;
     final rows = <MapEntry<String, String>>[
       MapEntry(labels['receiptNo']!, receipt.saleNumber),
       MapEntry(labels['dateTime']!, receiptDate(receipt.saleDate)),
-      if (_hasValue(receipt.cashierName))
+      if (showCashier && _hasValue(receipt.cashierName))
         MapEntry(labels['cashier']!, receipt.cashierName!),
-      MapEntry(
-        labels['customer']!,
-        _hasValue(receipt.customerName)
-            ? receipt.customerName!.trim()
-            : labels['walkIn']!,
-      ),
+      if (showCustomer)
+        MapEntry(
+          labels['customer']!,
+          _hasValue(receipt.customerName)
+              ? receipt.customerName!.trim()
+              : labels['walkIn']!,
+        ),
     ];
     return Column(
       children: [
@@ -223,6 +244,16 @@ class ReceiptTicketCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(labels['colItem']!, style: _body(context, bold: true)),
+            Text(labels['colTotal']!, style: _body(context, bold: true)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Divider(height: 1),
+        const SizedBox(height: 8),
         for (var i = 0; i < receipt.lines.length; i++) ...[
           if (i > 0) SizedBox(height: dense ? 6 : 8),
           _itemTwoLine(context, receipt.lines[i]),
@@ -361,10 +392,20 @@ class ReceiptTicketCard extends StatelessWidget {
   }
 
   Widget _footer(BuildContext context, Map<String, String> labels) {
+    final thanksNote = _hasValue(customization?.footerThanks)
+        ? customization!.footerThanks!
+        : labels['footerThanks']!;
+    final policyNote = _hasValue(customization?.footerPolicy)
+        ? customization!.footerPolicy!
+        : labels['footerPolicy1']!;
+
     final lines = [
-      labels['footerThanks']!,
-      labels['footerPolicy1']!,
-      labels['footerPolicy2']!,
+      thanksNote,
+      policyNote,
+      if (_hasValue(customization?.footerContact))
+        customization!.footerContact!
+      else
+        labels['footerPolicy2']!,
       labels['footerBrand']!,
     ];
     return Column(

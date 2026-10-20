@@ -169,3 +169,19 @@ class SyncQueue extends Table {
   @override
   Set<Column> get primaryKey => {operationId};
 }
+
+/// Stored receipt snapshot for an issued sale. Enables instant offline
+/// reprinting and sharing without hitting the server.
+class LocalReceipts extends Table {
+  TextColumn get saleId => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get receiptNumber => text()();
+  TextColumn get receiptDataJson => text()();
+  TextColumn get receiptText => text().nullable()();
+  DateTimeColumn get issuedAt => dateTime()();
+  IntColumn get printCount => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {saleId};
+}
+

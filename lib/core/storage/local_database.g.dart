@@ -4003,6 +4003,412 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
   }
 }
 
+class $LocalReceiptsTable extends LocalReceipts
+    with TableInfo<$LocalReceiptsTable, LocalReceipt> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalReceiptsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _saleIdMeta = const VerificationMeta('saleId');
+  @override
+  late final GeneratedColumn<String> saleId = GeneratedColumn<String>(
+      'sale_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _tenantIdMeta =
+      const VerificationMeta('tenantId');
+  @override
+  late final GeneratedColumn<String> tenantId = GeneratedColumn<String>(
+      'tenant_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _receiptNumberMeta =
+      const VerificationMeta('receiptNumber');
+  @override
+  late final GeneratedColumn<String> receiptNumber = GeneratedColumn<String>(
+      'receipt_number', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _receiptDataJsonMeta =
+      const VerificationMeta('receiptDataJson');
+  @override
+  late final GeneratedColumn<String> receiptDataJson = GeneratedColumn<String>(
+      'receipt_data_json', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _receiptTextMeta =
+      const VerificationMeta('receiptText');
+  @override
+  late final GeneratedColumn<String> receiptText = GeneratedColumn<String>(
+      'receipt_text', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _issuedAtMeta =
+      const VerificationMeta('issuedAt');
+  @override
+  late final GeneratedColumn<DateTime> issuedAt = GeneratedColumn<DateTime>(
+      'issued_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _printCountMeta =
+      const VerificationMeta('printCount');
+  @override
+  late final GeneratedColumn<int> printCount = GeneratedColumn<int>(
+      'print_count', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns => [
+        saleId,
+        tenantId,
+        receiptNumber,
+        receiptDataJson,
+        receiptText,
+        issuedAt,
+        printCount
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_receipts';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalReceipt> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('sale_id')) {
+      context.handle(_saleIdMeta,
+          saleId.isAcceptableOrUnknown(data['sale_id']!, _saleIdMeta));
+    } else if (isInserting) {
+      context.missing(_saleIdMeta);
+    }
+    if (data.containsKey('tenant_id')) {
+      context.handle(_tenantIdMeta,
+          tenantId.isAcceptableOrUnknown(data['tenant_id']!, _tenantIdMeta));
+    } else if (isInserting) {
+      context.missing(_tenantIdMeta);
+    }
+    if (data.containsKey('receipt_number')) {
+      context.handle(
+          _receiptNumberMeta,
+          receiptNumber.isAcceptableOrUnknown(
+              data['receipt_number']!, _receiptNumberMeta));
+    } else if (isInserting) {
+      context.missing(_receiptNumberMeta);
+    }
+    if (data.containsKey('receipt_data_json')) {
+      context.handle(
+          _receiptDataJsonMeta,
+          receiptDataJson.isAcceptableOrUnknown(
+              data['receipt_data_json']!, _receiptDataJsonMeta));
+    } else if (isInserting) {
+      context.missing(_receiptDataJsonMeta);
+    }
+    if (data.containsKey('receipt_text')) {
+      context.handle(
+          _receiptTextMeta,
+          receiptText.isAcceptableOrUnknown(
+              data['receipt_text']!, _receiptTextMeta));
+    }
+    if (data.containsKey('issued_at')) {
+      context.handle(_issuedAtMeta,
+          issuedAt.isAcceptableOrUnknown(data['issued_at']!, _issuedAtMeta));
+    } else if (isInserting) {
+      context.missing(_issuedAtMeta);
+    }
+    if (data.containsKey('print_count')) {
+      context.handle(
+          _printCountMeta,
+          printCount.isAcceptableOrUnknown(
+              data['print_count']!, _printCountMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {saleId};
+  @override
+  LocalReceipt map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalReceipt(
+      saleId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sale_id'])!,
+      tenantId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tenant_id'])!,
+      receiptNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}receipt_number'])!,
+      receiptDataJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}receipt_data_json'])!,
+      receiptText: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}receipt_text']),
+      issuedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}issued_at'])!,
+      printCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}print_count'])!,
+    );
+  }
+
+  @override
+  $LocalReceiptsTable createAlias(String alias) {
+    return $LocalReceiptsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalReceipt extends DataClass implements Insertable<LocalReceipt> {
+  final String saleId;
+  final String tenantId;
+  final String receiptNumber;
+  final String receiptDataJson;
+  final String? receiptText;
+  final DateTime issuedAt;
+  final int printCount;
+  const LocalReceipt(
+      {required this.saleId,
+      required this.tenantId,
+      required this.receiptNumber,
+      required this.receiptDataJson,
+      this.receiptText,
+      required this.issuedAt,
+      required this.printCount});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['sale_id'] = Variable<String>(saleId);
+    map['tenant_id'] = Variable<String>(tenantId);
+    map['receipt_number'] = Variable<String>(receiptNumber);
+    map['receipt_data_json'] = Variable<String>(receiptDataJson);
+    if (!nullToAbsent || receiptText != null) {
+      map['receipt_text'] = Variable<String>(receiptText);
+    }
+    map['issued_at'] = Variable<DateTime>(issuedAt);
+    map['print_count'] = Variable<int>(printCount);
+    return map;
+  }
+
+  LocalReceiptsCompanion toCompanion(bool nullToAbsent) {
+    return LocalReceiptsCompanion(
+      saleId: Value(saleId),
+      tenantId: Value(tenantId),
+      receiptNumber: Value(receiptNumber),
+      receiptDataJson: Value(receiptDataJson),
+      receiptText: receiptText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptText),
+      issuedAt: Value(issuedAt),
+      printCount: Value(printCount),
+    );
+  }
+
+  factory LocalReceipt.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalReceipt(
+      saleId: serializer.fromJson<String>(json['saleId']),
+      tenantId: serializer.fromJson<String>(json['tenantId']),
+      receiptNumber: serializer.fromJson<String>(json['receiptNumber']),
+      receiptDataJson: serializer.fromJson<String>(json['receiptDataJson']),
+      receiptText: serializer.fromJson<String?>(json['receiptText']),
+      issuedAt: serializer.fromJson<DateTime>(json['issuedAt']),
+      printCount: serializer.fromJson<int>(json['printCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'saleId': serializer.toJson<String>(saleId),
+      'tenantId': serializer.toJson<String>(tenantId),
+      'receiptNumber': serializer.toJson<String>(receiptNumber),
+      'receiptDataJson': serializer.toJson<String>(receiptDataJson),
+      'receiptText': serializer.toJson<String?>(receiptText),
+      'issuedAt': serializer.toJson<DateTime>(issuedAt),
+      'printCount': serializer.toJson<int>(printCount),
+    };
+  }
+
+  LocalReceipt copyWith(
+          {String? saleId,
+          String? tenantId,
+          String? receiptNumber,
+          String? receiptDataJson,
+          Value<String?> receiptText = const Value.absent(),
+          DateTime? issuedAt,
+          int? printCount}) =>
+      LocalReceipt(
+        saleId: saleId ?? this.saleId,
+        tenantId: tenantId ?? this.tenantId,
+        receiptNumber: receiptNumber ?? this.receiptNumber,
+        receiptDataJson: receiptDataJson ?? this.receiptDataJson,
+        receiptText: receiptText.present ? receiptText.value : this.receiptText,
+        issuedAt: issuedAt ?? this.issuedAt,
+        printCount: printCount ?? this.printCount,
+      );
+  LocalReceipt copyWithCompanion(LocalReceiptsCompanion data) {
+    return LocalReceipt(
+      saleId: data.saleId.present ? data.saleId.value : this.saleId,
+      tenantId: data.tenantId.present ? data.tenantId.value : this.tenantId,
+      receiptNumber: data.receiptNumber.present
+          ? data.receiptNumber.value
+          : this.receiptNumber,
+      receiptDataJson: data.receiptDataJson.present
+          ? data.receiptDataJson.value
+          : this.receiptDataJson,
+      receiptText:
+          data.receiptText.present ? data.receiptText.value : this.receiptText,
+      issuedAt: data.issuedAt.present ? data.issuedAt.value : this.issuedAt,
+      printCount:
+          data.printCount.present ? data.printCount.value : this.printCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalReceipt(')
+          ..write('saleId: $saleId, ')
+          ..write('tenantId: $tenantId, ')
+          ..write('receiptNumber: $receiptNumber, ')
+          ..write('receiptDataJson: $receiptDataJson, ')
+          ..write('receiptText: $receiptText, ')
+          ..write('issuedAt: $issuedAt, ')
+          ..write('printCount: $printCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(saleId, tenantId, receiptNumber,
+      receiptDataJson, receiptText, issuedAt, printCount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalReceipt &&
+          other.saleId == this.saleId &&
+          other.tenantId == this.tenantId &&
+          other.receiptNumber == this.receiptNumber &&
+          other.receiptDataJson == this.receiptDataJson &&
+          other.receiptText == this.receiptText &&
+          other.issuedAt == this.issuedAt &&
+          other.printCount == this.printCount);
+}
+
+class LocalReceiptsCompanion extends UpdateCompanion<LocalReceipt> {
+  final Value<String> saleId;
+  final Value<String> tenantId;
+  final Value<String> receiptNumber;
+  final Value<String> receiptDataJson;
+  final Value<String?> receiptText;
+  final Value<DateTime> issuedAt;
+  final Value<int> printCount;
+  final Value<int> rowid;
+  const LocalReceiptsCompanion({
+    this.saleId = const Value.absent(),
+    this.tenantId = const Value.absent(),
+    this.receiptNumber = const Value.absent(),
+    this.receiptDataJson = const Value.absent(),
+    this.receiptText = const Value.absent(),
+    this.issuedAt = const Value.absent(),
+    this.printCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalReceiptsCompanion.insert({
+    required String saleId,
+    required String tenantId,
+    required String receiptNumber,
+    required String receiptDataJson,
+    this.receiptText = const Value.absent(),
+    required DateTime issuedAt,
+    this.printCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : saleId = Value(saleId),
+        tenantId = Value(tenantId),
+        receiptNumber = Value(receiptNumber),
+        receiptDataJson = Value(receiptDataJson),
+        issuedAt = Value(issuedAt);
+  static Insertable<LocalReceipt> custom({
+    Expression<String>? saleId,
+    Expression<String>? tenantId,
+    Expression<String>? receiptNumber,
+    Expression<String>? receiptDataJson,
+    Expression<String>? receiptText,
+    Expression<DateTime>? issuedAt,
+    Expression<int>? printCount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (saleId != null) 'sale_id': saleId,
+      if (tenantId != null) 'tenant_id': tenantId,
+      if (receiptNumber != null) 'receipt_number': receiptNumber,
+      if (receiptDataJson != null) 'receipt_data_json': receiptDataJson,
+      if (receiptText != null) 'receipt_text': receiptText,
+      if (issuedAt != null) 'issued_at': issuedAt,
+      if (printCount != null) 'print_count': printCount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalReceiptsCompanion copyWith(
+      {Value<String>? saleId,
+      Value<String>? tenantId,
+      Value<String>? receiptNumber,
+      Value<String>? receiptDataJson,
+      Value<String?>? receiptText,
+      Value<DateTime>? issuedAt,
+      Value<int>? printCount,
+      Value<int>? rowid}) {
+    return LocalReceiptsCompanion(
+      saleId: saleId ?? this.saleId,
+      tenantId: tenantId ?? this.tenantId,
+      receiptNumber: receiptNumber ?? this.receiptNumber,
+      receiptDataJson: receiptDataJson ?? this.receiptDataJson,
+      receiptText: receiptText ?? this.receiptText,
+      issuedAt: issuedAt ?? this.issuedAt,
+      printCount: printCount ?? this.printCount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (saleId.present) {
+      map['sale_id'] = Variable<String>(saleId.value);
+    }
+    if (tenantId.present) {
+      map['tenant_id'] = Variable<String>(tenantId.value);
+    }
+    if (receiptNumber.present) {
+      map['receipt_number'] = Variable<String>(receiptNumber.value);
+    }
+    if (receiptDataJson.present) {
+      map['receipt_data_json'] = Variable<String>(receiptDataJson.value);
+    }
+    if (receiptText.present) {
+      map['receipt_text'] = Variable<String>(receiptText.value);
+    }
+    if (issuedAt.present) {
+      map['issued_at'] = Variable<DateTime>(issuedAt.value);
+    }
+    if (printCount.present) {
+      map['print_count'] = Variable<int>(printCount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalReceiptsCompanion(')
+          ..write('saleId: $saleId, ')
+          ..write('tenantId: $tenantId, ')
+          ..write('receiptNumber: $receiptNumber, ')
+          ..write('receiptDataJson: $receiptDataJson, ')
+          ..write('receiptText: $receiptText, ')
+          ..write('issuedAt: $issuedAt, ')
+          ..write('printCount: $printCount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   $LocalDatabaseManager get managers => $LocalDatabaseManager(this);
@@ -4015,6 +4421,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $LocalSaleLinesTable localSaleLines = $LocalSaleLinesTable(this);
   late final $LocalPaymentsTable localPayments = $LocalPaymentsTable(this);
   late final $SyncQueueTable syncQueue = $SyncQueueTable(this);
+  late final $LocalReceiptsTable localReceipts = $LocalReceiptsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4027,7 +4434,8 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
         localSales,
         localSaleLines,
         localPayments,
-        syncQueue
+        syncQueue,
+        localReceipts
       ];
 }
 
@@ -5985,6 +6393,217 @@ typedef $$SyncQueueTableProcessedTableManager = ProcessedTableManager<
     ),
     SyncQueueData,
     PrefetchHooks Function()>;
+typedef $$LocalReceiptsTableCreateCompanionBuilder = LocalReceiptsCompanion
+    Function({
+  required String saleId,
+  required String tenantId,
+  required String receiptNumber,
+  required String receiptDataJson,
+  Value<String?> receiptText,
+  required DateTime issuedAt,
+  Value<int> printCount,
+  Value<int> rowid,
+});
+typedef $$LocalReceiptsTableUpdateCompanionBuilder = LocalReceiptsCompanion
+    Function({
+  Value<String> saleId,
+  Value<String> tenantId,
+  Value<String> receiptNumber,
+  Value<String> receiptDataJson,
+  Value<String?> receiptText,
+  Value<DateTime> issuedAt,
+  Value<int> printCount,
+  Value<int> rowid,
+});
+
+class $$LocalReceiptsTableFilterComposer
+    extends Composer<_$LocalDatabase, $LocalReceiptsTable> {
+  $$LocalReceiptsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get saleId => $composableBuilder(
+      column: $table.saleId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tenantId => $composableBuilder(
+      column: $table.tenantId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get receiptNumber => $composableBuilder(
+      column: $table.receiptNumber, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get receiptDataJson => $composableBuilder(
+      column: $table.receiptDataJson,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get receiptText => $composableBuilder(
+      column: $table.receiptText, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get issuedAt => $composableBuilder(
+      column: $table.issuedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get printCount => $composableBuilder(
+      column: $table.printCount, builder: (column) => ColumnFilters(column));
+}
+
+class $$LocalReceiptsTableOrderingComposer
+    extends Composer<_$LocalDatabase, $LocalReceiptsTable> {
+  $$LocalReceiptsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get saleId => $composableBuilder(
+      column: $table.saleId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tenantId => $composableBuilder(
+      column: $table.tenantId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get receiptNumber => $composableBuilder(
+      column: $table.receiptNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get receiptDataJson => $composableBuilder(
+      column: $table.receiptDataJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get receiptText => $composableBuilder(
+      column: $table.receiptText, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get issuedAt => $composableBuilder(
+      column: $table.issuedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get printCount => $composableBuilder(
+      column: $table.printCount, builder: (column) => ColumnOrderings(column));
+}
+
+class $$LocalReceiptsTableAnnotationComposer
+    extends Composer<_$LocalDatabase, $LocalReceiptsTable> {
+  $$LocalReceiptsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get saleId =>
+      $composableBuilder(column: $table.saleId, builder: (column) => column);
+
+  GeneratedColumn<String> get tenantId =>
+      $composableBuilder(column: $table.tenantId, builder: (column) => column);
+
+  GeneratedColumn<String> get receiptNumber => $composableBuilder(
+      column: $table.receiptNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get receiptDataJson => $composableBuilder(
+      column: $table.receiptDataJson, builder: (column) => column);
+
+  GeneratedColumn<String> get receiptText => $composableBuilder(
+      column: $table.receiptText, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get issuedAt =>
+      $composableBuilder(column: $table.issuedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get printCount => $composableBuilder(
+      column: $table.printCount, builder: (column) => column);
+}
+
+class $$LocalReceiptsTableTableManager extends RootTableManager<
+    _$LocalDatabase,
+    $LocalReceiptsTable,
+    LocalReceipt,
+    $$LocalReceiptsTableFilterComposer,
+    $$LocalReceiptsTableOrderingComposer,
+    $$LocalReceiptsTableAnnotationComposer,
+    $$LocalReceiptsTableCreateCompanionBuilder,
+    $$LocalReceiptsTableUpdateCompanionBuilder,
+    (
+      LocalReceipt,
+      BaseReferences<_$LocalDatabase, $LocalReceiptsTable, LocalReceipt>
+    ),
+    LocalReceipt,
+    PrefetchHooks Function()> {
+  $$LocalReceiptsTableTableManager(
+      _$LocalDatabase db, $LocalReceiptsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalReceiptsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalReceiptsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalReceiptsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> saleId = const Value.absent(),
+            Value<String> tenantId = const Value.absent(),
+            Value<String> receiptNumber = const Value.absent(),
+            Value<String> receiptDataJson = const Value.absent(),
+            Value<String?> receiptText = const Value.absent(),
+            Value<DateTime> issuedAt = const Value.absent(),
+            Value<int> printCount = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              LocalReceiptsCompanion(
+            saleId: saleId,
+            tenantId: tenantId,
+            receiptNumber: receiptNumber,
+            receiptDataJson: receiptDataJson,
+            receiptText: receiptText,
+            issuedAt: issuedAt,
+            printCount: printCount,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String saleId,
+            required String tenantId,
+            required String receiptNumber,
+            required String receiptDataJson,
+            Value<String?> receiptText = const Value.absent(),
+            required DateTime issuedAt,
+            Value<int> printCount = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              LocalReceiptsCompanion.insert(
+            saleId: saleId,
+            tenantId: tenantId,
+            receiptNumber: receiptNumber,
+            receiptDataJson: receiptDataJson,
+            receiptText: receiptText,
+            issuedAt: issuedAt,
+            printCount: printCount,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$LocalReceiptsTable, LocalReceipt>(table),
+                    BaseReferences<_$LocalDatabase, $LocalReceiptsTable,
+                        LocalReceipt>(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$LocalReceiptsTableProcessedTableManager = ProcessedTableManager<
+    _$LocalDatabase,
+    $LocalReceiptsTable,
+    LocalReceipt,
+    $$LocalReceiptsTableFilterComposer,
+    $$LocalReceiptsTableOrderingComposer,
+    $$LocalReceiptsTableAnnotationComposer,
+    $$LocalReceiptsTableCreateCompanionBuilder,
+    $$LocalReceiptsTableUpdateCompanionBuilder,
+    (
+      LocalReceipt,
+      BaseReferences<_$LocalDatabase, $LocalReceiptsTable, LocalReceipt>
+    ),
+    LocalReceipt,
+    PrefetchHooks Function()>;
 
 class $LocalDatabaseManager {
   final _$LocalDatabase _db;
@@ -6005,4 +6624,6 @@ class $LocalDatabaseManager {
       $$LocalPaymentsTableTableManager(_db, _db.localPayments);
   $$SyncQueueTableTableManager get syncQueue =>
       $$SyncQueueTableTableManager(_db, _db.syncQueue);
+  $$LocalReceiptsTableTableManager get localReceipts =>
+      $$LocalReceiptsTableTableManager(_db, _db.localReceipts);
 }

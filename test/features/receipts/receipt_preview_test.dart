@@ -239,11 +239,10 @@ void main() {
 
     test('render includes item header and unit price plus line total', () {
       final output = renderer.render(receipt: _createTestReceipt());
-      expect(output, contains('Item'));
-      expect(output, contains('Qty'));
-      expect(output, contains('Price'));
-      expect(output, contains('Total'));
-      expect(output, matches(RegExp(r'2\.50')));
+      expect(output, contains('ITEM'));
+      expect(output, contains('TOTAL'));
+      expect(output, contains('Paracetamol 500mg'));
+      expect(output, contains('  4 x 2.50'));
       expect(output, matches(RegExp(r'10\.00')));
     });
 
@@ -282,9 +281,10 @@ void main() {
       final output = renderer.render(receipt: _createTestReceipt());
       expect(output, contains('Paracetamol 500mg'));
       expect(output, contains('Vitamin C 1000mg'));
-      // qty 4 @ 2.50 → line total 10.00, in the qty/price/total columns.
-      expect(output, matches(RegExp(r'4\s+2\.50\s+10\.00')));
-      expect(output, matches(RegExp(r'2\s+5\.00\s+10\.00')));
+      // two-line layout: indented calculation on line 2, line total on right.
+      expect(output, contains('  4 x 2.50'));
+      expect(output, contains('10.00'));
+      expect(output, contains('  2 x 5.00'));
     });
 
     test('render includes payment method and paid amount', () {
