@@ -18,7 +18,8 @@ import '../../../receipts/domain/receipt_preview.dart';
 import '../../../receipts/domain/receipt_renderer.dart';
 import '../../../receipts/presentation/widgets/receipt_ticket_card.dart';
 import '../../../sales/data/receipt_printer_service.dart';
-import '../../../workspaces/application/workspace_controller.dart';
+import '../../../onboarding/application/workspace_controller.dart';
+import '../../../onboarding/data/workspace_providers.dart';
 
 class ReceiptSettingsPage extends ConsumerStatefulWidget {
   const ReceiptSettingsPage({super.key});
