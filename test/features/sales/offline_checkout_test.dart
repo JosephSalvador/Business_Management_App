@@ -62,6 +62,7 @@ Session _offlineSession() => Session(
     );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late LocalDatabase db;
   late LocalSalesService service;
   late _TestJournal journal;

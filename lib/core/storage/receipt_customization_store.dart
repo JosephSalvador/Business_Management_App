@@ -21,12 +21,12 @@ class ReceiptCustomizationStore {
   final FlutterSecureStorage _storage;
 
   Future<ReceiptCustomization?> read({String? tenantId}) async {
-    final key = tenantId != null && tenantId.isNotEmpty
-        ? '$_keyPrefix.$tenantId'
-        : _keyPrefix;
-    final jsonStr = await _storage.read(key: key);
-    if (jsonStr == null || jsonStr.trim().isEmpty) return null;
     try {
+      final key = tenantId != null && tenantId.isNotEmpty
+          ? '$_keyPrefix.$tenantId'
+          : _keyPrefix;
+      final jsonStr = await _storage.read(key: key);
+      if (jsonStr == null || jsonStr.trim().isEmpty) return null;
       final map = jsonDecode(jsonStr) as Map<String, dynamic>;
       return ReceiptCustomization.fromJson(map);
     } catch (_) {
@@ -35,11 +35,13 @@ class ReceiptCustomizationStore {
   }
 
   Future<void> write(ReceiptCustomization customization, {String? tenantId}) async {
-    final key = tenantId != null && tenantId.isNotEmpty
-        ? '$_keyPrefix.$tenantId'
-        : _keyPrefix;
-    final jsonStr = jsonEncode(customization.toJson());
-    await _storage.write(key: key, value: jsonStr);
+    try {
+      final key = tenantId != null && tenantId.isNotEmpty
+          ? '$_keyPrefix.$tenantId'
+          : _keyPrefix;
+      final jsonStr = jsonEncode(customization.toJson());
+      await _storage.write(key: key, value: jsonStr);
+    } catch (_) {}
   }
 }
 
@@ -56,11 +58,13 @@ class ReceiptCustomizationNotifier extends Notifier<ReceiptCustomization> {
   }
 
   Future<void> _restore() async {
-    final store = ref.read(receiptCustomizationStoreProvider);
-    final saved = await store.read();
-    if (saved != null) {
-      state = saved;
-    }
+    try {
+      final store = ref.read(receiptCustomizationStoreProvider);
+      final saved = await store.read();
+      if (saved != null) {
+        state = saved;
+      }
+    } catch (_) {}
   }
 
   Future<void> update(ReceiptCustomization customization, {String? tenantId}) async {
