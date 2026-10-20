@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/storage/locale_store.dart';
 import '../../../../core/storage/printer_store.dart';
 import '../../../../core/storage/receipt_customization_store.dart';
-import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../receipts/data/receipt_providers.dart';
