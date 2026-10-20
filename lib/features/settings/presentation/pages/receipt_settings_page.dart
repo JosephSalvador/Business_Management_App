@@ -11,12 +11,14 @@ import '../../../../core/storage/receipt_customization_store.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
-import '../../../onboarding/application/workspace_controller.dart';
+import '../../../receipts/data/receipt_providers.dart';
 import '../../../receipts/domain/receipt_customization.dart';
 import '../../../receipts/domain/receipt_format.dart';
 import '../../../receipts/domain/receipt_preview.dart';
+import '../../../receipts/domain/receipt_renderer.dart';
 import '../../../receipts/presentation/widgets/receipt_ticket_card.dart';
 import '../../../sales/data/receipt_printer_service.dart';
+import '../../../workspaces/application/workspace_controller.dart';
 
 class ReceiptSettingsPage extends ConsumerStatefulWidget {
   const ReceiptSettingsPage({super.key});
@@ -124,6 +126,8 @@ class _ReceiptSettingsPageState extends ConsumerState<ReceiptSettingsPage>
           quantity: 2,
           unitPrice: 15000,
           discountAmount: 0,
+          taxCode: 'A',
+          taxAmount: 0,
           lineTotal: 30000,
         ),
         ReceiptLine(
@@ -131,6 +135,8 @@ class _ReceiptSettingsPageState extends ConsumerState<ReceiptSettingsPage>
           quantity: 1,
           unitPrice: 7500,
           discountAmount: 0,
+          taxCode: 'A',
+          taxAmount: 0,
           lineTotal: 7500,
         ),
         ReceiptLine(
@@ -138,6 +144,8 @@ class _ReceiptSettingsPageState extends ConsumerState<ReceiptSettingsPage>
           quantity: 3,
           unitPrice: 2500,
           discountAmount: 0,
+          taxCode: 'A',
+          taxAmount: 0,
           lineTotal: 7500,
         ),
       ],
