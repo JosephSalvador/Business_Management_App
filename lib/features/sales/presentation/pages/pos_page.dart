@@ -24,6 +24,8 @@ import '../../application/pos_catalog_controller.dart';
 import '../../../../shared/design_system/responsive.dart';
 import 'sync_status_sheet.dart';
 import 'payment_sheet.dart';
+import 'parked_carts_sheet.dart';
+import 'shift_close_sheet.dart';
 
 /// POS page: search products, add to cart, pay.
 /// Works online and offline — offline sales sync when internet returns.
@@ -79,6 +81,7 @@ class _PosPageState extends ConsumerState<PosPage> {
     final cart = ref.watch(cartControllerProvider);
     final connection = ref.watch(connectionQualityProvider);
     final syncStatus = ref.watch(syncStatusProvider);
+    final parkedCarts = ref.watch(parkedCartsProvider);
     final loc = context.loc;
 
     return PopScope(
@@ -116,6 +119,22 @@ class _PosPageState extends ConsumerState<PosPage> {
                 onPressed: _pickCustomer,
                 tooltip: loc.posAddCustomer,
               ),
+            // Parked carts button with badge
+            Badge(
+              isLabelVisible: parkedCarts.isNotEmpty,
+              label: Text('${parkedCarts.length}'),
+              child: IconButton(
+                icon: const Icon(Icons.pause_circle_outline),
+                tooltip: 'Oda Pembeni',
+                onPressed: () => showParkedCartsSheet(context),
+              ),
+            ),
+            // Shift close / Z-Report
+            IconButton(
+              icon: const Icon(Icons.point_of_sale_outlined),
+              tooltip: 'Funga Hesabu (Z-Report)',
+              onPressed: () => showShiftCloseSheet(context),
+            ),
             // Connection status icon (wifi signal)
             _ConnectionIcon(quality: connection, stale: catalog.stale),
             Badge(
@@ -123,11 +142,13 @@ class _PosPageState extends ConsumerState<PosPage> {
               label: Text('${syncStatus.pendingCount}'),
               child: IconButton(
                 icon: const Icon(Icons.sync),
+                tooltip: 'Usawazishaji & Outbox',
                 onPressed: () => showSyncStatusSheet(context),
               ),
             ),
             IconButton(
               icon: const Icon(Icons.receipt_long),
+              tooltip: 'Historia ya Mauzo',
               onPressed: () => context.push(Routes.salesHistory),
             ),
           ],
@@ -977,6 +998,27 @@ class _CartBar extends ConsumerWidget {
                     ],
                   ),
                 ),
+                IconButton.outlined(
+                  icon: const Icon(Icons.pause_circle_outline, size: 20),
+                  tooltip: 'Weka Oda Pembeni',
+                  onPressed: () async {
+                    await ref.read(parkedCartsProvider.notifier).park(
+                          cart.lines,
+                          customerName: customerName,
+                          customerId: customerId,
+                        );
+                    ref.read(cartControllerProvider.notifier).clear();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Oda imewekwa pembeni!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
                 FilledButton.icon(
                   icon: const Icon(Icons.shopping_cart_checkout, size: 18),
                   label: Text(
