@@ -4,8 +4,8 @@ import 'package:intl/intl.dart';
 
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
-import '../data/offline_parked_cart_service.dart';
-import '../data/sales_providers.dart';
+import '../../data/offline_parked_cart_service.dart';
+import '../../data/sales_providers.dart';
 
 /// Opens the Parked Carts ("Oda Zilizowekwa Pembeni") sheet.
 Future<void> showParkedCartsSheet(BuildContext context) {

@@ -44,6 +44,7 @@ class OfflineInventoryService {
     final tenantId = (await _tenantIdOf()) ?? 'unknown';
     final branchId = (await _branchIdOf()) ?? tenantId;
     final deviceId = await _deviceIdOf();
+    final userId = await _userIdOf();
     final effectiveWarehouseId = warehouseId ?? '*';
     final operationId = _uuid.v4();
     final now = DateTime.now().toUtc();
@@ -65,6 +66,7 @@ class OfflineInventoryService {
       'adjustmentQuantity': quantity,
       'reason': 'Kupokea Mzigo Nje ya Mtandao (Inbound)',
       'notes': notes,
+      'createdBy': userId,
       'createdAt': now.toIso8601String(),
     };
 

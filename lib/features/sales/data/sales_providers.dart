@@ -13,7 +13,6 @@ import '../../../core/network/api_routes.dart';
 import '../../../core/network/connectivity_monitor.dart';
 import '../../../core/storage/local_database.dart' show LocalSale;
 import '../../../core/storage/sync_queue_dao.dart';
-import '../../../core/storage/tables.dart' show LocalSaleStatus;
 import '../../../core/sync/local_sales_service.dart';
 import '../../../core/sync/sync_engine.dart';
 import '../../authentication/application/auth_controller.dart';
@@ -22,6 +21,7 @@ import '../application/cart_controller.dart';
 import '../application/checkout_controller.dart';
 import '../application/pos_catalog_controller.dart';
 import '../application/sales_history_controller.dart';
+import '../domain/sale.dart' show CartLine;
 import '../../customers/data/customer_providers.dart'
     show customerRepositoryProvider, offlineCustomerDebtServiceProvider;
 import '../../dashboard/data/dashboard_providers.dart';

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../app/providers.dart';
 import '../../../core/di/core_providers.dart' show localReceiptDaoProvider;
 import '../../../core/network/app_exception.dart';
+import '../../../core/network/connectivity_monitor.dart';
 import '../../authentication/application/auth_controller.dart';
 import '../../onboarding/application/workspace_controller.dart';
 import '../data/offline_sale_recorder.dart';

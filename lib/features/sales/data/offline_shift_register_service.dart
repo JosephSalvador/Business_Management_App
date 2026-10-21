@@ -226,12 +226,14 @@ class OfflineShiftRegisterService {
     final tenantId = (await _tenantIdOf()) ?? 'unknown';
     final branchId = (await _branchIdOf()) ?? tenantId;
     final deviceId = await _deviceIdOf();
+    final userId = await _userIdOf();
     final now = DateTime.now().toUtc();
 
     final payload = {
       'shiftId': shiftId,
       'tenantId': tenantId,
       'branchId': branchId,
+      'closedBy': userId,
       'summary': summary.toJson(),
       'closedAt': now.toIso8601String(),
     };

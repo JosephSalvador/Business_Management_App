@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jolinx_app/core/storage/local_database.dart';
 import 'package:jolinx_app/core/storage/offline_cache_dao.dart';
 import 'package:jolinx_app/core/storage/sync_queue_dao.dart';
-import 'package:jolinx_app/features/finance/data/expense_repository.dart';
 import 'package:jolinx_app/features/finance/data/offline_expense_service.dart';
 
 void main() {

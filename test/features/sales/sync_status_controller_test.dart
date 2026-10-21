@@ -5,7 +5,6 @@ import 'package:jolinx_app/app/providers.dart';
 import 'package:jolinx_app/core/storage/local_database.dart';
 import 'package:jolinx_app/core/storage/local_sales_dao.dart';
 import 'package:jolinx_app/core/sync/local_sales_service.dart';
-import 'package:jolinx_app/features/sales/data/sales_providers.dart';
 
 import 'sync_engine_test.dart' show ServerSimulatingRepository;
 
