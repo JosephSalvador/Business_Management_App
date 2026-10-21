@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/core_providers.dart';
 import '../../../core/storage/cached_catalog_dao.dart';
 import '../../../core/storage/sync_queue_dao.dart';
-import '../../authentication/data/auth_providers.dart';
 import '../../sales/data/sales_providers.dart';
 import '../application/stock_controller.dart';
 import 'inventory_repository.dart';

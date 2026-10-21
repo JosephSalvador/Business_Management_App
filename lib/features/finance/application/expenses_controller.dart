@@ -3,10 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/network/connectivity_monitor.dart';
-import '../../sales/data/sales_providers.dart' show connectionQualityProvider;
-import '../data/expense_providers.dart';
 import '../data/expense_repository.dart';
-import '../data/offline_expense_service.dart';
 
 const int expensePageSize = 20;
 

@@ -54,6 +54,7 @@ class OfflineExpenseService {
 
     final enrichedBody = Map<String, dynamic>.from(body);
     enrichedBody['id'] = expenseId;
+    enrichedBody['userId'] ??= userId;
     enrichedBody['pendingLocally'] = true;
     enrichedBody['createdAt'] =
         enrichedBody['createdAt'] ?? DateTime.now().toUtc().toIso8601String();

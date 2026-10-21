@@ -5,7 +5,6 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
-import '../../data/offline_shift_register_service.dart';
 import '../../data/sales_providers.dart';
 
 /// Opens the Shift Close and Thermal Z-Report bottom sheet.
@@ -317,7 +316,8 @@ class _ShiftCloseSheetState extends ConsumerState<_ShiftCloseSheet> {
             icon: const Icon(Icons.share),
             label: const Text('Tuma WhatsApp'),
             onPressed: () {
-              SharePlus.instance.share(reportText, subject: 'Z-Report Hesabu ya Leo');
+              // ignore: deprecated_member_use
+              Share.share(reportText, subject: 'Z-Report Hesabu ya Leo');
             },
           ),
           FilledButton(

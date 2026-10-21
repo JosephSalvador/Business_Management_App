@@ -48,6 +48,7 @@ class OfflineCustomerDebtService {
     final tenantId = (await _tenantIdOf()) ?? 'unknown';
     final branchId = (await _branchIdOf()) ?? tenantId;
     final deviceId = await _deviceIdOf();
+    final userId = await _userIdOf();
     final now = DateTime.now().toUtc();
     final receiptNumber =
         'RCP-PAY-${paymentId.substring(0, 8).toUpperCase()}';
@@ -60,6 +61,7 @@ class OfflineCustomerDebtService {
       'description': description,
       'paymentMethod': paymentMethod,
       'receiptNumber': receiptNumber,
+      'collectedBy': userId,
       'createdAt': now.toIso8601String(),
     };
 
@@ -75,31 +77,45 @@ class OfflineCustomerDebtService {
       payload: jsonEncode(payload),
     );
 
-    // 2. Save offline receipt so the customer gets a receipt immediately
+    // 2. Cache latest payment for customer
+    await _cache.save('last_debt_payment_$customerId', payload);
+
+    // 3. Save offline receipt so the customer gets a receipt immediately
     final receiptPreview = ReceiptPreview(
       saleId: paymentId,
       saleNumber: receiptNumber,
       saleDate: now,
       isVoided: false,
       hasMetadata: true,
+      isReprint: false,
+      printCount: 0,
       businessName: 'STAKABADHI YA MALIPO YA DENI',
       customerName: customerName,
       currency: 'TZS',
+      qrPayload: '',
       subtotal: amount,
       taxAmount: 0,
+      discountAmount: 0,
       totalAmount: amount,
       amountPaid: amount,
       change: 0,
-      paymentMethodName: paymentMethod,
       lines: [
-        ReceiptLinePreview(
+        ReceiptLine(
           productName: 'Malipo ya Deni - $description',
           quantity: 1,
           unitPrice: amount,
+          discountAmount: 0,
           lineTotal: amount,
+          taxCode: 'EX',
+          taxAmount: 0,
         ),
       ],
-      footerMessage: 'Asante kwa malipo yako. Deni limepunguzwa.',
+      payments: [
+        ReceiptPayment(
+          method: paymentMethod,
+          amount: amount,
+        ),
+      ],
     );
 
     await _receipts.saveReceipt(

@@ -6,7 +6,6 @@ import '../../../core/network/connectivity_monitor.dart';
 import '../../sales/data/sales_providers.dart' show connectionQualityProvider;
 import '../data/customer_providers.dart';
 import '../data/customer_repository.dart';
-import '../data/offline_customer_debt_service.dart';
 
 sealed class CustomersState {
   const CustomersState();
