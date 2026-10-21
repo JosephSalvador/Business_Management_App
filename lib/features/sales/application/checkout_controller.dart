@@ -99,6 +99,22 @@ class CheckoutController extends Notifier<CheckoutState> {
         throw ValidationException('Tawi la biashara halipatikani.');
       }
 
+      final connection = ref.read(connectionQualityProvider);
+      if (connection == ConnectionQuality.offline ||
+          connection == ConnectionQuality.unreachable) {
+        final windowOpen =
+            await ref.read(sessionJournalProvider).offlineWindowOpen();
+        if (windowOpen) {
+          final offlineSale = await _recordOffline(lines, paymentMethod,
+              amountTendered: amountTendered,
+              customerId: customerId,
+              customerName: customerName);
+          if (offlineSale != null) {
+            return offlineSale;
+          }
+        }
+      }
+
       final online = _tryOnline(
         branchId: branchId,
         lines: lines,

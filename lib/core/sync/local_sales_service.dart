@@ -1,7 +1,7 @@
-import '../storage/cached_catalog_dao.dart';
-import '../storage/local_receipt_dao.dart';
 import '../../features/sales/domain/sale.dart';
-import '../storage/local_database.dart' show LocalDatabase;
+import '../storage/cached_catalog_dao.dart';
+import '../storage/local_database.dart' show LocalDatabase, LocalSale;
+import '../storage/local_receipt_dao.dart';
 import '../storage/local_sales_dao.dart';
 import '../storage/quick_sale_memory.dart';
 import '../storage/sync_queue_dao.dart';
@@ -115,6 +115,12 @@ class LocalSalesService {
 
   Future<int> conflictedSaleCount() =>
       sales.countByStatus(LocalSaleStatus.conflict);
+
+  Future<List<LocalSale>> pendingSales({int limit = 50}) =>
+      sales.byStatus(LocalSaleStatus.pending, limit: limit);
+
+  Future<List<LocalSale>> conflictedSales({int limit = 50}) =>
+      sales.byStatus(LocalSaleStatus.conflict, limit: limit);
 
   /// Builds a provisional [SaleDto] from the local pending sale, so receipts
   /// and detail pages work before (or without) server confirmation.

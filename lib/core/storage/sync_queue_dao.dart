@@ -89,6 +89,63 @@ class SyncQueueDao {
     });
   }
 
+  Future<void> enqueue({
+    required String operationId,
+    required String tenantId,
+    required String branchId,
+    required String deviceId,
+    required String operationType,
+    required String aggregateType,
+    required String aggregateId,
+    required String payload,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await _db.into(_db.syncQueue).insertOnConflictUpdate(
+          SyncQueueCompanion(
+            operationId: Value(operationId),
+            tenantId: Value(tenantId),
+            branchId: Value(branchId),
+            deviceId: Value(deviceId),
+            operationType: Value(operationType),
+            aggregateType: Value(aggregateType),
+            aggregateId: Value(aggregateId),
+            payload: Value(payload),
+            status: const Value(SyncOperationStatus.pending),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+  }
+
+  Future<List<QueuedOperation>> listByOperationType(
+    String operationType, {
+    int status = SyncOperationStatus.pending,
+    int limit = 100,
+  }) async {
+    final rows = await (_db.select(_db.syncQueue)
+          ..where((t) =>
+              t.operationType.equals(operationType) & t.status.equals(status))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
+          ])
+          ..limit(limit))
+        .get();
+    return [
+      for (final row in rows)
+        QueuedOperation(
+          operationId: row.operationId,
+          operationType: row.operationType,
+          aggregateType: row.aggregateType,
+          aggregateId: row.aggregateId,
+          tenantId: row.tenantId,
+          branchId: row.branchId,
+          deviceId: row.deviceId,
+          payload: row.payload,
+          attemptCount: row.attemptCount,
+        ),
+    ];
+  }
+
   /// Returns an in-flight operation to pending unchanged — used when the
   /// engine stops before attempting delivery (session paused, offline).
   Future<void> releaseUnattempted(String operationId) {

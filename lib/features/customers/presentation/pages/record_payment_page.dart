@@ -168,7 +168,12 @@ class _RecordPaymentPageState extends ConsumerState<RecordPaymentPage> {
 
       await ref
           .read(customersControllerProvider.notifier)
-          .recordPayment(widget.customerId, amount, description);
+          .recordPayment(
+            widget.customerId,
+            amount,
+            description,
+            customerName: widget.customerName,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

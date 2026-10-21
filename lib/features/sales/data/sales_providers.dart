@@ -7,9 +7,13 @@ import '../../../core/di/core_providers.dart'
         localSalesServiceProvider,
         deviceIdentityProvider,
         branchCacheProvider,
-        localDatabaseProvider;
+        localDatabaseProvider,
+        offlineCacheDaoProvider;
 import '../../../core/network/api_routes.dart';
 import '../../../core/network/connectivity_monitor.dart';
+import '../../../core/storage/local_database.dart' show LocalSale;
+import '../../../core/storage/sync_queue_dao.dart';
+import '../../../core/storage/tables.dart' show LocalSaleStatus;
 import '../../../core/sync/local_sales_service.dart';
 import '../../../core/sync/sync_engine.dart';
 import '../../authentication/application/auth_controller.dart';
@@ -18,9 +22,23 @@ import '../application/cart_controller.dart';
 import '../application/checkout_controller.dart';
 import '../application/pos_catalog_controller.dart';
 import '../application/sales_history_controller.dart';
+import '../../customers/data/customer_providers.dart'
+    show customerRepositoryProvider, offlineCustomerDebtServiceProvider;
 import '../../dashboard/data/dashboard_providers.dart';
+import '../../finance/data/expense_providers.dart'
+    show
+        expenseRepositoryProvider,
+        expensesControllerProvider,
+        offlineExpenseServiceProvider;
+import '../../inventory/data/inventory_providers.dart'
+    show inventoryRepositoryProvider;
+import 'offline_parked_cart_service.dart';
 import 'offline_sale_recorder.dart';
+import 'offline_shift_register_service.dart';
 import 'sale_repository.dart';
+
+export 'offline_parked_cart_service.dart' show ParkedCart;
+export 'offline_shift_register_service.dart' show ShiftSummary;
 
 final saleRepositoryProvider = Provider<SaleRepository>(
   (ref) => SaleRepository(apiClient: ref.watch(apiClientProvider)),
@@ -52,6 +70,9 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   final engine = SyncEngine(
     salesService: ref.watch(localSalesServiceProvider),
     repository: ref.watch(saleRepositoryProvider),
+    expenseRepository: ref.watch(expenseRepositoryProvider),
+    customerRepository: ref.watch(customerRepositoryProvider),
+    inventoryRepository: ref.watch(inventoryRepositoryProvider),
   );
   final monitor = ref.watch(connectivityMonitorProvider.notifier);
   Timer? timer;
@@ -79,6 +100,9 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
       try {
         ref.read(salesHistoryControllerProvider.notifier).load();
       } catch (_) {}
+      try {
+        ref.read(expensesControllerProvider.notifier).load();
+      } catch (_) {}
     }
     ref.read(syncStatusProvider.notifier).refresh();
   };
@@ -95,21 +119,33 @@ class SyncStatusState {
     this.pendingCount = 0,
     this.conflictCount = 0,
     this.lastSyncAt,
+    this.isSyncing = false,
+    this.pendingSales = const [],
+    this.conflictSales = const [],
   });
 
   final int pendingCount;
   final int conflictCount;
   final DateTime? lastSyncAt;
+  final bool isSyncing;
+  final List<LocalSale> pendingSales;
+  final List<LocalSale> conflictSales;
 
   SyncStatusState copyWith({
     int? pendingCount,
     int? conflictCount,
     DateTime? lastSyncAt,
+    bool? isSyncing,
+    List<LocalSale>? pendingSales,
+    List<LocalSale>? conflictSales,
   }) =>
       SyncStatusState(
         pendingCount: pendingCount ?? this.pendingCount,
         conflictCount: conflictCount ?? this.conflictCount,
         lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+        isSyncing: isSyncing ?? this.isSyncing,
+        pendingSales: pendingSales ?? this.pendingSales,
+        conflictSales: conflictSales ?? this.conflictSales,
       );
 }
 
@@ -131,15 +167,31 @@ class SyncStatusController extends Notifier<SyncStatusState> {
     try {
       final pending = await _service.pendingSaleCount();
       final conflicts = await _service.conflictedSaleCount();
+      final pendingList = await _service.pendingSales();
+      final conflictList = await _service.conflictedSales();
       state = state.copyWith(
         pendingCount: pending,
         conflictCount: conflicts,
+        pendingSales: pendingList,
+        conflictSales: conflictList,
       );
     } catch (_) {}
   }
 
   void noteSyncCompleted() {
     state = state.copyWith(lastSyncAt: DateTime.now().toUtc());
+  }
+
+  Future<void> triggerSync() async {
+    if (state.isSyncing) return;
+    state = state.copyWith(isSyncing: true);
+    try {
+      final engine = ref.read(syncEngineProvider);
+      await engine.drain(forceRetryAll: true);
+    } finally {
+      state = state.copyWith(isSyncing: false);
+      await refresh();
+    }
   }
 }
 
@@ -228,4 +280,80 @@ final checkoutControllerProvider =
 final salesHistoryControllerProvider =
     NotifierProvider<SalesHistoryController, SalesHistoryState>(
   SalesHistoryController.new,
+);
+
+final offlineShiftRegisterServiceProvider =
+    Provider<OfflineShiftRegisterService>((ref) {
+  final service = ref.watch(localSalesServiceProvider);
+  final identity = ref.watch(deviceIdentityProvider);
+  final db = ref.watch(localDatabaseProvider);
+  final cache = ref.watch(offlineCacheDaoProvider);
+  final expense = ref.watch(offlineExpenseServiceProvider);
+  final debt = ref.watch(offlineCustomerDebtServiceProvider);
+
+  return OfflineShiftRegisterService(
+    salesDao: service.sales,
+    expenseService: expense,
+    debtService: debt,
+    queue: SyncQueueDao(db),
+    cache: cache,
+    tenantIdOf: () async => ref.read(sessionContextProvider).$1,
+    branchIdOf: () => ref.read(posBranchIdProvider)(),
+    deviceIdOf: () => identity.get(),
+    userIdOf: () async => ref.read(sessionContextProvider).$2,
+  );
+});
+
+final offlineParkedCartServiceProvider =
+    Provider<OfflineParkedCartService>((ref) {
+  final cache = ref.watch(offlineCacheDaoProvider);
+  return OfflineParkedCartService(cache: cache);
+});
+
+class ParkedCartsNotifier extends Notifier<List<ParkedCart>> {
+  @override
+  List<ParkedCart> build() {
+    Future.microtask(() => load());
+    return const [];
+  }
+
+  OfflineParkedCartService get _service =>
+      ref.read(offlineParkedCartServiceProvider);
+
+  Future<void> load() async {
+    final list = await _service.listParkedCarts();
+    state = list;
+  }
+
+  Future<ParkedCart> park(
+    List<CartLine> lines, {
+    String? customerName,
+    String? customerId,
+    String? label,
+  }) async {
+    final cart = await _service.parkCart(
+      lines: lines,
+      customerName: customerName,
+      customerId: customerId,
+      label: label,
+    );
+    await load();
+    return cart;
+  }
+
+  Future<ParkedCart?> restore(String cartId) async {
+    final restored = await _service.restoreCart(cartId);
+    await load();
+    return restored;
+  }
+
+  Future<void> discard(String cartId) async {
+    await _service.discardCart(cartId);
+    await load();
+  }
+}
+
+final parkedCartsProvider =
+    NotifierProvider<ParkedCartsNotifier, List<ParkedCart>>(
+  ParkedCartsNotifier.new,
 );

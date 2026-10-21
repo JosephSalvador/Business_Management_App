@@ -2,7 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
+import '../../../core/network/connectivity_monitor.dart';
+import '../../sales/data/sales_providers.dart' show connectionQualityProvider;
+import '../data/expense_providers.dart';
 import '../data/expense_repository.dart';
+import '../data/offline_expense_service.dart';
 
 const int expensePageSize = 20;
 
@@ -65,6 +69,8 @@ class ExpensesController extends Notifier<ExpensesState> {
   ExpensesState build() => const ExpensesLoading();
 
   ExpenseRepository get _repository => ref.read(expenseRepositoryProvider);
+  OfflineExpenseService get _offlineService =>
+      ref.read(offlineExpenseServiceProvider);
 
   Future<void> load({
     String? search,
@@ -113,37 +119,76 @@ class ExpensesController extends Notifier<ExpensesState> {
   }
 
   Future<ExpensesState> _fetchPage(int page) async {
-    final result = await _repository.list(
-      page: page,
-      pageSize: expensePageSize,
-      search: _search,
-      fromDate: _fromDate == null ? null : expenseDayStartUtc(_fromDate!),
-      toDate: _toDate == null ? null : expenseDayEndUtc(_toDate!),
-    );
-    final summary = await _repository.getSummary(
-      fromDate: _fromDate == null ? null : expenseDayStartUtc(_fromDate!),
-      toDate: _toDate == null ? null : expenseDayEndUtc(_toDate!),
-    );
-    return ExpensesLoaded(
-      items: result.items,
-      total: result.total,
-      page: page,
-      // items.length is the size of THIS page, not the loaded total — a
-      // short last page (5 < 25) must still end pagination.
-      hasMore: page * expensePageSize < result.total,
-      search: _search,
-      fromDate: _fromDate,
-      toDate: _toDate,
-      summary: summary,
-    );
+    List<Map<String, dynamic>> pending = const [];
+    if (page == 1) {
+      try {
+        pending = await _offlineService.listPendingExpenses();
+      } catch (_) {}
+    }
+
+    try {
+      final result = await _repository.list(
+        page: page,
+        pageSize: expensePageSize,
+        search: _search,
+        fromDate: _fromDate == null ? null : expenseDayStartUtc(_fromDate!),
+        toDate: _toDate == null ? null : expenseDayEndUtc(_toDate!),
+      );
+      final summary = await _repository.getSummary(
+        fromDate: _fromDate == null ? null : expenseDayStartUtc(_fromDate!),
+        toDate: _toDate == null ? null : expenseDayEndUtc(_toDate!),
+      );
+      return ExpensesLoaded(
+        items: [...pending, ...result.items],
+        total: result.total + pending.length,
+        page: page,
+        hasMore: page * expensePageSize < result.total,
+        search: _search,
+        fromDate: _fromDate,
+        toDate: _toDate,
+        summary: summary,
+      );
+    } on AppException {
+      if (page == 1 && pending.isNotEmpty) {
+        return ExpensesLoaded(
+          items: pending,
+          total: pending.length,
+          page: 1,
+          hasMore: false,
+          search: _search,
+          fromDate: _fromDate,
+          toDate: _toDate,
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getById(String id) async {
+    final pending = await _offlineService.listPendingExpenses();
+    final localMatch = pending.where((e) => e['id'] == id).firstOrNull;
+    if (localMatch != null) return localMatch;
     return _repository.getById(id);
   }
 
   Future<void> create(Map<String, dynamic> body) async {
-    await _repository.create(body);
+    final connection = ref.read(connectionQualityProvider);
+    if (connection == ConnectionQuality.offline ||
+        connection == ConnectionQuality.unreachable) {
+      await _offlineService.recordOffline(body);
+      await load();
+      return;
+    }
+
+    try {
+      await _repository.create(body);
+    } on AppException catch (e) {
+      if (e is NetworkException || e is TimeoutException) {
+        await _offlineService.recordOffline(body);
+      } else {
+        rethrow;
+      }
+    }
     await load();
   }
 

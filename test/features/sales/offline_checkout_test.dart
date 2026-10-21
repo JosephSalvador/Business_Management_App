@@ -9,6 +9,7 @@ import 'package:jolinx_app/core/storage/local_database.dart';
 import 'package:jolinx_app/core/storage/session_journal.dart';
 import 'package:jolinx_app/core/storage/tables.dart';
 import 'package:jolinx_app/core/network/app_exception.dart';
+import 'package:jolinx_app/core/network/connectivity_monitor.dart';
 import 'package:jolinx_app/core/sync/local_sales_service.dart';
 import 'package:jolinx_app/features/authentication/application/auth_controller.dart';
 import 'package:jolinx_app/features/authentication/domain/session.dart';
@@ -269,6 +270,36 @@ void main() {
     expect(result!.pendingLocally, true);
     expect(result.totalAmount, 15000);
 
+    final pending = await service.sales.byStatus(LocalSaleStatus.pending);
+    expect(pending, hasLength(1));
+  });
+
+  test('offline connection fast-paths directly to offline recording without network attempts',
+      () async {
+    await seedStock(50);
+    final sales = FakeSaleRepository(); // would succeed if called online
+    final offline = recorder();
+    final container = ProviderContainer(overrides: [
+      saleRepositoryProvider.overrideWithValue(sales),
+      offlineSaleRecorderProvider.overrideWithValue(offline),
+      sessionJournalProvider.overrideWithValue(journal),
+      posBranchIdProvider.overrideWithValue(() async => 'branch-1'),
+      branchCacheProvider.overrideWithValue(_FakeBranchCache()),
+      authControllerProvider.overrideWith(() => _FakeAuthController()),
+      connectionQualityProvider.overrideWithValue(ConnectionQuality.offline),
+    ]);
+    addTearDown(container.dispose);
+    final controller = container.read(checkoutControllerProvider.notifier);
+
+    final result = await controller.submit(
+      lines: [line()],
+      paymentMethod: 0,
+    );
+
+    expect(result, isNotNull);
+    expect(result!.pendingLocally, true);
+    expect(sales.createCalls, 0,
+        reason: 'fast-path must not touch the network');
     final pending = await service.sales.byStatus(LocalSaleStatus.pending);
     expect(pending, hasLength(1));
   });

@@ -347,11 +347,13 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
   Widget _buildExpenseTile(Map<String, dynamic> expense, AppLocalizations loc) {
     final description = expense['description'] ?? '';
     final amount = (expense['amount'] ?? 0).toDouble();
-    final dateStr = expense['expenseDate'] ?? '';
+    final dateStr = expense['expenseDate'] ?? expense['createdAt'] ?? '';
     final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
     final category = expense['categoryName'] as String?;
+    final isPending = expense['pendingLocally'] == true;
 
     final detail = <String>[
+      if (isPending) 'Nje ya mtandao (Outbox)',
       if (date != null) DateFormat('dd/MM/yyyy').format(date),
       if (category != null && category.trim().isNotEmpty) category,
     ];
@@ -362,11 +364,16 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF4757).withValues(alpha: 0.1),
+            color: isPending
+                ? Colors.amber.withValues(alpha: 0.15)
+                : const Color(0xFFFF4757).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.receipt_long,
-              color: Color(0xFFFF4757), size: 20),
+          child: Icon(
+            isPending ? Icons.cloud_off : Icons.receipt_long,
+            color: isPending ? Colors.amber.shade900 : const Color(0xFFFF4757),
+            size: 20,
+          ),
         ),
         title: Text(description,
             style: const TextStyle(fontWeight: FontWeight.w500)),
@@ -374,7 +381,11 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
             ? null
             : Text(
                 detail.join(' · '),
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isPending ? Colors.amber.shade900 : Colors.grey.shade500,
+                  fontWeight: isPending ? FontWeight.w500 : FontWeight.normal,
+                ),
               ),
         trailing: Text(
           formatMoney(amount),

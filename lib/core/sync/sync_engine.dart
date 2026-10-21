@@ -4,6 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../network/app_exception.dart';
+import '../../features/customers/data/customer_repository.dart';
+import '../../features/finance/data/expense_repository.dart';
+import '../../features/inventory/data/inventory_repository.dart';
+import '../../features/inventory/domain/stock.dart';
 import '../../features/sales/data/sale_repository.dart';
 import '../../features/sales/domain/sale.dart' show QuickSaleDefaults;
 import '../storage/sync_queue_dao.dart' show QueuedOperation;
@@ -45,11 +49,20 @@ class SyncEngine {
   SyncEngine({
     required LocalSalesService salesService,
     required SaleRepository repository,
+    ExpenseRepository? expenseRepository,
+    CustomerRepository? customerRepository,
+    InventoryRepository? inventoryRepository,
   })  : _salesService = salesService,
-        _repository = repository;
+        _repository = repository,
+        _expenseRepository = expenseRepository,
+        _customerRepository = customerRepository,
+        _inventoryRepository = inventoryRepository;
 
   final LocalSalesService _salesService;
   final SaleRepository _repository;
+  final ExpenseRepository? _expenseRepository;
+  final CustomerRepository? _customerRepository;
+  final InventoryRepository? _inventoryRepository;
 
   Future<void> Function(SyncOutcome)? onDrained;
 
@@ -98,50 +111,65 @@ class SyncEngine {
   }
 
   Future<bool> _pricesStillMatch(
-      QueuedOperation op, SyncOutcome outcome) async {
-    try {
-      final payload = op.decodedPayload;
-      final branchId = payload['branchId'] as String?;
-      final paidAmount =
-          ((payload['payments'] as List?)?.firstOrNull?['amount'] as num?)
-              ?.toDouble();
-      if (branchId == null || paidAmount == null) {
-        return true; // Let the backend decide anything unusual.
-      }
-      final localSale = await _salesService.sales.byClientSaleId(op.aggregateId);
-      final targetTotal = localSale?.totalEstimate ?? paidAmount;
-
-      var expected = 0.0;
-      for (final raw in payload['lines'] as List? ?? []) {
-        final line = raw as Map<String, dynamic>;
-        final qty = (line['quantity'] as num).toDouble();
-        if (line['unitPrice'] != null) {
-          expected += (line['unitPrice'] as num).toDouble() * qty;
-          continue;
-        }
-        final resolved = await _repository.resolvePrice(
-          line['productId'] as String,
-          quantity: qty,
-          branchId: branchId,
-        );
-        if (resolved == null) {
-          await _conflict(
-              op, outcome, 'PRODUCT', 'Bidhaa haipatikani tena kwenye mfumo.');
-          return false;
-        }
-        expected += resolved.price * qty;
-      }
-      if ((expected - targetTotal).abs() > 0.01) {
-        await _conflict(op, outcome, 'PRICE',
-            'Bei imebadilika kwenye mfumo. Muamala unahitaji kuangaliwa.');
-        return false;
-      }
-      return true;
-    } on AppException {
-      // Cannot verify right now (offline/timeout): send anyway — the
-      // backend re-resolves and its validation has the final word.
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (op.operationType != 'sale.create') {
       return true;
     }
+
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final lines = (body['lines'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+
+      // Quick-sale lines carry an open client-fixed price; they bypass
+      // backend price resolution by definition (the cashier typed the price).
+      final catalogLines = lines
+          .where((l) =>
+              l['unitPriceOverride'] == null &&
+              l['productId'] != QuickSaleDefaults.provisionalProductId)
+          .toList();
+
+      if (catalogLines.isEmpty) {
+        return true;
+      }
+
+      final productIds = catalogLines
+          .map((l) => l['productId'] as String?)
+          .whereType<String>()
+          .toList();
+
+      final resolvedPrices = await _repository.resolvePrices(
+        productIds: productIds,
+        branchId: body['branchId'] as String?,
+      );
+
+      for (final line in catalogLines) {
+        final pid = line['productId'] as String?;
+        if (pid == null) continue;
+        final resolved = resolvedPrices[pid];
+        if (resolved == null) continue;
+
+        final charged = (line['unitPrice'] as num?)?.toDouble();
+        if (charged != null && (charged - resolved).abs() > 0.01) {
+          await _conflict(
+            op,
+            outcome,
+            'PRICE_CHANGED',
+            'Bei ya bidhaa imebadilika mtandaoni wakati ukiuza nje ya mtandao.',
+          );
+          return false;
+        }
+      }
+    } on AppException {
+      // Resolution failed due to network / auth: let delivery attempt it
+      // so normal error handling (offline pause, session wait) takes over.
+    } catch (_) {
+      // Malformed payload handled at delivery.
+    }
+
+    return true;
   }
 
   Future<_DeliveryResult> _deliver(
@@ -151,6 +179,12 @@ class SyncEngine {
     switch (op.operationType) {
       case 'sale.create':
         return _deliverSale(op, outcome);
+      case 'expense.create':
+        return _deliverExpense(op, outcome);
+      case 'customer.debt_payment':
+        return _deliverCustomerDebtPayment(op, outcome);
+      case 'inventory.receive':
+        return _deliverInventoryAdjustment(op, outcome);
       default:
         await _salesService.markQueueFailed(
           op.operationId,
@@ -248,10 +282,142 @@ class SyncEngine {
       return _DeliveryResult.stop;
     } on ServerException {
       await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverExpense(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_expenseRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final result = await _expenseRepository.create(body);
+      final serverId = result['id']?.toString() ?? op.aggregateId;
+      await _salesService.queue.markSynced(op.operationId, serverId);
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
       return _DeliveryResult.stop;
-    } on UnknownException {
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
       await _retryLater(op, outcome);
       return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverCustomerDebtPayment(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_customerRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final customerId = body['customerId']?.toString() ?? op.aggregateId;
+      final amount = (body['amount'] as num?)?.toDouble() ?? 0.0;
+      final description = body['description']?.toString() ?? 'Malipo ya Deni';
+
+      await _customerRepository.recordPayment(customerId, amount, description);
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverInventoryAdjustment(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_inventoryRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final entry = AdjustStockEntry(
+        productId: body['productId']?.toString() ?? '',
+        warehouseId: body['warehouseId']?.toString() ?? '',
+        adjustmentQuantity:
+            (body['adjustmentQuantity'] as num?)?.toDouble() ?? 0.0,
+        reason: body['reason']?.toString() ?? 'Inbound Receiving',
+        notes: body['notes']?.toString(),
+        idempotencyKey: op.operationId,
+      );
+
+      await _inventoryRepository.adjustStock(entry);
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
     }
   }
 
@@ -262,11 +428,19 @@ class SyncEngine {
     String message,
   ) async {
     debugPrint('sync conflict ${op.operationId}: $code');
-    await _salesService.markSaleConflict(
-      clientSaleId: op.aggregateId,
-      errorCode: code,
-      errorMessage: message,
-    );
+    if (op.operationType == 'sale.create') {
+      await _salesService.markSaleConflict(
+        clientSaleId: op.aggregateId,
+        errorCode: code,
+        errorMessage: message,
+      );
+    } else {
+      await _salesService.queue.markConflict(
+        op.operationId,
+        errorCode: code,
+        errorMessage: message,
+      );
+    }
     outcome.conflicted++;
   }
 
@@ -281,11 +455,13 @@ class SyncEngine {
       errorCode: code,
       errorMessage: message,
     );
-    await _salesService.markSaleConflictOnly(
-      clientSaleId: op.aggregateId,
-      errorCode: code,
-      errorMessage: message,
-    );
+    if (op.operationType == 'sale.create') {
+      await _salesService.markSaleConflictOnly(
+        clientSaleId: op.aggregateId,
+        errorCode: code,
+        errorMessage: message,
+      );
+    }
     outcome.failed++;
   }
 
@@ -299,7 +475,3 @@ class SyncEngine {
 }
 
 enum _DeliveryResult { continue_, stop }
-
-extension _FirstOrNull<T> on List<T> {
-  T? get firstOrNull => isEmpty ? null : first;
-}

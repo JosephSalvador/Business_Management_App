@@ -122,5 +122,9 @@ class CartController extends Notifier<CartState> {
     state = CartState(lines: lines);
   }
 
+  void restoreLines(List<CartLine> lines) {
+    state = CartState(lines: lines);
+  }
+
   void clear() => state = const CartState();
 }

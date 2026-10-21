@@ -267,6 +267,41 @@ class CachedCatalogDao {
     });
   }
 
+  Future<void> incrementCachedStock({
+    required String tenantId,
+    required String productId,
+    required String warehouseId,
+    required double quantity,
+  }) async {
+    final existing = await (_db.select(_db.cachedStock)
+          ..where((t) =>
+              t.tenantId.equals(tenantId) &
+              t.productId.equals(productId) &
+              t.warehouseId.equals(warehouseId)))
+        .getSingleOrNull();
+
+    final now = DateTime.now().toUtc();
+    if (existing != null) {
+      await (_db.update(_db.cachedStock)
+            ..where((t) =>
+                t.tenantId.equals(tenantId) &
+                t.productId.equals(productId) &
+                t.warehouseId.equals(warehouseId)))
+          .write(CachedStockCompanion(
+        quantity: Value(existing.quantity + quantity),
+        fetchedAt: Value(now),
+      ));
+    } else {
+      await _db.into(_db.cachedStock).insert(CachedStockCompanion.insert(
+            tenantId: tenantId,
+            productId: productId,
+            warehouseId: warehouseId,
+            quantity: quantity,
+            fetchedAt: now,
+          ));
+    }
+  }
+
   /// When the product catalog was last fully replaced via [replaceCatalog].
   /// (`replaceStockBalances` stamps its own `last_stock_refresh` key.)
   Future<DateTime?> lastRefresh() async {

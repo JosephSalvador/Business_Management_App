@@ -2,7 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
+import '../../../core/network/connectivity_monitor.dart';
+import '../../sales/data/sales_providers.dart' show connectionQualityProvider;
+import '../data/customer_providers.dart';
 import '../data/customer_repository.dart';
+import '../data/offline_customer_debt_service.dart';
 
 sealed class CustomersState {
   const CustomersState();
@@ -41,6 +45,8 @@ class CustomersController extends Notifier<CustomersState> {
   CustomersState build() => const CustomersLoading();
 
   CustomerRepository get _repository => ref.read(customerRepositoryProvider);
+  OfflineCustomerDebtService get _offlineDebt =>
+      ref.read(offlineCustomerDebtServiceProvider);
 
   Future<void> load({String? search, bool silent = false}) async {
     if (search != null) {
@@ -78,7 +84,34 @@ class CustomersController extends Notifier<CustomersState> {
   }
 
   Future<Map<String, dynamic>?> getCredit(String customerId) async {
-    return _repository.getCredit(customerId);
+    final pendingDeduction =
+        await _offlineDebt.getPendingDebtDeduction(customerId);
+    try {
+      final remote = await _repository.getCredit(customerId);
+      if (remote == null) return null;
+      if (pendingDeduction > 0) {
+        final currentBalance =
+            (remote['balance'] as num?)?.toDouble() ?? 0.0;
+        final adjusted =
+            (currentBalance - pendingDeduction).clamp(0.0, double.infinity);
+        return {
+          ...remote,
+          'balance': adjusted,
+          'pendingOfflinePayment': pendingDeduction,
+        };
+      }
+      return remote;
+    } catch (_) {
+      if (pendingDeduction > 0) {
+        return {
+          'customerId': customerId,
+          'balance': 0.0,
+          'creditLimit': 0.0,
+          'pendingOfflinePayment': pendingDeduction,
+        };
+      }
+      return null;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getOutstandingCredit() async {
@@ -86,8 +119,40 @@ class CustomersController extends Notifier<CustomersState> {
   }
 
   Future<void> recordPayment(
-      String customerId, double amount, String description) async {
-    await _repository.recordPayment(customerId, amount, description);
+    String customerId,
+    double amount,
+    String description, {
+    String customerName = 'Mteja',
+    String paymentMethod = 'Pesa Taslimu',
+  }) async {
+    final connection = ref.read(connectionQualityProvider);
+    if (connection == ConnectionQuality.offline ||
+        connection == ConnectionQuality.unreachable) {
+      await _offlineDebt.recordOfflinePayment(
+        customerId: customerId,
+        customerName: customerName,
+        amount: amount,
+        description: description,
+        paymentMethod: paymentMethod,
+      );
+      return;
+    }
+
+    try {
+      await _repository.recordPayment(customerId, amount, description);
+    } on AppException catch (e) {
+      if (e is NetworkException || e is TimeoutException) {
+        await _offlineDebt.recordOfflinePayment(
+          customerId: customerId,
+          customerName: customerName,
+          amount: amount,
+          description: description,
+          paymentMethod: paymentMethod,
+        );
+      } else {
+        rethrow;
+      }
+    }
   }
 
   void reset() {
