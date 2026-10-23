@@ -91,12 +91,12 @@ jobs:
             CF_BRANCH="main"
             APP_ENV="production"
             API_URL="https://api.joberthix.xyz"
-            FALLBACK_URL="https://jolinx-api.onrender.com"
+            FALLBACK_URL="https://jolinx-api.kindsky-ea584b9f.centralindia.azurecontainerapps.io"
           else
             CF_BRANCH="staging"
             APP_ENV="staging"
-            API_URL="https://jolinx-staging-api.onrender.com"
-            FALLBACK_URL="https://jolinx-staging-api.onrender.com"
+            API_URL="https://jolinx-api-staging.kindsky-ea584b9f.centralindia.azurecontainerapps.io"
+            FALLBACK_URL="https://jolinx-api-staging.kindsky-ea584b9f.centralindia.azurecontainerapps.io"
           fi
 
           echo "target=$TARGET" >> $GITHUB_OUTPUT
