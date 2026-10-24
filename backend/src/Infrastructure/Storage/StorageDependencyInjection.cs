@@ -16,6 +16,11 @@ public static class StorageDependencyInjection
         {
             services.AddSingleton<IFileStorage, LocalFileStorage>();
         }
+        else if (string.Equals(options.Provider, "Azure", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(options.Provider, "AzureBlob", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IFileStorage, AzureBlobFileStorage>();
+        }
         else
         {
             services.AddSingleton<IFileStorage, S3FileStorage>();

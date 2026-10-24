@@ -53,6 +53,8 @@ public sealed class StorageOptions
     public string Bucket { get; set; } = string.Empty;
     public string Region { get; set; } = string.Empty;
     public bool UseHttps { get; set; }
+    public string ConnectionString { get; set; } = string.Empty;
+    public string ContainerName { get; set; } = "uploads";
 }
 
 public sealed class PaymentsOptions
