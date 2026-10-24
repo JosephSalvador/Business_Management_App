@@ -4,7 +4,8 @@ import '../../authentication/data/auth_providers.dart';
 import '../application/purchases_controller.dart';
 import 'purchase_repository.dart';
 
-import '../../../core/di/core_providers.dart';
+import '../../../core/di/core_providers.dart'
+    show localDatabaseProvider, offlineCacheDaoProvider, deviceIdentityProvider;
 import '../../../core/storage/sync_queue_dao.dart';
 import '../../sales/data/sales_providers.dart';
 

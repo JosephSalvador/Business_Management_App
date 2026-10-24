@@ -5,7 +5,7 @@ import '../../../../app/router.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
-import '../../sales/presentation/pages/shift_close_sheet.dart';
+import '../../../sales/presentation/pages/shift_close_sheet.dart';
 
 class ReportsPage extends StatelessWidget {
   const ReportsPage({super.key});

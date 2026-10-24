@@ -52,21 +52,21 @@ class SupplierRepository {
       );
       final paged = _decodePage(response);
       if (_cache != null && search == null && page == 1) {
-        await _cache!.save(_cacheKey, {
+        await _cache.save(_cacheKey, {
           'items': paged.items,
           'total': paged.total,
         });
         for (final s in paged.items) {
           final id = s['id']?.toString();
           if (id != null) {
-            await _cache!.save('supplier_$id', s);
+            await _cache.save('supplier_$id', s);
           }
         }
       }
       return paged;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load(_cacheKey);
+        final cached = await _cache.load(_cacheKey);
         if (cached != null) {
           var items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()

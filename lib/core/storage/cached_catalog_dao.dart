@@ -118,6 +118,13 @@ class CachedCatalogDao {
         .get();
   }
 
+  Future<List<CachedProduct>> all({int limit = 500}) {
+    return (_db.select(_db.cachedProducts)
+          ..orderBy([(t) => OrderingTerm(expression: t.name)])
+          ..limit(limit))
+        .get();
+  }
+
   Future<CachedProduct?> byId(String tenantId, String productId) {
     return (_db.select(_db.cachedProducts)
           ..where((t) =>

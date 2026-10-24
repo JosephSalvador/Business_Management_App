@@ -1,5 +1,5 @@
 import '../../../core/network/api_client.dart';
-import '../../../core/network/exceptions.dart';
+import '../../../core/network/app_exception.dart';
 import '../../../core/storage/cached_catalog_dao.dart';
 import '../../../core/storage/local_sales_dao.dart';
 import '../../../core/storage/offline_cache_dao.dart';
@@ -297,6 +297,25 @@ class ReportRepository {
   final OfflineCacheDao? _cache;
   final CachedCatalogDao? _catalogDao;
 
+  Future<List<Map<String, dynamic>>> _loadAllExpenses() async {
+    final list = <Map<String, dynamic>>[];
+    final cache = _cache;
+    if (cache != null) {
+      final cached = await cache.load('expenses_list_cache');
+      if (cached != null && cached['items'] is List) {
+        list.addAll((cached['items'] as List)
+            .whereType<Map<dynamic, dynamic>>()
+            .map((raw) => Map<String, dynamic>.from(raw)));
+      }
+    }
+    final service = _expenseService;
+    if (service != null) {
+      final pending = await service.listPendingExpenses();
+      list.addAll(pending);
+    }
+    return list;
+  }
+
   Future<SalesSummary> salesSummary({
     DateTime? from,
     DateTime? to,
@@ -320,8 +339,9 @@ class ReportRepository {
         totalRevenue: (data['totalRevenue'] ?? 0) as num,
         averageSale: (data['averageSale'] ?? 0) as num,
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {
           'totalSales': summary.totalSales,
           'totalRevenue': summary.totalRevenue,
           'averageSale': summary.averageSale,
@@ -329,8 +349,9 @@ class ReportRepository {
       }
       return summary;
     } on AppException {
-      if (_salesDao != null) {
-        final sales = await _salesDao!.listSales(
+      final salesDao = _salesDao;
+      if (salesDao != null) {
+        final sales = await salesDao.listSales(
           from: effectiveFrom,
           to: effectiveTo,
           limit: 10000,
@@ -347,8 +368,9 @@ class ReportRepository {
           averageSale: averageSale,
         );
       }
-      if (_cache != null) {
-        final cached = await _cache!.load(cacheKey);
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load(cacheKey);
         if (cached != null) {
           return SalesSummary(
             totalSales: (cached['totalSales'] as num?)?.toInt() ?? 0,
@@ -393,15 +415,17 @@ class ReportRepository {
                 marginPercent: (e['marginPercent'] ?? 0) as num,
               ))
           .toList();
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {
           'items': result.map((p) => p.toJson()).toList(),
         });
       }
       return result;
     } on AppException {
-      if (_salesDao != null) {
-        final sales = await _salesDao!.listSales(
+      final salesDao = _salesDao;
+      if (salesDao != null) {
+        final sales = await salesDao.listSales(
           from: effectiveFrom,
           to: effectiveTo,
           limit: 10000,
@@ -431,8 +455,9 @@ class ReportRepository {
                 ))
             .toList();
       }
-      if (_cache != null) {
-        final cached = await _cache!.load(cacheKey);
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load(cacheKey);
         if (cached != null && cached['items'] is List) {
           return (cached['items'] as List)
               .map((e) =>
@@ -459,8 +484,9 @@ class ReportRepository {
                 revenue: (e['revenue'] ?? 0) as num,
               ))
           .toList();
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {
           'dataPoints': result
               .map((p) => {'label': p.label, 'revenue': p.revenue})
               .toList(),
@@ -468,12 +494,13 @@ class ReportRepository {
       }
       return result;
     } on AppException {
-      if (_salesDao != null) {
+      final salesDao = _salesDao;
+      if (salesDao != null) {
         final now = DateTime.now();
         final from = DateTime(now.year, now.month, now.day)
             .subtract(Duration(days: days - 1))
             .toUtc();
-        final sales = await _salesDao!.listSales(from: from, limit: 10000);
+        final sales = await salesDao.listSales(from: from, limit: 10000);
 
         final Map<String, double> dayTotals = {};
         for (var i = 0; i < days; i++) {
@@ -497,8 +524,9 @@ class ReportRepository {
             .map((e) => SalesTrendPoint(label: e.key, revenue: e.value))
             .toList();
       }
-      if (_cache != null) {
-        final cached = await _cache!.load(cacheKey);
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load(cacheKey);
         if (cached != null && cached['dataPoints'] is List) {
           return (cached['dataPoints'] as List)
               .map((e) => SalesTrendPoint(
@@ -557,13 +585,15 @@ class ReportRepository {
                 ))
             .toList(),
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, data);
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, data);
       }
       return overview;
     } on AppException {
-      if (_salesDao != null) {
-        final sales = await _salesDao!.listSales(
+      final salesDao = _salesDao;
+      if (salesDao != null) {
+        final sales = await salesDao.listSales(
           from: effectiveFrom,
           to: effectiveTo,
           limit: 10000,
@@ -572,15 +602,14 @@ class ReportRepository {
             sales.fold<double>(0.0, (sum, s) => sum + s.totalAmount);
 
         double totalExpenses = 0.0;
-        if (_expenseService != null) {
-          final expenses = await _expenseService!.getExpenses(limit: 1000);
-          for (final exp in expenses) {
-            final date = DateTime.tryParse(exp.expenseDate ?? '');
-            if (date != null &&
-                date.isAfter(effectiveFrom) &&
-                date.isBefore(effectiveTo)) {
-              totalExpenses += exp.amount;
-            }
+        final expenses = await _loadAllExpenses();
+        for (final exp in expenses) {
+          final date = DateTime.tryParse(
+              exp['expenseDate']?.toString() ?? exp['createdAt']?.toString() ?? '');
+          if (date != null &&
+              date.isAfter(effectiveFrom) &&
+              date.isBefore(effectiveTo)) {
+            totalExpenses += (exp['amount'] as num?)?.toDouble() ?? 0.0;
           }
         }
 
@@ -651,24 +680,26 @@ class ReportRepository {
             .toList(),
         currentBalance: (data['currentBalance'] ?? 0) as num,
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, data);
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, data);
       }
       return movement;
     } on AppException {
-      if (_salesDao != null) {
-        final sales = await _salesDao!.listSales(
+      final salesDao = _salesDao;
+      if (salesDao != null) {
+        final sales = await salesDao.listSales(
           from: effectiveFrom,
           to: effectiveTo,
           limit: 10000,
         );
         final cashSales =
             sales.fold<double>(0.0, (sum, s) => sum + s.totalAmount);
-        double expenses = 0.0;
-        if (_expenseService != null) {
-          final expList = await _expenseService!.getExpenses(limit: 1000);
-          expenses = expList.fold<double>(0.0, (sum, e) => sum + e.amount);
-        }
+        final expensesList = await _loadAllExpenses();
+        final expenses = expensesList.fold<double>(
+          0.0,
+          (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0),
+        );
         return MoneyMovement(
           startingBalance: 0,
           moneyIn: [
@@ -708,13 +739,15 @@ class ReportRepository {
         pendingCount: (data['pendingCount'] ?? 0) as int,
         receivedCount: (data['receivedCount'] ?? 0) as int,
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, data);
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, data);
       }
       return summary;
     } on AppException {
-      if (_cache != null) {
-        final cached = await _cache!.load('purchases_list_cache');
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load('purchases_list_cache');
         final items = (cached?['items'] as List<dynamic>? ?? const []);
         final totalPurchased = items.fold<double>(
           0.0,
@@ -755,8 +788,9 @@ class ReportRepository {
                 count: (e['count'] ?? 0) as int,
               ))
           .toList();
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {
           'items': result
               .map((p) => {
                     'paymentMethod': p.paymentMethod,
@@ -768,8 +802,9 @@ class ReportRepository {
       }
       return result;
     } on AppException {
-      if (_salesDao != null) {
-        final sales = await _salesDao!.listSales(
+      final salesDao = _salesDao;
+      if (salesDao != null) {
+        final sales = await salesDao.listSales(
           from: effectiveFrom,
           to: effectiveTo,
           limit: 10000,
@@ -812,8 +847,9 @@ class ReportRepository {
                 ))
             .toList();
       }
-      if (_cache != null) {
-        final cached = await _cache!.load(cacheKey);
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load(cacheKey);
         if (cached != null && cached['items'] is List) {
           return (cached['items'] as List)
               .map((e) => SalesByPaymentMethod(
@@ -851,8 +887,9 @@ class ReportRepository {
                 quantity: (e['quantity'] ?? 0) as num,
               ))
           .toList();
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {
           'items': result
               .map((p) => {
                     'categoryName': p.categoryName,
@@ -864,8 +901,9 @@ class ReportRepository {
       }
       return result;
     } on AppException {
-      if (_salesDao != null) {
-        final sales = await _salesDao!.listSales(
+      final salesDao = _salesDao;
+      if (salesDao != null) {
+        final sales = await salesDao.listSales(
           from: effectiveFrom,
           to: effectiveTo,
           limit: 10000,
@@ -886,8 +924,9 @@ class ReportRepository {
                 ))
             .toList();
       }
-      if (_cache != null) {
-        final cached = await _cache!.load(cacheKey);
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load(cacheKey);
         if (cached != null && cached['items'] is List) {
           return (cached['items'] as List)
               .map((e) => SalesByCategory(
@@ -931,23 +970,25 @@ class ReportRepository {
                 ))
             .toList(),
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {'rows': rows});
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {'rows': rows});
       }
       return result;
     } on AppException {
-      if (_catalogDao != null) {
-        final products = await _catalogDao!.all();
+      final catalogDao = _catalogDao;
+      if (catalogDao != null) {
+        final products = await catalogDao.all();
         return StockSummaryReport(
           rows: products
               .map((p) => StockSummaryRow(
                     productName: p.name,
                     sku: p.sku,
-                    opening: p.currentStock,
+                    opening: 0,
                     purchased: 0,
                     sold: 0,
                     adjusted: 0,
-                    closing: p.currentStock,
+                    closing: 0,
                   ))
               .toList(),
         );
@@ -981,13 +1022,15 @@ class ReportRepository {
                 ))
             .toList(),
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {'items': items});
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {'items': items});
       }
       return result;
     } on AppException {
-      if (_cache != null) {
-        final cached = await _cache!.load(cacheKey);
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load(cacheKey);
         if (cached != null && cached['items'] is List) {
           return StockMovementSummaryReport(
             items: (cached['items'] as List)
@@ -1031,20 +1074,22 @@ class ReportRepository {
                 ))
             .toList(),
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {'items': items});
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {'items': items});
       }
       return result;
     } on AppException {
-      if (_catalogDao != null) {
-        final products = await _catalogDao!.all();
+      final catalogDao = _catalogDao;
+      if (catalogDao != null) {
+        final products = await catalogDao.all();
         return StockVelocityReport(
           items: products
               .map((p) => StockVelocityItem(
                     productName: p.name,
                     sku: p.sku,
                     sold: 0,
-                    onHand: p.currentStock,
+                    onHand: 0,
                     velocityPerDay: 0,
                   ))
               .toList(),
@@ -1079,31 +1124,32 @@ class ReportRepository {
                 ))
             .toList(),
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {'dataPoints': dataPoints});
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {'dataPoints': dataPoints});
       }
       return result;
     } on AppException {
-      if (_expenseService != null) {
-        final expenses = await _expenseService!.getExpenses(limit: 1000);
-        final Map<String, double> days = {};
-        for (final exp in expenses) {
-          final d = DateTime.tryParse(exp.expenseDate ?? '')?.toLocal();
-          if (d != null &&
-              d.isAfter(effectiveFrom) &&
-              d.isBefore(effectiveTo)) {
-            final label =
-                '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-            days[label] = (days[label] ?? 0.0) + exp.amount;
-          }
+      final expenses = await _loadAllExpenses();
+      final Map<String, double> days = {};
+      for (final exp in expenses) {
+        final d = DateTime.tryParse(
+                exp['expenseDate']?.toString() ?? exp['createdAt']?.toString() ?? '')
+            ?.toLocal();
+        if (d != null &&
+            d.isAfter(effectiveFrom) &&
+            d.isBefore(effectiveTo)) {
+          final label =
+              '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+          final amt = (exp['amount'] as num?)?.toDouble() ?? 0.0;
+          days[label] = (days[label] ?? 0.0) + amt;
         }
-        return ExpenseTrendReport(
-          dataPoints: days.entries
-              .map((e) => ExpenseTrendPoint(label: e.key, amount: e.value))
-              .toList(),
-        );
       }
-      rethrow;
+      return ExpenseTrendReport(
+        dataPoints: days.entries
+            .map((e) => ExpenseTrendPoint(label: e.key, amount: e.value))
+            .toList(),
+      );
     }
   }
 
@@ -1129,31 +1175,33 @@ class ReportRepository {
                 amount: (e['amount'] ?? 0) as num,
               ))
           .toList();
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {'items': items});
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {'items': items});
       }
       return result;
     } on AppException {
-      if (_expenseService != null) {
-        final expenses = await _expenseService!.getExpenses(limit: 1000);
-        final Map<String, double> methods = {};
-        for (final exp in expenses) {
-          final d = DateTime.tryParse(exp.expenseDate ?? '');
-          if (d != null &&
-              d.isAfter(effectiveFrom) &&
-              d.isBefore(effectiveTo)) {
-            final m = exp.paidViaCash ? 'Cash' : 'Bank/Electronic';
-            methods[m] = (methods[m] ?? 0.0) + exp.amount;
-          }
+      final expenses = await _loadAllExpenses();
+      final Map<String, double> methods = {};
+      for (final exp in expenses) {
+        final d = DateTime.tryParse(
+            exp['expenseDate']?.toString() ?? exp['createdAt']?.toString() ?? '');
+        if (d != null &&
+            d.isAfter(effectiveFrom) &&
+            d.isBefore(effectiveTo)) {
+          final isCash =
+              exp['paidViaCash'] == true || exp['paymentMethod'] == 0;
+          final m = isCash ? 'Cash' : 'Bank/Electronic';
+          final amt = (exp['amount'] as num?)?.toDouble() ?? 0.0;
+          methods[m] = (methods[m] ?? 0.0) + amt;
         }
-        return methods.entries
-            .map((e) => ExpenseByPaymentMethod(
-                  paymentMethod: e.key,
-                  amount: e.value,
-                ))
-            .toList();
       }
-      rethrow;
+      return methods.entries
+          .map((e) => ExpenseByPaymentMethod(
+                paymentMethod: e.key,
+                amount: e.value,
+              ))
+          .toList();
     }
   }
 
@@ -1182,15 +1230,17 @@ class ReportRepository {
                 ))
             .toList(),
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, {
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, {
           'items': items,
         });
       }
       return result;
     } on AppException {
-      if (_cache != null) {
-        final cached = await _cache!.load('purchases_list_cache');
+      final cache = _cache;
+      if (cache != null) {
+        final cached = await cache.load('purchases_list_cache');
         final items = (cached?['items'] as List<dynamic>? ?? const []);
         final Map<String, (double, int)> suppliers = {};
         for (final item in items) {
@@ -1238,37 +1288,36 @@ class ReportRepository {
                 ))
             .toList(),
       );
-      if (_cache != null) {
-        await _cache!.save(cacheKey, data);
+      final cache = _cache;
+      if (cache != null) {
+        await cache.save(cacheKey, data);
       }
       return result;
     } on AppException {
-      if (_expenseService != null) {
-        final expenses = await _expenseService!.getExpenses(limit: 1000);
-        double total = 0.0;
-        final Map<String, double> byCat = {};
-        for (final exp in expenses) {
-          final d = DateTime.tryParse(exp.expenseDate ?? '');
-          if (d != null &&
-              d.isAfter(effectiveFrom) &&
-              d.isBefore(effectiveTo)) {
-            total += exp.amount;
-            final cat = exp.categoryName ?? 'Other';
-            byCat[cat] = (byCat[cat] ?? 0.0) + exp.amount;
-          }
+      final expenses = await _loadAllExpenses();
+      double total = 0.0;
+      final Map<String, double> byCat = {};
+      for (final exp in expenses) {
+        final d = DateTime.tryParse(
+            exp['expenseDate']?.toString() ?? exp['createdAt']?.toString() ?? '');
+        if (d != null &&
+            d.isAfter(effectiveFrom) &&
+            d.isBefore(effectiveTo)) {
+          final amt = (exp['amount'] as num?)?.toDouble() ?? 0.0;
+          total += amt;
+          final cat = (exp['categoryName'] ?? exp['category'] ?? 'Other').toString();
+          byCat[cat] = (byCat[cat] ?? 0.0) + amt;
         }
-        return ExpenseSummaryReport(
-          total: total,
-          byCategory: byCat.entries
-              .map((e) => ExpenseCategoryTotal(
-                    categoryName: e.key,
-                    amount: e.value,
-                  ))
-              .toList(),
-        );
       }
-      rethrow;
+      return ExpenseSummaryReport(
+        total: total,
+        byCategory: byCat.entries
+            .map((e) => ExpenseCategoryTotal(
+                  categoryName: e.key,
+                  amount: e.value,
+                ))
+            .toList(),
+      );
     }
   }
 }
-
