@@ -302,6 +302,10 @@ class CachedCatalogDao {
     }
   }
 
+  Future<void> upsertProduct(CachedProductsCompanion product) async {
+    await _db.into(_db.cachedProducts).insertOnConflictUpdate(product);
+  }
+
   /// When the product catalog was last fully replaced via [replaceCatalog].
   /// (`replaceStockBalances` stamps its own `last_stock_refresh` key.)
   Future<DateTime?> lastRefresh() async {

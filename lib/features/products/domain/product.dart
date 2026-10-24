@@ -57,6 +57,21 @@ class Product {
         costPrice: (json['costPrice'] as num?)?.toDouble(),
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'description': description,
+        'sku': sku,
+        'barcode': barcode,
+        'categoryId': categoryId,
+        'brandId': brandId,
+        'unitOfMeasureId': unitOfMeasureId,
+        'productType': productType,
+        'status': status,
+        'taxCategoryId': taxCategoryId,
+        'costPrice': costPrice,
+      };
+
   Map<String, dynamic> toCreateBody() => {
         'name': name.trim(),
         if (hasText(description)) 'description': description!.trim(),

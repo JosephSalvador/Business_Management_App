@@ -8,8 +8,8 @@ import '../../features/customers/data/customer_repository.dart';
 import '../../features/finance/data/expense_repository.dart';
 import '../../features/finance/data/money_account_repository.dart';
 import '../../features/inventory/data/inventory_repository.dart';
-import '../../features/products/data/product_repository.dart'
-    show AdjustStockEntry;
+import '../../features/products/data/product_repository.dart';
+import '../../features/products/domain/catalog.dart' show PriceList;
 import '../../features/sales/data/sale_repository.dart';
 import '../../features/sales/domain/sale.dart' show QuickSaleDefaults;
 import '../storage/sync_queue_dao.dart' show QueuedOperation;
@@ -55,12 +55,14 @@ class SyncEngine {
     CustomerRepository? customerRepository,
     InventoryRepository? inventoryRepository,
     MoneyAccountRepository? moneyAccountRepository,
+    ProductRepository? productRepository,
   })  : _salesService = salesService,
         _repository = repository,
         _expenseRepository = expenseRepository,
         _customerRepository = customerRepository,
         _inventoryRepository = inventoryRepository,
-        _moneyAccountRepository = moneyAccountRepository;
+        _moneyAccountRepository = moneyAccountRepository,
+        _productRepository = productRepository;
 
   final LocalSalesService _salesService;
   final SaleRepository _repository;
@@ -68,6 +70,7 @@ class SyncEngine {
   final CustomerRepository? _customerRepository;
   final InventoryRepository? _inventoryRepository;
   final MoneyAccountRepository? _moneyAccountRepository;
+  final ProductRepository? _productRepository;
 
   Future<void> Function(SyncOutcome)? onDrained;
 
@@ -196,6 +199,12 @@ class SyncEngine {
         return _deliverCashSessionClose(op, outcome);
       case 'inventory.receive':
         return _deliverInventoryAdjustment(op, outcome);
+      case 'product.create':
+        return _deliverProductCreate(op, outcome);
+      case 'product.update':
+        return _deliverProductUpdate(op, outcome);
+      case 'product.price_set':
+        return _deliverProductPriceSet(op, outcome);
       default:
         await _salesService.markQueueFailed(
           op.operationId,
@@ -545,6 +554,168 @@ class SyncEngine {
       );
 
       await _inventoryRepository.adjustStock(entry);
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverProductCreate(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_productRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final draft = ProductDraft(
+        name: body['name'] as String? ?? '',
+        unitOfMeasureId: body['unitOfMeasureId'] as String? ?? '',
+        description: body['description'] as String?,
+        sku: body['sku'] as String?,
+        barcode: body['barcode'] as String?,
+        categoryId: body['categoryId'] as String?,
+        brandId: body['brandId'] as String?,
+        taxCategoryId: body['taxCategoryId'] as String?,
+        costPrice: (body['costPrice'] as num?)?.toDouble(),
+      );
+      final result = await _productRepository.create(draft, remoteOnly: true);
+      await _salesService.queue.markSynced(op.operationId, result.id);
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverProductUpdate(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_productRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final id = body['id'] as String? ?? op.aggregateId;
+      final draft = ProductDraft(
+        name: body['name'] as String? ?? '',
+        unitOfMeasureId: body['unitOfMeasureId'] as String? ?? '',
+        description: body['description'] as String?,
+        sku: body['sku'] as String?,
+        barcode: body['barcode'] as String?,
+        categoryId: body['categoryId'] as String?,
+        brandId: body['brandId'] as String?,
+        taxCategoryId: body['taxCategoryId'] as String?,
+        costPrice: (body['costPrice'] as num?)?.toDouble(),
+      );
+      await _productRepository.update(id, draft, remoteOnly: true);
+      await _salesService.queue.markSynced(op.operationId, id);
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverProductPriceSet(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_productRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final priceListId = body['priceListId'] as String? ?? 'default';
+      final productId = body['productId'] as String? ?? op.aggregateId;
+      final price = (body['price'] as num?)?.toDouble() ?? 0.0;
+      final priceType = (body['priceType'] as num?)?.toInt() ?? 0;
+
+      final priceList = await _productRepository.defaultPriceList() ??
+          PriceList(
+            id: priceListId,
+            name: 'Retail',
+            currency: 'TZS',
+            isDefault: true,
+          );
+
+      await _productRepository.setSellingPrice(
+        priceList: priceList,
+        productId: productId,
+        price: price,
+        priceType: priceType,
+        remoteOnly: true,
+      );
       await _salesService.queue.markSynced(op.operationId, 'synced');
       outcome.synced++;
       return _DeliveryResult.continue_;
