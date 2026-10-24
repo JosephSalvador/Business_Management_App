@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
-import '../../../core/network/connectivity_monitor.dart';
 import '../data/expense_repository.dart';
 
 const int expensePageSize = 20;
@@ -176,16 +175,6 @@ class ExpensesController extends Notifier<ExpensesState> {
   }
 
   Future<void> create(Map<String, dynamic> body) async {
-    try {
-      final connection = ref.read(connectionQualityProvider);
-      if (connection == ConnectionQuality.offline ||
-          connection == ConnectionQuality.unreachable) {
-        await _offlineService.recordOffline(body);
-        await load();
-        return;
-      }
-    } catch (_) {}
-
     try {
       await _repository.create(body);
     } on AppException catch (e) {
