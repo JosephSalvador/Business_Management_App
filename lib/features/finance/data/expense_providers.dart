@@ -12,7 +12,15 @@ export '../application/expenses_controller.dart'
 export 'offline_expense_service.dart';
 
 final expenseRepositoryProvider = Provider<ExpenseRepository>(
-  (ref) => ExpenseRepository(apiClient: ref.watch(apiClientProvider)),
+  (ref) {
+    final cache = ref.watch(offlineCacheDaoProvider);
+    final offlineService = ref.watch(offlineExpenseServiceProvider);
+    return ExpenseRepository(
+      apiClient: ref.watch(apiClientProvider),
+      cache: cache,
+      offlineService: offlineService,
+    );
+  },
 );
 
 final offlineExpenseServiceProvider = Provider<OfflineExpenseService>((ref) {

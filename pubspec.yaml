@@ -2,7 +2,7 @@ name: jolinx_app
 description: JOLINX Business OS — offline-first business management for East African shops.
 
 publish_to: 'none'
-version: 1.0.0+40
+version: 1.0.0+41
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

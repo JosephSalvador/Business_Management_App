@@ -135,9 +135,15 @@ class ExpensesController extends Notifier<ExpensesState> {
         fromDate: _fromDate == null ? null : expenseDayStartUtc(_fromDate!),
         toDate: _toDate == null ? null : expenseDayEndUtc(_toDate!),
       );
+
+      final existingIds = result.items.map((e) => e['id']).toSet();
+      final uniquePending =
+          pending.where((p) => !existingIds.contains(p['id'])).toList();
+
+      final combined = [...uniquePending, ...result.items];
       return ExpensesLoaded(
-        items: [...pending, ...result.items],
-        total: result.total + pending.length,
+        items: combined,
+        total: combined.length,
         page: page,
         hasMore: page * expensePageSize < result.total,
         search: _search,
@@ -146,7 +152,7 @@ class ExpensesController extends Notifier<ExpensesState> {
         summary: summary,
       );
     } on AppException {
-      if (page == 1 && pending.isNotEmpty) {
+      if (page == 1) {
         return ExpensesLoaded(
           items: pending,
           total: pending.length,
@@ -155,6 +161,7 @@ class ExpensesController extends Notifier<ExpensesState> {
           search: _search,
           fromDate: _fromDate,
           toDate: _toDate,
+          summary: const ExpenseSummary(total: 0, byCategory: []),
         );
       }
       rethrow;
