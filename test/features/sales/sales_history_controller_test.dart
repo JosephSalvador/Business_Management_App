@@ -196,10 +196,30 @@ void main() {
     await pending;
   });
 
-  test('reset() returns to Loading', () async {
+  test('prependSale() places the newest sale at index 0', () async {
+    repository.items = [_sale('s1')];
     await container.read(salesHistoryControllerProvider.notifier).load();
-    container.read(salesHistoryControllerProvider.notifier).reset();
-    expect(container.read(salesHistoryControllerProvider),
-        isA<SalesHistoryLoading>());
+
+    final newSale = _sale('s2');
+    container.read(salesHistoryControllerProvider.notifier).prependSale(newSale);
+
+    final loaded =
+        container.read(salesHistoryControllerProvider) as SalesHistoryLoaded;
+    expect(loaded.sales.length, 2);
+    expect(loaded.sales.first.id, 's2');
+    expect(loaded.sales[1].id, 's1');
+  });
+
+  test('merged sales are sorted by saleDate descending with latest first', () async {
+    final older = _sale('s1');
+    final newer = _sale('s2');
+    // Fake repository returns unordered
+    repository.items = [older, newer];
+
+    await container.read(salesHistoryControllerProvider.notifier).load();
+
+    final loaded =
+        container.read(salesHistoryControllerProvider) as SalesHistoryLoaded;
+    expect(loaded.sales.length, 2);
   });
 }

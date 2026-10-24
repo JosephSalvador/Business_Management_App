@@ -52,7 +52,12 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
   }
 
   /// Loads one local calendar day (midnight → next midnight). Pass [search] to
-  /// filter by receipt number or customer name. Reads local SQLite first for offline readiness.
+  /// filter by receipt number or customer name.
+  ///
+  /// Local-First Invariant: Local device SQLite is the primary authoritative
+  /// source of truth. Results are rendered immediately with the latest sale
+  /// always at the top (effectiveAt DESC). Background remote fetch enriches
+  /// external multi-terminal sales without ever wiping or replacing local sales.
   Future<void> load({DateTime? day, String? search}) async {
     state = const SalesHistoryLoading();
     final target = day ?? DateTime.now();
@@ -60,26 +65,29 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
     final end = start.add(const Duration(days: 1));
     final term = _cleanSearch(search);
 
-    // 1. Load from local SQLite first (100% offline ready)
+    // 1. Authoritative local SQLite load (instant, 100% offline-ready)
+    List<SaleDto> localSales = const [];
+    bool localReadSucceeded = false;
     try {
-      final localSales = await ref.read(localSalesServiceProvider).sales.listSales(
+      localSales = await ref.read(localSalesServiceProvider).sales.listSales(
         from: start,
         to: end,
         search: term,
         limit: _pageSize,
       );
-      if (localSales.isNotEmpty) {
-        state = SalesHistoryLoaded(
-          sales: localSales,
-          total: localSales.length,
-          searchActive: term != null,
-        );
-      }
+      localReadSucceeded = true;
+      // Immediately present local sales to the user — zero network delay.
+      // Latest sale is ALWAYS at index 0 (ordered by effectiveAt DESC).
+      state = SalesHistoryLoaded(
+        sales: localSales,
+        total: localSales.length,
+        searchActive: term != null,
+      );
     } catch (_) {
-      // Local read degraded — continue to remote fetch
+      // Local DB read degraded — fall back to remote fetch
     }
 
-    // 2. Fetch from server when online to capture multi-terminal sales
+    // 2. Background remote reconciliation for multi-terminal environments
     try {
       final page = await _repository.list(
         from: start,
@@ -87,15 +95,59 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
         search: term,
         pageSize: _pageSize,
       );
+
+      // Merge remote sales without ever wiping or deleting local sales
+      final existingKeys = <String>{};
+      for (final s in localSales) {
+        existingKeys.add(s.id);
+        if (s.number.isNotEmpty) existingKeys.add(s.number);
+      }
+
+      final merged = List<SaleDto>.from(localSales);
+      for (final remote in page.items) {
+        final matchesLocal = existingKeys.contains(remote.id) ||
+            (remote.number.isNotEmpty && existingKeys.contains(remote.number));
+        if (!matchesLocal) {
+          merged.add(remote);
+        }
+      }
+
+      // Invariant: Latest sale is ALWAYS first in the list
+      merged.sort((a, b) => b.saleDate.compareTo(a.saleDate));
+
       state = SalesHistoryLoaded(
-        sales: page.items,
-        total: page.total,
+        sales: merged,
+        total: merged.length,
         searchActive: term != null,
       );
     } on AppException catch (error) {
-      if (state is! SalesHistoryLoaded) {
+      // If local read succeeded, NEVER surface network errors to the UI!
+      // The user is working offline and local sales are already displayed safely.
+      if (!localReadSucceeded && state is! SalesHistoryLoaded) {
         state = SalesHistoryFailure(error.message);
       }
+    }
+  }
+
+  /// Optimistically prepends a newly completed sale to the loaded list so it
+  /// is immediately visible at index 0 without waiting for a re-query.
+  void prependSale(SaleDto sale) {
+    if (state is SalesHistoryLoaded) {
+      final current = (state as SalesHistoryLoaded).sales;
+      if (!current.any((s) => s.id == sale.id || (s.number.isNotEmpty && s.number == sale.number))) {
+        final updated = [sale, ...current];
+        state = SalesHistoryLoaded(
+          sales: updated,
+          total: updated.length,
+          searchActive: (state as SalesHistoryLoaded).searchActive,
+        );
+      }
+    } else {
+      state = SalesHistoryLoaded(
+        sales: [sale],
+        total: 1,
+        searchActive: false,
+      );
     }
   }
 
