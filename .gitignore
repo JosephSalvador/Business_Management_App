@@ -64,8 +64,13 @@ backend/run-backend.sh
 # Adobe Photoshop Master Binaries (Stored locally in multimedia/branding/logo/master_psd/)
 *.psd
 
-# Node modules
+# Node modules & build outputs
 **/node_modules/
 **/node_modules
 node_modules
 portal/node_modules
+portal/dist/
+dist/
+
+# Local monitoring credentials
+deploy/monitoring/grafana/provisioning/datasources/azure.yaml

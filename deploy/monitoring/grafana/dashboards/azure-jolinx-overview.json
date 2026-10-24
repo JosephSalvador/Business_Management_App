@@ -1,0 +1,563 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "title": "🚀 Jolinx API - Azure Container Apps (Production & Staging)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "P1EB995EACC6832D3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Requests",
+            "axisPlacement": "auto",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "lineWidth": 2,
+            "showPoints": "auto"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "title": "API Request Traffic",
+      "type": "timeseries",
+      "targets": [
+        {
+          "azureMonitor": {
+            "aggregation": "Total",
+            "metricName": "Requests",
+            "metricNamespace": "Microsoft.App/containerApps",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "jolinx-api",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.App/containerApps/jolinx-api",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "A",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        },
+        {
+          "azureMonitor": {
+            "aggregation": "Total",
+            "metricName": "Requests",
+            "metricNamespace": "Microsoft.App/containerApps",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "jolinx-api-staging",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.App/containerApps/jolinx-api-staging",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "B",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "P1EB995EACC6832D3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Bytes",
+            "axisPlacement": "auto",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "auto"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "title": "API Container Working Memory",
+      "type": "timeseries",
+      "targets": [
+        {
+          "azureMonitor": {
+            "aggregation": "Average",
+            "metricName": "MemoryWorkingSetBytes",
+            "metricNamespace": "Microsoft.App/containerApps",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "jolinx-api",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.App/containerApps/jolinx-api",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "A",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        },
+        {
+          "azureMonitor": {
+            "aggregation": "Average",
+            "metricName": "MemoryWorkingSetBytes",
+            "metricNamespace": "Microsoft.App/containerApps",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "jolinx-api-staging",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.App/containerApps/jolinx-api-staging",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "B",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 101,
+      "title": "🗄️ Azure Database for PostgreSQL (Flexible Server)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "P1EB995EACC6832D3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Connections",
+            "axisPlacement": "auto",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "auto"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "title": "PostgreSQL Active Connections",
+      "type": "timeseries",
+      "targets": [
+        {
+          "azureMonitor": {
+            "aggregation": "Average",
+            "metricName": "active_connections",
+            "metricNamespace": "Microsoft.DBforPostgreSQL/flexibleServers",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "businessos-pg-prod",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.DBforPostgreSQL/flexibleServers/businessos-pg-prod",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "A",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "P1EB995EACC6832D3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "% Used",
+            "axisPlacement": "auto",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "auto"
+          },
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 10
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "title": "PostgreSQL CPU & Memory %",
+      "type": "timeseries",
+      "targets": [
+        {
+          "azureMonitor": {
+            "aggregation": "Average",
+            "metricName": "cpu_percent",
+            "metricNamespace": "Microsoft.DBforPostgreSQL/flexibleServers",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "businessos-pg-prod",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.DBforPostgreSQL/flexibleServers/businessos-pg-prod",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "A",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        },
+        {
+          "azureMonitor": {
+            "aggregation": "Average",
+            "metricName": "memory_percent",
+            "metricNamespace": "Microsoft.DBforPostgreSQL/flexibleServers",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "businessos-pg-prod",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.DBforPostgreSQL/flexibleServers/businessos-pg-prod",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "B",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "P1EB995EACC6832D3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
+      "id": 5,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "title": "PostgreSQL Disk Storage Used %",
+      "type": "gauge",
+      "targets": [
+        {
+          "azureMonitor": {
+            "aggregation": "Average",
+            "metricName": "storage_percent",
+            "metricNamespace": "Microsoft.DBforPostgreSQL/flexibleServers",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "businessos-pg-prod",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.DBforPostgreSQL/flexibleServers/businessos-pg-prod",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "A",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 102,
+      "title": "📦 Azure Blob Storage (stjolinxprod)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "P1EB995EACC6832D3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Transactions",
+            "axisPlacement": "auto",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "auto"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "title": "Blob Storage Transactions",
+      "type": "timeseries",
+      "targets": [
+        {
+          "azureMonitor": {
+            "aggregation": "Total",
+            "metricName": "Transactions",
+            "metricNamespace": "Microsoft.Storage/storageAccounts",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "stjolinxprod",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.Storage/storageAccounts/stjolinxprod",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "A",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "P1EB995EACC6832D3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Used Space",
+            "axisPlacement": "auto",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "auto"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "title": "Blob Storage Capacity Used",
+      "type": "timeseries",
+      "targets": [
+        {
+          "azureMonitor": {
+            "aggregation": "Average",
+            "metricName": "UsedCapacity",
+            "metricNamespace": "Microsoft.Storage/storageAccounts",
+            "resourceGroup": "rg-jolinx-prod",
+            "resourceName": "stjolinxprod",
+            "resourceUri": "/subscriptions/004b3ea6-f90e-42f3-b2d7-63405c3a08b8/resourceGroups/rg-jolinx-prod/providers/Microsoft.Storage/storageAccounts/stjolinxprod",
+            "timeGrain": "auto"
+          },
+          "queryType": "Azure Monitor",
+          "refId": "A",
+          "subscription": "004b3ea6-f90e-42f3-b2d7-63405c3a08b8"
+        }
+      ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "azure",
+    "jolinx",
+    "production"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Jolinx Cloud Infrastructure (Azure Prod)",
+  "uid": "jolinx-azure-prod",
+  "version": 1
+}

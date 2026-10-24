@@ -7,7 +7,8 @@ import '../network/app_exception.dart';
 import '../../features/customers/data/customer_repository.dart';
 import '../../features/finance/data/expense_repository.dart';
 import '../../features/inventory/data/inventory_repository.dart';
-import '../../features/inventory/domain/stock.dart';
+import '../../features/products/data/product_repository.dart'
+    show AdjustStockEntry;
 import '../../features/sales/data/sale_repository.dart';
 import '../../features/sales/domain/sale.dart' show QuickSaleDefaults;
 import '../storage/sync_queue_dao.dart' show QueuedOperation;
@@ -381,13 +382,20 @@ class SyncEngine {
     }
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final quantity = (body['quantityDelta'] ?? body['adjustmentQuantity'] as num?)
+              ?.toDouble() ??
+          0.0;
+      final reasonText = body['reason']?.toString() ?? 'Inbound Receiving';
+      final notesText = body['notes']?.toString();
+      final combinedReason = (notesText != null && notesText.trim().isNotEmpty)
+          ? '$reasonText - $notesText'
+          : reasonText;
+
       final entry = AdjustStockEntry(
         productId: body['productId']?.toString() ?? '',
         warehouseId: body['warehouseId']?.toString() ?? '',
-        adjustmentQuantity:
-            (body['adjustmentQuantity'] as num?)?.toDouble() ?? 0.0,
-        reason: body['reason']?.toString() ?? 'Inbound Receiving',
-        notes: body['notes']?.toString(),
+        quantityDelta: quantity,
+        reason: combinedReason,
         idempotencyKey: op.operationId,
       );
 

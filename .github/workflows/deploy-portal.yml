@@ -1,0 +1,83 @@
+name: Deploy Back-Office Portal to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'feature/**'
+    paths:
+      - 'portal/**'
+      - '.github/workflows/deploy-portal.yml'
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Deployment Environment (production or staging)'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-portal:
+    name: Build & Deploy Portal to Cloudflare Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache-dependency-path: portal/package.json
+
+      - name: Determine Target Environment
+        id: env
+        run: |
+          TARGET="${{ inputs.target_env }}"
+          if [ -z "$TARGET" ]; then
+            if [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+              TARGET="production"
+            else
+              TARGET="staging"
+            fi
+          fi
+
+          if [ "$TARGET" = "production" ]; then
+            CF_BRANCH="main"
+          else
+            CF_BRANCH="staging"
+          fi
+
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "cf_branch=$CF_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Portal Deployment::Environment: $TARGET | Cloudflare Branch: $CF_BRANCH"
+
+      - name: Install Dependencies & Build Portal
+        run: |
+          cd portal
+          rm -f node_modules
+          npm install
+          npm run build
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "Deploying portal/dist to Cloudflare Pages project 'jolinx-portal' (branch: ${{ steps.env.outputs.cf_branch }})..."
+            npx wrangler pages deploy portal/dist \
+              --project-name=jolinx-portal \
+              --branch="${{ steps.env.outputs.cf_branch }}" \
+              --commit-dirty=true
+          else
+            echo "::error::CLOUDFLARE_API_TOKEN secret is missing. Add it in GitHub repository secrets."
+            exit 1
+          fi

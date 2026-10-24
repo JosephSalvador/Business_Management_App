@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/network/connectivity_monitor.dart';
-import '../../sales/data/sales_providers.dart' show connectionQualityProvider;
-import '../data/customer_providers.dart';
 import '../data/customer_repository.dart';
 
 sealed class CustomersState {
