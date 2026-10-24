@@ -51,9 +51,12 @@ class DashboardController extends Notifier<DashboardState> {
   OfflineCacheDao get _cacheDao => ref.read(offlineCacheDaoProvider);
 
   Future<void> load({int trendDays = 30}) async {
-    // 1. Instantly restore cached snapshot if present (zero-spinner open)
+    // 1. Instantly restore offline state from local SQLite or cached snapshot if present
     final cached = await _cacheDao.load('dashboard');
-    if (cached != null) {
+    final offlineState = await _buildOfflineDashboardState(trendDays, cached);
+    if (offlineState != null) {
+      state = offlineState;
+    } else if (cached != null) {
       try {
         final summary = DashboardSummary.fromJson(
             cached['summary'] as Map<String, dynamic>);
@@ -96,6 +99,126 @@ class DashboardController extends Notifier<DashboardState> {
   }
 
   LocalSalesService get _salesService => ref.read(localSalesServiceProvider);
+
+  Future<DashboardLoaded?> _buildOfflineDashboardState(
+    int trendDays,
+    Map<String, dynamic>? cached,
+  ) async {
+    try {
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day).toUtc();
+      final todayEnd =
+          DateTime(now.year, now.month, now.day, 23, 59, 59, 999).toUtc();
+      final windowStart = DateTime(now.year, now.month, now.day)
+          .subtract(Duration(days: trendDays - 1))
+          .toUtc();
+
+      // Query local authoritative SQLite sales
+      final windowSales = await _salesService.sales
+          .listSales(from: windowStart, to: todayEnd, limit: 5000);
+
+      if (windowSales.isEmpty && cached == null) {
+        return null;
+      }
+
+      var todayRevenue = 0.0;
+      final bucketMap = <String, (int, double)>{};
+
+      for (final sale in windowSales) {
+        final effective = sale.saleDate.toLocal();
+        final dateKey = effective.toIso8601String().substring(0, 10);
+        final current = bucketMap[dateKey] ?? (0, 0.0);
+        bucketMap[dateKey] = (current.$1 + 1, current.$2 + sale.totalAmount);
+
+        if (sale.saleDate.isAfter(todayStart) &&
+            sale.saleDate.isBefore(todayEnd)) {
+          todayRevenue += sale.totalAmount;
+        }
+      }
+
+      final trendData = List.generate(trendDays, (i) {
+        final day = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: trendDays - 1 - i));
+        final dateKey = day.toIso8601String().substring(0, 10);
+        final stats = bucketMap[dateKey] ?? (0, 0.0);
+        return SalesTrendPoint(
+          label: dateKey,
+          saleCount: stats.$1,
+          revenue: stats.$2,
+        );
+      });
+
+      final recentSales = await _salesService.sales.listSales(limit: 10);
+      final recentActivity = recentSales
+          .map((s) => {
+                'id': s.id,
+                'type': 'sale',
+                'description':
+                    'Mauzo #${s.number.isNotEmpty ? s.number : (s.id.length >= 8 ? s.id.substring(0, 8) : s.id)}',
+                'amount': s.totalAmount,
+                'createdAt': s.saleDate.toIso8601String(),
+              })
+          .toList();
+
+      // Top products aggregated from local sales lines
+      final productMap = <String, (int, double)>{};
+      for (final sale in windowSales) {
+        for (final line in sale.lines) {
+          final current = productMap[line.productName] ?? (0, 0.0);
+          productMap[line.productName] = (
+            current.$1 + line.quantity.toInt(),
+            current.$2 + line.lineTotal,
+          );
+        }
+      }
+      final sortedProducts = productMap.entries.toList()
+        ..sort((a, b) => b.value.$2.compareTo(a.value.$2));
+      final topProducts = sortedProducts.take(5).map((e) => {
+            'productName': e.key,
+            'quantity': e.value.$1,
+            'revenue': e.value.$2,
+          }).toList();
+
+      // Fallbacks from cache if available
+      final cachedSummary = cached?['summary'] != null
+          ? DashboardSummary.fromJson(
+              cached!['summary'] as Map<String, dynamic>)
+          : null;
+      final cachedLowStock = (cached?['lowStock'] as List?)
+              ?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+
+      final summary = DashboardSummary(
+        branchName: cachedSummary?.branchName ?? 'Duka Langu',
+        revenueToday: todayRevenue > 0
+            ? todayRevenue
+            : (cachedSummary?.revenueToday ?? 0),
+        totalProducts: cachedSummary?.totalProducts ?? 0,
+      );
+
+      final lastUpdated = await _cacheDao.getLastUpdated('dashboard');
+
+      return DashboardLoaded(
+        summary: summary,
+        lowStock: cachedLowStock,
+        recentActivity: recentActivity.isNotEmpty
+            ? recentActivity
+            : ((cached?['recentActivity'] as List?)
+                    ?.cast<Map<String, dynamic>>() ??
+                const []),
+        trendData: trendData,
+        topProducts: topProducts.isNotEmpty
+            ? topProducts
+            : ((cached?['topProducts'] as List?)
+                    ?.cast<Map<String, dynamic>>() ??
+                const []),
+        isFromCache: true,
+        lastUpdated: lastUpdated ?? DateTime.now(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> _fetch({int trendDays = 30}) async {
     try {
@@ -183,9 +306,15 @@ class DashboardController extends Notifier<DashboardState> {
         });
       } catch (_) {}
     } catch (error) {
+      final cached = await _cacheDao.load('dashboard');
+      final offlineState = await _buildOfflineDashboardState(trendDays, cached);
+      if (offlineState != null) {
+        state = offlineState;
+        return;
+      }
+
       if (state is! DashboardLoaded) {
         // Try restoring from offline cache if not already loaded
-        final cached = await _cacheDao.load('dashboard');
         if (cached != null) {
           try {
             final summary = DashboardSummary.fromJson(

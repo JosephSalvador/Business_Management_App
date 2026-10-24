@@ -181,6 +181,7 @@ void main() {
       expect(loaded.isFromCache, isTrue);
       expect(loaded.summary.branchName, 'Cached Branch');
       expect(loaded.summary.revenueToday, 50000);
+      expect(loaded.trendData, hasLength(7));
     });
   });
 }
