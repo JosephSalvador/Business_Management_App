@@ -214,7 +214,9 @@ void main() {
     expect(await service.pendingSaleCount(), 0);
   });
 
-  test('local stock guard refuses to oversell the projected balance', () async {
+  test(
+      'advisory stock allows offline sale even when projected balance is exceeded',
+      () async {
     await service.catalog.replaceCatalog(
       tenantId: 'tenant-1',
       products: const [],
@@ -240,9 +242,11 @@ void main() {
       paymentMethod: 0,
     );
 
-    expect(result, isNull);
-    expect(await service.pendingSaleCount(), 0,
-        reason: 'nothing is written when the guard trips');
+    expect(result, isNotNull);
+    expect(result!.pendingLocally, true);
+    expect(await service.pendingSaleCount(), 1,
+        reason:
+            'stock is advisory (African retail reality); sale must succeed');
   });
 
   test('quick-sale line skips the stock guard (services hold no stock)',

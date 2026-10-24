@@ -59,22 +59,10 @@ class OfflineSaleRecorder {
     final deviceId = await _deviceIdOf();
     final userId = await _userIdOf() ?? '';
 
-    // Conservative stock guard: sell at most what the cache knows minus
-    // other still-pending offline deductions. Server re-validates at sync.
-    // Quick-sale lines carry a client-fixed price and are services — they
-    // never draw stock, so the guard is skipped for them.
-    for (final line in lines) {
-      if (line.unitPriceOverride != null) {
-        continue;
-      }
-      final projected =
-          await _catalogDao.projectedQuantity(tenantId, line.productId);
-      if (projected < line.quantity) {
-        throw ValidationException(
-          'Kiasi cha ${line.name} hakitoshi kwenye hesabu ya karibuni.',
-        );
-      }
-    }
+    // Stock is advisory and never blocks sales (African retail reality).
+    // The server remains the final authority at sync time and supports
+    // non-blocking debit / negative balances.
+
 
     var subtotal = 0.0;
     for (final line in lines) {

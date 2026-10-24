@@ -201,11 +201,11 @@ class _PosPageState extends ConsumerState<PosPage> {
     if (product.outOfStock) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.loc.posOutOfStock),
-          backgroundColor: AppColors.error,
+          content: Text('${product.name}: ${context.loc.posOutOfStock}'),
+          backgroundColor: AppColors.warning,
+          duration: const Duration(seconds: 1),
         ),
       );
-      return;
     }
     ref
         .read(cartControllerProvider.notifier)
@@ -374,11 +374,11 @@ class _PosPageState extends ConsumerState<PosPage> {
     if (product.outOfStock) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.loc.posOutOfStock),
-          backgroundColor: AppColors.error,
+          content: Text('${product.name}: ${context.loc.posOutOfStock}'),
+          backgroundColor: AppColors.warning,
+          duration: const Duration(seconds: 1),
         ),
       );
-      return;
     }
     final loc = context.loc;
     final controller = TextEditingController(text: '1');
@@ -841,7 +841,7 @@ class _ProductCard extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: outOfStock ? null : onTap,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(10),
@@ -856,7 +856,7 @@ class _ProductCard extends StatelessWidget {
                     height: 36,
                     decoration: BoxDecoration(
                       color: outOfStock
-                          ? AppColors.errorContainer
+                          ? AppColors.warningContainer
                           : AppColors.primaryContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -866,12 +866,13 @@ class _ProductCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: outOfStock ? AppColors.error : AppColors.primary,
+                        color:
+                            outOfStock ? AppColors.warning : AppColors.primary,
                       ),
                     ),
                   ),
                   const Spacer(),
-                  if (!outOfStock)
+                  if (onQuantityTap != null)
                     InkWell(
                       onTap: onQuantityTap,
                       borderRadius: BorderRadius.circular(6),
@@ -920,7 +921,11 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ),
                   if (outOfStock)
-                    const Icon(Icons.block, size: 14, color: AppColors.error),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 15,
+                      color: AppColors.warning,
+                    ),
                 ],
               ),
             ],
