@@ -64,9 +64,23 @@ class DashboardController extends Notifier<DashboardState> {
             (cached['lowStock'] as List).cast<Map<String, dynamic>>();
         final recentActivity =
             (cached['recentActivity'] as List).cast<Map<String, dynamic>>();
-        final trendData = (cached['trendData'] as List)
+        var trendData = (cached['trendData'] as List)
             .map((e) => SalesTrendPoint.fromJson(e as Map<String, dynamic>))
             .toList();
+        if (trendData.isEmpty) {
+          final now = DateTime.now();
+          trendData = List.generate(
+            trendDays,
+            (i) => SalesTrendPoint(
+              label: now
+                  .subtract(Duration(days: trendDays - 1 - i))
+                  .toIso8601String()
+                  .substring(0, 10),
+              saleCount: 0,
+              revenue: 0,
+            ),
+          );
+        }
         final topProducts =
             (cached['topProducts'] as List).cast<Map<String, dynamic>>();
         final lastUpdated = await _cacheDao.getLastUpdated('dashboard');
@@ -323,9 +337,23 @@ class DashboardController extends Notifier<DashboardState> {
                 (cached['lowStock'] as List).cast<Map<String, dynamic>>();
             final recentActivity =
                 (cached['recentActivity'] as List).cast<Map<String, dynamic>>();
-            final trendData = (cached['trendData'] as List)
+            var trendData = (cached['trendData'] as List)
                 .map((e) => SalesTrendPoint.fromJson(e as Map<String, dynamic>))
                 .toList();
+            if (trendData.isEmpty) {
+              final now = DateTime.now();
+              trendData = List.generate(
+                trendDays,
+                (i) => SalesTrendPoint(
+                  label: now
+                      .subtract(Duration(days: trendDays - 1 - i))
+                      .toIso8601String()
+                      .substring(0, 10),
+                  saleCount: 0,
+                  revenue: 0,
+                ),
+              );
+            }
             final topProducts =
                 (cached['topProducts'] as List).cast<Map<String, dynamic>>();
             final lastUpdated = await _cacheDao.getLastUpdated('dashboard');

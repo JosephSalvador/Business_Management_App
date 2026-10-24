@@ -75,16 +75,46 @@ final connectionQualityProvider = Provider<ConnectionQuality>(
 );
 
 final syncEngineProvider = Provider<SyncEngine>((ref) {
+  ExpenseRepository? expenseRepo;
+  CustomerRepository? customerRepo;
+  InventoryRepository? inventoryRepo;
+  MoneyAccountRepository? moneyAccountRepo;
+  ProductRepository? productRepo;
+  SupplierRepository? supplierRepo;
+  PurchaseRepository? purchaseRepo;
+
+  try {
+    expenseRepo = ref.watch(expenseRepositoryProvider);
+  } catch (_) {}
+  try {
+    customerRepo = ref.watch(customerRepositoryProvider);
+  } catch (_) {}
+  try {
+    inventoryRepo = ref.watch(inventoryRepositoryProvider);
+  } catch (_) {}
+  try {
+    moneyAccountRepo = ref.watch(moneyAccountRepositoryProvider);
+  } catch (_) {}
+  try {
+    productRepo = ref.watch(productRepositoryProvider);
+  } catch (_) {}
+  try {
+    supplierRepo = ref.watch(supplierRepositoryProvider);
+  } catch (_) {}
+  try {
+    purchaseRepo = ref.watch(purchaseRepositoryProvider);
+  } catch (_) {}
+
   final engine = SyncEngine(
     salesService: ref.watch(localSalesServiceProvider),
     repository: ref.watch(saleRepositoryProvider),
-    expenseRepository: ref.watch(expenseRepositoryProvider),
-    customerRepository: ref.watch(customerRepositoryProvider),
-    inventoryRepository: ref.watch(inventoryRepositoryProvider),
-    moneyAccountRepository: ref.watch(moneyAccountRepositoryProvider),
-    productRepository: ref.watch(productRepositoryProvider),
-    supplierRepository: ref.watch(supplierRepositoryProvider),
-    purchaseRepository: ref.watch(purchaseRepositoryProvider),
+    expenseRepository: expenseRepo,
+    customerRepository: customerRepo,
+    inventoryRepository: inventoryRepo,
+    moneyAccountRepository: moneyAccountRepo,
+    productRepository: productRepo,
+    supplierRepository: supplierRepo,
+    purchaseRepository: purchaseRepo,
   );
   final monitor = ref.watch(connectivityMonitorProvider.notifier);
   Timer? timer;

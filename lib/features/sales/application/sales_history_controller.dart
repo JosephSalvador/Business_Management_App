@@ -134,7 +134,7 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
   void prependSale(SaleDto sale) {
     if (state is SalesHistoryLoaded) {
       final current = (state as SalesHistoryLoaded).sales;
-      if (!current.any((s) => s.id == sale.id || (s.number.isNotEmpty && s.number == sale.number))) {
+      if (!current.any((s) => s.id == sale.id)) {
         final updated = [sale, ...current];
         state = SalesHistoryLoaded(
           sales: updated,

@@ -151,29 +151,32 @@ class SyncEngine {
         return true;
       }
 
-      final productIds = catalogLines
-          .map((l) => l['productId'] as String?)
-          .whereType<String>()
-          .toList();
-
-      final resolvedPrices = await _repository.resolvePrices(
-        productIds: productIds,
-        branchId: body['branchId'] as String?,
-      );
-
       for (final line in catalogLines) {
         final pid = line['productId'] as String?;
         if (pid == null) continue;
-        final resolved = resolvedPrices[pid];
-        if (resolved == null) continue;
-
-        final charged = (line['unitPrice'] as num?)?.toDouble();
-        if (charged != null && (charged - resolved).abs() > 0.01) {
+        final qty = (line['quantity'] as num?)?.toDouble() ?? 1.0;
+        final resolved = await _repository.resolvePrice(
+          pid,
+          quantity: qty,
+          branchId: body['branchId'] as String?,
+        );
+        if (resolved == null) {
           await _conflict(
             op,
             outcome,
-            'PRICE_CHANGED',
-            'Bei ya bidhaa imebadilika mtandaoni wakati ukiuza nje ya mtandao.',
+            'PRODUCT',
+            'Bidhaa haipatikani tena kwenye mfumo.',
+          );
+          return false;
+        }
+
+        final charged = (line['unitPrice'] as num?)?.toDouble();
+        if (charged != null && (charged - resolved.price).abs() > 0.01) {
+          await _conflict(
+            op,
+            outcome,
+            'PRICE',
+            'Bei imebadilika kwenye mfumo. Muamala unahitaji kuangaliwa.',
           );
           return false;
         }

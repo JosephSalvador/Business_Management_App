@@ -265,8 +265,14 @@ class ProductRepository {
         await _appendProductToCache(created);
       }
       return created;
-    } on AppException {
-      if (remoteOnly) rethrow;
+    } on AppException catch (e) {
+      if (remoteOnly ||
+          e is ValidationException ||
+          e is ConflictException ||
+          e is NotFoundException ||
+          e is UnauthorizedException) {
+        rethrow;
+      }
 
       final localId = _uuid.v4();
       final localProduct = Product(
@@ -366,8 +372,14 @@ class ProductRepository {
         await _appendProductToCache(updated);
       }
       return updated;
-    } on AppException {
-      if (remoteOnly) rethrow;
+    } on AppException catch (e) {
+      if (remoteOnly ||
+          e is ValidationException ||
+          e is ConflictException ||
+          e is NotFoundException ||
+          e is UnauthorizedException) {
+        rethrow;
+      }
 
       final updated = Product(
         id: id,

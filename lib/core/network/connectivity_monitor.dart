@@ -68,7 +68,12 @@ class ConnectivityMonitor extends Notifier<ConnectionQuality> {
 
   /// Re-evaluates reachability now.
   Future<void> check() async {
-    final apiClient = ref.read(apiClientProvider);
+    final ApiClient apiClient;
+    try {
+      apiClient = ref.read(apiClientProvider);
+    } catch (_) {
+      return;
+    }
     final hasInterface = await _hasInterface();
     if (!hasInterface) {
       _consecutiveFailures = 0;

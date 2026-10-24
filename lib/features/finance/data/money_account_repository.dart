@@ -171,12 +171,18 @@ class MoneyAccountRepository {
         await _cache.save('cash_session_$accountId', session);
       }
       return session;
-    } on AppException {
+    } on NetworkException {
       if (_cache != null) {
         final cached = await _cache.load('cash_session_$accountId');
         if (cached != null) return cached;
       }
-      return null;
+      rethrow;
+    } on TimeoutException {
+      if (_cache != null) {
+        final cached = await _cache.load('cash_session_$accountId');
+        if (cached != null) return cached;
+      }
+      rethrow;
     }
   }
 

@@ -143,7 +143,7 @@ class ExpensesController extends Notifier<ExpensesState> {
       final combined = [...uniquePending, ...result.items];
       return ExpensesLoaded(
         items: combined,
-        total: combined.length,
+        total: result.total + uniquePending.length,
         page: page,
         hasMore: page * expensePageSize < result.total,
         search: _search,
@@ -152,7 +152,7 @@ class ExpensesController extends Notifier<ExpensesState> {
         summary: summary,
       );
     } on AppException {
-      if (page == 1) {
+      if (page == 1 && pending.isNotEmpty) {
         return ExpensesLoaded(
           items: pending,
           total: pending.length,
