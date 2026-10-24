@@ -11,7 +11,10 @@ import 'offline_inventory_service.dart';
 export 'offline_inventory_service.dart';
 
 final inventoryRepositoryProvider = Provider<InventoryRepository>(
-  (ref) => InventoryRepository(apiClient: ref.watch(apiClientProvider)),
+  (ref) => InventoryRepository(
+    apiClient: ref.watch(apiClientProvider),
+    offlineService: ref.watch(offlineInventoryServiceProvider),
+  ),
 );
 
 final offlineInventoryServiceProvider =

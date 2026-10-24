@@ -553,7 +553,7 @@ class SyncEngine {
         idempotencyKey: op.operationId,
       );
 
-      await _inventoryRepository.adjustStock(entry);
+      await _inventoryRepository.adjustStock(entry, remoteOnly: true);
       await _salesService.queue.markSynced(op.operationId, 'synced');
       outcome.synced++;
       return _DeliveryResult.continue_;

@@ -5,6 +5,8 @@ import '../../../core/network/app_exception.dart';
 import '../../products/data/product_repository.dart';
 import '../domain/stock.dart';
 
+import 'offline_inventory_service.dart';
+
 /// A paged envelope shared by the inventory endpoints: `{items, total}`.
 class PagedStock<T> {
   const PagedStock({required this.items, required this.total});
@@ -17,9 +19,14 @@ class PagedStock<T> {
 /// source of truth for balances, movements and transfers; the local cache
 /// serves as an offline projection only.
 class InventoryRepository {
-  InventoryRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+  InventoryRepository({
+    required ApiClient apiClient,
+    OfflineInventoryService? offlineService,
+  })  : _apiClient = apiClient,
+        _offlineService = offlineService;
 
   final ApiClient _apiClient;
+  final OfflineInventoryService? _offlineService;
 
   /// Enriched stock balances across warehouses and locations. Pass
   /// [warehouseId] to scope to one warehouse, [productId] to zoom into a
@@ -83,20 +90,47 @@ class InventoryRepository {
   }
 
   /// Records an adjustment; the returned enriched balance is the server truth.
-  Future<StockBalanceItem> adjustStock(AdjustStockEntry entry) async {
-    final response = await _apiClient.post<dynamic>(
-      '/api/v1/inventory/stock/adjustments',
-      body: entry.toBody(),
-      headers: entry.idempotencyKey != null
-          ? {'Idempotency-Key': entry.idempotencyKey!}
-          : const {},
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+  Future<StockBalanceItem> adjustStock(
+    AdjustStockEntry entry, {
+    bool remoteOnly = false,
+  }) async {
+    try {
+      final response = await _apiClient.post<dynamic>(
+        '/api/v1/inventory/stock/adjustments',
+        body: entry.toBody(),
+        headers: entry.idempotencyKey != null
+            ? {'Idempotency-Key': entry.idempotencyKey!}
+            : const {},
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      return StockBalanceItem.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+    } on AppException {
+      if (remoteOnly) rethrow;
+      if (_offlineService != null) {
+        await _offlineService!.recordOfflineInboundReceiving(
+          productId: entry.productId,
+          productName: entry.productId,
+          quantity: entry.quantityDelta,
+          warehouseId: entry.warehouseId,
+          notes: entry.reason,
+        );
+        return StockBalanceItem(
+          productId: entry.productId,
+          productName: '',
+          sku: '',
+          warehouseId: entry.warehouseId,
+          warehouseName: '',
+          quantity: entry.quantityDelta,
+          allocatedQuantity: 0,
+          availableQuantity: entry.quantityDelta,
+        );
+      }
+      rethrow;
     }
-    return StockBalanceItem.fromJson(
-      Map<String, dynamic>.from(response.data as Map),
-    );
   }
 
   static PagedStock<T> _decodePage<T>(
