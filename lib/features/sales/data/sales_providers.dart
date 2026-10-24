@@ -75,13 +75,13 @@ final connectionQualityProvider = Provider<ConnectionQuality>(
 );
 
 final syncEngineProvider = Provider<SyncEngine>((ref) {
-  ExpenseRepository? expenseRepo;
-  CustomerRepository? customerRepo;
-  InventoryRepository? inventoryRepo;
-  MoneyAccountRepository? moneyAccountRepo;
-  ProductRepository? productRepo;
-  SupplierRepository? supplierRepo;
-  PurchaseRepository? purchaseRepo;
+  dynamic expenseRepo;
+  dynamic customerRepo;
+  dynamic inventoryRepo;
+  dynamic moneyAccountRepo;
+  dynamic productRepo;
+  dynamic supplierRepo;
+  dynamic purchaseRepo;
 
   try {
     expenseRepo = ref.watch(expenseRepositoryProvider);
