@@ -321,11 +321,11 @@ class _ModuleUpgradeSheetState extends ConsumerState<ModuleUpgradeSheet> {
           icon: CupertinoIcons.chart_bar_alt_fill,
           title: 'Ripoti na Uchambuzi wa Kina',
           tagline:
-              'Pata ufahamu kamili wa faida halisi, bidhaa zinazoongoza, na mwenendo wa kodi.',
+              'Pata ufahamu kamili wa faida halisi, bidhaa zinazoongoza, na mwenendo wa biashara.',
           benefits: [
             'Fahamu faida halisi baada ya kutoa gharama zote za ununuzi na uendeshaji.',
             'Tambua bidhaa zinazotoka kwa kasi (Fast-Moving) na zile zinazokaa stoo bila sababu.',
-            'Ripoti rasmi za TRA na muhtasari wa kodi unazoweza kupakua kwa PDF au Excel.',
+            'Ripoti rasmi za mauzo na muhtasari wa biashara unazoweza kupakua kwa PDF au Excel.',
           ],
         );
       case WorkspaceModule.crm:

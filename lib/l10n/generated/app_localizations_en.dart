@@ -549,9 +549,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get posSetQuantity => 'Set quantity';
 
   @override
-  String get posPricesIncludeTax => 'Prices include tax.';
-
-  @override
   String get posCartTotal => 'Total';
 
   @override
@@ -690,9 +687,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get saleSummarySubtotal => 'Subtotal';
-
-  @override
-  String get saleSummaryTax => 'Tax (VAT)';
 
   @override
   String get saleSummaryDiscount => 'Discount';
@@ -1067,9 +1061,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsEmail => 'Email';
-
-  @override
-  String get settingsTax => 'Tax';
 
   @override
   String get settingsTIN => 'TIN';
@@ -1756,9 +1747,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invoiceLineUnitPrice => 'Unit price';
 
   @override
-  String get invoiceLineTaxRate => 'Tax %';
-
-  @override
   String get invoiceAddLine => 'Add line';
 
   @override
@@ -2107,9 +2095,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customerFormNameRequired => 'Name is required';
-
-  @override
-  String get customerFormVatRegistered => 'VAT Registered';
 
   @override
   String get customerFormSaved => 'Saved!';

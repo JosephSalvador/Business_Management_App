@@ -94,14 +94,6 @@ class CustomerDetailPage extends ConsumerWidget {
                   const Divider(),
                   _infoTile(Icons.receipt, context.loc.settingsTIN,
                       customer['tin'] ?? '-'),
-                  const Divider(),
-                  _infoTile(
-                    Icons.verified,
-                    context.loc.customerFormVatRegistered,
-                    (customer['isVatRegistered'] ?? false)
-                        ? context.loc.commonYes
-                        : context.loc.commonNo,
-                  ),
                 ],
               ),
             ),

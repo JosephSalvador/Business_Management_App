@@ -390,10 +390,6 @@ class ReceiptPrinterService {
       buffer.write(
           '<div class="row"><span class="col-left">Discount:</span><span class="col-right">-${receipt.discountAmount.toStringAsFixed(0)}</span></div>');
     }
-    if (receipt.taxAmount > 0) {
-      buffer.write(
-          '<div class="row"><span class="col-left">Tax:</span><span class="col-right">${receipt.taxAmount.toStringAsFixed(0)}</span></div>');
-    }
 
     buffer.write('<div class="solid"></div>');
     buffer.write(

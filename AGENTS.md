@@ -35,3 +35,14 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Run flutter analyze and flutter test; verify clean passes.
 - [x] Task 6: Commit and push changes, then trigger `build-clients.yml` to produce the new APK for the user.
 
+## Implementation Plan — Remove VAT & Tax Everywhere in the App
+- [x] Task 1: Remove Tax/VAT summary row from `sale_detail_page.dart` and `receipt_printer_service.dart`.
+- [x] Task 2: Replace "Tax No" / "Namba ya Kodi" labels with "TIN" in `receipt_renderer.dart` and update receipt tests.
+- [x] Task 3: Remove "VAT Registered" / "Mwasilishaji VAT" switch and display from `customer_form_page.dart` & `customer_detail_page.dart`.
+- [x] Task 4: Remove "Tax %" / "Kodi %" input from invoice creation (`create_invoice_page.dart`).
+- [x] Task 5: Remove dedicated "Tax" / "Kodi" section in `settings_page.dart` and merge TIN into Organization Information.
+- [x] Task 6: Clean up TRA / Tax marketing copy in `module_upgrade_sheet.dart`, documentation, and ARB localization files.
+- [x] Task 7: Increment version code in `pubspec.yaml` (1.0.0+59).
+- [ ] Task 8: Commit, push changes, and trigger `build-clients.yml` to generate the updated APK.
+
+

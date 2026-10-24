@@ -176,9 +176,6 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
                 _SummaryRow(
                     label: context.loc.saleSummarySubtotal,
                     value: sale.subtotal),
-                if (sale.taxAmount > 0)
-                  _SummaryRow(
-                      label: context.loc.saleSummaryTax, value: sale.taxAmount),
                 if (sale.discountAmount > 0)
                   _SummaryRow(
                       label: context.loc.saleSummaryDiscount,

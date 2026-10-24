@@ -28,7 +28,7 @@ void main() {
       expect(find.text('Dar es Salaam'), findsOneWidget);
       expect(find.text('Phone: +255712345678'), findsOneWidget);
       expect(find.text('Email: info@jolinx.co.tz'), findsOneWidget);
-      expect(find.text('Tax No: 123456789'), findsOneWidget);
+      expect(find.text('TIN: 123456789'), findsOneWidget);
 
       expect(find.text('Receipt No.'), findsOneWidget);
       // meta row + QR caption

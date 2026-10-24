@@ -23,7 +23,6 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
   final _addressController = TextEditingController();
   final _tinController = TextEditingController();
   final _notesController = TextEditingController();
-  bool _isVatRegistered = false;
   bool _saving = false;
 
   @override
@@ -45,7 +44,6 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
           _addressController.text = data['address'] ?? '';
           _tinController.text = data['tin'] ?? '';
           _notesController.text = data['notes'] ?? '';
-          _isVatRegistered = data['isVatRegistered'] ?? false;
         });
       }
     } catch (e) {
@@ -115,13 +113,6 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                 decoration: InputDecoration(labelText: loc.settingsTIN),
               ),
               const SizedBox(height: 16),
-              SwitchListTile(
-                title: Text(loc.customerFormVatRegistered),
-                value: _isVatRegistered,
-                onChanged: (v) => setState(() => _isVatRegistered = v),
-                contentPadding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 16),
               TextFormField(
                 controller: _notesController,
                 decoration: InputDecoration(labelText: loc.purchasesNotes),
@@ -165,7 +156,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
         'tin': _tinController.text.trim().isEmpty
             ? null
             : _tinController.text.trim(),
-        'isVatRegistered': _isVatRegistered,
+        'isVatRegistered': false,
         'notes': _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),

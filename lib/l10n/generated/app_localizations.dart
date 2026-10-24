@@ -1130,12 +1130,6 @@ abstract class AppLocalizations {
   /// **'Set quantity'**
   String get posSetQuantity;
 
-  /// No description provided for @posPricesIncludeTax.
-  ///
-  /// In en, this message translates to:
-  /// **'Prices include tax.'**
-  String get posPricesIncludeTax;
-
   /// No description provided for @posCartTotal.
   ///
   /// In en, this message translates to:
@@ -1393,12 +1387,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Subtotal'**
   String get saleSummarySubtotal;
-
-  /// No description provided for @saleSummaryTax.
-  ///
-  /// In en, this message translates to:
-  /// **'Tax (VAT)'**
-  String get saleSummaryTax;
 
   /// No description provided for @saleSummaryDiscount.
   ///
@@ -2119,12 +2107,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Email'**
   String get settingsEmail;
-
-  /// No description provided for @settingsTax.
-  ///
-  /// In en, this message translates to:
-  /// **'Tax'**
-  String get settingsTax;
 
   /// No description provided for @settingsTIN.
   ///
@@ -3452,12 +3434,6 @@ abstract class AppLocalizations {
   /// **'Unit price'**
   String get invoiceLineUnitPrice;
 
-  /// No description provided for @invoiceLineTaxRate.
-  ///
-  /// In en, this message translates to:
-  /// **'Tax %'**
-  String get invoiceLineTaxRate;
-
   /// No description provided for @invoiceAddLine.
   ///
   /// In en, this message translates to:
@@ -4141,12 +4117,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Name is required'**
   String get customerFormNameRequired;
-
-  /// No description provided for @customerFormVatRegistered.
-  ///
-  /// In en, this message translates to:
-  /// **'VAT Registered'**
-  String get customerFormVatRegistered;
 
   /// No description provided for @customerFormSaved.
   ///

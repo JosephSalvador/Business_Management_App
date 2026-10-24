@@ -35,17 +35,15 @@ receipt a single, tested, localized artifact.
   always, so columns line up. The QR payload keeps a whole-number total (verification text,
   not a ledger figure).
 - **Section order:** reprint/void watermark → centered business header (name, branch,
-  address, `Phone:`, `Email:`, `Tax No:` — each omitted when empty) → meta block (Receipt No.,
+  address, `Phone:`, `Email:`, `TIN:` — each omitted when empty) → meta block (Receipt No.,
   Date/Time `dd-MMM-yyyy hh:mm a`, Cashier when present, Customer or walk-in label) → item
 table (`Item | Qty | Price | Total`, name column absorbs the remainder and truncates with
    `…`) → Subtotal, `Discount (n%)` with a `-` sign → `=` rule →
    `GRAND TOTAL` → Paid Amount, Payment Method, Transaction ID (first payment reference; row
    omitted when none), Change when > 0 → `Verification:` only when a fiscal hash exists →
    `[QR CODE]` marker + centered sale number only when a payload exists → 4 footer lines.
-- **No tax on the receipt:** VAT/tax is **not implemented yet** (deliberately deferred), so the
-   ticket never prints a tax row and never derives a tax percentage. `taxAmount` still travels
-   on `ReceiptPreviewDto`/`ReceiptPreview` as sale data, but no receipt surface (screen, thermal
-   text, PDF/share, `saleToReceipt`) prints or computes it. Discount percentages stay.
+- **No tax on the receipt:** Tax and VAT are removed across all retail workflows in the app, so
+   the ticket never prints a tax row and never derives a tax percentage. Discount percentages stay.
 - **Localization:** labels come from `ReceiptLabels` keyed by `ReceiptLanguage`
   (`receiptLanguageForCode(locale.languageCode)`). Both `thermalRendererProvider` and
   `receiptPrinterServiceProvider` watch the app locale, so screen, text and print agree.

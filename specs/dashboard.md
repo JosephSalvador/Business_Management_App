@@ -3,11 +3,11 @@
 > Phase 1, fifth slice. Approval required before coding. Tasks in `tasks/dashboard/TASKS.md`.
 > Design-first: no Dashboard code until this spec and the task plan are approved.
 >
-> **Scope:** the roadmap's item 5 "Dashboard — real aggregates from events (revenue, VAT, top
+> **Scope:** the roadmap's item 5 "Dashboard — real aggregates from events (revenue, top
 > products, receivables)" depends on a Sales domain that does not exist yet (`Modules.Sales` is
 > an empty reference stub). This slice therefore ships the **Operational Dashboard** — real
 > aggregates over the data that exists today (catalog, inventory, pricing, organization).
-> Revenue/VAT/top-sellers/receivables are added when the Sales slice lands (future improvement).
+> Revenue/top-sellers/receivables are added when the Sales slice lands (future improvement).
 >
 > **Status: implemented & verified 2026-08-15** — all 5 tasks complete: ports + repository,
 > application queries, API endpoints, unit + integration tests (full suite 236/236), docs &
@@ -117,7 +117,7 @@ All routes under `/api/v1/dashboard`, `RequirePermission(PermissionNames.Dashboa
 
 ## Future improvements
 
-- Revenue, VAT, top sellers, receivables KPIs — when the Sales domain ships.
+- Revenue, top sellers, receivables KPIs — when the Sales domain ships.
 - Event-projected per-tenant activity-feed table (the outbox activity-feed handlers today only
   log; a materialized feed would be the source for recent-activity instead of AuditLogs).
 - Stock value in currency (needs a cost/landed-cost field — not modelled yet).

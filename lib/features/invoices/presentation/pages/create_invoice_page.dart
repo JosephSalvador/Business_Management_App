@@ -44,8 +44,6 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
 
   double get _subtotal => _lines.fold(0, (sum, line) => sum + line.lineTotal);
 
-  double get _tax => _lines.fold(0, (sum, line) => sum + line.lineTax);
-
   bool get _canSave =>
       !_saving && _lines.any((line) => line.description.text.trim().isNotEmpty);
 
@@ -119,7 +117,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${loc.invoiceTotal}: ${formatMoney(_subtotal + _tax)}'),
+                  Text('${loc.invoiceTotal}: ${formatMoney(_subtotal)}'),
                 ],
               ),
             ),
@@ -171,7 +169,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
             description: line.description.text,
             quantity: line.parsedQuantity,
             unitPrice: line.parsedUnitPrice,
-            taxRatePercent: line.parsedTaxRate,
+            taxRatePercent: 0,
           ),
         )
         .toList(growable: false);
@@ -202,23 +200,17 @@ class _LineInputs {
   final description = TextEditingController();
   final quantity = TextEditingController(text: '1');
   final unitPrice = TextEditingController();
-  final taxRate = TextEditingController(text: '0');
 
   double get parsedQuantity => double.tryParse(quantity.text.trim()) ?? 1;
 
   double get parsedUnitPrice => double.tryParse(unitPrice.text.trim()) ?? 0;
 
-  double get parsedTaxRate => double.tryParse(taxRate.text.trim()) ?? 0;
-
   double get lineTotal => parsedQuantity * parsedUnitPrice;
-
-  double get lineTax => lineTotal * parsedTaxRate / 100;
 
   void dispose() {
     description.dispose();
     quantity.dispose();
     unitPrice.dispose();
-    taxRate.dispose();
   }
 }
 
@@ -276,16 +268,6 @@ class _LineCard extends StatelessWidget {
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration:
                         InputDecoration(labelText: loc.invoiceLineUnitPrice),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: inputs.taxRate,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration:
-                        InputDecoration(labelText: loc.invoiceLineTaxRate),
                   ),
                 ),
               ],

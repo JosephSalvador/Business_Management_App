@@ -182,7 +182,7 @@ void main() {
       expect(output, contains('Dar es Salaam'));
       expect(output, contains('Phone: +255712345678'));
       expect(output, contains('Email: info@jolinx.co.tz'));
-      expect(output, contains('Tax No: 123456789'));
+      expect(output, contains('TIN: 123456789'));
     });
 
     test('render omits header lines that have no value', () {
@@ -211,7 +211,7 @@ void main() {
       expect(output, contains('Jolinx Shop'));
       expect(output, isNot(contains('Phone:')));
       expect(output, isNot(contains('Email:')));
-      expect(output, isNot(contains('Tax No:')));
+      expect(output, isNot(contains('TIN:')));
       expect(output, isNot(contains('Downtown Branch')));
     });
 

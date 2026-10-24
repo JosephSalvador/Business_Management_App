@@ -334,11 +334,9 @@
    subtotal/VAT/total), ReceiptPreviewPage (copy + save .txt via path_provider — no
    printer stack in M4), SalesHistoryPage, SaleDetailPage. Router /pos /pos/success /sales +
    receipt/detail param routes; home tab 0 = POS; logout resets cart/checkout/history.
-   posBranchIdProvider fetches first branch via GET /branches (WorkspaceDto has no BranchId).
-   User-approved design decision: shelf prices are tax-inclusive server-side; tax calculation
-   is deferred to a future addon (no tax-rules read API), so the cart shows Jumla only with
-   hint "Bei zinajumuisha kodi." and the exact Subtotal/VAT split appears solely on the
-   success screen/receipt from server truth (when tax addon is enabled).
+   Design decision: shelf prices are simple net selling prices without tax/VAT friction.
+   Tax and VAT have been completely removed across the entire app (no tax rows in POS, sale detail,
+   receipts, invoice inputs, customer forms, or settings). Total is always the direct sum of sold items.
    flutter analyze clean; 77/77 tests green. Real-API E2E (/tmp/opencode/m4_e2e.sh) verified
    the full journey incl. oversell → 400 whole-sale reject, same-key replay returns ORIGINAL
    sale with exactly one DB row, API restart + fresh login persistence, stock 50→48 stable.

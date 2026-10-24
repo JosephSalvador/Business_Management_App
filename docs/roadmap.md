@@ -26,7 +26,7 @@ The repo is a **Flutter client-only app**. No backend exists. Three data systems
 | Menu / Navigation | Complete | GoRouter + privilege-filtered drawer. |
 | User Management | Partial | Hardcoded 5 users; add/filter dialogs empty. |
 | Product Management | Stub | Empty page, commented-out repo. |
-| Sales | Partial | Real VAT (dual VAT A/B), real Bluetooth ESC/POS printing, real TRA TIN API with mock fallback. Products mocked, payments simulated, history in-memory (lost on restart). |
+| Sales | Partial | Real Bluetooth ESC/POS printing, TIN support, simple shelf pricing (tax/VAT removed). Products mocked, payments simulated, history in-memory (lost on restart). |
 | Reports | Stub | "Coming Soon". Not routed. |
 | Settings | Stub | "Coming Soon". Not routed. |
 | Drift DB + repositories | Complete but disconnected | 11 tables with `remoteId/syncStatus/deletedAt` — offline-first design already modelled. |
@@ -131,7 +131,7 @@ First-class domain events: `SaleCompleted`, `StockReduced`, `InvoiceCreated`, `P
 | Workflow Engine | No-code approval pipelines (PO → manager → finance → director → pay) |
 | Notification Engine | One API → email/SMS/WhatsApp/FCM/push, per-tenant templates |
 | Approval Engine | Escalations, delegation, SLAs |
-| Tax Engine | Country rules, versioned, effective-dated (TRA 18/16 dual VAT, KRA, etc.) — no code per country |
+| Compliance Engine | Versioned numbering sequences, receipt policies, business identification (TIN) |
 | Document Engine | Storage, versioning, signing, approvals |
 | Search Engine | Indexes everything; `ISearchService` abstraction (OpenSearch behind it) |
 | Payment Engine | `IPaymentProvider` — M-Pesa Daraja, Airtel, Tigo, Mixx, cards |
@@ -177,7 +177,7 @@ Each module owns its models, rules, events, commands, and queries (DDD). Platfor
 5. **RBAC, not roles:** `Sales.Create`, `Inventory.View`, `Accounting.Approve`; roles are sets of permissions; feature flags gate module visibility per tenant.
 6. **Audit log on every mutation** (actor, action, entity, tenant, IP, device, old/new).
 7. **Event-driven + outbox** for anything that spans modules or side effects.
-8. **Everything configurable:** tax rules (country → rules → version → effective date), numbering sequences, currencies, units, dynamic fields (custom attributes on entities), UI strings. No hardcoded business rules.
+8. **Everything configurable:** numbering sequences, currencies, units, dynamic fields (custom attributes on entities), UI strings. No hardcoded business rules.
 9. **Dynamic Forms:** businesses add their own fields to Customer, Product, Sale, etc. without code (schema per tenant via JSONB + metadata).
 10. **Offline-first:** Drift on device → `SyncQueueItems` outbox → REST `sync` → server applies idempotently; `updatedAt` + server-wins conflict merge first, per-table strategy later.
 11. **Riverpod over Bloc** — swap per feature, not big-bang. Keep go_router.
@@ -229,25 +229,24 @@ Platform (Phase 0) → then Core Business modules, in this order:
    repositories, application layer, `IdentityEndpoints`, activity-feed handler, 154 tests);
    Flutter admin screens are the follow-up.
  4. **Product & Inventory Foundation (Slice 3)** — **build before Sales/POS** so a sale always
-    resolves a real product/SKU/unit/price/tax/branch/stock. See "Slice 3 — Product & Inventory
+    resolves a real product/SKU/unit/price/branch/stock. See "Slice 3 — Product & Inventory
     Foundation" below. `[x] backend slice 2026-08-15` — spec `specs/products-inventory.md`:
     3a Product Catalog (domain, migration, repositories, application, API, activity-feed
     consumer, 181 tests), 3b Inventory Foundation (warehouses, stock locations, opening stock,
     ledger, 205 tests), 3c Pricing Engine (price lists, per-branch/wholesale pricing, bulk
     upsert, price resolution, 224 tests), 3d docs & release checkpoint. Flutter admin screens
     and the offline POS build on this foundation are the follow-up.
-5. **Dashboard** — real aggregates from events (revenue, VAT, top products, receivables).
+5. **Dashboard** — real aggregates from events (revenue, top products, receivables).
    `[x] backend slice 2026-08-15` — spec `specs/dashboard.md`: read-only **Operational
    Dashboard** over existing catalog/inventory/pricing/organization tables (summary KPIs,
-   low-stock, recent activity, 236 tests total). Revenue/VAT/top-sellers KPIs are deferred
+   low-stock, recent activity, 236 tests total). Revenue and top-sellers KPIs are deferred
    until the Sales domain exists (see spec "Future improvements"). Flutter dashboard screens
    are the follow-up.
 6. **Sales + Offline POS** — offline-first POS, barcode, thermal print (already works), returns,
    discounts, loyalty, multiple payments incl. **mobile money** (M-Pesa, Airtel Money, Tigo
    Pesa, Mixx by Yas, HaloPesa).
    `[x] backend slice 2026-08-16` — spec `specs/sales-pos.md`: Sales domain (`Sale`
-   aggregate, exact reconciliation + full payment), Tax Engine (temporal rules, exemptions,
-   strategy dispatch, `TZ_DUAL_VAT` dual-VAT A/B plugin under `Localizations/`), numbering
+   aggregate, exact reconciliation + full payment), numbering
    (`NumberSequence`), row-locked stock debit, `CreateSaleQuery`/`ListSalesQuery` +
    `SalesEndpoints` (`Sales.Create`/`Sales.View`), `ClientSaleId`/`Idempotency-Key` replay,
    `SaleCompletedEvent` activity-feed consumer, 357 tests. Void/returns and fiscal adapters
@@ -255,8 +254,7 @@ Platform (Phase 0) → then Core Business modules, in this order:
 7. **Inventory** — products, warehouses, stock movements, counts, transfers, batches.
 8. **Purchasing** — suppliers, RFQs, POs, goods-received, supplier bills.
 9. **Accounting basics** — chart of accounts, journal entries, general ledger, trial balance.
-10. **Reporting + Tax** — PDF/Excel/CSV, TRA e-receipt compliance, VAT summaries; tax rules
-    loaded from config (no hardcoding).
+10. **Reporting** — PDF/Excel/CSV, sales summaries, business overview; rules loaded from config.
 11. **Workflow Engine v1** — approvals for purchases, expenses, sales discounts.
 12. **Dynamic Forms v1** — custom fields on Customer/Product/Sale.
 
@@ -277,13 +275,13 @@ Inventory         → warehouses, stock locations, opening stock, stock balances
 - Multi-branch stock follows the existing `Branch` architecture
   (Company → Branch → Warehouse/Shop), making Slice 1's branch model genuinely useful.
 - **Country-pack principle:** do **not** hardcode Tanzania into the core domain. Core carries
-  the generic engines; a **Tanzania Country Pack** (TZS, VAT, TRA-compatible tax, EFD
-  integration architecture, M-Pesa/Airtel/Mixx/HaloPesa/bank/cash) ships alongside, with
+  the generic engines; a **Tanzania Country Pack** (TZS, TIN identification, receipt policies,
+  M-Pesa/Airtel/Mixx/HaloPesa/bank/cash) ships alongside, with
   Kenya/Uganda packs to follow. Core = African Business OS; packs = per-country compliance.
 - Work order: Product Catalog → Inventory Foundation → Pricing Engine → Customers → Sales
   Domain → Offline POS → Payments (Phase 1 "commercial engine").
 
-**MVP non-negotiables:** offline with reliable sync, mobile money, TRA fiscal compliance, Swahili UI, low bandwidth, guided onboarding < 10 min, audit on every write, events on every mutation.
+**MVP non-negotiables:** offline with reliable sync, mobile money, Swahili UI, low bandwidth, guided onboarding < 10 min, audit on every write, events on every mutation.
 
 **Feature slice (proves the whole stack):**
 ```
@@ -297,7 +295,7 @@ POS (drift) → save Sale + items → SyncQueueItems outbox
 ## 8. Phase 2 — Enterprise & Scale (6–12 months)
 
 - HR (employees, attendance, leave, recruitment, performance, documents)
-- Payroll (salary structures, payslips, taxes, allowances, deductions — country-specific)
+- Payroll (salary structures, payslips, allowances, deductions — country-specific)
 - Projects (tasks, Gantt, Kanban, time tracking)
 - Assets (depreciation, maintenance, register)
 - Fleet (vehicles, fuel, service history)
@@ -339,11 +337,11 @@ POS (drift) → save Sale + items → SyncQueueItems outbox
 | Offline sync conflicts | `updatedAt` + server-wins first; per-table strategy config; tests on device loss |
 | Multi-tenancy isolation | Row-level `tenant_id` + repository guardrail; escape hatch: schema-per-tenant |
 | Mobile money integrations | `IPaymentProvider` adapters per provider (Daraja, Airtel, Tigo); separate sandboxes |
-| Country tax rules | `TaxEngine`: country → rules → version → effective date; TRA dual VAT proven in app |
+| Retail pricing | Simple net pricing without tax/VAT friction |
 | Riverpod vs Bloc churn | Per-feature swap behind feature flags; keep go_router |
 | Plugin security | Modules run in-process → strict contract, signature/licensing, sandboxed storage keys |
 | Feature creep | Every module ships with offline + audit + RBAC + events from day one or it doesn't ship |
-| Fiscal compliance | TRA/URSB e-invoicing; fiscal QR on receipts per country |
+| Fiscal compliance | E-invoicing & fiscal QR on receipts per country when required |
 | Bloat trap (again) | Cap features per phase; platform capabilities gate everything |
 
 ---
@@ -354,7 +352,7 @@ POS (drift) → save Sale + items → SyncQueueItems outbox
 |---|---|---|
 | Offline-first POS | Weak | Core design |
 | Mobile money | Add-on | First-class via Payment Engine |
-| Local tax (TRA etc.) | Generic | Versioned country Tax Engine |
+| Retail simplicity | Mixed | Zero-friction net sales (tax/VAT removed) |
 | Swahili + local languages | Partial | First-class |
 | Low-bandwidth | Poor | Optimized |
 | SME pricing | High | Affordable, per-branch |

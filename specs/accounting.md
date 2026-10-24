@@ -14,7 +14,7 @@ Accounting is the financial backbone that connects operational modules (Sales, P
 to financial reporting. Every monetary event in the system produces a balanced journal entry:
 
 ```
-Sale Completed     → Debit Cash, Credit Revenue + VAT Payable
+Sale Completed     → Debit Cash, Credit Revenue
 Supplier Bill      → Debit Expense, Credit Accounts Payable
 Supplier Payment   → Debit Accounts Payable, Credit Cash
 Sale Voided        → Reversing entry (flip debits/credits of original)
@@ -65,7 +65,6 @@ Keys (constants):
 - `SalesRevenue` — credit on sale
 - `CashAndBank` — debit on sale, credit on supplier payment
 - `AccountsPayable` — credit on supplier bill, debit on supplier payment
-- `VATPayable` — credit on sale (tax portion)
 - `InventoryAsset` — debit on supplier bill (goods received)
 - `CostOfGoodsSold` — debit on sale (cost portion, future)
 

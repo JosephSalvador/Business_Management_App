@@ -33,7 +33,7 @@ backend/
     API/              — minimal API endpoints, middleware
     Workers/          — background jobs (outbox flush, email)
     Notifications/    — email/SMS/push handlers
-    Localizations/    — tax strategy adapters (TZ dual VAT)
+    Localizations/    — country localization adapters
     Modules/Sales/    — sales module boundary
   tests/
     BusinessOS.Tests/ — unit + integration (125 integration, 389 unit)
@@ -51,7 +51,7 @@ backend/
 | Pricing Engine | ✅ Implemented | Unit + Integration |
 | Sales POS | ✅ Implemented | Unit + Integration |
 | Accounting (JE, Accounts) | ✅ Implemented | Unit only |
-| Reporting & Tax | ✅ Implemented | Unit only |
+| Reporting | ✅ Implemented | Unit only |
 | Dashboard | ✅ Implemented | Unit + Integration |
 
 ### 1.4 Test Status

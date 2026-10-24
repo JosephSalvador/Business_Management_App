@@ -549,9 +549,6 @@ class AppLocalizationsSw extends AppLocalizations {
   String get posSetQuantity => 'Weka idadi';
 
   @override
-  String get posPricesIncludeTax => 'Bei zinajumuisha kodi.';
-
-  @override
   String get posCartTotal => 'Jumla';
 
   @override
@@ -690,9 +687,6 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get saleSummarySubtotal => 'Jumla ndogo';
-
-  @override
-  String get saleSummaryTax => 'Kodi (VAT)';
 
   @override
   String get saleSummaryDiscount => 'Punguzo';
@@ -1067,9 +1061,6 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get settingsEmail => 'Barua Pepe';
-
-  @override
-  String get settingsTax => 'Kodi';
 
   @override
   String get settingsTIN => 'TIN';
@@ -1762,9 +1753,6 @@ class AppLocalizationsSw extends AppLocalizations {
   String get invoiceLineUnitPrice => 'Bei kimoja';
 
   @override
-  String get invoiceLineTaxRate => 'Kodi %';
-
-  @override
   String get invoiceAddLine => 'Ongeza kipengele';
 
   @override
@@ -2115,9 +2103,6 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get customerFormNameRequired => 'Jina linahitajika';
-
-  @override
-  String get customerFormVatRegistered => 'Mwasilishaji VAT';
 
   @override
   String get customerFormSaved => 'Umefanikiwa!';

@@ -76,12 +76,6 @@ class SettingsPage extends ConsumerWidget {
               subtitle: organization.email ?? '-',
               onTap: () => _editOrganization(context, ref, organization),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _Section(
-          title: loc.settingsTax,
-          children: [
             _SettingsTile(
               icon: Icons.receipt_outlined,
               title: loc.settingsTIN,

@@ -60,7 +60,8 @@ tenant staff (get a clear "why is this locked" answer instead of a silent 403).
   incrementally; `BalanceDue = TotalAmount − AmountPaid`. An overpayment is a validation
   error, not a negative balance.
 - **Totals are server-authoritative.** The client displays a computed preview for UX, but
-  subtotal/tax/total are recalculated on the server from the submitted lines.
+  subtotal and total are recalculated on the server from the submitted lines.
+  Tax and VAT have been removed across invoice workflows.
 
 ## Screens (Flutter)
 
@@ -68,7 +69,7 @@ tenant staff (get a clear "why is this locked" answer instead of a silent 403).
   status filter, refresh, empty and failure states. Rows show number, customer, status,
   total, balance.
 - `/invoices/new` → `CreateInvoicePage`: customer dropdown (null-safe), issue/due date,
-  dynamic lines (description, quantity, unit price, tax rate), notes, live totals, save.
+  dynamic lines (description, quantity, unit price), notes, live totals, save.
 - `/invoices/:id` → `InvoiceDetailPage`: full invoice, line items, payment history,
   record-payment sheet (amount / method / reference), void action.
 - `/module-locked` → `ModuleLockedPage`: shown when a route is refused and the session may
@@ -133,7 +134,7 @@ Tenant/audit conventions follow the rest of the schema: `TenantId` on every tabl
 ## Validation
 
 - Invoice lines: at least one line; description non-empty; quantity > 0; unit price >= 0;
-  tax rate 0–100; per-line total and tax recomputed server-side.
+  per-line total recomputed server-side.
 - Payment: amount > 0; amount must not exceed the remaining `BalanceDue`.
 - Void: refused when already void, and refused when already fully paid.
 - Dates: due date must not precede the issue date.

@@ -1,27 +1,22 @@
-# Feature Spec — Reporting + Tax
+# Feature Spec — Reporting (Tax Removed)
 
 ## Feature
 
-`Reporting + Tax — Sales tax reports, dashboard KPIs, and CSV/Excel export infrastructure`
+`Reporting — Sales summary reports, dashboard KPIs, and CSV/Excel export infrastructure`
 
 ## Purpose
 
-Businesses need to file VAT returns and understand their tax liability. The tax engine already
-calculates per-line snapshots (`TaxCode`, `AppliedRate`, `BaseAmount`, `TaxAmount`) on every
-`SaleLine`, but no queries aggregate this data. This slice adds tax summary reports, dashboard
-KPIs, and a CSV/Excel export pipeline so operators can download reports for accountants and
-tax authorities.
+Businesses need clear insights into revenue, top products, and cash movement without VAT/tax friction.
+Tax and VAT calculation has been completely removed across the system to match everyday African retail reality.
+This slice focuses on sales summary reports, dashboard KPIs, and a CSV/Excel export pipeline.
 
 ## Business rules
 
-- Tax data is immutable once a Sale is completed — reports read from `SaleLines` snapshots.
-- Reports are tenant-scoped — no cross-tenant data leakage.
-- Tax summary groups by `TaxCode` (e.g., `VAT_A`, `VAT_B`, `EXEMPT`).
+- Sales reporting is tenant-scoped — no cross-tenant data leakage.
+- Direct revenue calculations: shelf prices are net selling amounts without VAT deductions.
 - Date filters default to current fiscal month if not provided.
 - CSV export uses UTF-8 BOM for Excel compatibility.
-- No PDF generation in this slice (deferred to Phase 2).
-- Dashboard KPIs: total revenue, VAT collected by code, top-selling products by revenue.
-- Tax configuration (categories, rules, regimes) is read-only — no tenant CRUD in this slice.
+- Dashboard KPIs: total revenue, sales volume, top-selling products by revenue.
 
 ## Screens (Flutter)
 
