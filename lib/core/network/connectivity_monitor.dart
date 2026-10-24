@@ -48,10 +48,12 @@ class ConnectivityMonitor extends Notifier<ConnectionQuality> {
   ConnectionQuality build() {
     final connectivity = Connectivity();
 
-    _subscription = connectivity.onConnectivityChanged.listen(
-      (_) => scheduleCheck(),
-    );
-    scheduleCheck();
+    try {
+      _subscription = connectivity.onConnectivityChanged.listen(
+        (_) => scheduleCheck(),
+      );
+      scheduleCheck();
+    } catch (_) {}
 
     ref.onDispose(() {
       _subscription?.cancel();

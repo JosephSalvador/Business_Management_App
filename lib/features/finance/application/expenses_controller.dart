@@ -176,13 +176,15 @@ class ExpensesController extends Notifier<ExpensesState> {
   }
 
   Future<void> create(Map<String, dynamic> body) async {
-    final connection = ref.read(connectionQualityProvider);
-    if (connection == ConnectionQuality.offline ||
-        connection == ConnectionQuality.unreachable) {
-      await _offlineService.recordOffline(body);
-      await load();
-      return;
-    }
+    try {
+      final connection = ref.read(connectionQualityProvider);
+      if (connection == ConnectionQuality.offline ||
+          connection == ConnectionQuality.unreachable) {
+        await _offlineService.recordOffline(body);
+        await load();
+        return;
+      }
+    } catch (_) {}
 
     try {
       await _repository.create(body);

@@ -136,29 +136,30 @@ class SyncEngine {
 
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
-      final lines = (body['lines'] as List?)?.cast<Map<String, dynamic>>() ??
-          const <Map<String, dynamic>>[];
-
-      // Quick-sale lines carry an open client-fixed price; they bypass
-      // backend price resolution by definition (the cashier typed the price).
-      final catalogLines = lines
-          .where((l) =>
-              l['unitPriceOverride'] == null &&
-              l['productId'] != QuickSaleDefaults.provisionalProductId)
-          .toList();
-
-      if (catalogLines.isEmpty) {
+      final branchId = body['branchId'] as String?;
+      final payments = body['payments'] as List?;
+      final paidAmount = (payments != null && payments.isNotEmpty)
+          ? (payments.first['amount'] as num?)?.toDouble()
+          : null;
+      if (branchId == null || paidAmount == null) {
         return true;
       }
+      final localSale =
+          await _salesService.sales.byClientSaleId(op.aggregateId);
+      final targetTotal = localSale?.totalEstimate ?? paidAmount;
 
-      for (final line in catalogLines) {
-        final pid = line['productId'] as String?;
-        if (pid == null) continue;
-        final qty = (line['quantity'] as num?)?.toDouble() ?? 1.0;
+      var expected = 0.0;
+      for (final raw in body['lines'] as List? ?? []) {
+        final line = raw as Map<String, dynamic>;
+        final qty = (line['quantity'] as num).toDouble();
+        if (line['unitPrice'] != null) {
+          expected += (line['unitPrice'] as num).toDouble() * qty;
+          continue;
+        }
         final resolved = await _repository.resolvePrice(
-          pid,
+          line['productId'] as String,
           quantity: qty,
-          branchId: body['branchId'] as String?,
+          branchId: branchId,
         );
         if (resolved == null) {
           await _conflict(
@@ -169,26 +170,23 @@ class SyncEngine {
           );
           return false;
         }
-
-        final charged = (line['unitPrice'] as num?)?.toDouble();
-        if (charged != null && (charged - resolved.price).abs() > 0.01) {
-          await _conflict(
-            op,
-            outcome,
-            'PRICE',
-            'Bei imebadilika kwenye mfumo. Muamala unahitaji kuangaliwa.',
-          );
-          return false;
-        }
+        expected += resolved.price * qty;
       }
+      if ((expected - targetTotal).abs() > 0.01) {
+        await _conflict(
+          op,
+          outcome,
+          'PRICE',
+          'Bei imebadilika kwenye mfumo. Muamala unahitaji kuangaliwa.',
+        );
+        return false;
+      }
+      return true;
     } on AppException {
-      // Resolution failed due to network / auth: let delivery attempt it
-      // so normal error handling (offline pause, session wait) takes over.
+      return true;
     } catch (_) {
-      // Malformed payload handled at delivery.
+      return true;
     }
-
-    return true;
   }
 
   Future<_DeliveryResult> _deliver(
