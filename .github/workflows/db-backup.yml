@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   pg-dump-backup:
-    name: Backup Neon PostgreSQL Database
+    name: Backup Azure PostgreSQL Databases
     runs-on: ubuntu-latest
     steps:
       - name: Check if DATABASE_URL secret is configured
@@ -26,28 +26,39 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install PostgreSQL 17 Client
+      - name: Install PostgreSQL Client
         if: steps.check-secret.outputs.configured == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Run pg_dump compressed backup
+      - name: Run pg_dump compressed backups (Production & Staging)
         if: steps.check-secret.outputs.configured == 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          mkdir -p backups
           TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
-          BACKUP_FILE="jolinx-db-backup-${TIMESTAMP}.dump"
-          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --compress=9 --file="$BACKUP_FILE"
-          ls -lh "$BACKUP_FILE"
-          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_OUTPUT"
-        id: dump
+
+          echo "Dumping Production database..."
+          PROD_FILE="backups/jolinx-prod-backup-${TIMESTAMP}.dump"
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --compress=9 --file="$PROD_FILE"
+          ls -lh "$PROD_FILE"
+
+          # Automatically dump Staging if it exists on the same server
+          STAGING_URL="${DATABASE_URL/\/businessos?/\/businessos_staging?}"
+          STAGING_FILE="backups/jolinx-staging-backup-${TIMESTAMP}.dump"
+          echo "Dumping Staging database..."
+          if pg_dump "$STAGING_URL" --format=custom --no-owner --no-acl --compress=9 --file="$STAGING_FILE" 2>/dev/null; then
+            ls -lh "$STAGING_FILE"
+          else
+            echo "Note: Staging dump skipped or not reachable."
+          fi
 
       - name: Upload 90-day Encrypted Artifact Backup
         if: steps.check-secret.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: jolinx-db-backup-${{ github.run_number }}
-          path: ${{ steps.dump.outputs.backup_file }}
+          name: jolinx-azure-db-backups-${{ github.run_number }}
+          path: backups/*.dump
           retention-days: 90
