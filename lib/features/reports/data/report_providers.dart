@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/di/core_providers.dart'
     show localSalesServiceProvider, offlineCacheDaoProvider;
-import '../../finance/data/expense_providers.dart'
-    show offlineExpenseServiceProvider;
 import '../application/reports_controller.dart';
 import '../application/top_products_controller.dart';
 import 'report_repository.dart';

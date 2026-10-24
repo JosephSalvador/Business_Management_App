@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../authentication/data/auth_providers.dart';
+import '../../authentication/data/auth_providers.dart' show sessionContextProvider;
 import '../application/catalog_controller.dart';
 import '../application/products_controller.dart';
 import 'product_repository.dart';

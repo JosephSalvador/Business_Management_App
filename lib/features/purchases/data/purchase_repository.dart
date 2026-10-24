@@ -51,21 +51,21 @@ class PurchaseRepository {
       );
       final paged = _decodePage(response);
       if (_cache != null && search == null && page == 1) {
-        await _cache!.save(_cacheKey, {
+        await _cache.save(_cacheKey, {
           'items': paged.items,
           'total': paged.total,
         });
         for (final p in paged.items) {
           final id = p['id']?.toString();
           if (id != null) {
-            await _cache!.save('purchase_$id', p);
+            await _cache.save('purchase_$id', p);
           }
         }
       }
       return paged;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load(_cacheKey);
+        final cached = await _cache.load(_cacheKey);
         if (cached != null) {
           var items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -99,14 +99,14 @@ class PurchaseRepository {
       }
       final data = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('purchase_$id', data);
+        await _cache.save('purchase_$id', data);
       }
       return data;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('purchase_$id');
+        final cached = await _cache.load('purchase_$id');
         if (cached != null) return cached;
-        final listCached = await _cache!.load(_cacheKey);
+        final listCached = await _cache.load(_cacheKey);
         if (listCached != null) {
           final items = (listCached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -144,19 +144,19 @@ class PurchaseRepository {
       };
 
       if (_cache != null) {
-        await _cache!.save('purchase_$localId', localOrder);
+        await _cache.save('purchase_$localId', localOrder);
         await _appendPurchaseToCache(localOrder);
       }
 
       if (_queue != null) {
         final tenantId = _tenantIdOf != null
-            ? (await _tenantIdOf!()) ?? 'unknown'
+            ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
         final branchId =
-            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: localId,
           tenantId: tenantId,
           branchId: branchId,
@@ -173,14 +173,14 @@ class PurchaseRepository {
   Future<void> _appendPurchaseToCache(Map<String, dynamic> order) async {
     if (_cache == null) return;
     try {
-      final listCached = await _cache!.load(_cacheKey);
+      final listCached = await _cache.load(_cacheKey);
       final items = (listCached?['items'] as List<dynamic>? ?? const [])
           .whereType<Map<dynamic, dynamic>>()
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList();
       items.removeWhere((p) => p['id'] == order['id']);
       items.insert(0, order);
-      await _cache!.save(_cacheKey, {
+      await _cache.save(_cacheKey, {
         'items': items,
         'total': items.length,
       });
@@ -210,7 +210,7 @@ class PurchaseRepository {
       );
       final paged = _decodeSuppliers(response);
       if (_cache != null) {
-        await _cache!.save('suppliers_list', {
+        await _cache.save('suppliers_list', {
           'items': paged.items,
           'total': paged.total,
         });
@@ -218,7 +218,7 @@ class PurchaseRepository {
       return paged;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('suppliers_list');
+        final cached = await _cache.load('suppliers_list');
         if (cached != null) {
           final items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -244,12 +244,12 @@ class PurchaseRepository {
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList(growable: false);
       if (_cache != null) {
-        await _cache!.save('warehouses_list', {'items': list});
+        await _cache.save('warehouses_list', {'items': list});
       }
       return list;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('warehouses_list');
+        final cached = await _cache.load('warehouses_list');
         if (cached != null) {
           final items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()

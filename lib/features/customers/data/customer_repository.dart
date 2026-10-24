@@ -67,14 +67,14 @@ class CustomerRepository {
 
       // Cache online customer catalog for offline use
       if (_cache != null && search == null) {
-        await _cache!.save(_cacheKey, {
+        await _cache.save(_cacheKey, {
           'items': items,
           'total': doc['total'] ?? items.length,
         });
         for (final item in items) {
           final id = item['id']?.toString();
           if (id != null && id.isNotEmpty) {
-            await _cache!.save('customer_$id', item);
+            await _cache.save('customer_$id', item);
           }
         }
       }
@@ -86,7 +86,7 @@ class CustomerRepository {
     } on AppException {
       // 100% Offline fallback
       if (_cache != null) {
-        final cached = await _cache!.load(_cacheKey);
+        final cached = await _cache.load(_cacheKey);
         if (cached != null) {
           var items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -117,15 +117,15 @@ class CustomerRepository {
       }
       final data = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('customer_$id', data);
+        await _cache.save('customer_$id', data);
       }
       return data;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('customer_$id');
+        final cached = await _cache.load('customer_$id');
         if (cached != null) return cached;
 
-        final listCached = await _cache!.load(_cacheKey);
+        final listCached = await _cache.load(_cacheKey);
         if (listCached != null) {
           final items = (listCached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -152,7 +152,7 @@ class CustomerRepository {
       }
       final created = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('customer_${created['id']}', created);
+        await _cache.save('customer_${created['id']}', created);
         await _appendCustomerToCache(created);
       }
       return created;
@@ -173,18 +173,18 @@ class CustomerRepository {
         };
 
         // Cache locally immediately so POS can use it
-        await _cache!.save('customer_$localId', localCustomer);
+        await _cache.save('customer_$localId', localCustomer);
         await _appendCustomerToCache(localCustomer);
 
         // Queue for background sync
         final tenantId = _tenantIdOf != null
-            ? (await _tenantIdOf!()) ?? 'unknown'
+            ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
         final branchId =
-            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: localId,
           tenantId: tenantId,
           branchId: branchId,
@@ -204,14 +204,14 @@ class CustomerRepository {
   Future<void> _appendCustomerToCache(Map<String, dynamic> customer) async {
     if (_cache == null) return;
     try {
-      final listCached = await _cache!.load(_cacheKey);
+      final listCached = await _cache.load(_cacheKey);
       final items = (listCached?['items'] as List<dynamic>? ?? const [])
           .whereType<Map<dynamic, dynamic>>()
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList();
       items.removeWhere((c) => c['id'] == customer['id']);
       items.insert(0, customer);
-      await _cache!.save(_cacheKey, {
+      await _cache.save(_cacheKey, {
         'items': items,
         'total': items.length,
       });
@@ -229,7 +229,7 @@ class CustomerRepository {
     }
     final updated = Map<String, dynamic>.from(response.data as Map);
     if (_cache != null) {
-      await _cache!.save('customer_$id', updated);
+      await _cache.save('customer_$id', updated);
       await _appendCustomerToCache(updated);
     }
     return updated;
@@ -246,15 +246,15 @@ class CustomerRepository {
       }
       final data = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('customer_credit_$customerId', data);
+        await _cache.save('customer_credit_$customerId', data);
       }
       return data;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('customer_credit_$customerId');
+        final cached = await _cache.load('customer_credit_$customerId');
         if (cached != null) return cached;
 
-        final cust = await _cache!.load('customer_$customerId');
+        final cust = await _cache.load('customer_$customerId');
         if (cust != null) {
           return {
             'customerId': customerId,
@@ -280,19 +280,19 @@ class CustomerRepository {
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList();
       if (_cache != null) {
-        await _cache!.save('outstanding_credit_list', {'items': list});
+        await _cache.save('outstanding_credit_list', {'items': list});
       }
       return list;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('outstanding_credit_list');
+        final cached = await _cache.load('outstanding_credit_list');
         if (cached != null) {
           return (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
               .map((raw) => Map<String, dynamic>.from(raw))
               .toList();
         }
-        final listCached = await _cache!.load(_cacheKey);
+        final listCached = await _cache.load(_cacheKey);
         if (listCached != null) {
           final items = (listCached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -328,13 +328,13 @@ class CustomerRepository {
       if (_queue != null) {
         final paymentId = _uuid.v4();
         final tenantId = _tenantIdOf != null
-            ? (await _tenantIdOf!()) ?? 'unknown'
+            ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
         final branchId =
-            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: paymentId,
           tenantId: tenantId,
           branchId: branchId,
@@ -351,13 +351,13 @@ class CustomerRepository {
         );
 
         if (_cache != null) {
-          final cust = await _cache!.load('customer_$customerId');
+          final cust = await _cache.load('customer_$customerId');
           if (cust != null) {
             final currentDebt =
                 (cust['currentDebtBalance'] as num?)?.toDouble() ?? 0.0;
             cust['currentDebtBalance'] =
                 (currentDebt - amount).clamp(0.0, double.infinity);
-            await _cache!.save('customer_$customerId', cust);
+            await _cache.save('customer_$customerId', cust);
             await _appendCustomerToCache(cust);
           }
         }

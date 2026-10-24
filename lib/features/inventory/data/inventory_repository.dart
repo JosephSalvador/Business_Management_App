@@ -122,11 +122,13 @@ class InventoryRepository {
           productId: entry.productId,
           productName: '',
           sku: '',
+          barcode: null,
           warehouseId: entry.warehouseId,
           warehouseName: '',
+          stockLocationId: '',
+          stockLocationName: '',
+          unitOfMeasureName: '',
           quantity: entry.quantityDelta,
-          allocatedQuantity: 0,
-          availableQuantity: entry.quantityDelta,
         );
       }
       rethrow;

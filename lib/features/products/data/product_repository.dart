@@ -83,8 +83,8 @@ class OpeningStockEntry {
         'quantity': quantity,
         'unitOfMeasureId': unitOfMeasureId,
         'effectiveAt': DateTime.now().toUtc().toIso8601String(),
-        if (reason != null && reason!.trim().isNotEmpty)
-          'reason': reason!.trim(),
+        if (reason != null && reason.trim().isNotEmpty)
+          'reason': reason.trim(),
         if (unitCost != null) 'unitCost': unitCost,
       };
 }
@@ -117,11 +117,11 @@ class AdjustStockEntry {
         'productId': productId,
         'quantityDelta': quantityDelta,
         'effectiveAt': DateTime.now().toUtc().toIso8601String(),
-        if (reason != null && reason!.trim().isNotEmpty)
-          'reason': reason!.trim(),
+        if (reason != null && reason.trim().isNotEmpty)
+          'reason': reason.trim(),
         if (unitCost != null) 'unitCost': unitCost,
-        if (reasonType != null && reasonType!.trim().isNotEmpty)
-          'reasonType': reasonType!.trim(),
+        if (reasonType != null && reasonType.trim().isNotEmpty)
+          'reasonType': reasonType.trim(),
       };
 }
 
@@ -174,18 +174,18 @@ class ProductRepository {
       );
       final paged = _decodePage(response);
       if (_cache != null && search == null && page == 1) {
-        await _cache!.save(_cacheKey, {
+        await _cache.save(_cacheKey, {
           'items': paged.items.map((p) => p.toJson()).toList(),
           'total': paged.total,
         });
         for (final p in paged.items) {
-          await _cache!.save('product_${p.id}', p.toJson());
+          await _cache.save('product_${p.id}', p.toJson());
         }
       }
       return paged;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load(_cacheKey);
+        final cached = await _cache.load(_cacheKey);
         if (cached != null) {
           var items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -220,16 +220,16 @@ class ProductRepository {
       final product =
           Product.fromJson(Map<String, dynamic>.from(response.data as Map));
       if (_cache != null) {
-        await _cache!.save('product_$id', product.toJson());
+        await _cache.save('product_$id', product.toJson());
       }
       return product;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('product_$id');
+        final cached = await _cache.load('product_$id');
         if (cached != null) {
           return Product.fromJson(cached);
         }
-        final listCached = await _cache!.load(_cacheKey);
+        final listCached = await _cache.load(_cacheKey);
         if (listCached != null) {
           final items = (listCached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -257,7 +257,7 @@ class ProductRepository {
       final created =
           Product.fromJson(Map<String, dynamic>.from(response.data as Map));
       if (_cache != null) {
-        await _cache!.save('product_${created.id}', created.toJson());
+        await _cache.save('product_${created.id}', created.toJson());
         await _appendProductToCache(created);
       }
       return created;
@@ -281,25 +281,26 @@ class ProductRepository {
       );
 
       if (_cache != null) {
-        await _cache!.save('product_$localId', localProduct.toJson());
+        await _cache.save('product_$localId', localProduct.toJson());
         await _appendProductToCache(localProduct);
       }
 
       final tenantId = _tenantIdOf != null
-          ? (await _tenantIdOf!()) ?? 'unknown'
+          ? (await _tenantIdOf()) ?? 'unknown'
           : 'unknown';
       final branchId =
-          _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-      final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+          _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+      final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
       if (_catalogDao != null) {
-        await _catalogDao!.upsertProduct(CachedProductsCompanion(
+        await _catalogDao.upsertProduct(CachedProductsCompanion(
           tenantId: Value(tenantId),
           productId: Value(localId),
           name: Value(localProduct.name),
           sku: Value(localProduct.sku ?? ''),
           barcode: Value(localProduct.barcode ?? ''),
-          unitOfMeasure: const Value('Pcs'),
+          retailPrice: Value(localProduct.costPrice ?? 0),
+          currency: const Value('TZS'),
           status: const Value(LocalProductCodes.statusActive),
           sellable: const Value(true),
           productType: const Value(LocalProductCodes.typeGoods),
@@ -308,7 +309,7 @@ class ProductRepository {
       }
 
       if (_queue != null) {
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: localId,
           tenantId: tenantId,
           branchId: branchId,
@@ -327,14 +328,14 @@ class ProductRepository {
   Future<void> _appendProductToCache(Product product) async {
     if (_cache == null) return;
     try {
-      final listCached = await _cache!.load(_cacheKey);
+      final listCached = await _cache.load(_cacheKey);
       final items = (listCached?['items'] as List<dynamic>? ?? const [])
           .whereType<Map<dynamic, dynamic>>()
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList();
       items.removeWhere((p) => p['id'] == product.id);
       items.insert(0, product.toJson());
-      await _cache!.save(_cacheKey, {
+      await _cache.save(_cacheKey, {
         'items': items,
         'total': items.length,
       });
@@ -357,7 +358,7 @@ class ProductRepository {
       final updated =
           Product.fromJson(Map<String, dynamic>.from(response.data as Map));
       if (_cache != null) {
-        await _cache!.save('product_$id', updated.toJson());
+        await _cache.save('product_$id', updated.toJson());
         await _appendProductToCache(updated);
       }
       return updated;
@@ -380,25 +381,26 @@ class ProductRepository {
       );
 
       if (_cache != null) {
-        await _cache!.save('product_$id', updated.toJson());
+        await _cache.save('product_$id', updated.toJson());
         await _appendProductToCache(updated);
       }
 
       final tenantId = _tenantIdOf != null
-          ? (await _tenantIdOf!()) ?? 'unknown'
+          ? (await _tenantIdOf()) ?? 'unknown'
           : 'unknown';
       final branchId =
-          _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-      final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+          _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+      final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
       if (_catalogDao != null) {
-        await _catalogDao!.upsertProduct(CachedProductsCompanion(
+        await _catalogDao.upsertProduct(CachedProductsCompanion(
           tenantId: Value(tenantId),
           productId: Value(id),
           name: Value(updated.name),
           sku: Value(updated.sku ?? ''),
           barcode: Value(updated.barcode ?? ''),
-          unitOfMeasure: const Value('Pcs'),
+          retailPrice: Value(updated.costPrice ?? 0),
+          currency: const Value('TZS'),
           status: const Value(LocalProductCodes.statusActive),
           sellable: const Value(true),
           productType: const Value(LocalProductCodes.typeGoods),
@@ -407,7 +409,7 @@ class ProductRepository {
       }
 
       if (_queue != null) {
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: _uuid.v4(),
           tenantId: tenantId,
           branchId: branchId,
@@ -428,12 +430,12 @@ class ProductRepository {
       final data = await _listArray('/api/v1/units');
       final list = data.map(UnitOfMeasure.fromJson).toList(growable: false);
       if (_cache != null) {
-        await _cache!.save('units_list', {'items': data});
+        await _cache.save('units_list', {'items': data});
       }
       return list;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('units_list');
+        final cached = await _cache.load('units_list');
         if (cached != null) {
           final items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -466,12 +468,12 @@ class ProductRepository {
       final data = await _listArray('/api/v1/tax-categories');
       final list = data.map(TaxCategory.fromJson).toList(growable: false);
       if (_cache != null) {
-        await _cache!.save('tax_categories_list', {'items': data});
+        await _cache.save('tax_categories_list', {'items': data});
       }
       return list;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('tax_categories_list');
+        final cached = await _cache.load('tax_categories_list');
         if (cached != null) {
           final items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -490,12 +492,12 @@ class ProductRepository {
       final data = await _listArray('/api/v1/categories');
       final list = data.map(Category.fromJson).toList(growable: false);
       if (_cache != null) {
-        await _cache!.save('categories_list', {'items': data});
+        await _cache.save('categories_list', {'items': data});
       }
       return list;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('categories_list');
+        final cached = await _cache.load('categories_list');
         if (cached != null) {
           final items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -514,12 +516,12 @@ class ProductRepository {
       final data = await _listArray('/api/v1/brands');
       final list = data.map(Brand.fromJson).toList(growable: false);
       if (_cache != null) {
-        await _cache!.save('brands_list', {'items': data});
+        await _cache.save('brands_list', {'items': data});
       }
       return list;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('brands_list');
+        final cached = await _cache.load('brands_list');
         if (cached != null) {
           final items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -602,7 +604,7 @@ class ProductRepository {
     try {
       final data = await _listArray('/api/v1/price-lists');
       if (_cache != null) {
-        await _cache!.save('price_lists', {'items': data});
+        await _cache.save('price_lists', {'items': data});
       }
       for (final raw in data) {
         final list = PriceList.fromJson(raw);
@@ -613,7 +615,7 @@ class ProductRepository {
       return null;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('price_lists');
+        final cached = await _cache.load('price_lists');
         if (cached != null) {
           final items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -681,14 +683,14 @@ class ProductRepository {
       if (remoteOnly) rethrow;
 
       final tenantId = _tenantIdOf != null
-          ? (await _tenantIdOf!()) ?? 'unknown'
+          ? (await _tenantIdOf()) ?? 'unknown'
           : 'unknown';
       final branchId =
-          _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-      final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+          _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+      final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
       if (_queue != null) {
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: _uuid.v4(),
           tenantId: tenantId,
           branchId: branchId,

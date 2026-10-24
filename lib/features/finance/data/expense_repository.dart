@@ -107,7 +107,7 @@ class ExpenseRepository {
 
       // Cache online page 1 for offline resilience
       if (_cache != null && page == 1 && search == null && fromDate == null) {
-        await _cache!.save(_cacheKey, {
+        await _cache.save(_cacheKey, {
           'items': items,
           'total': doc['total'] ?? items.length,
         });
@@ -120,7 +120,7 @@ class ExpenseRepository {
     } on AppException {
       // Offline fallback: load from local cache
       if (_cache != null) {
-        final cached = await _cache!.load(_cacheKey);
+        final cached = await _cache.load(_cacheKey);
         var items = (cached?['items'] as List<dynamic>? ?? const [])
             .whereType<Map<dynamic, dynamic>>()
             .map((raw) => Map<String, dynamic>.from(raw))
@@ -153,7 +153,7 @@ class ExpenseRepository {
       return Map<String, dynamic>.from(response.data as Map);
     } on AppException {
       if (_cache != null) {
-        final listCached = await _cache!.load(_cacheKey);
+        final listCached = await _cache.load(_cacheKey);
         if (listCached != null) {
           final items = (listCached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -189,7 +189,7 @@ class ExpenseRepository {
           (e is NetworkException ||
               e is TimeoutException ||
               e is ServerException)) {
-        final offlineExpense = await _offlineService!.recordOffline(body);
+        final offlineExpense = await _offlineService.recordOffline(body);
         if (_cache != null) {
           await _appendExpenseToCache(offlineExpense);
         }
@@ -202,14 +202,14 @@ class ExpenseRepository {
   Future<void> _appendExpenseToCache(Map<String, dynamic> expense) async {
     if (_cache == null) return;
     try {
-      final listCached = await _cache!.load(_cacheKey);
+      final listCached = await _cache.load(_cacheKey);
       final items = (listCached?['items'] as List<dynamic>? ?? const [])
           .whereType<Map<dynamic, dynamic>>()
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList();
       items.removeWhere((e) => e['id'] == expense['id']);
       items.insert(0, expense); // Latest first!
-      await _cache!.save(_cacheKey, {
+      await _cache.save(_cacheKey, {
         'items': items,
         'total': items.length,
       });
@@ -239,13 +239,13 @@ class ExpenseRepository {
     }
     if (_cache != null) {
       try {
-        final listCached = await _cache!.load(_cacheKey);
+        final listCached = await _cache.load(_cacheKey);
         final items = (listCached?['items'] as List<dynamic>? ?? const [])
             .whereType<Map<dynamic, dynamic>>()
             .map((raw) => Map<String, dynamic>.from(raw))
             .toList();
         items.removeWhere((e) => e['id'] == id);
-        await _cache!.save(_cacheKey, {
+        await _cache.save(_cacheKey, {
           'items': items,
           'total': items.length,
         });
@@ -293,7 +293,7 @@ class ExpenseRepository {
       final summary = ExpenseSummary.fromJson(
           Map<String, dynamic>.from(response.data as Map));
       if (_cache != null && fromDate == null && toDate == null) {
-        await _cache!.save(_summaryCacheKey, {
+        await _cache.save(_summaryCacheKey, {
           'total': summary.total,
           'byCategory': summary.byCategory
               .map((c) => {
@@ -307,7 +307,7 @@ class ExpenseRepository {
       return summary;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load(_summaryCacheKey);
+        final cached = await _cache.load(_summaryCacheKey);
         if (cached != null) {
           return ExpenseSummary.fromJson(cached);
         }

@@ -44,12 +44,12 @@ class MoneyAccountRepository {
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList();
       if (_cache != null) {
-        await _cache!.save(_accountsCacheKey, {'items': list});
+        await _cache.save(_accountsCacheKey, {'items': list});
       }
       return list;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load(_accountsCacheKey);
+        final cached = await _cache.load(_accountsCacheKey);
         if (cached != null) {
           return (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -168,12 +168,12 @@ class MoneyAccountRepository {
       }
       final session = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('cash_session_$accountId', session);
+        await _cache.save('cash_session_$accountId', session);
       }
       return session;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('cash_session_$accountId');
+        final cached = await _cache.load('cash_session_$accountId');
         if (cached != null) return cached;
       }
       return null;
@@ -194,7 +194,7 @@ class MoneyAccountRepository {
       }
       final session = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('cash_session_${body['accountId']}', session);
+        await _cache.save('cash_session_${body['accountId']}', session);
       }
       return session;
     } on AppException {
@@ -213,18 +213,18 @@ class MoneyAccountRepository {
       };
 
       if (_cache != null) {
-        await _cache!.save('cash_session_$accountId', localSession);
+        await _cache.save('cash_session_$accountId', localSession);
       }
 
       if (_queue != null) {
         final tenantId = _tenantIdOf != null
-            ? (await _tenantIdOf!()) ?? 'unknown'
+            ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
         final branchId =
-            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: sessionId,
           tenantId: tenantId,
           branchId: branchId,
@@ -257,7 +257,7 @@ class MoneyAccountRepository {
       if (_cache != null) {
         final accountId = session['accountId']?.toString();
         if (accountId != null) {
-          await _cache!.clear('cash_session_$accountId');
+          await _cache.clear('cash_session_$accountId');
         }
       }
       return session;
@@ -282,20 +282,20 @@ class MoneyAccountRepository {
       if (_cache != null) {
         final accountId = body['accountId']?.toString();
         if (accountId != null) {
-          await _cache!.clear('cash_session_$accountId');
+          await _cache.clear('cash_session_$accountId');
         }
-        await _cache!.save('cash_session_closed_$sessionId', closedSession);
+        await _cache.save('cash_session_closed_$sessionId', closedSession);
       }
 
       if (_queue != null) {
         final tenantId = _tenantIdOf != null
-            ? (await _tenantIdOf!()) ?? 'unknown'
+            ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
         final branchId =
-            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: _uuid.v4(),
           tenantId: tenantId,
           branchId: branchId,

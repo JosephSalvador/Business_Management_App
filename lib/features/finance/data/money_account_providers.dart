@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../authentication/data/auth_providers.dart';
+import '../../authentication/data/auth_providers.dart' show sessionContextProvider;
 import '../application/money_accounts_controller.dart';
 import '../application/cash_session_controller.dart';
 import 'money_account_repository.dart';
