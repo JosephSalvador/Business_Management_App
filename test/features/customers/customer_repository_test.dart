@@ -148,7 +148,7 @@ void main() {
 
       // Network adapter that immediately throws NetworkException
       final adapter = ScriptedAdapter([
-        ScriptedResponse(503, 'offline', statusMessage: 'Network error'),
+        ScriptedResponse(503, 'offline'),
       ]);
       final repository = CustomerRepository(
         apiClient: clientWith(adapter),

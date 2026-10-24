@@ -30,7 +30,10 @@ class FakeCustomerRepository implements CustomerRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> create(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     final newCustomer = {...body, 'id': 'c${customers.length + 1}'};
     customers = [...customers, newCustomer];
     return newCustomer;
@@ -54,7 +57,11 @@ class FakeCustomerRepository implements CustomerRepository {
 
   @override
   Future<Map<String, dynamic>> recordPayment(
-      String customerId, double amount, String description) async {
+    String customerId,
+    double amount,
+    String description, {
+    bool remoteOnly = false,
+  }) async {
     return {'customerId': customerId, 'amount': amount, 'balance': 0};
   }
 }

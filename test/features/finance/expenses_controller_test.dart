@@ -60,7 +60,10 @@ class FakeExpenseRepository implements ExpenseRepository {
       items.firstWhere((e) => e['id'] == id);
 
   @override
-  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> create(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     final created = {...body, 'id': 'new'};
     items.insert(0, created);
     return created;

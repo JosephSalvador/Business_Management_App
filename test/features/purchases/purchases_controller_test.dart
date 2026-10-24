@@ -30,7 +30,10 @@ class FakePurchaseRepository implements PurchaseRepository {
   }
 
   @override
-  Future<void> create(Map<String, dynamic> body) async {
+  Future<void> create(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     createCallCount++;
     lastCreateBody = body;
   }

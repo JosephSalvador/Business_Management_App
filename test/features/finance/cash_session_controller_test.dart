@@ -44,7 +44,10 @@ class FakeCashSessionRepository implements MoneyAccountRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> openSession(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> openSession(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     currentSession = {
       'id': 's1',
       'accountId': body['accountId'],
@@ -57,7 +60,10 @@ class FakeCashSessionRepository implements MoneyAccountRepository {
 
   @override
   Future<Map<String, dynamic>> closeSession(
-      String sessionId, Map<String, dynamic> body) async {
+    String sessionId,
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     currentSession = {
       'id': sessionId,
       'accountId': currentSession?['accountId'],

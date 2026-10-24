@@ -99,14 +99,14 @@ class SupplierRepository {
       }
       final data = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('supplier_$id', data);
+        await _cache.save('supplier_$id', data);
       }
       return data;
     } on AppException {
       if (_cache != null) {
-        final cached = await _cache!.load('supplier_$id');
+        final cached = await _cache.load('supplier_$id');
         if (cached != null) return cached;
-        final listCached = await _cache!.load(_cacheKey);
+        final listCached = await _cache.load(_cacheKey);
         if (listCached != null) {
           final items = (listCached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
@@ -133,7 +133,7 @@ class SupplierRepository {
       }
       final created = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('supplier_${created['id']}', created);
+        await _cache.save('supplier_${created['id']}', created);
         await _appendSupplierToCache(created);
       }
       return created;
@@ -153,19 +153,19 @@ class SupplierRepository {
       };
 
       if (_cache != null) {
-        await _cache!.save('supplier_$localId', localSupplier);
+        await _cache.save('supplier_$localId', localSupplier);
         await _appendSupplierToCache(localSupplier);
       }
 
       if (_queue != null) {
         final tenantId = _tenantIdOf != null
-            ? (await _tenantIdOf!()) ?? 'unknown'
+            ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
         final branchId =
-            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: localId,
           tenantId: tenantId,
           branchId: branchId,
@@ -182,16 +182,17 @@ class SupplierRepository {
   }
 
   Future<void> _appendSupplierToCache(Map<String, dynamic> supplier) async {
-    if (_cache == null) return;
+    final cache = _cache;
+    if (cache == null) return;
     try {
-      final listCached = await _cache!.load(_cacheKey);
+      final listCached = await cache.load(_cacheKey);
       final items = (listCached?['items'] as List<dynamic>? ?? const [])
           .whereType<Map<dynamic, dynamic>>()
           .map((raw) => Map<String, dynamic>.from(raw))
           .toList();
       items.removeWhere((s) => s['id'] == supplier['id']);
       items.insert(0, supplier);
-      await _cache!.save(_cacheKey, {
+      await cache.save(_cacheKey, {
         'items': items,
         'total': items.length,
       });
@@ -213,7 +214,7 @@ class SupplierRepository {
       }
       final updated = Map<String, dynamic>.from(response.data as Map);
       if (_cache != null) {
-        await _cache!.save('supplier_$id', updated);
+        await _cache.save('supplier_$id', updated);
         await _appendSupplierToCache(updated);
       }
       return updated;
@@ -227,19 +228,19 @@ class SupplierRepository {
       };
 
       if (_cache != null) {
-        await _cache!.save('supplier_$id', updated);
+        await _cache.save('supplier_$id', updated);
         await _appendSupplierToCache(updated);
       }
 
       if (_queue != null) {
         final tenantId = _tenantIdOf != null
-            ? (await _tenantIdOf!()) ?? 'unknown'
+            ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
         final branchId =
-            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
-        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
 
-        await _queue!.enqueue(
+        await _queue.enqueue(
           operationId: _uuid.v4(),
           tenantId: tenantId,
           branchId: branchId,

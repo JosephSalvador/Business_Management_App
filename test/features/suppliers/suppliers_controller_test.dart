@@ -30,7 +30,10 @@ class FakeSupplierRepository implements SupplierRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> create(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     final newSupplier = {...body, 'id': 's${suppliers.length + 1}'};
     suppliers = [...suppliers, newSupplier];
     return newSupplier;
@@ -38,7 +41,10 @@ class FakeSupplierRepository implements SupplierRepository {
 
   @override
   Future<Map<String, dynamic>> update(
-      String id, Map<String, dynamic> body) async {
+    String id,
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     return {...body, 'id': id};
   }
 }

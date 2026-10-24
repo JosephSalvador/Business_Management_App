@@ -54,7 +54,10 @@ class FakeProductRepository implements ProductRepository {
       products.singleWhere((p) => p.id == id);
 
   @override
-  Future<Product> create(ProductDraft draft) async {
+  Future<Product> create(
+    ProductDraft draft, {
+    bool remoteOnly = false,
+  }) async {
     final error = createError;
     if (error != null) {
       throw error;
@@ -74,7 +77,11 @@ class FakeProductRepository implements ProductRepository {
   }
 
   @override
-  Future<Product> update(String id, ProductDraft draft) async {
+  Future<Product> update(
+    String id,
+    ProductDraft draft, {
+    bool remoteOnly = false,
+  }) async {
     lastDraft = draft;
     final index = products.indexWhere((p) => p.id == id);
     final updated = Product(
@@ -181,6 +188,7 @@ class FakeProductRepository implements ProductRepository {
     required String productId,
     required double price,
     int priceType = 0,
+    bool remoteOnly = false,
   }) async {
     lastPrice = price;
     if (priceType == 1) {

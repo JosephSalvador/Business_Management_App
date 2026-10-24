@@ -78,12 +78,18 @@ class FakeMoneyAccountRepository implements MoneyAccountRepository {
       null;
 
   @override
-  Future<Map<String, dynamic>> openSession(Map<String, dynamic> body) async =>
+  Future<Map<String, dynamic>> openSession(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async =>
       {};
 
   @override
   Future<Map<String, dynamic>> closeSession(
-          String sessionId, Map<String, dynamic> body) async =>
+    String sessionId,
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async =>
       {};
 }
 
