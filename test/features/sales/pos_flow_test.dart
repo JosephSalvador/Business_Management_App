@@ -217,7 +217,9 @@ void main() {
     expect(find.text('TSh 2,500'), findsOneWidget);
   });
 
-  testWidgets('out-of-stock cached product cannot be added', (tester) async {
+  testWidgets(
+      'advisory stock: zero-stock cached product can still be added to cart',
+      (tester) async {
     final db = LocalDatabase(NativeDatabase.memory());
     final service = LocalSalesService(database: db);
 
@@ -268,8 +270,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    // Out-of-stock cards do not open the cart at all.
-    expect(find.text('1 bidhaa'), findsNothing);
+    // Advisory stock: sales always succeed; product is added to cart
+    expect(find.text('1 bidhaa'), findsOneWidget);
   });
 
   testWidgets(
