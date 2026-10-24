@@ -182,6 +182,8 @@ class SyncEngine {
         return _deliverSale(op, outcome);
       case 'expense.create':
         return _deliverExpense(op, outcome);
+      case 'customer.create':
+        return _deliverCustomerCreate(op, outcome);
       case 'customer.debt_payment':
         return _deliverCustomerDebtPayment(op, outcome);
       case 'inventory.receive':
@@ -344,6 +346,47 @@ class SyncEngine {
 
       await _customerRepository.recordPayment(customerId, amount, description);
       await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverCustomerCreate(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_customerRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final result = await _customerRepository.create(body);
+      final serverId = result['id']?.toString() ?? op.aggregateId;
+      await _salesService.queue.markSynced(op.operationId, serverId);
       outcome.synced++;
       return _DeliveryResult.continue_;
     } on ValidationException catch (error) {

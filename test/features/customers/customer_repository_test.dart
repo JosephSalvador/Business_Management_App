@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jolinx_app/core/config/app_config.dart';
 import 'package:jolinx_app/core/network/app_exception.dart';
 import 'package:jolinx_app/core/network/api_client.dart';
+import 'package:jolinx_app/core/storage/offline_cache_dao.dart';
+import 'package:jolinx_app/core/storage/sync_queue_dao.dart';
 import 'package:jolinx_app/features/customers/data/customer_repository.dart';
 import '../../support/fakes.dart';
 
@@ -132,4 +134,100 @@ void main() {
       );
     });
   });
+
+  group('CustomerRepository offline resilience', () {
+    test('list falls back to cache on network failure and filters by search', () async {
+      final cache = InMemoryOfflineCacheDao();
+      await cache.save('customers_list', {
+        'items': [
+          customerJson('c1', name: 'Mussa Juma'),
+          customerJson('c2', name: 'Baraka Pharmacy'),
+        ],
+        'total': 2,
+      });
+
+      // Network adapter that immediately throws NetworkException
+      final adapter = ScriptedAdapter([
+        ScriptedResponse(503, 'offline', statusMessage: 'Network error'),
+      ]);
+      final repository = CustomerRepository(
+        apiClient: clientWith(adapter),
+        cache: cache,
+      );
+
+      final paged = await repository.list(search: 'Baraka');
+      expect(paged.items, hasLength(1));
+      expect(paged.items.first['name'], 'Baraka Pharmacy');
+      expect(paged.total, 1);
+    });
+
+    test('create generates provisional customer and saves locally when offline', () async {
+      final cache = InMemoryOfflineCacheDao();
+      final queue = InMemorySyncQueueDao();
+
+      final adapter = ScriptedAdapter([
+        ScriptedResponse(503, 'offline'),
+      ]);
+      final repository = CustomerRepository(
+        apiClient: clientWith(adapter),
+        cache: cache,
+        queue: queue,
+      );
+
+      final created = await repository.create({
+        'name': 'Hamisi Bakari',
+        'phone': '+255755123456',
+      });
+
+      expect(created['name'], 'Hamisi Bakari');
+      expect(created['phone'], '+255755123456');
+      expect(created['isOfflinePending'], isTrue);
+      expect(created['id'], isNotEmpty);
+
+      // Verify cached
+      final cached = await cache.load('customer_${created['id']}');
+      expect(cached, isNotNull);
+      expect(cached!['name'], 'Hamisi Bakari');
+    });
+  });
+}
+
+class InMemoryOfflineCacheDao implements OfflineCacheDao {
+  final Map<String, Map<String, dynamic>> store = {};
+
+  @override
+  Future<void> save(String key, Map<String, dynamic> data) async {
+    store[key] = Map<String, dynamic>.from(data);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> load(String key) async => store[key];
+
+  @override
+  Future<void> clear(String key) async {
+    store.remove(key);
+  }
+
+  @override
+  Future<DateTime?> getLastUpdated(String key) async => DateTime.now();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class InMemorySyncQueueDao implements SyncQueueDao {
+  @override
+  Future<void> enqueue({
+    required String operationId,
+    required String tenantId,
+    required String branchId,
+    required String deviceId,
+    required String operationType,
+    required String aggregateType,
+    required String aggregateId,
+    required String payload,
+  }) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

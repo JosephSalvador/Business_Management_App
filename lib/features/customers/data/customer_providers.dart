@@ -13,7 +13,19 @@ export '../application/customers_controller.dart'
 export 'offline_customer_debt_service.dart';
 
 final customerRepositoryProvider = Provider<CustomerRepository>(
-  (ref) => CustomerRepository(apiClient: ref.watch(apiClientProvider)),
+  (ref) {
+    final db = ref.watch(localDatabaseProvider);
+    final cache = ref.watch(offlineCacheDaoProvider);
+    final identity = ref.watch(deviceIdentityProvider);
+    return CustomerRepository(
+      apiClient: ref.watch(apiClientProvider),
+      cache: cache,
+      queue: SyncQueueDao(db),
+      tenantIdOf: () async => ref.read(sessionContextProvider).$1,
+      branchIdOf: () => ref.read(posBranchIdProvider)(),
+      deviceIdOf: () => identity.get(),
+    );
+  },
 );
 
 final offlineCustomerDebtServiceProvider =
