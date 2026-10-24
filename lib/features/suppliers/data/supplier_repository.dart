@@ -1,13 +1,39 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_routes.dart';
 import '../../../core/network/app_exception.dart';
+import '../../../core/storage/offline_cache_dao.dart';
+import '../../../core/storage/sync_queue_dao.dart';
 
 class SupplierRepository {
-  SupplierRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+  SupplierRepository({
+    required ApiClient apiClient,
+    OfflineCacheDao? cache,
+    SyncQueueDao? queue,
+    Future<String?> Function()? tenantIdOf,
+    Future<String?> Function()? branchIdOf,
+    Future<String> Function()? deviceIdOf,
+    Uuid uuid = const Uuid(),
+  })  : _apiClient = apiClient,
+        _cache = cache,
+        _queue = queue,
+        _tenantIdOf = tenantIdOf,
+        _branchIdOf = branchIdOf,
+        _deviceIdOf = deviceIdOf,
+        _uuid = uuid;
 
   final ApiClient _apiClient;
+  final OfflineCacheDao? _cache;
+  final SyncQueueDao? _queue;
+  final Future<String?> Function()? _tenantIdOf;
+  final Future<String?> Function()? _branchIdOf;
+  final Future<String> Function()? _deviceIdOf;
+  final Uuid _uuid;
+
+  static const _cacheKey = 'suppliers_list';
 
   Future<PagedSuppliers> list({
     int page = 1,
@@ -19,46 +45,214 @@ class SupplierRepository {
       'pageSize': pageSize,
       if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
     };
-    final response = await _apiClient.get<dynamic>(
-      ApiRoutes.v1('/suppliers'),
-      query: query,
-    );
-    return _decodePage(response);
+    try {
+      final response = await _apiClient.get<dynamic>(
+        ApiRoutes.v1('/suppliers'),
+        query: query,
+      );
+      final paged = _decodePage(response);
+      if (_cache != null && search == null && page == 1) {
+        await _cache!.save(_cacheKey, {
+          'items': paged.items,
+          'total': paged.total,
+        });
+        for (final s in paged.items) {
+          final id = s['id']?.toString();
+          if (id != null) {
+            await _cache!.save('supplier_$id', s);
+          }
+        }
+      }
+      return paged;
+    } on AppException {
+      if (_cache != null) {
+        final cached = await _cache!.load(_cacheKey);
+        if (cached != null) {
+          var items = (cached['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((raw) => Map<String, dynamic>.from(raw))
+              .toList();
+
+          if (search != null && search.trim().isNotEmpty) {
+            final term = search.trim().toLowerCase();
+            items = items.where((s) {
+              final name = (s['name'] ?? '').toString().toLowerCase();
+              final phone = (s['phone'] ?? '').toString().toLowerCase();
+              return name.contains(term) || phone.contains(term);
+            }).toList();
+          }
+
+          return PagedSuppliers(items: items, total: items.length);
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getById(String id) async {
-    final response = await _apiClient.get<dynamic>(
-      ApiRoutes.v1('/suppliers/$id'),
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    try {
+      final response = await _apiClient.get<dynamic>(
+        ApiRoutes.v1('/suppliers/$id'),
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final data = Map<String, dynamic>.from(response.data as Map);
+      if (_cache != null) {
+        await _cache!.save('supplier_$id', data);
+      }
+      return data;
+    } on AppException {
+      if (_cache != null) {
+        final cached = await _cache!.load('supplier_$id');
+        if (cached != null) return cached;
+        final listCached = await _cache!.load(_cacheKey);
+        if (listCached != null) {
+          final items = (listCached['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((raw) => Map<String, dynamic>.from(raw));
+          final found = items.where((s) => s['id']?.toString() == id);
+          if (found.isNotEmpty) return found.first;
+        }
+      }
+      rethrow;
     }
-    return Map<String, dynamic>.from(response.data as Map);
   }
 
-  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
-    final response = await _apiClient.post<dynamic>(
-      ApiRoutes.v1('/suppliers'),
-      body: body,
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+  Future<Map<String, dynamic>> create(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
+    try {
+      final response = await _apiClient.post<dynamic>(
+        ApiRoutes.v1('/suppliers'),
+        body: body,
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final created = Map<String, dynamic>.from(response.data as Map);
+      if (_cache != null) {
+        await _cache!.save('supplier_${created['id']}', created);
+        await _appendSupplierToCache(created);
+      }
+      return created;
+    } on AppException {
+      if (remoteOnly) rethrow;
+
+      final localId = _uuid.v4();
+      final localSupplier = {
+        'id': localId,
+        'name': body['name'] ?? '',
+        'contactPerson': body['contactPerson'],
+        'phone': body['phone'],
+        'email': body['email'],
+        'address': body['address'],
+        'isOfflinePending': true,
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      };
+
+      if (_cache != null) {
+        await _cache!.save('supplier_$localId', localSupplier);
+        await _appendSupplierToCache(localSupplier);
+      }
+
+      if (_queue != null) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf!()) ?? 'unknown'
+            : 'unknown';
+        final branchId =
+            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+
+        await _queue!.enqueue(
+          operationId: localId,
+          tenantId: tenantId,
+          branchId: branchId,
+          deviceId: deviceId,
+          operationType: 'supplier.create',
+          aggregateType: 'supplier',
+          aggregateId: localId,
+          payload: jsonEncode(body),
+        );
+      }
+
+      return localSupplier;
     }
-    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> _appendSupplierToCache(Map<String, dynamic> supplier) async {
+    if (_cache == null) return;
+    try {
+      final listCached = await _cache!.load(_cacheKey);
+      final items = (listCached?['items'] as List<dynamic>? ?? const [])
+          .whereType<Map<dynamic, dynamic>>()
+          .map((raw) => Map<String, dynamic>.from(raw))
+          .toList();
+      items.removeWhere((s) => s['id'] == supplier['id']);
+      items.insert(0, supplier);
+      await _cache!.save(_cacheKey, {
+        'items': items,
+        'total': items.length,
+      });
+    } catch (_) {}
   }
 
   Future<Map<String, dynamic>> update(
     String id,
-    Map<String, dynamic> body,
-  ) async {
-    final response = await _apiClient.put<dynamic>(
-      ApiRoutes.v1('/suppliers/$id'),
-      body: body,
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
+    try {
+      final response = await _apiClient.put<dynamic>(
+        ApiRoutes.v1('/suppliers/$id'),
+        body: body,
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final updated = Map<String, dynamic>.from(response.data as Map);
+      if (_cache != null) {
+        await _cache!.save('supplier_$id', updated);
+        await _appendSupplierToCache(updated);
+      }
+      return updated;
+    } on AppException {
+      if (remoteOnly) rethrow;
+
+      final updated = {
+        'id': id,
+        ...body,
+        'isOfflinePending': true,
+      };
+
+      if (_cache != null) {
+        await _cache!.save('supplier_$id', updated);
+        await _appendSupplierToCache(updated);
+      }
+
+      if (_queue != null) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf!()) ?? 'unknown'
+            : 'unknown';
+        final branchId =
+            _branchIdOf != null ? (await _branchIdOf!()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf!() : '';
+
+        await _queue!.enqueue(
+          operationId: _uuid.v4(),
+          tenantId: tenantId,
+          branchId: branchId,
+          deviceId: deviceId,
+          operationType: 'supplier.update',
+          aggregateType: 'supplier',
+          aggregateId: id,
+          payload: jsonEncode({'id': id, ...body}),
+        );
+      }
+
+      return updated;
     }
-    return Map<String, dynamic>.from(response.data as Map);
   }
 
   PagedSuppliers _decodePage(Response<dynamic> response) {

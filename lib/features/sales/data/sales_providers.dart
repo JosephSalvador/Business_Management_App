@@ -36,6 +36,10 @@ import '../../inventory/data/inventory_providers.dart'
     show inventoryRepositoryProvider;
 import '../../products/data/product_providers.dart'
     show productRepositoryProvider;
+import '../../suppliers/data/supplier_providers.dart'
+    show supplierRepositoryProvider;
+import '../../purchases/data/purchase_providers.dart'
+    show purchaseRepositoryProvider;
 import 'offline_parked_cart_service.dart';
 import 'offline_sale_recorder.dart';
 import 'offline_shift_register_service.dart';
@@ -79,6 +83,8 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
     inventoryRepository: ref.watch(inventoryRepositoryProvider),
     moneyAccountRepository: ref.watch(moneyAccountRepositoryProvider),
     productRepository: ref.watch(productRepositoryProvider),
+    supplierRepository: ref.watch(supplierRepositoryProvider),
+    purchaseRepository: ref.watch(purchaseRepositoryProvider),
   );
   final monitor = ref.watch(connectivityMonitorProvider.notifier);
   Timer? timer;
