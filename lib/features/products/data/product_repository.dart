@@ -77,16 +77,18 @@ class OpeningStockEntry {
   final String? reason;
   final double? unitCost;
 
-  Map<String, dynamic> toBody() => {
-        'warehouseId': warehouseId,
-        'productId': productId,
-        'quantity': quantity,
-        'unitOfMeasureId': unitOfMeasureId,
-        'effectiveAt': DateTime.now().toUtc().toIso8601String(),
-        if (reason != null && reason.trim().isNotEmpty)
-          'reason': reason.trim(),
-        if (unitCost != null) 'unitCost': unitCost,
-      };
+  Map<String, dynamic> toBody() {
+    final r = reason;
+    return {
+      'warehouseId': warehouseId,
+      'productId': productId,
+      'quantity': quantity,
+      'unitOfMeasureId': unitOfMeasureId,
+      'effectiveAt': DateTime.now().toUtc().toIso8601String(),
+      if (r != null && r.trim().isNotEmpty) 'reason': r.trim(),
+      if (unitCost != null) 'unitCost': unitCost,
+    };
+  }
 }
 
 /// A positive/negative stock movement recorded through the adjustments
@@ -112,17 +114,19 @@ class AdjustStockEntry {
   final String? reasonType;
   final String? idempotencyKey;
 
-  Map<String, dynamic> toBody() => {
-        'warehouseId': warehouseId,
-        'productId': productId,
-        'quantityDelta': quantityDelta,
-        'effectiveAt': DateTime.now().toUtc().toIso8601String(),
-        if (reason != null && reason.trim().isNotEmpty)
-          'reason': reason.trim(),
-        if (unitCost != null) 'unitCost': unitCost,
-        if (reasonType != null && reasonType.trim().isNotEmpty)
-          'reasonType': reasonType.trim(),
-      };
+  Map<String, dynamic> toBody() {
+    final r = reason;
+    final rt = reasonType;
+    return {
+      'warehouseId': warehouseId,
+      'productId': productId,
+      'quantityDelta': quantityDelta,
+      'effectiveAt': DateTime.now().toUtc().toIso8601String(),
+      if (r != null && r.trim().isNotEmpty) 'reason': r.trim(),
+      if (unitCost != null) 'unitCost': unitCost,
+      if (rt != null && rt.trim().isNotEmpty) 'reasonType': rt.trim(),
+    };
+  }
 }
 
 /// Speaks to the existing Business OS catalog, pricing and inventory APIs.

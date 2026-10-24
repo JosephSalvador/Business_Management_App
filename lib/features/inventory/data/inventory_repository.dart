@@ -111,7 +111,7 @@ class InventoryRepository {
     } on AppException {
       if (remoteOnly) rethrow;
       if (_offlineService != null) {
-        await _offlineService!.recordOfflineInboundReceiving(
+        await _offlineService.recordOfflineInboundReceiving(
           productId: entry.productId,
           productName: entry.productId,
           quantity: entry.quantityDelta,
