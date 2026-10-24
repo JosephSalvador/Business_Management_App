@@ -166,7 +166,10 @@ class ExpenseRepository {
     }
   }
 
-  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> create(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     try {
       final response = await _apiClient.post<dynamic>(
         '/api/v1/expenses',
@@ -181,6 +184,7 @@ class ExpenseRepository {
       }
       return created;
     } on AppException catch (e) {
+      if (remoteOnly) rethrow;
       if (_offlineService != null &&
           (e is NetworkException ||
               e is TimeoutException ||

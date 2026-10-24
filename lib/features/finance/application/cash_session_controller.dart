@@ -59,10 +59,12 @@ class CashSessionController extends Notifier<CashSessionState> {
     String sessionId,
     double closingCash,
     String? notes,
-    String accountId,
-  ) async {
+    String accountId, {
+    double? expectedCash,
+  }) async {
     final session = await _repository.closeSession(sessionId, {
       'closingCash': closingCash,
+      if (expectedCash != null) 'expectedCash': expectedCash,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     });
     await load(accountId);

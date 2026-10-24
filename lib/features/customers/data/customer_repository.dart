@@ -138,7 +138,10 @@ class CustomerRepository {
     }
   }
 
-  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> create(
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
     try {
       final response = await _apiClient.post<dynamic>(
         '/api/v1/customers',
@@ -154,6 +157,7 @@ class CustomerRepository {
       }
       return created;
     } on AppException {
+      if (remoteOnly) rethrow;
       // Offline customer creation
       if (_cache != null && _queue != null) {
         final localId = _uuid.v4();
@@ -304,7 +308,11 @@ class CustomerRepository {
   }
 
   Future<Map<String, dynamic>> recordPayment(
-      String customerId, double amount, String description) async {
+    String customerId,
+    double amount,
+    String description, {
+    bool remoteOnly = false,
+  }) async {
     try {
       final response = await _apiClient.post<dynamic>(
         '/api/v1/customers/$customerId/credit/payment',
@@ -315,6 +323,7 @@ class CustomerRepository {
       }
       return Map<String, dynamic>.from(response.data as Map);
     } on AppException {
+      if (remoteOnly) rethrow;
       // Offline debt payment fallback
       if (_queue != null) {
         final paymentId = _uuid.v4();

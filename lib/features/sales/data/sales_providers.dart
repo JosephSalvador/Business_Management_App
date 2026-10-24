@@ -30,6 +30,8 @@ import '../../finance/data/expense_providers.dart'
         expenseRepositoryProvider,
         expensesControllerProvider,
         offlineExpenseServiceProvider;
+import '../../finance/data/money_account_providers.dart'
+    show moneyAccountRepositoryProvider;
 import '../../inventory/data/inventory_providers.dart'
     show inventoryRepositoryProvider;
 import 'offline_parked_cart_service.dart';
@@ -73,6 +75,7 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
     expenseRepository: ref.watch(expenseRepositoryProvider),
     customerRepository: ref.watch(customerRepositoryProvider),
     inventoryRepository: ref.watch(inventoryRepositoryProvider),
+    moneyAccountRepository: ref.watch(moneyAccountRepositoryProvider),
   );
   final monitor = ref.watch(connectivityMonitorProvider.notifier);
   Timer? timer;

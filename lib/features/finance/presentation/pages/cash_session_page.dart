@@ -6,6 +6,7 @@ import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../../l10n/loc.dart';
 import '../../data/money_account_providers.dart';
+import '../../../sales/data/sales_providers.dart';
 
 class CashSessionPage extends ConsumerStatefulWidget {
   const CashSessionPage({super.key, required this.accountId});
@@ -106,80 +107,129 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
     final openedAt =
         openedAtStr.isNotEmpty ? DateTime.tryParse(openedAtStr) : null;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF16A34A).withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF16A34A).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.lock_open,
-                    color: Color(0xFF16A34A),
-                    size: 32,
-                  ),
+    return FutureBuilder<ShiftSummary>(
+      future: ref
+          .read(offlineShiftRegisterServiceProvider)
+          .computeShiftSummary(openingCash: openingCash),
+      builder: (context, snapshot) {
+        final summary = snapshot.data;
+        final expectedCash = summary?.expectedCash ?? openingCash;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A).withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  context.loc.cashOpenBadge,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF16A34A),
-                  ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.lock_open,
+                        color: Color(0xFF16A34A),
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      context.loc.cashOpenBadge,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Kiasi Kilichopo Droo (Kinachotarajiwa)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            formatMoney(expectedCash),
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF16A34A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _summaryRow(context.loc.cashOpeningAmount,
+                        formatMoney(openingCash)),
+                    if (summary != null) ...[
+                      _summaryRow('Mauzo ya Pesa Taslimu (+)',
+                          formatMoney(summary.cashSales),
+                          valueColor: const Color(0xFF16A34A)),
+                      _summaryRow('Marejesho ya Madeni (+)',
+                          formatMoney(summary.debtCashCollected),
+                          valueColor: const Color(0xFF16A34A)),
+                      _summaryRow('Matumizi ya Pesa Taslimu (-)',
+                          formatMoney(summary.cashExpenses),
+                          valueColor: const Color(0xFFDC2626)),
+                    ],
+                    if (openedAt != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        context.loc.cashOpenedAt(DateFormat('dd/MM/yyyy HH:mm')
+                            .format(openedAt.toLocal())),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade500),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  context.loc.cashOpeningAmount,
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  formatMoney(openingCash),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (openedAt != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    context.loc.cashOpenedAt(
-                        DateFormat('dd/MM/yyyy HH:mm').format(openedAt.toLocal())),
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () => _showCloseDialog(context, ref, session),
-              icon: const Icon(Icons.lock, size: 18),
-              label: Text(context.loc.cashCloseSession),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                foregroundColor: Colors.white,
               ),
-            ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showCloseDialog(
+                    context,
+                    ref,
+                    session,
+                    expectedCash: expectedCash,
+                  ),
+                  icon: const Icon(Icons.lock, size: 18),
+                  label: Text(context.loc.cashCloseSession),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -273,7 +323,11 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
   }
 
   void _showCloseDialog(
-      BuildContext context, WidgetRef ref, Map<String, dynamic> session) {
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> session, {
+    double? expectedCash,
+  }) {
     final closingController = TextEditingController();
     final notesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -328,7 +382,7 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
             ),
             ElevatedButton(
               onPressed: saving
-                  ? null
+              ? null
                   : () async {
                       if (!formKey.currentState!.validate()) return;
                       setDialogState(() => saving = true);
@@ -341,6 +395,7 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
                               double.parse(closingController.text.trim()),
                               notesController.text.trim(),
                               widget.accountId,
+                              expectedCash: expectedCash,
                             );
 
                         if (ctx.mounted) Navigator.pop(ctx);
