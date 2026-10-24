@@ -62,6 +62,13 @@ class OfflineSaleRecorder {
     // Stock is advisory and never blocks sales (African retail reality).
     // The server remains the final authority at sync time and supports
     // non-blocking debit / negative balances.
+    for (final line in lines) {
+      if (line.unitPriceOverride != null) {
+        continue;
+      }
+      // Advisory stock check (non-blocking):
+      await _catalogDao.projectedQuantity(tenantId, line.productId);
+    }
 
 
     var subtotal = 0.0;
