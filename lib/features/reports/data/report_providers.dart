@@ -4,13 +4,24 @@ import 'dart:collection';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/di/core_providers.dart'
+    show localSalesServiceProvider, offlineCacheDaoProvider;
+import '../../finance/data/expense_providers.dart'
+    show offlineExpenseServiceProvider;
 import '../application/reports_controller.dart';
 import '../application/top_products_controller.dart';
 import 'report_repository.dart';
 
-final reportRepositoryProvider = Provider<ReportRepository>(
-  (ref) => ReportRepository(apiClient: ref.watch(apiClientProvider)),
-);
+final reportRepositoryProvider = Provider<ReportRepository>((ref) {
+  final salesService = ref.watch(localSalesServiceProvider);
+  return ReportRepository(
+    apiClient: ref.watch(apiClientProvider),
+    salesDao: salesService.sales,
+    catalogDao: salesService.catalog,
+    expenseService: ref.watch(offlineExpenseServiceProvider),
+    cache: ref.watch(offlineCacheDaoProvider),
+  );
+});
 
 final reportsControllerProvider =
     NotifierProvider<ReportsController, ReportsState>(

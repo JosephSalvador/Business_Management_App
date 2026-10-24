@@ -5,6 +5,7 @@ import '../../../../app/router.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../sales/presentation/pages/shift_close_sheet.dart';
 
 class ReportsPage extends StatelessWidget {
   const ReportsPage({super.key});
@@ -103,6 +104,13 @@ class ReportsPage extends StatelessWidget {
                       icon: Icons.leaderboard,
                       color: const Color(0xFF8B5CF6),
                       onTap: () => context.push(Routes.reportsTopProducts),
+                    ),
+                    _ReportCard(
+                      title: 'Z-Report (End of Day)',
+                      subtitle: 'Hesabu ya Siku na Kufunga Shift',
+                      icon: Icons.print,
+                      color: const Color(0xFF0D9488),
+                      onTap: () => showShiftCloseSheet(context),
                     ),
                   ],
                 ),
