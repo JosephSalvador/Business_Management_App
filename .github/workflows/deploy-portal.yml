@@ -72,6 +72,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
         run: |
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "Ensuring Cloudflare Pages project 'jolinx-portal' exists..."
+            npx wrangler pages project create jolinx-portal --production-branch=main 2>&1 || true
+
             echo "Deploying portal/dist to Cloudflare Pages project 'jolinx-portal' (branch: ${{ steps.env.outputs.cf_branch }})..."
             npx wrangler pages deploy portal/dist \
               --project-name=jolinx-portal \
