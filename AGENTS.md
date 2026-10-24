@@ -32,6 +32,6 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 2: Update `_ProductCard`, `_addToCart`, and `_quickQuantity` in `pos_page.dart` to make stock advisory (allow tap, show advisory badge instead of red error/disabled tap).
 - [x] Task 3: Update `test/features/sales/offline_checkout_test.dart` to verify non-blocking advisory stock.
 - [x] Task 4: Increment version code in `pubspec.yaml` (1.0.0+56).
-- [ ] Task 5: Run flutter analyze and flutter test; verify clean passes.
-- [ ] Task 6: Commit and push changes, then trigger `build-clients.yml` to produce the new APK for the user.
+- [x] Task 5: Run flutter analyze and flutter test; verify clean passes.
+- [x] Task 6: Commit and push changes, then trigger `build-clients.yml` to produce the new APK for the user.
 
