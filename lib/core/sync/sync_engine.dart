@@ -206,8 +206,11 @@ class SyncEngine {
       outcome.synced++;
       return _DeliveryResult.continue_;
     } on ValidationException catch (error) {
-      final code =
-          error.message.contains('Insufficient stock') ? 'STOCK' : 'VALIDATION';
+      final code = error.message.contains('Insufficient stock')
+          ? 'STOCK'
+          : error.message.toLowerCase().contains('product not found')
+              ? 'PRODUCT'
+              : 'VALIDATION';
       await _conflict(op, outcome, code, error.message);
       return _DeliveryResult.continue_;
     } on UnauthorizedException {

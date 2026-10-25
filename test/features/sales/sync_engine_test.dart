@@ -240,7 +240,7 @@ void main() {
     test('product deleted while offline → conflict requiring review', () async {
       final id = await recordOfflineSale();
 
-      // Price resolution 404s → the engine conflicts before sending.
+      // The backend rejects the sale when the product no longer exists.
       final repo = _NullPriceRepository();
       final customEngine = SyncEngine(salesService: service, repository: repo);
 
@@ -387,7 +387,7 @@ class _NullPriceRepository extends ServerSimulatingRepository {
     required String idempotencyKey,
   }) async {
     createCalls++;
-    return super.create(body: body, idempotencyKey: idempotencyKey);
+    throw ValidationException('Product not found.');
   }
 }
 
