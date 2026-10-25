@@ -143,7 +143,17 @@ class PurchaseRepository {
         'warehouseId': body['warehouseId'],
         'status': 0, // draft
         'orderDate': DateTime.now().toUtc().toIso8601String(),
-        'items': body['items'] ?? [],
+        'lines': body['lines'] ?? [],
+        'items': body['lines'] ?? [],
+        'totalAmount': (body['lines'] as List<dynamic>? ?? const [])
+            .whereType<Map<dynamic, dynamic>>()
+            .fold<double>(
+              0,
+              (total, line) =>
+                  total +
+                  ((line['quantity'] as num?)?.toDouble() ?? 0) *
+                      ((line['unitPrice'] as num?)?.toDouble() ?? 0),
+            ),
         'isOfflinePending': true,
       };
 

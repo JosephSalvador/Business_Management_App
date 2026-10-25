@@ -137,15 +137,23 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
   }
 
   Widget _buildPurchaseTile(Map<String, dynamic> purchase) {
-    final ref = purchase['reference'] ?? '';
-    final supplierName = purchase['supplierName'] ?? '';
-    final total = (purchase['totalAmount'] ?? 0).toDouble();
-    final status = purchase['status'] ?? '';
-    final dateStr = purchase['orderDate'] ?? '';
-    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
+    final ref = purchase['reference']?.toString() ?? '';
+    final supplierName = purchase['supplierName']?.toString() ?? '';
+    final total = (purchase['totalAmount'] as num?)?.toDouble() ?? 0;
+    final rawStatus = purchase['status']?.toString().toLowerCase() ?? '';
+    final status = switch (rawStatus) {
+      '0' => 'draft',
+      '1' => 'submitted',
+      '2' => 'received',
+      '3' => 'cancelled',
+      _ => rawStatus,
+    };
+    final dateStr = purchase['orderDate']?.toString() ?? '';
+    final date =
+        dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
 
     Color statusColor;
-    switch (status.toLowerCase()) {
+    switch (status) {
       case 'draft':
         statusColor = Colors.grey;
         break;
