@@ -469,6 +469,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const PurchaseFormPage(),
       ),
       GoRoute(
+        path: '/purchases/:id/edit',
+        redirect: (_, __) =>
+            _premiumRouteRedirect(ref, BillingFeatureKeys.purchasing),
+        builder: (_, state) =>
+            PurchaseFormPage(purchaseId: state.pathParameters['id']),
+      ),
+      GoRoute(
         path: '/purchases/:id',
         builder: (_, state) =>
             PurchaseDetailPage(purchaseId: state.pathParameters['id']!),

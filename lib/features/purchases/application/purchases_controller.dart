@@ -73,6 +73,16 @@ class PurchasesController extends Notifier<PurchasesState> {
     await load();
   }
 
+  Future<void> update(String id, Map<String, dynamic> body) async {
+    await _repository.update(id, body);
+    await load();
+  }
+
+  Future<void> receive(String id) async {
+    await _repository.receive(id);
+    await load();
+  }
+
   Future<void> cancel(String id) async {
     await _repository.cancel(id);
     await load();

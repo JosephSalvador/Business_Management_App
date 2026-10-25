@@ -51,6 +51,25 @@ public sealed class CreatePurchaseOrderCommandValidator : AbstractValidator<Crea
     }
 }
 
+public sealed class UpdatePurchaseOrderCommandValidator : AbstractValidator<UpdatePurchaseOrderCommand>
+{
+    public UpdatePurchaseOrderCommandValidator()
+    {
+        RuleFor(x => x.Id).NotEmpty();
+        RuleFor(x => x.SupplierId).NotEmpty();
+        RuleFor(x => x.WarehouseId).NotEmpty();
+        RuleFor(x => x.Reference).MaximumLength(100);
+        RuleFor(x => x.Notes).MaximumLength(2000);
+        RuleFor(x => x.Lines).NotEmpty();
+        RuleForEach(x => x.Lines).ChildRules(line =>
+        {
+            line.RuleFor(l => l.ProductId).NotEmpty();
+            line.RuleFor(l => l.Quantity).GreaterThan(0);
+            line.RuleFor(l => l.UnitPrice).GreaterThanOrEqualTo(0);
+        });
+    }
+}
+
 public sealed class CreateSupplierBillCommandValidator : AbstractValidator<CreateSupplierBillCommand>
 {
     public CreateSupplierBillCommandValidator()

@@ -55,6 +55,9 @@ public static class PurchasingEndpoints
         purchaseOrders.MapPost("/", CreatePurchaseOrderAsync)
             .RequirePermission(PermissionNames.PurchasingManage)
             .WithName("CreatePurchaseOrder");
+        purchaseOrders.MapPut("/{id:guid}", UpdatePurchaseOrderAsync)
+            .RequirePermission(PermissionNames.PurchasingManage)
+            .WithName("UpdatePurchaseOrder");
         purchaseOrders.MapPost("/{id:guid}/submit", SubmitPurchaseOrderAsync)
             .RequirePermission(PermissionNames.PurchasingManage)
             .WithName("SubmitPurchaseOrder");
@@ -165,6 +168,17 @@ public static class PurchasingEndpoints
         CancellationToken cancellationToken)
         => (await sender.Send(new SubmitPurchaseOrderCommand(id), cancellationToken)).ToApiResult();
 
+    private static async Task<IResult> UpdatePurchaseOrderAsync(
+        Guid id,
+        UpdatePurchaseOrderRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(
+            new UpdatePurchaseOrderCommand(
+                id, request.SupplierId, request.WarehouseId, request.BranchId,
+                request.Reference, request.ExpectedDate, request.Notes, request.Lines),
+            cancellationToken)).ToApiResult();
+
     private static async Task<IResult> ReceivePurchaseOrderAsync(
         Guid id,
         ISender sender,
@@ -245,6 +259,15 @@ public static class PurchasingEndpoints
         bool IsActive);
 
     private sealed record CreatePurchaseOrderRequest(
+        Guid SupplierId,
+        Guid WarehouseId,
+        Guid? BranchId,
+        string? Reference,
+        DateTime? ExpectedDate,
+        string? Notes,
+        IReadOnlyList<PurchaseOrderLineInput> Lines);
+
+    private sealed record UpdatePurchaseOrderRequest(
         Guid SupplierId,
         Guid WarehouseId,
         Guid? BranchId,

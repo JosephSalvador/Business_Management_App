@@ -10,6 +10,7 @@ import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../products/application/products_controller.dart';
 import '../../../products/domain/product.dart';
+import '../../data/purchase_providers.dart';
 
 class _PurchaseLineItem {
   final String productId;
@@ -44,7 +45,11 @@ class _PurchaseLineItem {
 }
 
 class PurchaseFormPage extends ConsumerStatefulWidget {
-  const PurchaseFormPage({super.key});
+  const PurchaseFormPage({super.key, this.purchaseId});
+
+  final String? purchaseId;
+
+  bool get isEdit => purchaseId != null;
 
   @override
   ConsumerState<PurchaseFormPage> createState() => _PurchaseFormPageState();
@@ -60,6 +65,8 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
   DateTime? _expectedDate;
   bool _showMoreDetails = false;
   bool _saving = false;
+  bool _loadingExisting = false;
+  bool _loadedExisting = false;
 
   final List<_PurchaseLineItem> _lines = [];
 
@@ -70,6 +77,62 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
       final productsState = ref.read(productsControllerProvider);
       if (productsState is! ProductsLoaded) {
         ref.read(productsControllerProvider.notifier).load();
+      }
+      if (widget.isEdit) {
+        _loadExisting();
+      }
+    });
+  }
+
+  Future<void> _loadExisting() async {
+    setState(() => _loadingExisting = true);
+    try {
+      final purchase = await ref
+          .read(purchaseRepositoryProvider)
+          .getById(widget.purchaseId!);
+      _selectedSupplierId = purchase['supplierId']?.toString();
+      _selectedWarehouseId = purchase['warehouseId']?.toString();
+      _referenceController.text = purchase['reference']?.toString() ?? '';
+      _notesController.text = purchase['notes']?.toString() ?? '';
+      final expected = purchase['expectedDate']?.toString();
+      _expectedDate = expected == null ? null : DateTime.tryParse(expected);
+      final rawLines =
+          (purchase['lines'] ?? purchase['items'] ?? const []) as List<dynamic>;
+      for (final raw in rawLines.whereType<Map<dynamic, dynamic>>()) {
+        final line = Map<String, dynamic>.from(raw);
+        final item = _PurchaseLineItem(
+          productId: line['productId'].toString(),
+          productName:
+              line['productName']?.toString() ?? line['productId'].toString(),
+          sku: line['sku']?.toString(),
+          quantity: (line['quantity'] as num?)?.toInt() ?? 1,
+          unitPrice: (line['unitPrice'] as num?)?.toDouble() ?? 0,
+        );
+        _attachPriceListener(item);
+        _lines.add(item);
+      }
+      if (mounted) {
+        setState(() {
+          _loadedExisting = true;
+          _loadingExisting = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _loadingExisting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Imeshindikana kufungua oda: $error')),
+        );
+      }
+    }
+  }
+
+  void _attachPriceListener(_PurchaseLineItem line) {
+    line.priceController.addListener(() {
+      final parsed =
+          double.tryParse(line.priceController.text.replaceAll(',', '.'));
+      if (parsed != null && parsed != line.unitPrice && mounted) {
+        setState(() => line.unitPrice = parsed);
       }
     });
   }
@@ -114,14 +177,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                 quantity: 1,
                 unitPrice: defaultPrice,
               );
-              newLine.priceController.addListener(() {
-                final parsed = double.tryParse(newLine.priceController.text);
-                if (parsed != null && parsed != newLine.unitPrice) {
-                  setState(() {
-                    newLine.unitPrice = parsed;
-                  });
-                }
-              });
+              _attachPriceListener(newLine);
               _lines.add(newLine);
             }
           });
@@ -165,7 +221,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
 
     setState(() => _saving = true);
     try {
-      await ref.read(purchasesControllerProvider.notifier).create({
+      final body = {
         'supplierId': _selectedSupplierId,
         'warehouseId': _selectedWarehouseId,
         'reference': _referenceController.text.trim().isEmpty
@@ -182,7 +238,14 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
             'unitPrice': l.unitPrice,
           };
         }).toList(),
-      });
+      };
+      if (widget.isEdit) {
+        await ref
+            .read(purchasesControllerProvider.notifier)
+            .update(widget.purchaseId!, body);
+      } else {
+        await ref.read(purchasesControllerProvider.notifier).create(body);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -207,6 +270,10 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
     final theme = Theme.of(context);
     final suppliersAsync = ref.watch(suppliersProvider);
     final warehousesAsync = ref.watch(warehousesProvider);
+
+    if (widget.isEdit && (_loadingExisting || !_loadedExisting)) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     // Auto-select default/first warehouse
     warehousesAsync.whenData((warehouses) {

@@ -94,6 +94,47 @@ public sealed class PurchaseOrder : AggregateRoot
         SubmittedAt = submittedAt;
     }
 
+    public void UpdateDraft(
+        Guid supplierId,
+        Guid warehouseId,
+        Guid? branchId,
+        IEnumerable<(Guid ProductId, decimal Quantity, decimal UnitPrice)> lines,
+        string? reference,
+        DateTime? expectedDate,
+        string? notes)
+    {
+        if (Status != PurchaseOrderStatus.Draft)
+        {
+            throw new InvalidOperationException($"Cannot edit a PO in {Status} status.");
+        }
+
+        if (supplierId == Guid.Empty || warehouseId == Guid.Empty)
+        {
+            throw new ArgumentException("Supplier and warehouse are required.");
+        }
+
+        var lineList = lines.ToList();
+        if (lineList.Count == 0)
+        {
+            throw new ArgumentException("At least one line is required.", nameof(lines));
+        }
+
+        SupplierId = supplierId;
+        WarehouseId = warehouseId;
+        BranchId = branchId;
+        Reference = reference;
+        ExpectedDate = expectedDate;
+        Notes = notes;
+        _lines.Clear();
+        foreach (var line in lineList)
+        {
+            _lines.Add(PurchaseOrderLine.Create(
+                line.ProductId, line.Quantity, line.UnitPrice));
+        }
+
+        TotalAmount = _lines.Sum(l => l.LineTotal);
+    }
+
     public void Receive(DateTime receivedAt)
     {
         if (Status != PurchaseOrderStatus.Submitted)

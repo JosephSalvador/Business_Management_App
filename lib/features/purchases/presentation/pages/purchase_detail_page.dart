@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/providers.dart';
@@ -25,6 +26,16 @@ class PurchaseDetailPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(context.loc.purchasesDetailTitle),
+        actions: [
+          if (detailAsync.valueOrNull?['status']?.toString() == '0' ||
+              detailAsync.valueOrNull?['status']?.toString().toLowerCase() ==
+                  'draft')
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Draft',
+              onPressed: () => context.push('/purchases/$purchaseId/edit'),
+            ),
+        ],
       ),
       body: WaveBackground(
         child: detailAsync.when(
@@ -226,8 +237,23 @@ class PurchaseDetailPage extends ConsumerWidget {
 
   Widget _buildActions(
       BuildContext context, WidgetRef ref, Map<String, dynamic> purchase) {
-    if (_statusLabel(purchase['status']) != 'Draft' ||
-        purchase['isOfflinePending'] == true) {
+    final status = _statusLabel(purchase['status']);
+    if (purchase['isOfflinePending'] == true) {
+      return const SizedBox.shrink();
+    }
+
+    if (status == 'Submitted') {
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: () => _receive(context, ref),
+          icon: const Icon(Icons.inventory_2_outlined),
+          label: const Text('Receive Purchase'),
+        ),
+      );
+    }
+
+    if (status != 'Draft') {
       return const SizedBox.shrink();
     }
 
@@ -298,6 +324,24 @@ class PurchaseDetailPage extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.loc.purchasesCancelled)),
+        );
+        ref.invalidate(purchaseDetailProvider(purchaseId));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.loc.commonWithError(e.toString()))),
+        );
+      }
+    }
+  }
+
+  Future<void> _receive(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(purchasesControllerProvider.notifier).receive(purchaseId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase received and stock updated.')),
         );
         ref.invalidate(purchaseDetailProvider(purchaseId));
       }

@@ -88,6 +88,75 @@ public sealed record CreatePurchaseOrderCommand(
 public sealed record PurchaseOrderLineInput(
     Guid ProductId, decimal Quantity, decimal UnitPrice);
 
+public sealed record UpdatePurchaseOrderCommand(
+    Guid Id,
+    Guid SupplierId,
+    Guid WarehouseId,
+    Guid? BranchId,
+    string? Reference,
+    DateTime? ExpectedDate,
+    string? Notes,
+    IReadOnlyList<PurchaseOrderLineInput> Lines)
+    : IRequest<Result<PurchaseOrderDto>>, IRequiresTenantAdvisoryLock;
+
+public sealed class UpdatePurchaseOrderCommandHandler
+    : IRequestHandler<UpdatePurchaseOrderCommand, Result<PurchaseOrderDto>>
+{
+    private readonly ITenantContext _tenantContext;
+    private readonly IPurchaseOrderRepository _purchaseOrders;
+    private readonly ISupplierRepository _suppliers;
+    private readonly IWarehouseRepository _warehouses;
+    private readonly IProductRepository _products;
+
+    public UpdatePurchaseOrderCommandHandler(
+        ITenantContext tenantContext, IPurchaseOrderRepository purchaseOrders,
+        ISupplierRepository suppliers, IWarehouseRepository warehouses,
+        IProductRepository products)
+    {
+        _tenantContext = tenantContext;
+        _purchaseOrders = purchaseOrders;
+        _suppliers = suppliers;
+        _warehouses = warehouses;
+        _products = products;
+    }
+
+    public async Task<Result<PurchaseOrderDto>> Handle(
+        UpdatePurchaseOrderCommand command, CancellationToken cancellationToken)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var order = await _purchaseOrders.GetByIdAsync(
+            tenantId, command.Id, cancellationToken);
+        if (order is null) return Error.NotFound("Purchase order not found.");
+
+        var supplier = await _suppliers.GetByIdAsync(
+            tenantId, command.SupplierId, cancellationToken);
+        if (supplier is null) return Error.NotFound("Supplier not found.");
+        var warehouse = await _warehouses.GetByIdAsync(
+            tenantId, command.WarehouseId, cancellationToken);
+        if (warehouse is null) return Error.NotFound("Warehouse not found.");
+
+        foreach (var line in command.Lines)
+        {
+            var product = await _products.GetByIdAsync(
+                tenantId, line.ProductId, cancellationToken);
+            if (product is null) return Error.NotFound($"Product {line.ProductId} not found.");
+            if (product.ProductType != ProductType.Product)
+                return Error.Validation("Only physical products can be purchased.");
+        }
+
+        order.UpdateDraft(
+            command.SupplierId, command.WarehouseId, command.BranchId,
+            command.Lines.Select(l => (l.ProductId, l.Quantity, l.UnitPrice)),
+            command.Reference, command.ExpectedDate, command.Notes);
+        await _purchaseOrders.UpdateAsync(order, cancellationToken);
+
+        var lines = order.Lines.Select(l => new PurchaseOrderLineDto(
+            l.Id, l.ProductId, string.Empty, l.Quantity, l.UnitPrice, l.LineTotal));
+        return Result.Success(PurchasingMappers.ToDto(
+            order, supplier.Name, warehouse.Name, lines.ToList()));
+    }
+}
+
 public sealed class CreatePurchaseOrderCommandHandler
     : IRequestHandler<CreatePurchaseOrderCommand, Result<PurchaseOrderDto>>
 {

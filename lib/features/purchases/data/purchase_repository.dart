@@ -225,6 +225,19 @@ class PurchaseRepository {
     );
   }
 
+  Future<void> update(String id, Map<String, dynamic> body) async {
+    await _apiClient.put<dynamic>(
+      ApiRoutes.v1('/purchase-orders/$id'),
+      body: body,
+    );
+  }
+
+  Future<void> receive(String id) async {
+    await _apiClient.post<dynamic>(
+      ApiRoutes.v1('/purchase-orders/$id/receive'),
+    );
+  }
+
   Future<void> cancel(String id) async {
     await _apiClient.post<dynamic>(
       ApiRoutes.v1('/purchase-orders/$id/cancel'),
