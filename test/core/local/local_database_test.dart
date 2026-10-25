@@ -185,9 +185,12 @@ void main() {
       expect(payload['isElectronicPayment'], true);
       expect(
           (payload['lines'] as List).first, containsPair('productId', 'p-1'));
-      // No client-invented prices or tax in the wire body.
-      expect((payload['lines'] as List).first.keys,
-          everyElement(anyOf('productId', 'quantity')));
+      // The replay body carries the cached price so a sale remains
+      // reproducible offline; tax is never added by the client.
+      expect((payload['lines'] as List).first, containsPair('unitPrice', 2500));
+      expect((payload['lines'] as List).first,
+          containsPair('productName', 'Mchele'));
+      expect((payload['lines'] as List).first.keys, isNot(contains('tax')));
     });
 
     test('payload keeps cash non-electronic and stable effectiveAt', () async {

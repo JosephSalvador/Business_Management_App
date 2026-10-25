@@ -156,6 +156,7 @@ class LocalSalesDao {
                 line.unitPriceSnapshot > 0) ...{
               'unitPrice': line.unitPriceOverride ?? line.unitPriceSnapshot,
               'productName': line.productName,
+              if (line.unitPriceOverride != null) 'unitPriceOverride': true,
             },
           },
       ],

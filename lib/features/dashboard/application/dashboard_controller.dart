@@ -5,6 +5,7 @@ import '../../../core/storage/offline_cache_dao.dart';
 import '../../../core/sync/local_sales_service.dart';
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
+import '../../sales/domain/sale.dart';
 import '../data/dashboard_repository.dart';
 import '../presentation/widgets/revenue_line_chart.dart';
 
@@ -254,7 +255,7 @@ class DashboardController extends Notifier<DashboardState> {
       final trendData =
           rawTrend.map((e) => SalesTrendPoint.fromJson(e)).toList();
 
-      final localSales = await _salesService.sales.listSales(limit: 100);
+      final localSales = await _loadLocalSalesSafe(limit: 100);
       final pendingSales =
           localSales.where((sale) => sale.pendingLocally).toList();
 
@@ -409,6 +410,14 @@ class DashboardController extends Notifier<DashboardState> {
                 : 'Imeshindwa kupakia dashibodi.';
         state = DashboardFailure(message);
       }
+    }
+  }
+
+  Future<List<SaleDto>> _loadLocalSalesSafe({required int limit}) async {
+    try {
+      return await _salesService.sales.listSales(limit: limit);
+    } catch (_) {
+      return const [];
     }
   }
 

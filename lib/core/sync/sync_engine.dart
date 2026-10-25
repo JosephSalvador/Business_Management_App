@@ -152,7 +152,7 @@ class SyncEngine {
       for (final raw in body['lines'] as List? ?? []) {
         final line = raw as Map<String, dynamic>;
         final qty = (line['quantity'] as num).toDouble();
-        if (line['unitPrice'] != null) {
+        if (line['unitPriceOverride'] == true) {
           expected += (line['unitPrice'] as num).toDouble() * qty;
           continue;
         }

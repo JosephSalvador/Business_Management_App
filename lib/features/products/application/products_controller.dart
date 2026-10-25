@@ -188,13 +188,17 @@ class ProductsController extends Notifier<ProductsState> {
     double? wholesalePrice,
   }) async {
     Future<void> cacheRetailPrice(String productId, double price) async {
-      final tenantId = ref.read(sessionContextProvider).$1;
-      if (tenantId == null) return;
-      await ref.read(localSalesServiceProvider).catalog.updateRetailPrice(
-            tenantId: tenantId,
-            productId: productId,
-            price: price,
-          );
+      try {
+        final tenantId = ref.read(sessionContextProvider).$1;
+        if (tenantId == null) return;
+        await ref.read(localSalesServiceProvider).catalog.updateRetailPrice(
+              tenantId: tenantId,
+              productId: productId,
+              price: price,
+            );
+      } catch (_) {
+        // Local caching is supplementary; product creation remains successful.
+      }
     }
 
     final product = await _repository.create(draft);
