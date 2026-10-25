@@ -72,6 +72,7 @@ void main() {
               'items': [
                 {'id': 'a1', 'type': 'sale', 'amount': 5000},
                 {'id': 'a2', 'type': 'purchase', 'amount': 12000},
+                {'id': 'a3', 'entityType': 'Command', 'action': 'loadData'},
               ],
             })),
       ]);

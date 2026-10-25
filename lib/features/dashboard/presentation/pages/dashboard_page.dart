@@ -970,14 +970,24 @@ class _ActivityFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleItems = items
+        .where((item) =>
+            (item['entityType'] ?? item['type'] ?? '')
+                .toString()
+                .toLowerCase() !=
+            'command')
+        .toList();
+
     return Card(
       child: Column(
         children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i == 0 || _dateGroup(items[i]) != _dateGroup(items[i - 1]))
-              _ActivityDateHeader(label: _dateGroup(items[i])),
-            _ActivityTile(item: items[i], loc: loc),
-            if (i < items.length - 1) const Divider(height: 1, indent: 72),
+          for (var i = 0; i < visibleItems.length; i++) ...[
+            if (i == 0 ||
+                _dateGroup(visibleItems[i]) != _dateGroup(visibleItems[i - 1]))
+              _ActivityDateHeader(label: _dateGroup(visibleItems[i])),
+            _ActivityTile(item: visibleItems[i], loc: loc),
+            if (i < visibleItems.length - 1)
+              const Divider(height: 1, indent: 72),
           ],
         ],
       ),
@@ -1035,11 +1045,13 @@ class _ActivityTile extends StatelessWidget {
     final status = item['status'] as String?;
     final actor = item['actorEmail'] as String?;
     final occurredAt = item['occurredAt'] as String?;
+    final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
 
     final iconData = _iconForEntityType(entityType);
     final color = _colorForAction(action, status);
     final timeAgo = _relativeTime(occurredAt);
-    final description = _friendlyDescription(action, entityType, entityName);
+    final description =
+        _friendlyDescription(action, entityType, entityName, isSwahili);
 
     return ListTile(
       leading: Container(
@@ -1136,8 +1148,17 @@ class _ActivityTile extends StatelessWidget {
   }
 
   String _friendlyDescription(
-      String action, String entityType, String? entityName) {
-    final entity = entityName ?? _entityLabel(entityType);
+      String action, String entityType, String? entityName, bool isSwahili) {
+    final entity = entityName ?? _entityLabel(entityType, isSwahili);
+    final normalizedEntity = entityType.toLowerCase();
+
+    if (normalizedEntity == 'sale' && action == 'sale') {
+      return isSwahili ? 'Mauzo yamefanyika' : 'Sale recorded';
+    }
+    if (normalizedEntity == 'purchase' && action == 'purchase') {
+      return isSwahili ? 'Ununuzi umefanyika' : 'Purchase recorded';
+    }
+
     if (action.contains('create') || action.contains('add')) {
       return loc.dashboardActivityAdded(entity);
     }
@@ -1150,18 +1171,18 @@ class _ActivityTile extends StatelessWidget {
     return loc.dashboardActivityDefault(action, entity);
   }
 
-  String _entityLabel(String entityType) {
+  String _entityLabel(String entityType, bool isSwahili) {
     switch (entityType.toLowerCase()) {
       case 'sale':
-        return 'Mauzo';
+        return isSwahili ? 'Mauzo' : 'Sales';
       case 'product':
-        return 'Bidhaa';
+        return isSwahili ? 'Bidhaa' : 'Product';
       case 'customer':
-        return 'Mteja';
+        return isSwahili ? 'Mteja' : 'Customer';
       case 'expense':
-        return 'Gharama';
+        return isSwahili ? 'Gharama' : 'Expense';
       case 'purchase':
-        return 'Ununuzi';
+        return isSwahili ? 'Ununuzi' : 'Purchase';
       default:
         return entityType;
     }

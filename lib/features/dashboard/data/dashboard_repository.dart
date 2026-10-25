@@ -75,6 +75,11 @@ class DashboardRepository {
     return rawItems
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
+        .where((item) =>
+            (item['entityType'] ?? item['type'] ?? '')
+                .toString()
+                .toLowerCase() !=
+            'command')
         .toList();
   }
 

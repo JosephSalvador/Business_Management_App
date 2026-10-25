@@ -1473,10 +1473,7 @@ public sealed class DashboardRepository : IDashboardRepository
     {
         var meaningfulTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "Sale", "Product", "Customer", "Expense", "Purchase", "StockMovement", "User", "PriceList",
-
-            // Generic audit rows written by AuditBehavior for every mutation command.
-            "Command"
+            "Sale", "Product", "Customer", "Expense", "Purchase", "StockMovement", "User", "PriceList"
         };
 
         var logs = await _db.AuditLogs
