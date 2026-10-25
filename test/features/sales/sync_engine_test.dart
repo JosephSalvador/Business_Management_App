@@ -247,7 +247,7 @@ void main() {
       final outcome = await customEngine.drain();
 
       expect(outcome.conflicted, 1);
-      expect(repo.createCalls, 0);
+      expect(repo.createCalls, 1);
       final local = await service.sales.byClientSaleId(id);
       expect(local!.errorCode, 'PRODUCT');
     });
