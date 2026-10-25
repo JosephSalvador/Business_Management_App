@@ -27,8 +27,8 @@ class PurchaseDetailPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(context.loc.purchasesDetailTitle),
         actions: [
-          if (detailAsync.valueOrNull?['status']?.toString() == '0' ||
-              detailAsync.valueOrNull?['status']?.toString().toLowerCase() ==
+          if (detailAsync.asData?.value['status']?.toString() == '0' ||
+              detailAsync.asData?.value['status']?.toString().toLowerCase() ==
                   'draft')
             IconButton(
               icon: const Icon(Icons.edit_outlined),

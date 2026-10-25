@@ -16,6 +16,8 @@ class FakePurchaseRepository implements PurchaseRepository {
   Map<String, dynamic>? lastCreateBody;
   String? lastSubmitId;
   String? lastCancelId;
+  String? lastUpdateId;
+  String? lastReceiveId;
 
   @override
   Future<PagedPurchases> list({
@@ -48,6 +50,16 @@ class FakePurchaseRepository implements PurchaseRepository {
   Future<void> cancel(String id) async {
     cancelCallCount++;
     lastCancelId = id;
+  }
+
+  @override
+  Future<void> update(String id, Map<String, dynamic> body) async {
+    lastUpdateId = id;
+  }
+
+  @override
+  Future<void> receive(String id) async {
+    lastReceiveId = id;
   }
 
   @override

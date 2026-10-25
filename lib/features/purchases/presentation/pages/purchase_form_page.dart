@@ -10,7 +10,6 @@ import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../products/application/products_controller.dart';
 import '../../../products/domain/product.dart';
-import '../../data/purchase_providers.dart';
 
 class _PurchaseLineItem {
   final String productId;
