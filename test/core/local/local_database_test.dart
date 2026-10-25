@@ -237,6 +237,7 @@ void main() {
           'quantity': 1.0,
           'unitPrice': 15000.0,
           'productName': 'Uza Haraka',
+          'unitPriceOverride': true,
         },
       ]);
 
