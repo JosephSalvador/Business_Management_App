@@ -118,6 +118,26 @@ jobs:
       - name: Run Automated Flutter Test Guard (POS, Cart, Auth & Offline DB)
         run: flutter test --no-pub
 
+      - name: Configure staging Android signing
+        if: steps.cf_env.outputs.target == 'staging'
+        env:
+          STAGING_KEYSTORE_BASE64: ${{ secrets.STAGING_ANDROID_KEYSTORE_BASE64 }}
+          STAGING_KEYSTORE_PASSWORD: ${{ secrets.STAGING_ANDROID_KEYSTORE_PASSWORD }}
+          STAGING_KEY_ALIAS: ${{ secrets.STAGING_ANDROID_KEY_ALIAS }}
+          STAGING_KEY_PASSWORD: ${{ secrets.STAGING_ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$STAGING_KEYSTORE_BASE64"
+          test -n "$STAGING_KEYSTORE_PASSWORD"
+          test -n "$STAGING_KEY_ALIAS"
+          test -n "$STAGING_KEY_PASSWORD"
+          printf '%s' "$STAGING_KEYSTORE_BASE64" | base64 --decode > android/app/staging-release.keystore
+          cat > android/key.properties <<EOF
+          storeFile=staging-release.keystore
+          storePassword=$STAGING_KEYSTORE_PASSWORD
+          keyAlias=$STAGING_KEY_ALIAS
+          keyPassword=$STAGING_KEY_PASSWORD
+          EOF
+
       - name: Build Android Release APK (arm64)
         run: |
           sed -i '/org.gradle.java.home/d' android/gradle.properties
