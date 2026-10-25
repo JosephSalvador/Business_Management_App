@@ -359,6 +359,35 @@ void main() {
       expect(row.status, SyncOperationStatus.failed);
     });
 
+    test('synced local sales remain completed in the sales history model',
+        () async {
+      final recorded = await sales.recordOfflineSale(
+        tenantId: tenant,
+        branchId: 'b',
+        deviceId: 'd',
+        userId: 'u',
+        paymentMethod: 0,
+        subtotalEstimate: 0,
+        taxEstimate: 0,
+        totalEstimate: 5,
+        lines: [line()],
+      );
+
+      await sales.markSynced(
+        clientSaleId: recorded.clientSaleId,
+        serverSaleId: 'server-sale-id',
+        serverNumber: 'R-001',
+      );
+
+      final history = await sales.listSales();
+      final synced = history.singleWhere(
+        (sale) => sale.id == 'server-sale-id',
+      );
+      expect(synced.status, 0);
+      expect(synced.isVoided, isFalse);
+      expect(synced.number, 'R-001');
+    });
+
     test('stale syncing ops recover to pending after crash', () async {
       final recorded = await sales.recordOfflineSale(
         tenantId: tenant,

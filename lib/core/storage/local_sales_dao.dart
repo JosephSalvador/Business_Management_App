@@ -290,7 +290,9 @@ class LocalSalesDao {
         id: sale.serverSaleId ?? sale.clientSaleId,
         number: sale.serverNumber ??
             (sale.status == LocalSaleStatus.pending ? 'OFFLINE' : ''),
-        status: sale.status,
+        // LocalSaleStatus is a sync lifecycle, not the backend SaleStatus.
+        // A locally synced sale is still a completed sale, not a voided one.
+        status: 0,
         saleDate: sale.effectiveAt,
         currency: sale.currency,
         subtotal: sale.subtotalEstimate,
