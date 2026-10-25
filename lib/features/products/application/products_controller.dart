@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/storage/cached_catalog_dao.dart' show LocalProductCodes;
+import '../../../core/storage/cached_catalog_dao.dart';
 import '../../../core/storage/local_database.dart' show CachedProductsCompanion;
 import '../data/product_repository.dart';
 import '../domain/catalog.dart';
@@ -110,7 +111,13 @@ class ProductsController extends Notifier<ProductsState> {
             (stock[balance.productId] ?? 0) + balance.quantity;
       }
     } on AppException {
-      // Stock badges are optional decoration on this screen.
+      final tenantId = ref.read(sessionContextProvider).$1;
+      if (tenantId != null) {
+        stock = await ref
+            .read(localSalesServiceProvider)
+            .catalog
+            .projectedQuantities(tenantId);
+      }
     }
 
     if (_search.isEmpty) {
@@ -135,25 +142,22 @@ class ProductsController extends Notifier<ProductsState> {
       if (tenantId == null || products.isEmpty) return;
       final dao = ref.read(localSalesServiceProvider).catalog;
       final now = DateTime.now().toUtc();
-      dao.replaceProductsOnly(
-        tenantId: tenantId,
-        products: [
-          for (final p in products)
-            CachedProductsCompanion.insert(
-              tenantId: tenantId,
-              productId: p.id,
-              name: p.name,
-              sku: Value(p.sku),
-              barcode: Value(p.barcode),
-              status: p.status,
-              sellable: p.status == LocalProductCodes.statusActive,
-              productType: p.productType,
-              retailPrice: prices[p.id] ?? (p.costPrice ?? 0),
-              currency: 'TZS',
-              fetchedAt: now,
-            ),
-        ],
-      ).then((_) {
+      Future.wait([
+        for (final p in products)
+          dao.upsertProduct(CachedProductsCompanion.insert(
+            tenantId: tenantId,
+            productId: p.id,
+            name: p.name,
+            sku: Value(p.sku),
+            barcode: Value(p.barcode),
+            status: p.status,
+            sellable: p.status == LocalProductCodes.statusActive,
+            productType: p.productType,
+            retailPrice: prices[p.id] ?? (p.costPrice ?? 0),
+            currency: 'TZS',
+            fetchedAt: now,
+          )),
+      ]).then((_) {
         try {
           ref.read(posCatalogControllerProvider.notifier).load();
         } catch (_) {}
@@ -183,6 +187,16 @@ class ProductsController extends Notifier<ProductsState> {
     double? sellingPrice, {
     double? wholesalePrice,
   }) async {
+    Future<void> cacheRetailPrice(String productId, double price) async {
+      final tenantId = ref.read(sessionContextProvider).$1;
+      if (tenantId == null) return;
+      await ref.read(localSalesServiceProvider).catalog.updateRetailPrice(
+            tenantId: tenantId,
+            productId: productId,
+            price: price,
+          );
+    }
+
     final product = await _repository.create(draft);
     if (sellingPrice != null || wholesalePrice != null) {
       await _ensureDefaultPriceList();
@@ -194,6 +208,7 @@ class ProductsController extends Notifier<ProductsState> {
         price: sellingPrice,
         priceType: _retailPriceType,
       );
+      await cacheRetailPrice(product.id, sellingPrice);
     }
     if (wholesalePrice != null &&
         wholesalePrice > 0 &&
@@ -205,6 +220,7 @@ class ProductsController extends Notifier<ProductsState> {
         priceType: _wholesalePriceType,
       );
     }
+
     await load();
     return product;
   }

@@ -84,7 +84,8 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
   double get _grandTotal =>
       _lines.fold<double>(0.0, (sum, line) => sum + line.subtotal);
 
-  int get _totalUnits => _lines.fold<int>(0, (sum, line) => sum + line.quantity);
+  int get _totalUnits =>
+      _lines.fold<int>(0, (sum, line) => sum + line.quantity);
 
   void _openProductPicker() {
     showModalBottomSheet<void>(
@@ -208,6 +209,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
     });
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(loc.purchasesAdd),
       ),
@@ -291,9 +293,8 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                           initialValue: _selectedWarehouseId,
                           decoration: InputDecoration(
                             labelText: loc.purchasesOffice,
-                            prefixIcon: const Icon(
-                                Icons.warehouse_outlined,
-                                size: 20),
+                            prefixIcon:
+                                const Icon(Icons.warehouse_outlined, size: 20),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -395,7 +396,8 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                         decoration: InputDecoration(
                           labelText: loc.purchasesNotes,
                           hintText: 'Maelezo yoyote kuhusu ununuzi huu...',
-                          prefixIcon: const Icon(Icons.notes_outlined, size: 20),
+                          prefixIcon:
+                              const Icon(Icons.notes_outlined, size: 20),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -585,12 +587,12 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                             ),
                           ),
                           icon: _saving
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 18,
                                   height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white,
+                                    color: theme.colorScheme.onPrimary,
                                   ),
                                 )
                               : const Icon(Icons.check_circle_outline),
@@ -829,8 +831,7 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.add_shopping_cart,
-                      color: AppColors.primary),
+                  const Icon(Icons.add_shopping_cart, color: AppColors.primary),
                   const SizedBox(width: 8),
                   Text(
                     'Chagua Bidhaa ya Kuagiza',
@@ -868,7 +869,8 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   isDense: true,
                 ),
-                onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                onChanged: (v) =>
+                    setState(() => _query = v.trim().toLowerCase()),
               ),
             ),
             const Divider(height: 12),
@@ -914,8 +916,7 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
                                       ? 'Hakuna bidhaa zilizosajiliwa'
                                       : 'Hakuna bidhaa inayoendana na "$_query"',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      color: Colors.grey.shade600),
+                                  style: TextStyle(color: Colors.grey.shade600),
                                 ),
                               ],
                             ),

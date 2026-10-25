@@ -126,7 +126,8 @@ class SyncQueueDao {
           ..where((t) =>
               t.operationType.equals(operationType) & t.status.equals(status))
           ..orderBy([
-            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
+            (t) =>
+                OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
           ])
           ..limit(limit))
         .get();
@@ -191,6 +192,56 @@ class SyncQueueDao {
       lastAttemptAt: Value(now),
       updatedAt: Value(now),
     ));
+  }
+
+  Future<void> remapProductId({
+    required String localProductId,
+    required String serverProductId,
+  }) async {
+    final rows = await (_db.select(_db.syncQueue)
+          ..where((t) =>
+              t.status.equals(SyncOperationStatus.pending) |
+              t.status.equals(SyncOperationStatus.syncing)))
+        .get();
+    for (final row in rows) {
+      Map<String, dynamic> payload;
+      try {
+        payload = jsonDecode(row.payload) as Map<String, dynamic>;
+      } catch (_) {
+        continue;
+      }
+      var changed = false;
+      void replace(dynamic value) {
+        if (value is Map<String, dynamic>) {
+          for (final entry in value.entries) {
+            if ((entry.key == 'productId' || entry.key == 'id') &&
+                entry.value == localProductId &&
+                entry.key == 'productId') {
+              value[entry.key] = serverProductId;
+              changed = true;
+            } else {
+              replace(entry.value);
+            }
+          }
+        } else if (value is List) {
+          for (final item in value) {
+            replace(item);
+          }
+        }
+      }
+
+      replace(payload);
+      if (changed || row.aggregateId == localProductId) {
+        await (_db.update(_db.syncQueue)
+              ..where((t) => t.operationId.equals(row.operationId)))
+            .write(SyncQueueCompanion(
+          payload: Value(jsonEncode(payload)),
+          aggregateId: row.aggregateId == localProductId
+              ? Value(serverProductId)
+              : const Value.absent(),
+        ));
+      }
+    }
   }
 
   /// Terminal states — kept forever for auditability (M5 rule 9).

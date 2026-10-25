@@ -148,7 +148,8 @@ class _DashboardBody extends StatelessWidget {
                 color: AppColors.resolveCardBackground(context),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: AppColors.resolveOutline(context).withValues(alpha: 0.4),
+                  color:
+                      AppColors.resolveOutline(context).withValues(alpha: 0.4),
                 ),
               ),
               child: Row(
@@ -415,7 +416,8 @@ class _GreetingHeader extends StatelessWidget {
                     height: 12,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isOnline ? const Color(0xFF00E676) : AppColors.error,
+                      color:
+                          isOnline ? const Color(0xFF00E676) : AppColors.error,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
                   ),
@@ -453,7 +455,7 @@ class _GreetingHeader extends StatelessWidget {
               color: Colors.white,
               letterSpacing: -0.3,
             ),
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
@@ -874,8 +876,7 @@ class _LowStockCards extends StatelessWidget {
     return Column(
       children: items.map((item) {
         final name = item['productName'] ?? item['name'] ?? '';
-        final qty =
-            (item['onHand'] ?? item['quantity'] ?? 0).toDouble();
+        final qty = (item['onHand'] ?? item['quantity'] ?? 0).toDouble();
         final stockLevel = qty <= 0 ? 0.0 : (qty / 10).clamp(0.0, 1.0);
 
         final color = qty <= 0
@@ -973,13 +974,51 @@ class _ActivityFeed extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < items.length; i++) ...[
+            if (i == 0 || _dateGroup(items[i]) != _dateGroup(items[i - 1]))
+              _ActivityDateHeader(label: _dateGroup(items[i])),
             _ActivityTile(item: items[i], loc: loc),
-            if (i < items.length - 1) const Divider(height: 1, indent: 56),
+            if (i < items.length - 1) const Divider(height: 1, indent: 72),
           ],
         ],
       ),
     );
   }
+
+  String _dateGroup(Map<String, dynamic> item) {
+    final raw = item['occurredAt']?.toString();
+    if (raw == null) return 'Activity';
+    final date = DateTime.tryParse(raw)?.toLocal();
+    if (date == null) return 'Activity';
+    final today = DateTime.now();
+    final current = DateTime(today.year, today.month, today.day);
+    final itemDay = DateTime(date.year, date.month, date.day);
+    final days = current.difference(itemDay).inDays;
+    if (days == 0) return 'Today';
+    if (days == 1) return 'Yesterday';
+    return DateFormat('d MMM yyyy').format(date);
+  }
+}
+
+class _ActivityDateHeader extends StatelessWidget {
+  const _ActivityDateHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: AppColors.resolveTextTertiary(context),
+            ),
+          ),
+        ),
+      );
 }
 
 class _ActivityTile extends StatelessWidget {
@@ -994,6 +1033,7 @@ class _ActivityTile extends StatelessWidget {
     final entityName = item['entityName'] as String?;
     final amount = item['amount'] as num?;
     final status = item['status'] as String?;
+    final actor = item['actorEmail'] as String?;
     final occurredAt = item['occurredAt'] as String?;
 
     final iconData = _iconForEntityType(entityType);
@@ -1022,7 +1062,7 @@ class _ActivityTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: _buildSubtitle(context, amount, status, action),
+      subtitle: _buildSubtitle(context, amount, status, action, actor),
       trailing: timeAgo != null
           ? Text(
               timeAgo,
@@ -1035,14 +1075,17 @@ class _ActivityTile extends StatelessWidget {
     );
   }
 
-  Widget? _buildSubtitle(
-      BuildContext context, num? amount, String? status, String action) {
+  Widget? _buildSubtitle(BuildContext context, num? amount, String? status,
+      String action, String? actor) {
     final parts = <String>[];
     if (amount != null && amount > 0) {
       parts.add(formatMoney(amount.toDouble()));
     }
     if (status != null && status.isNotEmpty) {
       parts.add(status);
+    }
+    if (actor != null && actor.isNotEmpty) {
+      parts.add('By ${actor.split('@').first}');
     }
     if (parts.isEmpty) return null;
     return Text(

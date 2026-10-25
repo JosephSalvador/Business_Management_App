@@ -5,6 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_routes.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/storage/offline_cache_dao.dart';
+import '../../../core/storage/cached_catalog_dao.dart';
 import '../../../core/storage/sync_queue_dao.dart';
 
 class PurchaseRepository {
@@ -12,6 +13,7 @@ class PurchaseRepository {
     required ApiClient apiClient,
     OfflineCacheDao? cache,
     SyncQueueDao? queue,
+    CachedCatalogDao? catalogDao,
     Future<String?> Function()? tenantIdOf,
     Future<String?> Function()? branchIdOf,
     Future<String> Function()? deviceIdOf,
@@ -19,6 +21,7 @@ class PurchaseRepository {
   })  : _apiClient = apiClient,
         _cache = cache,
         _queue = queue,
+        _catalogDao = catalogDao,
         _tenantIdOf = tenantIdOf,
         _branchIdOf = branchIdOf,
         _deviceIdOf = deviceIdOf,
@@ -27,6 +30,7 @@ class PurchaseRepository {
   final ApiClient _apiClient;
   final OfflineCacheDao? _cache;
   final SyncQueueDao? _queue;
+  final CachedCatalogDao? _catalogDao;
   final Future<String?> Function()? _tenantIdOf;
   final Future<String?> Function()? _branchIdOf;
   final Future<String> Function()? _deviceIdOf;
@@ -166,6 +170,24 @@ class PurchaseRepository {
           aggregateId: localId,
           payload: jsonEncode(body),
         );
+      }
+      if (_catalogDao != null) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf()) ?? 'unknown'
+            : 'unknown';
+        final warehouseId = body['warehouseId']?.toString() ?? '*';
+        for (final rawLine in (body['lines'] as List<dynamic>? ?? const [])) {
+          if (rawLine is! Map) continue;
+          final productId = rawLine['productId']?.toString();
+          final quantity = (rawLine['quantity'] as num?)?.toDouble();
+          if (productId == null || quantity == null || quantity <= 0) continue;
+          await _catalogDao.incrementCachedStock(
+            tenantId: tenantId,
+            productId: productId,
+            warehouseId: warehouseId,
+            quantity: quantity,
+          );
+        }
       }
     }
   }

@@ -313,6 +313,63 @@ class CachedCatalogDao {
     await _db.into(_db.cachedProducts).insertOnConflictUpdate(product);
   }
 
+  Future<void> updateRetailPrice({
+    required String tenantId,
+    required String productId,
+    required double price,
+  }) async {
+    await (_db.update(_db.cachedProducts)
+          ..where((t) =>
+              t.tenantId.equals(tenantId) & t.productId.equals(productId)))
+        .write(CachedProductsCompanion(
+      retailPrice: Value(price),
+      fetchedAt: Value(DateTime.now().toUtc()),
+    ));
+  }
+
+  Future<void> remapProductId({
+    required String tenantId,
+    required String localProductId,
+    required String serverProductId,
+  }) async {
+    final products = await byId(tenantId, localProductId);
+    if (products != null) {
+      await upsertProduct(CachedProductsCompanion.insert(
+        tenantId: tenantId,
+        productId: serverProductId,
+        name: products.name,
+        sku: Value(products.sku),
+        barcode: Value(products.barcode),
+        retailPrice: products.retailPrice,
+        currency: products.currency,
+        status: products.status,
+        sellable: products.sellable,
+        productType: products.productType,
+        fetchedAt: products.fetchedAt,
+      ));
+    }
+    final stock = await (_db.select(_db.cachedStock)
+          ..where((t) =>
+              t.tenantId.equals(tenantId) & t.productId.equals(localProductId)))
+        .get();
+    for (final row in stock) {
+      await incrementCachedStock(
+        tenantId: tenantId,
+        productId: serverProductId,
+        warehouseId: row.warehouseId,
+        quantity: row.quantity,
+      );
+    }
+    await (_db.delete(_db.cachedStock)
+          ..where((t) =>
+              t.tenantId.equals(tenantId) & t.productId.equals(localProductId)))
+        .go();
+    await (_db.delete(_db.cachedProducts)
+          ..where((t) =>
+              t.tenantId.equals(tenantId) & t.productId.equals(localProductId)))
+        .go();
+  }
+
   /// When the product catalog was last fully replaced via [replaceCatalog].
   /// (`replaceStockBalances` stamps its own `last_stock_refresh` key.)
   Future<DateTime?> lastRefresh() async {

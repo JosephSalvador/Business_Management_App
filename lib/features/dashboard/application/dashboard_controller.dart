@@ -2,7 +2,6 @@ import 'dart:async' as async;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/core_providers.dart' show offlineCacheDaoProvider;
 import '../../../core/storage/offline_cache_dao.dart';
-import '../../../core/storage/tables.dart' show LocalSaleStatus;
 import '../../../core/sync/local_sales_service.dart';
 import '../../../app/providers.dart';
 import '../../../core/network/app_exception.dart';
@@ -187,20 +186,23 @@ class DashboardController extends Notifier<DashboardState> {
       }
       final sortedProducts = productMap.entries.toList()
         ..sort((a, b) => b.value.$2.compareTo(a.value.$2));
-      final topProducts = sortedProducts.take(5).map((e) => {
-            'productName': e.key,
-            'quantity': e.value.$1,
-            'revenue': e.value.$2,
-          }).toList();
+      final topProducts = sortedProducts
+          .take(5)
+          .map((e) => {
+                'productName': e.key,
+                'quantity': e.value.$1,
+                'revenue': e.value.$2,
+              })
+          .toList();
 
       // Fallbacks from cache if available
       final cachedSummary = cached?['summary'] != null
           ? DashboardSummary.fromJson(
               cached!['summary'] as Map<String, dynamic>)
           : null;
-      final cachedLowStock = (cached?['lowStock'] as List?)
-              ?.cast<Map<String, dynamic>>() ??
-          const <Map<String, dynamic>>[];
+      final cachedLowStock =
+          (cached?['lowStock'] as List?)?.cast<Map<String, dynamic>>() ??
+              const <Map<String, dynamic>>[];
 
       final summary = DashboardSummary(
         branchName: cachedSummary?.branchName ?? 'Duka Langu',
@@ -252,24 +254,53 @@ class DashboardController extends Notifier<DashboardState> {
       final trendData =
           rawTrend.map((e) => SalesTrendPoint.fromJson(e)).toList();
 
-      // Incorporate local pending sales from today for instant UI reflection
+      final localSales = await _salesService.sales.listSales(limit: 100);
+      final pendingSales =
+          localSales.where((sale) => sale.pendingLocally).toList();
+
+      // Keep local pending sales visible until the server confirms them.
       var pendingRevenue = 0.0;
       var pendingCount = 0;
       try {
-        final pendingSales =
-            await _salesService.sales.byStatus(LocalSaleStatus.pending);
         final now = DateTime.now();
         final todayStart = DateTime(now.year, now.month, now.day);
         final todayEnd = todayStart.add(const Duration(days: 1));
         for (final s in pendingSales) {
-          final localEffective = s.effectiveAt.toLocal();
+          final localEffective = s.saleDate.toLocal();
           if (localEffective.isAfter(todayStart) &&
               localEffective.isBefore(todayEnd)) {
-            pendingRevenue += s.totalEstimate;
+            pendingRevenue += s.totalAmount;
             pendingCount += 1;
           }
         }
       } catch (_) {}
+
+      final mergedActivity = [
+        ...pendingSales.take(5).map((sale) => {
+              'action': 'sale',
+              'entityType': 'sale',
+              'entityName': 'Receipt ${sale.number}',
+              'amount': sale.totalAmount,
+              'status': 'Pending sync',
+              'occurredAt': sale.saleDate.toIso8601String(),
+            }),
+        ...recentActivity,
+      ];
+      final mergedTopProducts = <String, Map<String, dynamic>>{
+        for (final item in topProducts)
+          (item['productName'] ?? item['name'] ?? '').toString(): item,
+      };
+      for (final sale in pendingSales) {
+        for (final line in sale.lines) {
+          final name = line.productName;
+          final current = mergedTopProducts[name];
+          mergedTopProducts[name] = {
+            'productName': name,
+            'quantity': (current?['quantity'] as num? ?? 0) + line.quantity,
+            'revenue': (current?['revenue'] as num? ?? 0) + line.lineTotal,
+          };
+        }
+      }
 
       final effectiveSummary = pendingRevenue > 0
           ? DashboardSummary(
@@ -302,9 +333,9 @@ class DashboardController extends Notifier<DashboardState> {
       state = DashboardLoaded(
         summary: effectiveSummary,
         lowStock: lowStock,
-        recentActivity: recentActivity,
+        recentActivity: mergedActivity,
         trendData: trendData,
-        topProducts: topProducts,
+        topProducts: mergedTopProducts.values.take(5).toList(),
         isFromCache: false,
         lastUpdated: DateTime.now(),
       );
@@ -314,9 +345,9 @@ class DashboardController extends Notifier<DashboardState> {
         await _cacheDao.save('dashboard', {
           'summary': effectiveSummary.toJson(),
           'lowStock': lowStock,
-          'recentActivity': recentActivity,
+          'recentActivity': mergedActivity,
           'trendData': trendData.map((e) => e.toJson()).toList(),
-          'topProducts': topProducts,
+          'topProducts': mergedTopProducts.values.take(5).toList(),
         });
       } catch (_) {}
     } catch (error) {
@@ -383,9 +414,7 @@ class DashboardController extends Notifier<DashboardState> {
 
   Future<List<Map<String, dynamic>>> _loadLowStockSafe() async {
     try {
-      return await _repository
-          .lowStock()
-          .timeout(const Duration(seconds: 10));
+      return await _repository.lowStock().timeout(const Duration(seconds: 10));
     } catch (_) {
       return const [];
     }

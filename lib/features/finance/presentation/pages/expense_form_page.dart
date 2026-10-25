@@ -79,7 +79,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       if (mounted) {
         _descriptionController.text = expense['description'] ?? '';
         _amountController.text = (expense['amount'] ?? 0).toString();
-        _paymentMethodController.text = expense['paymentMethod'] ?? 'Pesa Taslimu';
+        _paymentMethodController.text =
+            expense['paymentMethod'] ?? 'Pesa Taslimu';
         _referenceController.text = expense['reference'] ?? '';
         _notesController.text = expense['notes'] ?? '';
         _categoryId = expense['categoryId'] as String? ?? '';
@@ -87,7 +88,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         if (dateStr != null) {
           _expenseDate = DateTime.parse(dateStr).toLocal();
         }
-        if (_referenceController.text.isNotEmpty || _notesController.text.isNotEmpty) {
+        if (_referenceController.text.isNotEmpty ||
+            _notesController.text.isNotEmpty) {
           _showMoreDetails = true;
         }
         setState(() => _loading = false);
@@ -115,7 +117,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   void _addQuickAmount(int value) {
     final current = double.tryParse(_amountController.text) ?? 0.0;
     final updated = current + value;
-    _amountController.text = updated % 1 == 0 ? updated.toInt().toString() : updated.toStringAsFixed(0);
+    _amountController.text = updated % 1 == 0
+        ? updated.toInt().toString()
+        : updated.toStringAsFixed(0);
     setState(() {});
   }
 
@@ -126,6 +130,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(isEdit ? loc.expenseEditTitle : loc.expenseAddTitle),
         actions: [
@@ -143,14 +148,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             : Form(
                 key: _formKey,
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   children: [
                     // ── Amount Card (Hero) ──────────────────────────
                     Card(
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                            color: theme.colorScheme.outlineVariant
+                                .withValues(alpha: 0.5)),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -168,16 +176,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _amountController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
                               style: theme.textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.primary,
                               ),
                               decoration: InputDecoration(
                                 prefixText: 'TSh  ',
-                                prefixStyle: theme.textTheme.headlineSmall?.copyWith(
+                                prefixStyle:
+                                    theme.textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.resolveTextSecondary(context),
+                                  color:
+                                      AppColors.resolveTextSecondary(context),
                                 ),
                                 hintText: '0',
                                 border: InputBorder.none,
@@ -200,10 +212,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               runSpacing: 6,
                               children: _quickAmounts.map((val) {
                                 return ActionChip(
-                                  label: Text('+${formatMoney(val.toDouble())}'),
-                                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                  backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  label:
+                                      Text('+${formatMoney(val.toDouble())}'),
+                                  labelStyle: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
+                                  backgroundColor: theme
+                                      .colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.5),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   onPressed: () => _addQuickAmount(val),
                                 );
                               }).toList(),
@@ -219,7 +237,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                            color: theme.colorScheme.outlineVariant
+                                .withValues(alpha: 0.5)),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -239,9 +259,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               controller: _descriptionController,
                               textCapitalization: TextCapitalization.sentences,
                               decoration: InputDecoration(
-                                hintText: 'Mfano: Kodi ya mwezi, Luku ya duka...',
+                                hintText:
+                                    'Mfano: Kodi ya mwezi, Luku ya duka...',
                                 filled: true,
-                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                fillColor: theme
+                                    .colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.3),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                   borderSide: BorderSide.none,
@@ -269,7 +292,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                 return ActionChip(
                                   label: Text(suggestion),
                                   labelStyle: const TextStyle(fontSize: 12),
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   onPressed: () {
                                     setState(() {
                                       _descriptionController.text = suggestion;
@@ -289,7 +313,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                            color: theme.colorScheme.outlineVariant
+                                .withValues(alpha: 0.5)),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -303,7 +329,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                 Text(
                                   loc.expenseCategory,
                                   style: theme.textTheme.labelLarge?.copyWith(
-                                    color: AppColors.resolveTextSecondary(context),
+                                    color:
+                                        AppColors.resolveTextSecondary(context),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -331,7 +358,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               data: (cats) {
                                 final allCats = [
                                   if (_createdCategory != null &&
-                                      !cats.any((c) => c.id == _createdCategory!.id))
+                                      !cats.any(
+                                          (c) => c.id == _createdCategory!.id))
                                     _createdCategory!,
                                   ...cats,
                                 ];
@@ -344,7 +372,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                       label: Text(loc.expenseCategoryNone),
                                       selected: _categoryId.isEmpty,
                                       onSelected: (selected) {
-                                        if (selected) setState(() => _categoryId = '');
+                                        if (selected) {
+                                          setState(() => _categoryId = '');
+                                        }
                                       },
                                     ),
                                     ...allCats.map((cat) {
@@ -353,7 +383,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                         label: Text(cat.name),
                                         selected: isSelected,
                                         onSelected: (selected) {
-                                          setState(() => _categoryId = selected ? cat.id : '');
+                                          setState(() => _categoryId =
+                                              selected ? cat.id : '');
                                         },
                                       );
                                     }),
@@ -366,14 +397,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                   child: SizedBox(
                                     height: 18,
                                     width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   ),
                                 ),
                               ),
                               error: (_, __) => OutlinedButton.icon(
                                 icon: const Icon(Icons.refresh),
                                 label: Text(loc.commonRetry),
-                                onPressed: () => ref.invalidate(expenseCategoriesProvider),
+                                onPressed: () =>
+                                    ref.invalidate(expenseCategoriesProvider),
                               ),
                             ),
                           ],
@@ -387,7 +420,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                            color: theme.colorScheme.outlineVariant
+                                .withValues(alpha: 0.5)),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -407,13 +442,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               spacing: 8,
                               runSpacing: 8,
                               children: _paymentMethods.map((method) {
-                                final isSelected = _paymentMethodController.text == method;
+                                final isSelected =
+                                    _paymentMethodController.text == method;
                                 return ChoiceChip(
-                                  label: Text(storedPaymentMethodLabel(loc, method)),
+                                  label: Text(
+                                      storedPaymentMethodLabel(loc, method)),
                                   selected: isSelected,
                                   onSelected: (selected) {
                                     if (selected) {
-                                      setState(() => _paymentMethodController.text = method);
+                                      setState(() => _paymentMethodController
+                                          .text = method);
                                     }
                                   },
                                 );
@@ -425,20 +463,24 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               leading: Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
+                                child: const Icon(Icons.calendar_month,
+                                    color: AppColors.primary, size: 20),
                               ),
                               title: Text(
                                 loc.expenseDate,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
                                 DateFormat('dd/MM/yyyy').format(_expenseDate),
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: AppColors.resolveTextSecondary(context),
+                                  color:
+                                      AppColors.resolveTextSecondary(context),
                                 ),
                               ),
                               trailing: const Icon(Icons.chevron_right),
@@ -455,16 +497,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                            color: theme.colorScheme.outlineVariant
+                                .withValues(alpha: 0.5)),
                       ),
                       color: theme.colorScheme.surface,
                       child: ExpansionTile(
                         initiallyExpanded: _showMoreDetails,
                         shape: const Border(),
-                        leading: const Icon(Icons.more_horiz, color: AppColors.primary),
+                        leading: const Icon(Icons.more_horiz,
+                            color: AppColors.primary),
                         title: const Text(
                           'Maelezo Zaidi (Hiari)',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
                           'Namba ya risiti, kumbukumbu, au dokezo',
@@ -484,7 +530,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     labelText: loc.expenseReference,
                                     hintText: 'Namba ya risiti au rejea',
                                     filled: true,
-                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                    fillColor: theme
+                                        .colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.3),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(10),
                                       borderSide: BorderSide.none,
@@ -497,9 +545,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                   controller: _notesController,
                                   decoration: InputDecoration(
                                     labelText: loc.expenseNotes,
-                                    hintText: 'Maelezo ya ziada kuhusu gharama hii...',
+                                    hintText:
+                                        'Maelezo ya ziada kuhusu gharama hii...',
                                     filled: true,
-                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                    fillColor: theme
+                                        .colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.3),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(10),
                                       borderSide: BorderSide.none,
@@ -527,18 +578,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                       onPressed: _saving ? null : _save,
                       icon: _saving
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: theme.colorScheme.onPrimary,
                               ),
                             )
                           : const Icon(Icons.check_circle_outline),
                       label: Text(
                         isEdit ? loc.commonSave : loc.expenseAdd,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
                     const SizedBox(height: 32),

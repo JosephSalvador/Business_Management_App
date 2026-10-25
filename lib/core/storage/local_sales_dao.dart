@@ -152,8 +152,9 @@ class LocalSalesDao {
           {
             'productId': line.productId,
             'quantity': line.quantity,
-            if (line.unitPriceOverride != null) ...{
-              'unitPrice': line.unitPriceOverride,
+            if (line.unitPriceOverride != null ||
+                line.unitPriceSnapshot > 0) ...{
+              'unitPrice': line.unitPriceOverride ?? line.unitPriceSnapshot,
               'productName': line.productName,
             },
           },
@@ -269,10 +270,14 @@ class LocalSalesDao {
     }
     if (search != null && search.trim().isNotEmpty) {
       final term = '%${search.trim()}%';
-      query = query..where((t) => t.serverNumber.like(term) | t.clientSaleId.like(term));
+      query = query
+        ..where((t) => t.serverNumber.like(term) | t.clientSaleId.like(term));
     }
     final rows = await (query
-          ..orderBy([(t) => OrderingTerm(expression: t.effectiveAt, mode: OrderingMode.desc)])
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.effectiveAt, mode: OrderingMode.desc)
+          ])
           ..limit(limit))
         .get();
 
@@ -282,7 +287,8 @@ class LocalSalesDao {
       final payments = await paymentsOf(sale.clientSaleId);
       result.add(SaleDto(
         id: sale.serverSaleId ?? sale.clientSaleId,
-        number: sale.serverNumber ?? (sale.status == LocalSaleStatus.pending ? 'OFFLINE' : ''),
+        number: sale.serverNumber ??
+            (sale.status == LocalSaleStatus.pending ? 'OFFLINE' : ''),
         status: sale.status,
         saleDate: sale.effectiveAt,
         currency: sale.currency,
@@ -309,14 +315,14 @@ class LocalSalesDao {
         ],
         payments: [
           for (final p in payments)
-            SalePaymentData(method: p.method, amount: p.amount, reference: p.reference),
+            SalePaymentData(
+                method: p.method, amount: p.amount, reference: p.reference),
         ],
         pendingLocally: sale.status == LocalSaleStatus.pending,
       ));
     }
     return result;
   }
-
 
   Future<List<LocalSale>> byStatus(int status, {int limit = 100}) {
     return (_db.select(_db.localSales)

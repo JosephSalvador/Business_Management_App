@@ -245,8 +245,7 @@ class SyncEngine {
           final realQuickSaleId =
               await _repository.getOrCreateQuickSaleProduct();
           for (final line in lines) {
-            if (line['productId'] ==
-                QuickSaleDefaults.provisionalProductId) {
+            if (line['productId'] == QuickSaleDefaults.provisionalProductId) {
               line['productId'] = realQuickSaleId;
             }
           }
@@ -551,9 +550,10 @@ class SyncEngine {
     }
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
-      final quantity = (body['quantityDelta'] ?? body['adjustmentQuantity'] as num?)
-              ?.toDouble() ??
-          0.0;
+      final quantity =
+          (body['quantityDelta'] ?? body['adjustmentQuantity'] as num?)
+                  ?.toDouble() ??
+              0.0;
       final reasonText = body['reason']?.toString() ?? 'Inbound Receiving';
       final notesText = body['notes']?.toString();
       final combinedReason = (notesText != null && notesText.trim().isNotEmpty)
@@ -620,6 +620,16 @@ class SyncEngine {
         costPrice: (body['costPrice'] as num?)?.toDouble(),
       );
       final result = await _productRepository.create(draft, remoteOnly: true);
+      final tenantId = op.tenantId;
+      await _salesService.catalog.remapProductId(
+        tenantId: tenantId,
+        localProductId: op.aggregateId,
+        serverProductId: result.id,
+      );
+      await _salesService.queue.remapProductId(
+        localProductId: op.aggregateId,
+        serverProductId: result.id,
+      );
       await _salesService.queue.markSynced(op.operationId, result.id);
       outcome.synced++;
       return _DeliveryResult.continue_;

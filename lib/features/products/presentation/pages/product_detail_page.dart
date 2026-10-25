@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/providers.dart';
-import '../../../../core/network/api_routes.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
@@ -45,12 +44,9 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
     setState(() => _loading = true);
 
     try {
-      final client = ref.read(apiClientProvider);
-
-      final productResult = await client.get(
-        ApiRoutes.v1('/products/${widget.productId}'),
-      );
-      final product = productResult.data as Map<String, dynamic>;
+      final productModel =
+          await ref.read(productRepositoryProvider).getById(widget.productId);
+      final product = productModel.toJson();
 
       if (!mounted) return;
 
@@ -58,34 +54,17 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
       int lowStockCount = 0;
       int zeroStockCount = 0;
       try {
-        final stockResult = await client.get(
-          ApiRoutes.v1('/inventory/stock'),
-          query: {
-            'page': 1,
-            'pageSize': 250,
-            'search': product['name'] ?? '',
-          },
-        );
-        final stockData = stockResult.data;
-        List<dynamic> items;
-        if (stockData is Map<String, dynamic>) {
-          items = (stockData['items'] as List<dynamic>?) ?? [];
-        } else if (stockData is List<dynamic>) {
-          items = stockData;
-        } else {
-          items = [];
-        }
-        final pid = widget.productId.toLowerCase();
-        for (final item in items) {
-          final ipid = ((item['productId'] ?? '') as String).toLowerCase();
-          if (ipid == pid) {
-            final qty = ((item['quantity'] ?? 0) as num).toInt();
-            totalStock += qty;
-            if (qty <= 0) {
-              zeroStockCount++;
-            } else if (qty < 10) {
-              lowStockCount++;
-            }
+        final tenantId = ref.read(sessionContextProvider).$1;
+        if (tenantId != null) {
+          final quantity = await ref
+              .read(localSalesServiceProvider)
+              .catalog
+              .projectedQuantity(tenantId, widget.productId);
+          totalStock = quantity.toInt();
+          if (quantity <= 0) {
+            zeroStockCount = 1;
+          } else if (quantity < 10) {
+            lowStockCount = 1;
           }
         }
       } catch (_) {}
@@ -95,71 +74,19 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
       double retailPrice = 0;
       double wholesalePrice = 0;
       try {
-        final priceListsResult = await client.get(ApiRoutes.v1('/price-lists'));
-        final priceLists = (priceListsResult.data as List<dynamic>?) ?? [];
-        String? defaultPriceListId;
-        for (final pl in priceLists) {
-          if (pl['isDefault'] == true) {
-            defaultPriceListId = pl['id'] as String?;
-            break;
-          }
-        }
-        if (defaultPriceListId != null) {
-          final pricesResult = await client.get(
-            ApiRoutes.v1('/price-lists/$defaultPriceListId/prices'),
-          );
-          final prices = (pricesResult.data as List<dynamic>?) ?? [];
-          for (final p in prices) {
-            if (p['productId'] == widget.productId) {
-              final price = (p['price'] ?? 0).toDouble();
-              final priceType = p['priceType'] ?? 0;
-              if (priceType == 0) {
-                retailPrice = price;
-              } else if (priceType == 1) {
-                wholesalePrice = price;
-              }
-            }
-          }
-        }
+        final catalogProduct =
+            await ref.read(localSalesServiceProvider).catalog.byId(
+                  ref.read(sessionContextProvider).$1 ?? 'unknown',
+                  widget.productId,
+                );
+        retailPrice = catalogProduct?.retailPrice ?? 0;
       } catch (_) {}
 
       if (!mounted) return;
 
-      String categoryName = '-';
-      String brandName = '-';
-      String unitName = '-';
-      try {
-        final catId = product['categoryId'] as String?;
-        if (catId != null) {
-          final r = await client.get(ApiRoutes.v1('/categories'));
-          for (final c in (r.data as List<dynamic>?) ?? []) {
-            if (c['id'] == catId) {
-              categoryName = (c['name'] ?? '-') as String;
-              break;
-            }
-          }
-        }
-        final brandId = product['brandId'] as String?;
-        if (brandId != null) {
-          final r = await client.get(ApiRoutes.v1('/brands'));
-          for (final b in (r.data as List<dynamic>?) ?? []) {
-            if (b['id'] == brandId) {
-              brandName = (b['name'] ?? '-') as String;
-              break;
-            }
-          }
-        }
-        final unitId = product['unitOfMeasureId'] as String?;
-        if (unitId != null) {
-          final r = await client.get(ApiRoutes.v1('/units'));
-          for (final u in (r.data as List<dynamic>?) ?? []) {
-            if (u['id'] == unitId) {
-              unitName = (u['name'] ?? '-') as String;
-              break;
-            }
-          }
-        }
-      } catch (_) {}
+      const categoryName = '-';
+      const brandName = '-';
+      const unitName = '-';
 
       if (!mounted) return;
 
@@ -237,7 +164,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
       height: 120,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),

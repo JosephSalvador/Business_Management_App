@@ -7,6 +7,7 @@ import 'purchase_repository.dart';
 import '../../../core/di/core_providers.dart'
     show localDatabaseProvider, offlineCacheDaoProvider, deviceIdentityProvider;
 import '../../../core/storage/sync_queue_dao.dart';
+import '../../../core/storage/cached_catalog_dao.dart';
 import '../../sales/data/sales_providers.dart';
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>(
@@ -18,6 +19,7 @@ final purchaseRepositoryProvider = Provider<PurchaseRepository>(
       apiClient: ref.watch(apiClientProvider),
       cache: cache,
       queue: SyncQueueDao(db),
+      catalogDao: CachedCatalogDao(db),
       tenantIdOf: () async => ref.read(sessionContextProvider).$1,
       branchIdOf: () => ref.read(posBranchIdProvider)(),
       deviceIdOf: () => identity.get(),
