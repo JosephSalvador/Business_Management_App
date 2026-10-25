@@ -288,19 +288,20 @@ void main() {
     });
   });
 
-  group('price drift protection (M5.12 CASE 5)', () {
-    test('price changed at server → conflict PRICE, sale not sent', () async {
+  group('offline device pricing', () {
+    test('offline price is accepted even when the server price changed',
+        () async {
       final id = await recordOfflineSale(); // snapshot 2500 × 2 = 5000 paid
       final repo = _PricedRepository(3000);
       final customEngine = SyncEngine(salesService: service, repository: repo);
 
       final outcome = await customEngine.drain();
 
-      expect(outcome.conflicted, 1);
-      expect(repo.createCalls, 0,
-          reason: 'must not silently charge the customer more');
+      expect(outcome.synced, 1);
+      expect(repo.createCalls, 1,
+          reason: 'the device is the source of truth for the completed sale');
       final local = await service.sales.byClientSaleId(id);
-      expect(local!.errorCode, 'PRICE');
+      expect(local!.status, LocalSaleStatus.synced);
     });
 
     test('unchanged price sends normally', () async {

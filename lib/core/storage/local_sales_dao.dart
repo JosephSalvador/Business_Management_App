@@ -152,12 +152,9 @@ class LocalSalesDao {
           {
             'productId': line.productId,
             'quantity': line.quantity,
-            if (line.unitPriceOverride != null ||
-                line.unitPriceSnapshot > 0) ...{
-              'unitPrice': line.unitPriceOverride ?? line.unitPriceSnapshot,
-              'productName': line.productName,
-              if (line.unitPriceOverride != null) 'unitPriceOverride': true,
-            },
+            'unitPrice': line.unitPriceOverride ?? line.unitPriceSnapshot,
+            'productName': line.productName,
+            'unitPriceOverride': true,
           },
       ],
       'payments': [

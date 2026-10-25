@@ -105,13 +105,6 @@ class SyncEngine {
           break;
         }
 
-        // Price sanity before sending: the offline sale charged the cached
-        // shelf price; if the server would resolve a different price now the
-        // customer's transaction must NOT be silently altered (M5.12 CASE 5).
-        if (!await _pricesStillMatch(op, outcome)) {
-          continue;
-        }
-
         final delivered = await _deliver(op, outcome);
         if (delivered == _DeliveryResult.stop) {
           break;
@@ -124,69 +117,6 @@ class SyncEngine {
       await onDrained?.call(outcome);
     }
     return outcome;
-  }
-
-  Future<bool> _pricesStillMatch(
-    QueuedOperation op,
-    SyncOutcome outcome,
-  ) async {
-    if (op.operationType != 'sale.create') {
-      return true;
-    }
-
-    try {
-      final body = jsonDecode(op.payload) as Map<String, dynamic>;
-      final branchId = body['branchId'] as String?;
-      final payments = body['payments'] as List?;
-      final paidAmount = (payments != null && payments.isNotEmpty)
-          ? (payments.first['amount'] as num?)?.toDouble()
-          : null;
-      if (branchId == null || paidAmount == null) {
-        return true;
-      }
-      final localSale =
-          await _salesService.sales.byClientSaleId(op.aggregateId);
-      final targetTotal = localSale?.totalEstimate ?? paidAmount;
-
-      var expected = 0.0;
-      for (final raw in body['lines'] as List? ?? []) {
-        final line = raw as Map<String, dynamic>;
-        final qty = (line['quantity'] as num).toDouble();
-        if (line['unitPriceOverride'] == true) {
-          expected += (line['unitPrice'] as num).toDouble() * qty;
-          continue;
-        }
-        final resolved = await _repository.resolvePrice(
-          line['productId'] as String,
-          quantity: qty,
-          branchId: branchId,
-        );
-        if (resolved == null) {
-          await _conflict(
-            op,
-            outcome,
-            'PRODUCT',
-            'Bidhaa haipatikani tena kwenye mfumo.',
-          );
-          return false;
-        }
-        expected += resolved.price * qty;
-      }
-      if ((expected - targetTotal).abs() > 0.01) {
-        await _conflict(
-          op,
-          outcome,
-          'PRICE',
-          'Bei imebadilika kwenye mfumo. Muamala unahitaji kuangaliwa.',
-        );
-        return false;
-      }
-      return true;
-    } on AppException {
-      return true;
-    } catch (_) {
-      return true;
-    }
   }
 
   Future<_DeliveryResult> _deliver(
