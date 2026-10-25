@@ -17,6 +17,7 @@ class _PurchaseLineItem {
   final String? sku;
   int quantity;
   double unitPrice;
+  final TextEditingController quantityController;
   final TextEditingController priceController;
 
   _PurchaseLineItem({
@@ -25,7 +26,8 @@ class _PurchaseLineItem {
     this.sku,
     this.quantity = 1,
     this.unitPrice = 0.0,
-  }) : priceController = TextEditingController(
+  })  : quantityController = TextEditingController(text: quantity.toString()),
+        priceController = TextEditingController(
           text: unitPrice > 0
               ? (unitPrice % 1 == 0
                   ? unitPrice.toInt().toString()
@@ -36,6 +38,7 @@ class _PurchaseLineItem {
   double get subtotal => quantity * unitPrice;
 
   void dispose() {
+    quantityController.dispose();
     priceController.dispose();
   }
 }
@@ -148,6 +151,16 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
         SnackBar(content: Text(loc.purchasesLinesRequired)),
       );
       return;
+    }
+    for (final line in _lines) {
+      final quantity = int.tryParse(line.quantityController.text);
+      if (quantity == null || quantity <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Weka kiasi halali cha bidhaa zote.')),
+        );
+        return;
+      }
+      line.quantity = quantity;
     }
 
     setState(() => _saving = true);
@@ -520,6 +533,15 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                   onQuantityChanged: (newQty) {
                     setState(() {
                       line.quantity = newQty;
+                      final text = newQty.toString();
+                      if (line.quantityController.text != text) {
+                        line.quantityController.value =
+                            line.quantityController.value.copyWith(
+                          text: text,
+                          selection:
+                              TextSelection.collapsed(offset: text.length),
+                        );
+                      }
                     });
                   },
                   onDelete: () {
@@ -708,12 +730,24 @@ class _OrderLineCard extends StatelessWidget {
                             : null,
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Text(
-                          '${line.quantity}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: SizedBox(
+                          width: 42,
+                          child: TextField(
+                            controller: line.quantityController,
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onChanged: (value) {
+                              final parsed = int.tryParse(value);
+                              if (parsed != null && parsed > 0) {
+                                onQuantityChanged(parsed);
+                              }
+                            },
                           ),
                         ),
                       ),

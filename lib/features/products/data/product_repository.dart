@@ -553,19 +553,46 @@ class ProductRepository {
   /// Active warehouses for the tenant. The default "Main Store" created during
   /// business setup arrives first in practice; callers should not care.
   Future<List<Warehouse>> warehouses() async {
-    final response = await _apiClient.get<dynamic>(
-      '/api/v1/warehouses',
-      query: const {'page': 1, 'pageSize': 50},
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    try {
+      final response = await _apiClient.get<dynamic>(
+        '/api/v1/warehouses',
+        query: const {'page': 1, 'pageSize': 50},
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final doc = Map<String, dynamic>.from(response.data as Map);
+      final items = (doc['items'] as List<dynamic>? ?? const [])
+          .whereType<Map<dynamic, dynamic>>()
+          .map((raw) => Warehouse.fromJson(Map<String, dynamic>.from(raw)))
+          .toList(growable: false);
+      if (_cache != null) {
+        await _cache.save(
+          'warehouses_list',
+          {
+            'items': items
+                .map((warehouse) => {
+                      'id': warehouse.id,
+                      'name': warehouse.name,
+                      'code': warehouse.code,
+                    })
+                .toList(),
+          },
+        );
+      }
+      return items;
+    } on AppException {
+      if (_cache != null) {
+        final cached = await _cache.load('warehouses_list');
+        if (cached != null) {
+          return (cached['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((raw) => Warehouse.fromJson(Map<String, dynamic>.from(raw)))
+              .toList(growable: false);
+        }
+      }
+      return const [];
     }
-    final doc = Map<String, dynamic>.from(response.data as Map);
-    final items = (doc['items'] as List<dynamic>? ?? const [])
-        .whereType<Map<dynamic, dynamic>>()
-        .map((raw) => Warehouse.fromJson(Map<String, dynamic>.from(raw)))
-        .toList(growable: false);
-    return items;
   }
 
   /// Stock balances across all locations (first page, generous size) used for

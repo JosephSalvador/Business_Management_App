@@ -231,13 +231,19 @@ class PurchaseRepository {
         query: {'page': page, 'pageSize': pageSize},
       );
       final paged = _decodeSuppliers(response);
+      final pending = await _cachedPendingSuppliers();
+      final serverIds = paged.items.map((item) => item['id']).toSet();
+      final mergedItems = [
+        ...pending.where((item) => !serverIds.contains(item['id'])),
+        ...paged.items,
+      ];
       if (_cache != null) {
         await _cache.save('suppliers_list', {
-          'items': paged.items,
-          'total': paged.total,
+          'items': mergedItems,
+          'total': mergedItems.length,
         });
       }
-      return paged;
+      return PagedSuppliers(items: mergedItems, total: mergedItems.length);
     } on AppException {
       if (_cache != null) {
         final cached = await _cache.load('suppliers_list');
@@ -251,6 +257,17 @@ class PurchaseRepository {
       }
       return const PagedSuppliers(items: [], total: 0);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _cachedPendingSuppliers() async {
+    if (_cache == null) return const [];
+    final cached = await _cache.load('suppliers_list');
+    final items = (cached?['items'] as List<dynamic>? ?? const [])
+        .whereType<Map<dynamic, dynamic>>()
+        .map((raw) => Map<String, dynamic>.from(raw))
+        .where((item) => item['isOfflinePending'] == true)
+        .toList(growable: false);
+    return items;
   }
 
   Future<List<Map<String, dynamic>>> warehouses() async {

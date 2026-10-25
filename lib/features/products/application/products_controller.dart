@@ -110,6 +110,15 @@ class ProductsController extends Notifier<ProductsState> {
         stock[balance.productId] =
             (stock[balance.productId] ?? 0) + balance.quantity;
       }
+      if (balances.isEmpty && page.items.isNotEmpty) {
+        final tenantId = ref.read(sessionContextProvider).$1;
+        if (tenantId != null) {
+          stock = await ref
+              .read(localSalesServiceProvider)
+              .catalog
+              .projectedQuantities(tenantId);
+        }
+      }
     } on AppException {
       final tenantId = ref.read(sessionContextProvider).$1;
       if (tenantId != null) {

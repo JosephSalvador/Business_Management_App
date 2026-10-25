@@ -95,6 +95,8 @@ class CatalogController extends Notifier<CatalogState> {
           await _repository.createUnit(unit.name, unit.abbreviation);
         } on ConflictException {
           // Another session created it first — fine, it exists now.
+        } on AppException {
+          // Offline creation can proceed with the fallback unit list.
         }
       }
     }
