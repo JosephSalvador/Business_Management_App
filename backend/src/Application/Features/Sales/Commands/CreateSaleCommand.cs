@@ -2,7 +2,6 @@ using BusinessOS.Application.Features.Receipts.Services;
 using BusinessOS.Application.Features.Sales.Dtos;
 using BusinessOS.Application.Ports;
 using BusinessOS.Application.Sales;
-using BusinessOS.Application.Tax;
 using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Crm;
 using BusinessOS.Domain.Inventory;
@@ -22,7 +21,6 @@ public sealed record CreateSaleCommand(
     SaleSource Source,
     DateTime EffectiveAt,
     bool IsElectronicPayment,
-    bool? IsVatRegistered,
     string? CustomerName,
     string? CustomerPhone,
     string? CustomerTin,
@@ -33,23 +31,19 @@ public sealed record CreateSaleCommand(
 
 /// <summary>
 /// Records a completed sale against the real product/price/stock foundation. The server
-/// re-resolves price, tax and stock on the first arrival only: a replay of the same
+/// re-resolves price and stock on the first arrival only: a replay of the same
 /// <see cref="CreateSaleCommand.ClientSaleId"/> returns the original sale with no new stock,
 /// numbering, or event work (idempotency key, unique per tenant). All money is server-computed
 /// from resolved lines; the header is a dumb aggregator and must reconcile exactly.
 /// </summary>
 public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand, Result<SaleDto>>
 {
-    private const string DefaultTaxCategoryCode = "VAT_STANDARD";
-
     private readonly ITenantContext _tenantContext;
     private readonly IBranchRepository _branches;
     private readonly IWarehouseRepository _warehouses;
     private readonly IProductRepository _products;
     private readonly IUnitOfMeasureRepository _unitsOfMeasure;
     private readonly IPriceListRepository _priceLists;
-    private readonly ITaxRuleRepository _taxRules;
-    private readonly ITaxEngine _taxEngine;
     private readonly ISaleRepository _sales;
     private readonly INumberSequenceRepository _numberSequences;
     private readonly SaleStockDebitService _stockDebit;
@@ -63,8 +57,6 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         IProductRepository products,
         IUnitOfMeasureRepository unitsOfMeasure,
         IPriceListRepository priceLists,
-        ITaxRuleRepository taxRules,
-        ITaxEngine taxEngine,
         ISaleRepository sales,
         INumberSequenceRepository numberSequences,
         SaleStockDebitService stockDebit,
@@ -77,8 +69,6 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         _products = products;
         _unitsOfMeasure = unitsOfMeasure;
         _priceLists = priceLists;
-        _taxRules = taxRules;
-        _taxEngine = taxEngine;
         _sales = sales;
         _numberSequences = numberSequences;
         _stockDebit = stockDebit;
@@ -150,8 +140,6 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         var products = new List<Product>(command.Lines.Count);
         var prices = new ResolvedPrice[command.Lines.Count];
         var debitsStock = new bool[command.Lines.Count];
-        var itemIds = new Guid[command.Lines.Count];
-        var taxItems = new List<TaxCalculationLineItem>(command.Lines.Count);
         var onDate = command.EffectiveAt;
 
         var productIds = command.Lines.Select(l => l.ProductId).Distinct();
@@ -194,26 +182,7 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             products.Add(product);
             prices[i] = price;
             debitsStock[i] = product.ProductType == ProductType.Product;
-            itemIds[i] = itemId;
-            taxItems.Add(new TaxCalculationLineItem(
-                itemId,
-                await ResolveTaxCategoryCodeAsync(product, cancellationToken),
-                price.Price,
-                input.Quantity,
-                IsPriceTaxInclusive: true));
         }
-
-        var taxResult = await _taxEngine.CalculateAsync(new TaxCalculationContext(
-            tenantId,
-            branch.Id,
-            onDate,
-            CustomerId: null,
-            priceList.Currency,
-            command.IsElectronicPayment,
-            command.CustomerTin,
-            command.IsVatRegistered,
-            taxItems), cancellationToken);
-        var snapshotByItemId = taxResult.Lines.ToDictionary(s => s.ItemId);
 
         var unitOfMeasureNameById = await ResolveUnitOfMeasureNamesAsync(
             tenantId, products, cancellationToken);
@@ -225,7 +194,6 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             var input = command.Lines[i];
             var product = products[i];
             var price = prices[i];
-            var snapshot = snapshotByItemId[itemIds[i]];
             var variant = input.VariantId.HasValue
                 ? product.Variants.FirstOrDefault(v => v.Id == input.VariantId.Value)
                 : null;
@@ -247,12 +215,12 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
                 input.Quantity,
                 price.Price,
                 input.DiscountAmount,
-                snapshot.TaxCode,
-                snapshot.AppliedRate,
-                snapshot.AppliedRuleId,
-                snapshot.BaseAmount,
-                snapshot.TaxAmount,
-                snapshot.LineTotal,
+                "NONE",
+                0m,
+                null,
+                gross,
+                0m,
+                gross,
                 orderIndex: i,
                 unitCost: product.CostPrice));
 
@@ -260,7 +228,6 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         }
 
         var subtotal = saleLines.Sum(l => Round(l.UnitPrice * l.Quantity));
-        var taxAmount = saleLines.Sum(l => l.TaxAmount);
         var totalAmount = saleLines.Sum(l => l.LineTotal - l.DiscountAmount);
 
         var payments = command.Payments
@@ -299,10 +266,10 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
             command.CustomerId,
             command.CustomerName,
             command.CustomerTin,
-            command.IsVatRegistered,
+            null,
             subtotal,
             discountTotal,
-            taxAmount,
+            0m,
             totalAmount,
             amountPaid,
             Math.Max(0m, amountPaid - totalAmount),
@@ -414,27 +381,6 @@ private async Task<ResolvedPrice?> ResolvePriceAsync(
     return PriceResolver.Resolve(
         candidates, product.Id, input.VariantId, branchId, PriceType.Retail, input.Quantity, onDate);
 }
-
-    private readonly Dictionary<Guid, string> _taxCategoryCache = new();
-
-    private async Task<string> ResolveTaxCategoryCodeAsync(
-        Product product, CancellationToken cancellationToken)
-    {
-        if (!product.TaxCategoryId.HasValue)
-        {
-            return DefaultTaxCategoryCode;
-        }
-
-        if (_taxCategoryCache.TryGetValue(product.TaxCategoryId.Value, out var cachedCode))
-        {
-            return cachedCode;
-        }
-
-        var category = await _taxRules.GetCategoryByIdAsync(product.TaxCategoryId.Value, cancellationToken);
-        var code = category?.Code ?? DefaultTaxCategoryCode;
-        _taxCategoryCache[product.TaxCategoryId.Value] = code;
-        return code;
-    }
 
     private async Task<IReadOnlyDictionary<Guid, string?>> ResolveUnitOfMeasureNamesAsync(
         Guid tenantId, IReadOnlyCollection<Product> products, CancellationToken cancellationToken)

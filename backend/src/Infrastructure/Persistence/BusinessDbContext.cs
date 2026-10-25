@@ -1099,7 +1099,6 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.Property(i => i.Currency).IsRequired().HasMaxLength(3);
                 entity.Property(i => i.Status).IsRequired();
                 entity.Property(i => i.Subtotal).IsRequired().HasColumnType("decimal(18,2)");
-                entity.Property(i => i.TaxAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.TotalAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.AmountPaid).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.PaymentMethod).HasMaxLength(50);
@@ -1121,9 +1120,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.Property(l => l.Description).IsRequired().HasMaxLength(500);
                 entity.Property(l => l.Quantity).IsRequired().HasColumnType("decimal(18,4)");
                 entity.Property(l => l.UnitPrice).IsRequired().HasColumnType("decimal(18,2)");
-                entity.Property(l => l.TaxRatePercent).IsRequired().HasColumnType("decimal(9,4)");
                 entity.Property(l => l.LineTotal).IsRequired().HasColumnType("decimal(18,2)");
-                entity.Property(l => l.TaxAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.HasIndex(l => l.CustomerInvoiceId);
             });
 

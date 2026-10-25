@@ -98,7 +98,6 @@ public sealed class DatabaseSeeder
             }
         }
 
-        await EnsureTaxCatalogAsync(cancellationToken);
         await EnsureBillingCatalogAsync(cancellationToken);
         await EnsureFeatureFlagBackfillAsync(cancellationToken);
 

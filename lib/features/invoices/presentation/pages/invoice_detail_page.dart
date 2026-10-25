@@ -153,7 +153,7 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                             style: const TextStyle(fontSize: 14),
                           ),
                         ),
-                        Text(formatPriceValue(line.lineTotal + line.taxAmount)),
+                        Text(formatPriceValue(line.lineTotal)),
                       ],
                     ),
                   ),

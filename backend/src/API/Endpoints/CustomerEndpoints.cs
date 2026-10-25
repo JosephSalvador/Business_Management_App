@@ -63,7 +63,7 @@ public static class CustomerEndpoints
         => (await sender.Send(
             new CreateCustomerCommand(
                 request.Name, request.ContactName, request.Email, request.Phone,
-                request.Address, request.Tin, request.IsVatRegistered, request.Notes),
+                request.Address, request.Tin, request.Notes),
             cancellationToken)).ToApiResult();
 
     private static async Task<IResult> UpdateCustomerAsync(
@@ -74,14 +74,14 @@ public static class CustomerEndpoints
         => (await sender.Send(
             new UpdateCustomerCommand(
                 id, request.Name, request.ContactName, request.Email, request.Phone,
-                request.Address, request.Tin, request.IsVatRegistered, request.Notes),
+                request.Address, request.Tin, request.Notes),
             cancellationToken)).ToApiResult();
 
     private sealed record CreateCustomerRequest(
         string Name, string? ContactName, string? Email, string? Phone,
-        string? Address, string? Tin, bool IsVatRegistered, string? Notes);
+        string? Address, string? Tin, string? Notes);
 
     private sealed record UpdateCustomerRequest(
         string? Name, string? ContactName, string? Email, string? Phone,
-        string? Address, string? Tin, bool? IsVatRegistered, string? Notes);
+        string? Address, string? Tin, string? Notes);
 }

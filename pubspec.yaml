@@ -2,7 +2,7 @@ name: jolinx_app
 description: JOLINX Business OS — offline-first business management for East African shops.
 
 publish_to: 'none'
-version: 1.0.0+59
+version: 1.0.0+60
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -75,4 +75,3 @@ flutter:
         - asset: assets/fonts/RobotoMono-Regular.ttf
         - asset: assets/fonts/RobotoMono-Bold.ttf
           weight: 700
-

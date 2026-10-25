@@ -16,7 +16,7 @@ import '../../domain/product.dart';
 /// Add / edit a product. The core form stays deliberately short — only what
 /// the first sale needs. Optional catalog detail (category, brand, wholesale
 /// price, identifiers, description) lives behind a collapsed section so it
-/// never slows down the everyday seller. Tax is hidden until the TRA add-on.
+/// never slows down the everyday seller.
 class ProductFormPage extends ConsumerStatefulWidget {
   const ProductFormPage({super.key, this.productId});
 
@@ -406,7 +406,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             : null;
         _productType = product.productType;
         // Kept silent so an update never wipes it; surfaced again by the TRA
-        // add-on that will re-enable tax selection.
         _taxCategoryId = product.taxCategoryId;
         if (product.costPrice != null) {
           _costPrice.text = product.costPrice! % 1 == 0

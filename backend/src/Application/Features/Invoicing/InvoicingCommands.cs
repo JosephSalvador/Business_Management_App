@@ -18,7 +18,7 @@ public static class CustomerInvoiceMappers
         invoice.Notes,
         invoice.Status,
         invoice.Subtotal,
-        invoice.TaxAmount,
+        0m,
         invoice.TotalAmount,
         invoice.AmountPaid,
         invoice.BalanceDue,
@@ -30,7 +30,7 @@ public static class CustomerInvoiceMappers
             .OrderBy(line => line.OrderIndex)
             .Select(line => new CustomerInvoiceLineDto(
                 line.Id, line.Description, line.Quantity, line.UnitPrice,
-                line.TaxRatePercent, line.LineTotal, line.TaxAmount))
+                0m, line.LineTotal, 0m))
             .ToList(),
         invoice.CreatedAt);
 

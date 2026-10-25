@@ -9,13 +9,13 @@ public static class CustomerMappers
 {
     public static CustomerDto ToDto(Customer c) => new(
         c.Id, c.TenantId, c.Name, c.ContactName, c.Email, c.Phone,
-        c.Address, c.Tin, c.IsVatRegistered, c.Notes, c.IsActive, c.CreatedAt);
+        c.Address, c.Tin, c.Notes, c.IsActive, c.CreatedAt);
 }
 
 // ── Create Customer ─────────────────────────────────────────────
 public sealed record CreateCustomerCommand(
     string Name, string? ContactName, string? Email, string? Phone,
-    string? Address, string? Tin, bool IsVatRegistered, string? Notes)
+    string? Address, string? Tin, string? Notes)
     : IRequest<Result<CustomerDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateCustomerCommandHandler
@@ -41,7 +41,7 @@ public sealed class CreateCustomerCommandHandler
             customer = Customer.Create(
                 tenantId, command.Name, command.ContactName, command.Email,
                 command.Phone, command.Address, command.Tin,
-                command.IsVatRegistered, command.Notes);
+                false, command.Notes);
         }
         catch (ArgumentException ex)
         {
@@ -56,7 +56,7 @@ public sealed class CreateCustomerCommandHandler
 // ── Update Customer ─────────────────────────────────────────────
 public sealed record UpdateCustomerCommand(
     Guid CustomerId, string? Name, string? ContactName, string? Email,
-    string? Phone, string? Address, string? Tin, bool? IsVatRegistered, string? Notes)
+    string? Phone, string? Address, string? Tin, string? Notes)
     : IRequest<Result<CustomerDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class UpdateCustomerCommandHandler
@@ -80,7 +80,7 @@ public sealed class UpdateCustomerCommandHandler
 
         customer.UpdateDetails(
             command.Name, command.ContactName, command.Email, command.Phone,
-            command.Address, command.Tin, command.IsVatRegistered, command.Notes);
+            command.Address, command.Tin, false, command.Notes);
 
         await _customers.UpdateAsync(customer, cancellationToken);
         return Result.Success(CustomerMappers.ToDto(customer));

@@ -156,7 +156,6 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
         'tin': _tinController.text.trim().isEmpty
             ? null
             : _tinController.text.trim(),
-        'isVatRegistered': false,
         'notes': _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),

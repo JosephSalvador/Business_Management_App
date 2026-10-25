@@ -169,7 +169,6 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
             description: line.description.text,
             quantity: line.parsedQuantity,
             unitPrice: line.parsedUnitPrice,
-            taxRatePercent: 0,
           ),
         )
         .toList(growable: false);

@@ -23,25 +23,16 @@ public static class ReportingEndpoints
             .RequireAuthorization()
             .RequireRateLimiting("global");
 
-        reports.MapGet("/tax-summary", GetTaxSummaryAsync)
-            .RequirePermission(PermissionNames.SalesReportsView)
-            .WithName("GetTaxSummary");
         reports.MapGet("/sales-summary", GetSalesSummaryAsync)
             .RequirePermission(PermissionNames.SalesReportsView)
             .WithName("GetSalesSummary");
         reports.MapGet("/top-products", GetTopProductsAsync)
             .RequirePermission(PermissionNames.SalesReportsView)
             .WithName("GetTopProducts");
-        reports.MapGet("/dashboard-tax-kpis", GetDashboardTaxKpisAsync)
-            .RequirePermission(PermissionNames.SalesReportsView)
-            .WithName("GetDashboardTaxKpis");
         reports.MapGet("/sales-trend", GetSalesTrendAsync)
             .RequirePermission(PermissionNames.SalesReportsView)
             .WithName("GetSalesTrend");
 
-        reports.MapPost("/export/tax-summary", ExportTaxSummaryAsync)
-            .RequirePermission(PermissionNames.SalesReportsExport)
-            .WithName("ExportTaxSummary");
         reports.MapPost("/export/sales-summary", ExportSalesSummaryAsync)
             .RequirePermission(PermissionNames.SalesReportsExport)
             .WithName("ExportSalesSummary");
@@ -103,14 +94,6 @@ public static class ReportingEndpoints
         return app;
     }
 
-    private static async Task<IResult> GetTaxSummaryAsync(
-        DateTime? from, DateTime? to, Guid? branchId, ISender sender, CancellationToken cancellationToken)
-    {
-        var effectiveTo = to ?? DateTime.UtcNow;
-        var effectiveFrom = from ?? effectiveTo.AddDays(-30);
-        return (await sender.Send(new TaxSummaryQuery(effectiveFrom, effectiveTo, branchId), cancellationToken)).ToApiResult();
-    }
-
     private static async Task<IResult> GetSalesSummaryAsync(
         DateTime? from, DateTime? to, Guid? branchId, ISender sender, CancellationToken cancellationToken)
     {
@@ -127,23 +110,9 @@ public static class ReportingEndpoints
         return (await sender.Send(new TopProductsQuery(effectiveFrom, effectiveTo, limit, branchId), cancellationToken)).ToApiResult();
     }
 
-    private static async Task<IResult> GetDashboardTaxKpisAsync(
-        ISender sender, CancellationToken cancellationToken)
-        => (await sender.Send(new DashboardTaxKpisQuery(), cancellationToken)).ToApiResult();
-
     private static async Task<IResult> GetSalesTrendAsync(
         int? days, Guid? branchId, ISender sender, CancellationToken cancellationToken)
         => (await sender.Send(new SalesTrendQuery(days ?? 30, branchId), cancellationToken)).ToApiResult();
-
-    private static async Task<IResult> ExportTaxSummaryAsync(
-        ExportTaxSummaryRequest request, ISender sender, CancellationToken cancellationToken)
-    {
-        var result = await sender.Send(
-            new ExportTaxSummaryCommand(request.From, request.To, request.BranchId), cancellationToken);
-        return result.IsSuccess
-            ? Results.File(result.Value.FileBytes, result.Value.ContentType, result.Value.FileName)
-            : result.ToApiResult();
-    }
 
     private static async Task<IResult> ExportSalesSummaryAsync(
         ExportSalesSummaryRequest request, ISender sender, CancellationToken cancellationToken)
@@ -303,7 +272,6 @@ public static class ReportingEndpoints
             : result.ToApiResult();
     }
 
-    private sealed record ExportTaxSummaryRequest(DateTime From, DateTime To, Guid? BranchId);
     private sealed record ExportSalesSummaryRequest(DateTime From, DateTime To, Guid? BranchId);
     private sealed record ExportTopProductsRequest(DateTime From, DateTime To, int Limit, Guid? BranchId);
     private sealed record ExportSalesByPaymentMethodRequest(DateTime From, DateTime To, Guid? BranchId);

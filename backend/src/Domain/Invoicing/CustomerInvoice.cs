@@ -46,7 +46,6 @@ public sealed class CustomerInvoice : AggregateRoot
     public string? Notes { get; private set; }
     public CustomerInvoiceStatus Status { get; private set; }
     public decimal Subtotal { get; private set; }
-    public decimal TaxAmount { get; private set; }
     public decimal TotalAmount { get; private set; }
     public decimal AmountPaid { get; private set; }
     public decimal BalanceDue => TotalAmount - AmountPaid;
@@ -203,7 +202,6 @@ public sealed class CustomerInvoice : AggregateRoot
     private void RecalculateTotals()
     {
         Subtotal = decimal.Round(_lines.Sum(line => line.LineTotal), 2);
-        TaxAmount = decimal.Round(_lines.Sum(line => line.TaxAmount), 2);
-        TotalAmount = Subtotal + TaxAmount;
+        TotalAmount = Subtotal;
     }
 }
