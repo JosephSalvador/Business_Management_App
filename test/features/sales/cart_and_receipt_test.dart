@@ -104,6 +104,20 @@ void main() {
       controller.decrement(key);
       expect(controller.state.lines.single.quantity, 2);
     });
+
+    test(
+        'an edited price is used for cart totals even when the original is zero',
+        () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(cartControllerProvider.notifier);
+
+      controller.add('p-zero', 'Bidhaa ya bei wazi', 0);
+      controller.setPriceOverride('p-zero', 1500);
+
+      expect(controller.state.lines.single.effectiveUnitPrice, 1500);
+      expect(controller.state.total, 1500);
+    });
   });
 
   group('buildCreateSaleBody', () {

@@ -72,7 +72,9 @@ class CartLine {
   /// into the first (each has its own open price).
   final String key;
 
-  double get lineTotal => unitPrice * quantity;
+  double get effectiveUnitPrice => unitPriceOverride ?? unitPrice;
+
+  double get lineTotal => effectiveUnitPrice * quantity;
 }
 
 /// Body of `POST /api/v1/sales`. Contains only what the client is allowed to

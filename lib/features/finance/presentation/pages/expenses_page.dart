@@ -296,7 +296,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                                   ? 'Hakuna matumizi yaliyopatikana kwa "$_filter"'
                                   : loc.expenseEmptySearch,
                               style: TextStyle(
-                                  color: AppColors.resolveTextTertiary(context)),
+                                  color:
+                                      AppColors.resolveTextTertiary(context)),
                             ),
                           )
                         : EmptyState(
@@ -336,7 +337,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                   }
                   return const SizedBox.shrink();
                 }
-                return _buildExpenseTile(filtered[index], loc);
+                return _buildExpenseTile(context, filtered[index], loc);
               },
             ),
           );
@@ -344,11 +345,17 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
     };
   }
 
-  Widget _buildExpenseTile(Map<String, dynamic> expense, AppLocalizations loc) {
+  Widget _buildExpenseTile(BuildContext context, Map<String, dynamic> expense,
+      AppLocalizations loc) {
+    final theme = Theme.of(context);
+    final tertiary = AppColors.resolveTextTertiary(context);
+    final expenseColor = theme.colorScheme.error;
+    final pendingColor = theme.colorScheme.tertiary;
     final description = expense['description'] ?? '';
     final amount = (expense['amount'] ?? 0).toDouble();
     final dateStr = expense['expenseDate'] ?? expense['createdAt'] ?? '';
-    final date = dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
+    final date =
+        dateStr.isNotEmpty ? DateTime.tryParse(dateStr)?.toLocal() : null;
     final category = expense['categoryName'] as String?;
     final isPending = expense['pendingLocally'] == true;
 
@@ -365,32 +372,33 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isPending
-                ? Colors.amber.withValues(alpha: 0.15)
-                : const Color(0xFFFF4757).withValues(alpha: 0.1),
+                ? pendingColor.withValues(alpha: 0.15)
+                : expenseColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             isPending ? Icons.cloud_off : Icons.receipt_long,
-            color: isPending ? Colors.amber.shade900 : const Color(0xFFFF4757),
+            color: isPending ? pendingColor : expenseColor,
             size: 20,
           ),
         ),
         title: Text(description,
-            style: const TextStyle(fontWeight: FontWeight.w500)),
+            style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface)),
         subtitle: detail.isEmpty
             ? null
             : Text(
                 detail.join(' · '),
                 style: TextStyle(
                   fontSize: 12,
-                  color: isPending ? Colors.amber.shade900 : Colors.grey.shade500,
+                  color: isPending ? pendingColor : tertiary,
                   fontWeight: isPending ? FontWeight.w500 : FontWeight.normal,
                 ),
               ),
         trailing: Text(
           formatMoney(amount),
-          style: const TextStyle(
-              fontWeight: FontWeight.w600, color: Color(0xFFFF4757)),
+          style: TextStyle(fontWeight: FontWeight.w600, color: expenseColor),
         ),
         onTap: () => context.push('/expenses/${expense['id']}/edit'),
       ),

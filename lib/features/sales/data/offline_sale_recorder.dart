@@ -70,7 +70,6 @@ class OfflineSaleRecorder {
       await _catalogDao.projectedQuantity(tenantId, line.productId);
     }
 
-
     var subtotal = 0.0;
     for (final line in lines) {
       subtotal += line.lineTotal;
@@ -99,7 +98,7 @@ class OfflineSaleRecorder {
             productName: line.name,
             sku: null,
             quantity: line.quantity,
-            unitPriceSnapshot: line.unitPrice,
+            unitPriceSnapshot: line.effectiveUnitPrice,
             unitPriceOverride: line.unitPriceOverride,
           ),
       ],
@@ -139,7 +138,7 @@ class OfflineSaleRecorder {
             productName: line.name,
             sku: null,
             quantity: line.quantity,
-            unitPrice: line.unitPrice,
+            unitPrice: line.effectiveUnitPrice,
             discountAmount: 0,
             taxCode: '',
             taxAmount: 0,
