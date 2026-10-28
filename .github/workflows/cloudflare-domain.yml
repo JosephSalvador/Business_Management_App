@@ -39,7 +39,7 @@ jobs:
 
           echo "Response: $RESPONSE"
 
-          SUCCESS=$(echo "$RESPONSE" | grep -o '"success":true' || true)
+          SUCCESS=$(echo "$RESPONSE" | grep -E '"success"\s*:\s*true' || true)
           ALREADY_EXISTS=$(echo "$RESPONSE" | grep -o 'already exists' || true)
 
           if [ -n "$SUCCESS" ] || [ -n "$ALREADY_EXISTS" ]; then
@@ -48,3 +48,13 @@ jobs:
             echo "::error::Failed to attach domain: $RESPONSE"
             exit 1
           fi
+
+          echo "Ensuring DNS CNAME record exists in Cloudflare zone..."
+          ZONE_ID="5437d5518f6a7c86d595e9d77e91d76c"
+          DNS_RESPONSE=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"type\":\"CNAME\",\"name\":\"${DOMAIN}\",\"content\":\"${PROJECT_NAME}.pages.dev\",\"ttl\":1,\"proxied\":true}")
+
+          echo "DNS Response: $DNS_RESPONSE"
