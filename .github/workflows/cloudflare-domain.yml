@@ -49,6 +49,14 @@ jobs:
             exit 1
           fi
 
+          echo "Setting production_branch of '$PROJECT_NAME' to 'staging' so custom domains serve it..."
+          BRANCH_RES=$(curl -s -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"production_branch": "staging"}')
+          echo "Branch Update: $BRANCH_RES"
+
           echo "Ensuring DNS CNAME record exists in Cloudflare zone..."
           ZONE_ID="5437d5518f6a7c86d595e9d77e91d76c"
           DNS_RESPONSE=$(curl -s -X POST \
