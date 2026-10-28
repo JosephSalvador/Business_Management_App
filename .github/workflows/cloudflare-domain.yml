@@ -40,10 +40,10 @@ jobs:
           echo "Response: $RESPONSE"
 
           SUCCESS=$(echo "$RESPONSE" | grep -E '"success"\s*:\s*true' || true)
-          ALREADY_EXISTS=$(echo "$RESPONSE" | grep -o 'already exists' || true)
+          ALREADY_EXISTS=$(echo "$RESPONSE" | grep -iE 'already added|already exists' || true)
 
           if [ -n "$SUCCESS" ] || [ -n "$ALREADY_EXISTS" ]; then
-            echo "::notice title=Domain Configured::Custom domain '$DOMAIN' successfully linked to '$PROJECT_NAME'!"
+            echo "::notice title=Domain Configured::Custom domain '$DOMAIN' is linked to '$PROJECT_NAME'!"
           else
             echo "::error::Failed to attach domain: $RESPONSE"
             exit 1
