@@ -1,0 +1,50 @@
+name: Configure Cloudflare Pages Custom Domain
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Custom domain to attach (e.g. staging.joberthix.xyz)'
+        required: true
+        default: 'staging.joberthix.xyz'
+      project_name:
+        description: 'Cloudflare Pages project name'
+        required: true
+        default: 'jolinx-app'
+
+jobs:
+  configure-domain:
+    name: Attach Domain to Cloudflare Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Attach Custom Domain via Cloudflare API
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
+          DOMAIN: ${{ inputs.domain }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN secret is missing."
+            exit 1
+          fi
+
+          echo "Attaching domain '$DOMAIN' to Cloudflare Pages project '$PROJECT_NAME'..."
+
+          RESPONSE=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}/domains" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\": \"${DOMAIN}\"}")
+
+          echo "Response: $RESPONSE"
+
+          SUCCESS=$(echo "$RESPONSE" | grep -o '"success":true' || true)
+          ALREADY_EXISTS=$(echo "$RESPONSE" | grep -o 'already exists' || true)
+
+          if [ -n "$SUCCESS" ] || [ -n "$ALREADY_EXISTS" ]; then
+            echo "::notice title=Domain Configured::Custom domain '$DOMAIN' successfully linked to '$PROJECT_NAME'!"
+          else
+            echo "::error::Failed to attach domain: $RESPONSE"
+            exit 1
+          fi

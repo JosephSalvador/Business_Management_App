@@ -157,6 +157,10 @@ jobs:
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
             echo "Deploying to Cloudflare Pages (branch: ${{ steps.cf_env.outputs.cf_branch }})..."
             npx wrangler pages deploy build/web --project-name=jolinx-app --branch="${{ steps.cf_env.outputs.cf_branch }}" --commit-dirty=true
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/jolinx-app/domains" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"name": "staging.joberthix.xyz"}' 2>&1 || true
           else
             echo "CLOUDFLARE_API_TOKEN secret not configured yet. Skipping Cloudflare Pages deployment."
           fi
