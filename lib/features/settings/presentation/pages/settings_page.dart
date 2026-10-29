@@ -35,6 +35,7 @@ class SettingsPage extends ConsumerWidget {
             ),
           final SettingsLoaded loaded =>
             _buildBody(context, ref, loaded.organization),
+          _ => const Center(child: CircularProgressIndicator()),
         },
       ),
     );

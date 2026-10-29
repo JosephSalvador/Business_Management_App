@@ -32,6 +32,7 @@ class FakePurchaseRepository implements PurchaseRepository {
   @override
   Future<void> create(
     Map<String, dynamic> body, {
+    String? id,
     bool remoteOnly = false,
   }) async {
     createCallCount++;
@@ -39,13 +40,13 @@ class FakePurchaseRepository implements PurchaseRepository {
   }
 
   @override
-  Future<void> submit(String id) async {
+  Future<void> submit(String id, {bool remoteOnly = false}) async {
     submitCallCount++;
     lastSubmitId = id;
   }
 
   @override
-  Future<void> cancel(String id) async {
+  Future<void> cancel(String id, {bool remoteOnly = false}) async {
     cancelCallCount++;
     lastCancelId = id;
   }

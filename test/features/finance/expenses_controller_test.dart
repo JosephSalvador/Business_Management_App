@@ -62,6 +62,7 @@ class FakeExpenseRepository implements ExpenseRepository {
   @override
   Future<Map<String, dynamic>> create(
     Map<String, dynamic> body, {
+    String? idempotencyKey,
     bool remoteOnly = false,
   }) async {
     final created = {...body, 'id': 'new'};

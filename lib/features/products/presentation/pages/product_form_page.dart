@@ -515,7 +515,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.loc.offlineSavedOfflineNotice),
+            content: Text(context.loc.productFormSaved),
           ),
         );
         context.pop();

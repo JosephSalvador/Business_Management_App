@@ -80,6 +80,7 @@ class FakeMoneyAccountRepository implements MoneyAccountRepository {
   @override
   Future<Map<String, dynamic>> openSession(
     Map<String, dynamic> body, {
+    String? idempotencyKey,
     bool remoteOnly = false,
   }) async =>
       {};

@@ -32,9 +32,10 @@ class FakeSupplierRepository implements SupplierRepository {
   @override
   Future<Map<String, dynamic>> create(
     Map<String, dynamic> body, {
+    String? id,
     bool remoteOnly = false,
   }) async {
-    final newSupplier = {...body, 'id': 's${suppliers.length + 1}'};
+    final newSupplier = {...body, 'id': id ?? 's${suppliers.length + 1}'};
     suppliers = [...suppliers, newSupplier];
     return newSupplier;
   }

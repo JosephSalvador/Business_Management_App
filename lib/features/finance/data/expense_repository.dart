@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/storage/offline_cache_dao.dart';
@@ -73,6 +75,7 @@ class ExpenseRepository {
   final OfflineCacheDao? _cache;
   final OfflineExpenseService? _offlineService;
 
+  static const _uuid = Uuid();
   static const _cacheKey = 'expenses_list';
   static const _summaryCacheKey = 'expenses_summary';
 
@@ -204,7 +207,7 @@ class ExpenseRepository {
     bool remoteOnly = false,
     String? idempotencyKey,
   }) async {
-    final expenseId = (body['id'] as String?) ?? idempotencyKey ?? const Uuid().v4();
+    final expenseId = (body['id'] as String?) ?? idempotencyKey ?? _uuid.v4();
     final enrichedBody = Map<String, dynamic>.from(body);
     enrichedBody['id'] = expenseId;
 

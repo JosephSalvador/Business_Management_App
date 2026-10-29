@@ -56,7 +56,9 @@ class FakeProductRepository implements ProductRepository {
   @override
   Future<Product> create(
     ProductDraft draft, {
+    String? id,
     bool remoteOnly = false,
+    double? retailPrice,
   }) async {
     final error = createError;
     if (error != null) {

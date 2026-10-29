@@ -208,8 +208,8 @@ class ProductRepository {
               .map((cp) => Product(
                     id: cp.productId,
                     name: cp.name,
-                    sku: cp.sku.isEmpty ? null : cp.sku,
-                    barcode: cp.barcode.isEmpty ? null : cp.barcode,
+                    sku: (cp.sku?.isEmpty ?? true) ? null : cp.sku,
+                    barcode: (cp.barcode?.isEmpty ?? true) ? null : cp.barcode,
                     unitOfMeasureId: 'default-uom',
                     productType: cp.productType,
                     status: cp.status,
@@ -305,8 +305,8 @@ class ProductRepository {
             return Product(
               id: match.productId,
               name: match.name,
-              sku: match.sku.isEmpty ? null : match.sku,
-              barcode: match.barcode.isEmpty ? null : match.barcode,
+              sku: (match.sku?.isEmpty ?? true) ? null : match.sku,
+              barcode: (match.barcode?.isEmpty ?? true) ? null : match.barcode,
               unitOfMeasureId: 'default-uom',
               productType: match.productType,
               status: match.status,
