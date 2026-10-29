@@ -68,7 +68,7 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 ## Implementation Plan — Production APK Build
 - [x] Task 1: Update `.github/workflows/build-clients.yml` to automatically publish `jolinx-android.apk` to GitHub Release `latest` on production builds.
 - [x] Task 2: Bump version code to `1.0.0+61` in `pubspec.yaml` to ensure clean in-place app updates.
-- [ ] Task 3: Commit and push changes on branch `feature/mobile-pos-foundation`.
-- [ ] Task 4: Trigger GitHub Actions workflow `build-clients.yml` with `deploy_target: production`.
-- [ ] Task 5: Monitor remote workflow execution until production APK is published to `https://github.com/JosephSalvador/Business_Management_App/releases/tag/latest`.
+- [x] Task 3: Commit and push changes on branch `feature/mobile-pos-foundation`.
+- [x] Task 4: Trigger GitHub Actions workflow `build-clients.yml` with `deploy_target: production` (Run 40835113046).
+- [x] Task 5: Monitor remote workflow execution until production APK is published to `https://github.com/JosephSalvador/Business_Management_App/releases/tag/latest`.
 
