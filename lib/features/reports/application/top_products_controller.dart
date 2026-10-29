@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/core_providers.dart' show offlineCacheDaoProvider;
 import '../../../core/storage/offline_cache_dao.dart';
-import '../../../core/network/app_exception.dart';
 import '../data/report_repository.dart';
 import '../data/report_providers.dart';
 import 'reports_controller.dart';

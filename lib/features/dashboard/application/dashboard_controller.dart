@@ -1,11 +1,9 @@
-import 'dart:async' as async;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/core_providers.dart' show offlineCacheDaoProvider;
 import '../../../core/storage/offline_cache_dao.dart';
 import '../../../core/storage/tables.dart' show LocalSaleStatus;
 import '../../../core/sync/local_sales_service.dart';
 import '../../../app/providers.dart';
-import '../../../core/network/app_exception.dart';
 import '../data/dashboard_repository.dart';
 import '../presentation/widgets/revenue_line_chart.dart';
 

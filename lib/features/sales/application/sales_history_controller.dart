@@ -67,7 +67,6 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
 
     // 1. Authoritative local SQLite load (instant, 100% offline-ready)
     List<SaleDto> localSales = const [];
-    bool localReadSucceeded = false;
     try {
       localSales = await ref.read(localSalesServiceProvider).sales.listSales(
         from: start,
@@ -75,7 +74,6 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
         search: term,
         limit: _pageSize,
       );
-      localReadSucceeded = true;
       // Immediately present local sales to the user — zero network delay.
       // Latest sale is ALWAYS at index 0 (ordered by effectiveAt DESC).
       state = SalesHistoryLoaded(

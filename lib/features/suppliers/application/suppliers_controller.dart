@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
-import '../../../core/network/app_exception.dart';
 import '../data/supplier_repository.dart';
 
 sealed class SuppliersState {
