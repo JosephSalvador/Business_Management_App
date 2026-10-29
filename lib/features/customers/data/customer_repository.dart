@@ -84,7 +84,7 @@ class CustomerRepository {
         total: (doc['total'] as num?)?.toInt() ?? items.length,
       );
     } on AppException {
-      if (_cache == null && _localCustomersDao == null && _queue == null) {
+      if (_cache == null && _queue == null) {
         rethrow;
       }
       // 100% Local-first offline fallback

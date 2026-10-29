@@ -358,47 +358,45 @@ class DashboardController extends Notifier<DashboardState> {
 
       if (state is! DashboardLoaded) {
         // Try restoring from offline cache if not already loaded
-        if (cached != null) {
-          try {
-            final summary = DashboardSummary.fromJson(
-                cached['summary'] as Map<String, dynamic>);
-            final lowStock =
-                (cached['lowStock'] as List).cast<Map<String, dynamic>>();
-            final recentActivity =
-                (cached['recentActivity'] as List).cast<Map<String, dynamic>>();
-            var trendData = (cached['trendData'] as List)
-                .map((e) => SalesTrendPoint.fromJson(e as Map<String, dynamic>))
-                .toList();
-            if (trendData.isEmpty) {
-              final now = DateTime.now();
-              trendData = List.generate(
-                trendDays,
-                (i) => SalesTrendPoint(
-                  label: now
-                      .subtract(Duration(days: trendDays - 1 - i))
-                      .toIso8601String()
-                      .substring(0, 10),
-                  saleCount: 0,
-                  revenue: 0,
-                ),
-              );
-            }
-            final topProducts =
-                (cached['topProducts'] as List).cast<Map<String, dynamic>>();
-            final lastUpdated = await _cacheDao.getLastUpdated('dashboard');
-
-            state = DashboardLoaded(
-              summary: summary,
-              lowStock: lowStock,
-              recentActivity: recentActivity,
-              trendData: trendData,
-              topProducts: topProducts,
-              isFromCache: true,
-              lastUpdated: lastUpdated,
+        try {
+          final summary = DashboardSummary.fromJson(
+              cached['summary'] as Map<String, dynamic>);
+          final lowStock =
+              (cached['lowStock'] as List).cast<Map<String, dynamic>>();
+          final recentActivity =
+              (cached['recentActivity'] as List).cast<Map<String, dynamic>>();
+          var trendData = (cached['trendData'] as List)
+              .map((e) => SalesTrendPoint.fromJson(e as Map<String, dynamic>))
+              .toList();
+          if (trendData.isEmpty) {
+            final now = DateTime.now();
+            trendData = List.generate(
+              trendDays,
+              (i) => SalesTrendPoint(
+                label: now
+                    .subtract(Duration(days: trendDays - 1 - i))
+                    .toIso8601String()
+                    .substring(0, 10),
+                saleCount: 0,
+                revenue: 0,
+              ),
             );
-            return;
-          } catch (_) {}
-        }
+          }
+          final topProducts =
+              (cached['topProducts'] as List).cast<Map<String, dynamic>>();
+          final lastUpdated = await _cacheDao.getLastUpdated('dashboard');
+
+          state = DashboardLoaded(
+            summary: summary,
+            lowStock: lowStock,
+            recentActivity: recentActivity,
+            trendData: trendData,
+            topProducts: topProducts,
+            isFromCache: true,
+            lastUpdated: lastUpdated,
+          );
+          return;
+        } catch (_) {}
 
         state = (await _buildOfflineDashboardState(trendDays, cached)) ??
             DashboardLoaded(

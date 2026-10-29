@@ -189,7 +189,7 @@ class PurchaseRepository {
         },
       );
     } on AppException {
-      if (remoteOnly) rethrow;
+      if (remoteOnly || (_cache == null && _queue == null)) rethrow;
 
       final orderId = localId ?? _uuid.v4();
       final localOrder = {
@@ -199,7 +199,7 @@ class PurchaseRepository {
         'warehouseId': body['warehouseId'],
         'status': 0, // draft
         'orderDate': DateTime.now().toUtc().toIso8601String(),
-        'items': body['items'] ?? [],
+        'items': body['items'] ?? body['lines'] ?? [],
         'isOfflinePending': true,
       };
 
@@ -215,16 +215,18 @@ class PurchaseRepository {
         final branchId =
             _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
         final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
+        final queuedBody = Map<String, dynamic>.from(enrichedBody)
+          ..['id'] = orderId;
 
         await _queue.enqueue(
-          operationId: localId,
+          operationId: orderId,
           tenantId: tenantId,
           branchId: branchId,
           deviceId: deviceId,
           operationType: 'purchase.create',
           aggregateType: 'purchase',
-          aggregateId: localId,
-          payload: jsonEncode(enrichedBody),
+          aggregateId: orderId,
+          payload: jsonEncode(queuedBody),
         );
       }
     }
