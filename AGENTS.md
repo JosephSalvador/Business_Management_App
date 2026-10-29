@@ -65,10 +65,10 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [ ] Task 3: Create real-time backend errors & warnings Grafana dashboard (`deploy/monitoring/grafana/dashboards/backend-realtime-logs.json`).
 - [ ] Task 4: Add Serilog Loki sink to `BusinessOS.API` with environment configuration and non-blocking fallback.
 - [ ] Task 5: Verify end-to-end ingestion and live streaming in Grafana.
-## Implementation Plan — Production APK Build
-- [x] Task 1: Update `.github/workflows/build-clients.yml` to automatically publish `jolinx-android.apk` to GitHub Release `latest` on production builds.
-- [x] Task 2: Bump version code to `1.0.0+61` in `pubspec.yaml` to ensure clean in-place app updates.
-- [x] Task 3: Commit and push changes on branch `feature/mobile-pos-foundation`.
-- [x] Task 4: Trigger GitHub Actions workflow `build-clients.yml` with `deploy_target: production` (Run 40835113046).
-- [x] Task 5: Monitor remote workflow execution until production APK is published to `https://github.com/JosephSalvador/Business_Management_App/releases/tag/latest`.
+## Implementation Plan — Production APK Build v1.0.0+63
+- [x] Task 1: Stash invoice WIP safely and bump version to `1.0.0+63` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 2: Commit and push changes on branch `feature/mobile-pos-foundation`.
+- [ ] Task 3: Trigger GitHub Actions workflow `build-clients.yml` with `deploy_target: production`.
+- [ ] Task 4: Monitor remote workflow execution until production APK is published to `https://github.com/JosephSalvador/Business_Management_App/releases/tag/latest`.
+
 
