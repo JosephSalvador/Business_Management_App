@@ -389,18 +389,22 @@ class AuthController extends Notifier<AuthState> {
     required String phone,
     String? organizationName,
   }) async {
-    await _repository.register(
+    final registered = await _repository.register(
       email: email,
       password: password,
       fullName: fullName,
       organizationName: organizationName,
       phone: phone,
     );
-    state = AuthNeedsVerification(email: email.trim().toLowerCase());
+    if (registered.emailVerified) {
+      await login(identifier: email, password: password);
+    } else {
+      state = AuthNeedsVerification(email: email.trim().toLowerCase());
+    }
   }
 
   /// Registers a staff member with an owner-issued invitation code. Leads to
-  /// the same pending-verification state as [register].
+  /// the same pending-verification state as [register] unless already verified.
   Future<void> registerStaff({
     required String email,
     required String password,
@@ -408,14 +412,18 @@ class AuthController extends Notifier<AuthState> {
     required String phone,
     required String invitationCode,
   }) async {
-    await _repository.registerStaff(
+    final registered = await _repository.registerStaff(
       email: email,
       password: password,
       fullName: fullName,
       phone: phone,
       invitationCode: invitationCode,
     );
-    state = AuthNeedsVerification(email: email.trim().toLowerCase());
+    if (registered.emailVerified) {
+      await login(identifier: email, password: password);
+    } else {
+      state = AuthNeedsVerification(email: email.trim().toLowerCase());
+    }
   }
 
   /// Confirms the pending registration with the emailed code. On success the

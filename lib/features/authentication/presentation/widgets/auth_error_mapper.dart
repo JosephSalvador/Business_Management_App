@@ -23,21 +23,23 @@ AuthFieldErrors mapAuthError(AppException error) {
         for (final entry in error.fieldErrors.entries)
           if (entry.value.isNotEmpty) entry.key: entry.value.first,
       },
-      banner: error.fieldErrors.isEmpty ? error.message : null,
+      banner: error.message,
     );
   }
   if (error is ConflictException) {
     // Duplicate email/phone/business-name arrive as plain 409s.
     final message = error.message.toLowerCase();
+    final fields = <String, String>{};
     if (message.contains('email')) {
-      return AuthFieldErrors(fieldErrors: {'Email': error.message});
+      fields['Email'] = error.message;
     }
     if (message.contains('phone')) {
-      return AuthFieldErrors(fieldErrors: {'Phone': error.message});
+      fields['Phone'] = error.message;
     }
     if (message.contains('business name') || message.contains('organization')) {
-      return AuthFieldErrors(fieldErrors: {'OrganizationName': error.message});
+      fields['OrganizationName'] = error.message;
     }
+    return AuthFieldErrors(fieldErrors: fields, banner: error.message);
   }
   return AuthFieldErrors(banner: error.message);
 }

@@ -39,6 +39,7 @@ class FakeAuthRepository implements AuthRepository {
   int verifyCalls = 0;
   int resendCalls = 0;
   int registerStaffCalls = 0;
+  bool registerReturnsEmailVerified = false;
   String? lastInvitationCode;
   String? lastVerifyCode;
   String? registeredEmail;
@@ -107,7 +108,7 @@ class FakeAuthRepository implements AuthRepository {
       tenantId: 't1',
       email: registeredEmail!,
       fullName: fullName,
-      emailVerified: false,
+      emailVerified: registerReturnsEmailVerified,
     );
   }
 
@@ -127,7 +128,7 @@ class FakeAuthRepository implements AuthRepository {
       tenantId: 't1',
       email: registeredEmail!,
       fullName: fullName,
-      emailVerified: false,
+      emailVerified: registerReturnsEmailVerified,
     );
   }
 
@@ -384,6 +385,42 @@ void main() {
       expect(controller.state, isA<AuthNeedsVerification>());
       final state = controller.state as AuthNeedsVerification;
       expect(state.email, 'owner@test.local');
+    });
+
+    test('register auto-logins when account email is already verified',
+        () async {
+      final repository = FakeAuthRepository()
+        ..registerReturnsEmailVerified = true
+        ..loginOutcome = AuthenticatedLogin(
+          Session(
+            user: const User(
+              id: 'u1',
+              tenantId: 't1',
+              email: 'owner@test.local',
+              fullName: 'Mama',
+              phone: '+255712345678',
+              roles: ['Owner'],
+              permissions: ['*'],
+            ),
+            accessToken: 'tok',
+            refreshToken: 'ref',
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          ),
+        );
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      await Future.microtask(() {});
+
+      await controller.register(
+        email: 'owner@test.local',
+        password: 'Passw0rd!',
+        fullName: 'Mama',
+        phone: '+255712345678',
+      );
+
+      expect(controller.state, isA<AuthAuthenticated>());
+      expect(repository.loginIdentifier, 'owner@test.local');
     });
 
     test('verifyEmail consumes the code then returns to unauthenticated',

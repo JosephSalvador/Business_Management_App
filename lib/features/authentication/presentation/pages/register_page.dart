@@ -82,7 +82,28 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         );
       }
     } on AppException catch (error) {
-      setState(() => _errors = mapAuthError(error));
+      final mapped = mapAuthError(error);
+      setState(() => _errors = mapped);
+      if (mounted) {
+        final message = mapped.banner ?? error.message;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (error) {
+      final message = error.toString();
+      setState(() => _errors = AuthFieldErrors(banner: message));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
