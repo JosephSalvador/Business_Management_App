@@ -393,18 +393,18 @@ void main() {
         ..registerReturnsEmailVerified = true
         ..loginOutcome = AuthenticatedLogin(
           Session(
-            user: const User(
+            user: const AuthUser(
               id: 'u1',
               tenantId: 't1',
               email: 'owner@test.local',
               fullName: 'Mama',
               phone: '+255712345678',
-              roles: ['Owner'],
+              isActive: true,
+              emailVerified: true,
               permissions: ['*'],
             ),
-            accessToken: 'tok',
-            refreshToken: 'ref',
-            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+            accessTokenExpiresAt:
+                DateTime.now().toUtc().add(const Duration(hours: 1)),
           ),
         );
       final container = _container(repository: repository);
