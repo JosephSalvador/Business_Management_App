@@ -59,15 +59,10 @@ class CustomersController extends Notifier<CustomersState> {
         total: result.total,
         search: _search,
       );
-    } catch (_) {
-      // Local-first resilience: ensure users can always see and add customers
-      if (state is! CustomersLoaded) {
-        state = CustomersLoaded(
-          items: const [],
-          total: 0,
-          search: _search,
-        );
-      }
+    } on AppException catch (e) {
+      state = CustomersFailure(e.message);
+    } catch (e) {
+      state = CustomersFailure(e.toString());
     }
   }
 

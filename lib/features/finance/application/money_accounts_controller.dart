@@ -45,13 +45,13 @@ class MoneyAccountsController extends Notifier<MoneyAccountsState> {
     try {
       final accounts = await _repository.listAccounts();
       state = MoneyAccountsLoaded(accounts: accounts);
-    } on AppException {
+    } on AppException catch (e) {
       if (state is! MoneyAccountsLoaded) {
-        state = const MoneyAccountsLoaded(accounts: []);
+        state = MoneyAccountsFailure(e.message);
       }
-    } catch (_) {
+    } catch (e) {
       if (state is! MoneyAccountsLoaded) {
-        state = const MoneyAccountsLoaded(accounts: []);
+        state = MoneyAccountsFailure(e.toString());
       }
     }
   }

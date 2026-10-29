@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/network/app_exception.dart';
 import '../data/expense_repository.dart';
 
 const int expensePageSize = 20;
@@ -85,6 +86,10 @@ class ExpensesController extends Notifier<ExpensesState> {
     }
     try {
       state = await _fetchPage(1);
+    } on AppException catch (e) {
+      if (state is! ExpensesLoaded) {
+        state = ExpensesFailure(e.message);
+      }
     } catch (_) {
       if (state is! ExpensesLoaded) {
         state = ExpensesLoaded(

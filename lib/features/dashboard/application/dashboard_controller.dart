@@ -4,6 +4,7 @@ import '../../../core/storage/offline_cache_dao.dart';
 import '../../../core/storage/tables.dart' show LocalSaleStatus;
 import '../../../core/sync/local_sales_service.dart';
 import '../../../app/providers.dart';
+import '../../../core/network/app_exception.dart';
 import '../data/dashboard_repository.dart';
 import '../presentation/widgets/revenue_line_chart.dart';
 
@@ -345,6 +346,13 @@ class DashboardController extends Notifier<DashboardState> {
       final offlineState = await _buildOfflineDashboardState(trendDays, cached);
       if (offlineState != null) {
         state = offlineState;
+        return;
+      }
+
+      if (cached == null) {
+        final message =
+            error is AppException ? error.message : error.toString();
+        state = DashboardFailure(message);
         return;
       }
 

@@ -65,6 +65,9 @@ class SupplierRepository {
       }
       return paged;
     } on AppException {
+      if (_cache == null && _queue == null) {
+        rethrow;
+      }
       var items = <Map<String, dynamic>>[];
 
       if (_cache != null) {

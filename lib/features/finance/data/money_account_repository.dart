@@ -175,6 +175,8 @@ class MoneyAccountRepository {
       if (_cache != null) {
         final cached = await _cache.load('cash_session_$accountId');
         if (cached != null) return cached;
+      } else {
+        rethrow;
       }
       return null;
     }

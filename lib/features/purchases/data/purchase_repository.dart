@@ -64,6 +64,9 @@ class PurchaseRepository {
       }
       return paged;
     } on AppException {
+      if (_cache == null && _queue == null) {
+        rethrow;
+      }
       var items = <Map<String, dynamic>>[];
 
       if (_cache != null) {
@@ -128,6 +131,9 @@ class PurchaseRepository {
       }
       return data;
     } on AppException {
+      if (_cache == null && _queue == null) {
+        rethrow;
+      }
       if (_cache != null) {
         final cached = await _cache.load('purchase_$id');
         if (cached != null) return cached;
@@ -166,21 +172,29 @@ class PurchaseRepository {
     String? id,
     bool remoteOnly = false,
   }) async {
-    final localId = id ?? body['id']?.toString() ?? _uuid.v4();
-    final enrichedBody = Map<String, dynamic>.from(body)..['id'] = localId;
+    final localId = id ??
+        body['id']?.toString() ??
+        ((_cache != null || _queue != null) ? _uuid.v4() : null);
+    final enrichedBody = Map<String, dynamic>.from(body);
+    if (localId != null) {
+      enrichedBody['id'] = localId;
+    }
 
     try {
       await _apiClient.post<dynamic>(
         ApiRoutes.v1('/purchase-orders'),
         body: enrichedBody,
-        headers: {'Idempotency-Key': localId},
+        headers: {
+          if (localId != null) 'Idempotency-Key': localId,
+        },
       );
     } on AppException {
       if (remoteOnly) rethrow;
 
+      final orderId = localId ?? _uuid.v4();
       final localOrder = {
-        'id': localId,
-        'orderNumber': 'PO-OFFLINE-${localId.substring(0, 6).toUpperCase()}',
+        'id': orderId,
+        'orderNumber': 'PO-OFFLINE-${orderId.substring(0, 6).toUpperCase()}',
         'supplierId': body['supplierId'],
         'warehouseId': body['warehouseId'],
         'status': 0, // draft
@@ -190,7 +204,7 @@ class PurchaseRepository {
       };
 
       if (_cache != null) {
-        await _cache.save('purchase_$localId', localOrder);
+        await _cache.save('purchase_$orderId', localOrder);
         await _appendPurchaseToCache(localOrder);
       }
 

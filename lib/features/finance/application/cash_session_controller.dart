@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/network/app_exception.dart';
 import '../data/money_account_repository.dart';
 
 sealed class CashSessionState {
@@ -37,6 +38,8 @@ class CashSessionController extends Notifier<CashSessionState> {
     try {
       final session = await _repository.getCurrentSession(accountId);
       state = CashSessionLoaded(session: session);
+    } on AppException catch (e) {
+      state = CashSessionFailure(e.message);
     } catch (_) {
       state = const CashSessionLoaded(session: null);
     }

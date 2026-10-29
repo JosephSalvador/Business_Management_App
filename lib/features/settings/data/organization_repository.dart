@@ -68,11 +68,10 @@ class OrganizationRepository {
       }
       return org;
     } on AppException {
-      if (_cache != null) {
-        final cached = await _cache.load(_cacheKey);
-        if (cached != null) {
-          return Organization.fromJson(cached);
-        }
+      if (_cache == null) rethrow;
+      final cached = await _cache.load(_cacheKey);
+      if (cached != null) {
+        return Organization.fromJson(cached);
       }
       return const Organization(
         name: 'Biashara Yangu',
@@ -99,6 +98,7 @@ class OrganizationRepository {
       }
       return updated;
     } on AppException {
+      if (_cache == null) rethrow;
       final current = await get();
       final updated = Organization(
         name: body['name'] as String? ?? current.name,
@@ -109,9 +109,7 @@ class OrganizationRepository {
         countryCode: body['countryCode'] as String? ?? current.countryCode,
         currency: body['currency'] as String? ?? current.currency,
       );
-      if (_cache != null) {
-        await _cache.save(_cacheKey, updated.toJson());
-      }
+      await _cache.save(_cacheKey, updated.toJson());
       return updated;
     }
   }

@@ -118,13 +118,9 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
         total: merged.length,
         searchActive: term != null,
       );
-    } on AppException {
-      if (state is! SalesHistoryLoaded) {
-        state = SalesHistoryLoaded(
-          sales: const [],
-          total: 0,
-          searchActive: term != null,
-        );
+    } on AppException catch (e) {
+      if (localSales.isEmpty) {
+        state = SalesHistoryFailure(e.message);
       }
     } catch (_) {
       if (state is! SalesHistoryLoaded) {

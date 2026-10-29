@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/app_exception.dart';
 import '../data/report_repository.dart';
 import '../data/report_providers.dart';
 
@@ -86,6 +87,8 @@ class ReportsController extends Notifier<ReportsState> {
         topProducts: topProducts,
         trend: trend,
       );
+    } on AppException catch (e) {
+      state = ReportsFailure(e.message);
     } catch (_) {
       state = const ReportsLoaded(
         summary: SalesSummary(

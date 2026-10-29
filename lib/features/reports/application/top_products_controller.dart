@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/core_providers.dart' show offlineCacheDaoProvider;
 import '../../../core/storage/offline_cache_dao.dart';
+import '../../../core/network/app_exception.dart';
 import '../data/report_repository.dart';
 import '../data/report_providers.dart';
 import 'reports_controller.dart';
@@ -82,6 +83,10 @@ class TopProductsController extends Notifier<TopProductsState> {
       await _cacheDao.save(cacheKey, {
         'items': products.map((p) => p.toJson()).toList(),
       });
+    } on AppException catch (e) {
+      if (state is! TopProductsLoaded) {
+        state = TopProductsFailure(e.message);
+      }
     } catch (_) {
       if (state is! TopProductsLoaded) {
         state = const TopProductsLoaded([]);

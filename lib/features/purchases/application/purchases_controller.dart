@@ -56,22 +56,10 @@ class PurchasesController extends Notifier<PurchasesState> {
         total: page.total,
         search: _search,
       );
-    } on AppException {
-      if (state is! PurchasesLoaded) {
-        state = PurchasesLoaded(
-          items: const [],
-          total: 0,
-          search: _search,
-        );
-      }
-    } catch (_) {
-      if (state is! PurchasesLoaded) {
-        state = PurchasesLoaded(
-          items: const [],
-          total: 0,
-          search: _search,
-        );
-      }
+    } on AppException catch (e) {
+      state = PurchasesFailure(e.message);
+    } catch (e) {
+      state = PurchasesFailure(e.toString());
     }
   }
 
