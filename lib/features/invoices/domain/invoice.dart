@@ -48,6 +48,16 @@ class InvoiceLine {
         lineTotal: _requiredDouble(json, 'lineTotal'),
         taxAmount: _requiredDouble(json, 'taxAmount'),
       );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'description': description,
+        'quantity': quantity,
+        'unitPrice': unitPrice,
+        'taxRatePercent': taxRatePercent,
+        'lineTotal': lineTotal,
+        'taxAmount': taxAmount,
+      };
 }
 
 class CustomerInvoice {
@@ -104,6 +114,27 @@ class CustomerInvoice {
     if (due == null || !status.isOpen) return false;
     return due.isBefore(DateTime.now());
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'number': number,
+        'customerId': customerId,
+        'customerName': customerName,
+        'currency': currency,
+        'issueDate': issueDate.toIso8601String(),
+        'dueDate': dueDate?.toIso8601String(),
+        'notes': notes,
+        'status': status.code,
+        'subtotal': subtotal,
+        'taxAmount': taxAmount,
+        'totalAmount': totalAmount,
+        'amountPaid': amountPaid,
+        'balanceDue': balanceDue,
+        'paymentMethod': paymentMethod,
+        'paymentReference': paymentReference,
+        'paidAtUtc': paidAtUtc?.toIso8601String(),
+        'lines': [for (final line in lines) line.toJson()],
+      };
 
   factory CustomerInvoice.fromJson(Map<String, dynamic> json) {
     final rawLines = json['lines'];
@@ -184,6 +215,19 @@ class CustomerInvoiceSummary {
       balanceDue: _requiredDouble(json, 'balanceDue'),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'number': number,
+        'customerId': customerId,
+        'customerName': customerName,
+        'status': status.code,
+        'issueDate': issueDate.toIso8601String(),
+        'dueDate': dueDate?.toIso8601String(),
+        'totalAmount': totalAmount,
+        'amountPaid': amountPaid,
+        'balanceDue': balanceDue,
+      };
 }
 
 class InvoicePage {

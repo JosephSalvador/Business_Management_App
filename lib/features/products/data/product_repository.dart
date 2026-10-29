@@ -188,30 +188,83 @@ class ProductRepository {
       }
       return paged;
     } on AppException {
+      var items = <Product>[];
+
       if (_cache != null) {
         final cached = await _cache.load(_cacheKey);
         if (cached != null) {
-          var items = (cached['items'] as List<dynamic>? ?? const [])
+          items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
               .map((raw) => Product.fromJson(Map<String, dynamic>.from(raw)))
               .toList();
-
-          if (search != null && search.trim().isNotEmpty) {
-            final term = search.trim().toLowerCase();
-            items = items.where((p) {
-              final name = p.name.toLowerCase();
-              final sku = (p.sku ?? '').toLowerCase();
-              final barcode = (p.barcode ?? '').toLowerCase();
-              return name.contains(term) ||
-                  sku.contains(term) ||
-                  barcode.contains(term);
-            }).toList();
-          }
-
-          return PagedProducts(items: items, total: items.length);
         }
       }
-      rethrow;
+
+      // If cache was empty, restore directly from local SQLite catalog
+      if (items.isEmpty && _catalogDao != null) {
+        try {
+          final cachedProducts = await _catalogDao.all(limit: 1000);
+          items = cachedProducts
+              .map((cp) => Product(
+                    id: cp.productId,
+                    name: cp.name,
+                    sku: cp.sku.isEmpty ? null : cp.sku,
+                    barcode: cp.barcode.isEmpty ? null : cp.barcode,
+                    unitOfMeasureId: 'default-uom',
+                    productType: cp.productType,
+                    status: cp.status,
+                    costPrice: cp.retailPrice,
+                  ))
+              .toList();
+        } catch (_) {}
+      }
+
+      // Merge locally created products pending sync
+      if (_queue != null) {
+        try {
+          final pendingOps = await _queue.listByOperationType('product.create');
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic>) {
+                final id = decoded['id']?.toString() ?? op.aggregateId;
+                if (!items.any((p) => p.id == id)) {
+                  items.insert(
+                    0,
+                    Product(
+                      id: id,
+                      name: decoded['name']?.toString() ?? 'Bidhaa',
+                      description: decoded['description']?.toString(),
+                      sku: decoded['sku']?.toString(),
+                      barcode: decoded['barcode']?.toString(),
+                      unitOfMeasureId:
+                          decoded['unitOfMeasureId']?.toString() ?? 'default-uom',
+                      productType:
+                          (decoded['productType'] as num?)?.toInt() ?? 0,
+                      status: ProductStatus.active,
+                      costPrice: (decoded['costPrice'] as num?)?.toDouble(),
+                    ),
+                  );
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      if (search != null && search.trim().isNotEmpty) {
+        final term = search.trim().toLowerCase();
+        items = items.where((p) {
+          final name = p.name.toLowerCase();
+          final sku = (p.sku ?? '').toLowerCase();
+          final barcode = (p.barcode ?? '').toLowerCase();
+          return name.contains(term) ||
+              sku.contains(term) ||
+              barcode.contains(term);
+        }).toList();
+      }
+
+      return PagedProducts(items: items, total: items.length);
     }
   }
 
@@ -242,18 +295,52 @@ class ProductRepository {
           if (found.isNotEmpty) return found.first;
         }
       }
-      rethrow;
+
+      if (_catalogDao != null) {
+        try {
+          final cachedProducts = await _catalogDao.all(limit: 1000);
+          final match =
+              cachedProducts.where((cp) => cp.productId == id).firstOrNull;
+          if (match != null) {
+            return Product(
+              id: match.productId,
+              name: match.name,
+              sku: match.sku.isEmpty ? null : match.sku,
+              barcode: match.barcode.isEmpty ? null : match.barcode,
+              unitOfMeasureId: 'default-uom',
+              productType: match.productType,
+              status: match.status,
+              costPrice: match.retailPrice,
+            );
+          }
+        } catch (_) {}
+      }
+
+      return Product(
+        id: id,
+        name: 'Bidhaa',
+        unitOfMeasureId: 'default-uom',
+        productType: ProductType.goods,
+        status: ProductStatus.active,
+      );
     }
   }
 
   Future<Product> create(
     ProductDraft draft, {
+    String? id,
+    double? retailPrice,
     bool remoteOnly = false,
   }) async {
+    final effectiveId = id ?? _uuid.v4();
+    final createBody = draft.toDomain().toCreateBody();
+    createBody['id'] = effectiveId;
+
     try {
       final response = await _apiClient.post<dynamic>(
         '/api/v1/products',
-        body: draft.toDomain().toCreateBody(),
+        body: createBody,
+        headers: {'Idempotency-Key': effectiveId},
       );
       if (response.statusCode != 200 || response.data is! Map) {
         throw ServerException('Jibu la mfumo halijui muundo sahihi.');
@@ -274,7 +361,7 @@ class ProductRepository {
         rethrow;
       }
 
-      final localId = _uuid.v4();
+      final localId = effectiveId;
       final localProduct = Product(
         id: localId,
         name: draft.name,
@@ -309,7 +396,7 @@ class ProductRepository {
           name: Value(localProduct.name),
           sku: Value(localProduct.sku ?? ''),
           barcode: Value(localProduct.barcode ?? ''),
-          retailPrice: Value(localProduct.costPrice ?? 0),
+          retailPrice: Value(retailPrice ?? localProduct.costPrice ?? 0),
           currency: const Value('TZS'),
           status: const Value(LocalProductCodes.statusActive),
           sellable: const Value(true),
@@ -327,7 +414,7 @@ class ProductRepository {
           operationType: 'product.create',
           aggregateType: 'product',
           aggregateId: localId,
-          payload: jsonEncode(draft.toDomain().toCreateBody()),
+          payload: jsonEncode(createBody),
         );
       }
 
@@ -553,36 +640,81 @@ class ProductRepository {
   /// Active warehouses for the tenant. The default "Main Store" created during
   /// business setup arrives first in practice; callers should not care.
   Future<List<Warehouse>> warehouses() async {
-    final response = await _apiClient.get<dynamic>(
-      '/api/v1/warehouses',
-      query: const {'page': 1, 'pageSize': 50},
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    try {
+      final response = await _apiClient.get<dynamic>(
+        '/api/v1/warehouses',
+        query: const {'page': 1, 'pageSize': 50},
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final doc = Map<String, dynamic>.from(response.data as Map);
+      final items = (doc['items'] as List<dynamic>? ?? const [])
+          .whereType<Map<dynamic, dynamic>>()
+          .map((raw) => Warehouse.fromJson(Map<String, dynamic>.from(raw)))
+          .toList(growable: false);
+      if (_cache != null) {
+        await _cache.save('warehouses_catalog_list', {
+          'items': (doc['items'] as List<dynamic>? ?? const []),
+        });
+      }
+      return items;
+    } on AppException {
+      if (_cache != null) {
+        final cached = await _cache.load('warehouses_catalog_list');
+        if (cached != null) {
+          final items = (cached['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((raw) => Warehouse.fromJson(Map<String, dynamic>.from(raw)))
+              .toList(growable: false);
+          if (items.isNotEmpty) return items;
+        }
+      }
+      return const [
+        Warehouse(
+          id: 'default-warehouse',
+          code: 'MAINSTORE',
+          name: 'Stoo Kuu',
+        ),
+      ];
     }
-    final doc = Map<String, dynamic>.from(response.data as Map);
-    final items = (doc['items'] as List<dynamic>? ?? const [])
-        .whereType<Map<dynamic, dynamic>>()
-        .map((raw) => Warehouse.fromJson(Map<String, dynamic>.from(raw)))
-        .toList(growable: false);
-    return items;
   }
 
   /// Stock balances across all locations (first page, generous size) used for
   /// per-product stock badges. Backend remains authoritative.
   Future<List<StockBalance>> balances() async {
-    final response = await _apiClient.get<dynamic>(
-      '/api/v1/inventory/stock',
-      query: const {'page': 1, 'pageSize': 200},
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    try {
+      final response = await _apiClient.get<dynamic>(
+        '/api/v1/inventory/stock',
+        query: const {'page': 1, 'pageSize': 200},
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final doc = Map<String, dynamic>.from(response.data as Map);
+      final list = (doc['items'] as List<dynamic>? ?? const [])
+          .whereType<Map<dynamic, dynamic>>()
+          .map((raw) => StockBalance.fromJson(Map<String, dynamic>.from(raw)))
+          .toList(growable: false);
+      if (_cache != null) {
+        await _cache.save('stock_balances_list', {
+          'items': (doc['items'] as List<dynamic>? ?? const []),
+        });
+      }
+      return list;
+    } on AppException {
+      if (_cache != null) {
+        final cached = await _cache.load('stock_balances_list');
+        if (cached != null) {
+          final items = (cached['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((raw) => StockBalance.fromJson(Map<String, dynamic>.from(raw)))
+              .toList(growable: false);
+          return items;
+        }
+      }
+      return const [];
     }
-    final doc = Map<String, dynamic>.from(response.data as Map);
-    return (doc['items'] as List<dynamic>? ?? const [])
-        .whereType<Map<dynamic, dynamic>>()
-        .map((raw) => StockBalance.fromJson(Map<String, dynamic>.from(raw)))
-        .toList(growable: false);
   }
 
   Future<StockBalance> recordOpeningStock(OpeningStockEntry entry) async {
@@ -652,8 +784,24 @@ class ProductRepository {
   }
 
   Future<List<ProductPrice>> prices(String priceListId) async {
-    final data = await _listArray('/api/v1/price-lists/$priceListId/prices');
-    return data.map(ProductPrice.fromJson).toList(growable: false);
+    try {
+      final data = await _listArray('/api/v1/price-lists/$priceListId/prices');
+      if (_cache != null) {
+        await _cache.save('prices_$priceListId', {'items': data});
+      }
+      return data.map(ProductPrice.fromJson).toList(growable: false);
+    } catch (_) {
+      if (_cache != null) {
+        final cached = await _cache.load('prices_$priceListId');
+        if (cached != null && cached['items'] is List) {
+          return (cached['items'] as List)
+              .whereType<Map<dynamic, dynamic>>()
+              .map((r) => ProductPrice.fromJson(Map<String, dynamic>.from(r)))
+              .toList(growable: false);
+        }
+      }
+      return const [];
+    }
   }
 
   /// Sets (or replaces) a product's Retail selling price on the default price

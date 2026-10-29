@@ -46,7 +46,8 @@ public sealed class Supplier : AggregateRoot
         string? phone = null,
         string? address = null,
         string? tin = null,
-        string? notes = null)
+        string? notes = null,
+        Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -54,7 +55,7 @@ public sealed class Supplier : AggregateRoot
         }
 
         return new Supplier(
-            Guid.NewGuid(),
+            id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid(),
             tenantId,
             name.Trim(),
             contactName?.Trim(),

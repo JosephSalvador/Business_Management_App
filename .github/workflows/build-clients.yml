@@ -175,11 +175,28 @@ jobs:
             Continuous Staging Build for Android & Web:
             - **Target Environment:** Staging
             - **API:** ${{ steps.cf_env.outputs.api_url }}
-            - **Web:** https://staging.jolinx-app.pages.dev
+            - **Web:** https://staging.joberthix.xyz
             - **Build Number:** ${{ github.run_number }}
           prerelease: true
           files: |
             jolinx-android.apk
+
+      - name: Publish Production APK to GitHub Release
+        if: steps.cf_env.outputs.target == 'production'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Jolinx Business OS — Latest Production Release"
+          body: |
+            Automated Production Build:
+            - **Target Environment:** Production
+            - **Primary API:** ${{ steps.cf_env.outputs.api_url }}
+            - **Fallback API:** ${{ steps.cf_env.outputs.fallback_url }}
+            - **Build Number:** ${{ github.run_number }}
+          prerelease: false
+          files: |
+            jolinx-android.apk
+
 
       - name: Build Linux Desktop Release
         if: (github.event_name == 'workflow_dispatch' && inputs.build_all_platforms == true) || startsWith(github.ref, 'refs/tags/v')

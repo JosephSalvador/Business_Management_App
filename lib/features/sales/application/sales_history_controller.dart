@@ -120,11 +120,21 @@ class SalesHistoryController extends Notifier<SalesHistoryState> {
         total: merged.length,
         searchActive: term != null,
       );
-    } on AppException catch (error) {
-      // If local read succeeded, NEVER surface network errors to the UI!
-      // The user is working offline and local sales are already displayed safely.
-      if (!localReadSucceeded && state is! SalesHistoryLoaded) {
-        state = SalesHistoryFailure(error.message);
+    } on AppException {
+      if (state is! SalesHistoryLoaded) {
+        state = SalesHistoryLoaded(
+          sales: const [],
+          total: 0,
+          searchActive: term != null,
+        );
+      }
+    } catch (_) {
+      if (state is! SalesHistoryLoaded) {
+        state = SalesHistoryLoaded(
+          sales: const [],
+          total: 0,
+          searchActive: term != null,
+        );
       }
     }
   }

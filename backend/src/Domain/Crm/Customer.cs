@@ -50,15 +50,18 @@ public sealed class Customer : AggregateRoot
         string? address = null,
         string? tin = null,
         bool isVatRegistered = false,
-        string? notes = null)
+        string? notes = null,
+        Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Customer name is required.", nameof(name));
         }
 
+        var customerId = id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid();
+
         return new Customer(
-            Guid.NewGuid(),
+            customerId,
             tenantId,
             name.Trim(),
             contactName?.Trim(),

@@ -19,7 +19,8 @@ public sealed record CreateProductCommand(
     ProductType ProductType,
     ProductStatus Status = ProductStatus.Draft,
     Guid? TaxCategoryId = null,
-    decimal? CostPrice = null)
+    decimal? CostPrice = null,
+    Guid? Id = null)
     : IRequest<Result<ProductDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<ProductDto>>
@@ -54,6 +55,15 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
     {
         var tenantId = _tenantContext.TenantId;
 
+        if (command.Id.HasValue && command.Id.Value != Guid.Empty)
+        {
+            var existing = await _products.GetByIdAsync(tenantId, command.Id.Value, cancellationToken);
+            if (existing is not null)
+            {
+                return Result.Success(ProductMappers.ToDto(existing));
+            }
+        }
+
         var entitlement = await _entitlementGuard.GetEntitlementAsync(cancellationToken);
         var currentProducts = await _products.CountAsync(
             tenantId, new ProductListFilter(null, null, null, null, null), cancellationToken);
@@ -74,14 +84,30 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
         var sku = Product.NormalizeIdentifier(command.Sku);
         var barcode = Product.NormalizeIdentifier(command.Barcode);
 
-        if (sku is not null && await _products.GetBySkuAsync(tenantId, sku, cancellationToken) is not null)
+        if (sku is not null)
         {
-            return Error.Conflict("A product with this SKU already exists.");
+            var existingBySku = await _products.GetBySkuAsync(tenantId, sku, cancellationToken);
+            if (existingBySku is not null)
+            {
+                if (command.Id.HasValue && existingBySku.Id == command.Id.Value)
+                {
+                    return Result.Success(ProductMappers.ToDto(existingBySku));
+                }
+                return Error.Conflict("A product with this SKU already exists.");
+            }
         }
 
-        if (barcode is not null && await _products.GetByBarcodeAsync(tenantId, barcode, cancellationToken) is not null)
+        if (barcode is not null)
         {
-            return Error.Conflict("A product with this barcode already exists.");
+            var existingByBarcode = await _products.GetByBarcodeAsync(tenantId, barcode, cancellationToken);
+            if (existingByBarcode is not null)
+            {
+                if (command.Id.HasValue && existingByBarcode.Id == command.Id.Value)
+                {
+                    return Result.Success(ProductMappers.ToDto(existingByBarcode));
+                }
+                return Error.Conflict("A product with this barcode already exists.");
+            }
         }
 
         if (sku is not null && await _products.VariantSkuExistsAsync(tenantId, sku, cancellationToken: cancellationToken))
@@ -106,7 +132,8 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             command.ProductType,
             command.Status,
             command.TaxCategoryId,
-            command.CostPrice);
+            command.CostPrice,
+            command.Id);
 
         await _products.AddAsync(product, cancellationToken);
         return Result.Success(ProductMappers.ToDto(product));

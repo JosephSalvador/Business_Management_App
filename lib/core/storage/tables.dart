@@ -185,3 +185,66 @@ class LocalReceipts extends Table {
   Set<Column> get primaryKey => {saleId};
 }
 
+/// Local customer store for instant offline lookup, credit tracking,
+/// and deterministic creation before syncing.
+class LocalCustomers extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get name => text()();
+  TextColumn get contactName => text().nullable()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get address => text().nullable()();
+  TextColumn get tin => text().nullable()();
+  RealColumn get currentDebtBalance => real().withDefault(const Constant(0))();
+  RealColumn get creditLimit => real().withDefault(const Constant(0))();
+  IntColumn get syncStatus => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Local expense store for petty cash / store operational expenses.
+class LocalExpenses extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get branchId => text()();
+  TextColumn get categoryId => text().nullable()();
+  TextColumn get categoryName => text().nullable()();
+  TextColumn get description => text()();
+  RealColumn get amount => real()();
+  DateTimeColumn get expenseDate => dateTime()();
+  TextColumn get paymentMethod => text().nullable()();
+  TextColumn get reference => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  TextColumn get userId => text().nullable()();
+  IntColumn get syncStatus => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Local cash session store for cash drawers and register shifts.
+class LocalCashSessions extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get accountId => text()();
+  RealColumn get openingCash => real()();
+  RealColumn get closingCash => real().nullable()();
+  RealColumn get expectedCash => real().nullable()();
+  RealColumn get variance => real().nullable()();
+  IntColumn get status => integer()(); // 0 = open, 1 = closed
+  DateTimeColumn get openedAt => dateTime()();
+  DateTimeColumn get closedAt => dateTime().nullable()();
+  TextColumn get notes => text().nullable()();
+  IntColumn get syncStatus => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+

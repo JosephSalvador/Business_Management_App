@@ -38,13 +38,21 @@ class MoneyAccountsController extends Notifier<MoneyAccountsState> {
   MoneyAccountRepository get _repository =>
       ref.read(moneyAccountRepositoryProvider);
 
-  Future<void> load() async {
-    state = const MoneyAccountsLoading();
+  Future<void> load({bool silent = false}) async {
+    if (!silent || state is! MoneyAccountsLoaded) {
+      state = const MoneyAccountsLoading();
+    }
     try {
       final accounts = await _repository.listAccounts();
       state = MoneyAccountsLoaded(accounts: accounts);
-    } on AppException catch (e) {
-      state = MoneyAccountsFailure(e.message);
+    } on AppException {
+      if (state is! MoneyAccountsLoaded) {
+        state = const MoneyAccountsLoaded(accounts: []);
+      }
+    } catch (_) {
+      if (state is! MoneyAccountsLoaded) {
+        state = const MoneyAccountsLoaded(accounts: []);
+      }
     }
   }
 
@@ -63,22 +71,22 @@ class MoneyAccountsController extends Notifier<MoneyAccountsState> {
 
   Future<void> createAccount(Map<String, dynamic> body) async {
     await _repository.createAccount(body);
-    await load();
+    await load(silent: true);
   }
 
   Future<void> recordIncome(Map<String, dynamic> body) async {
     await _repository.recordIncome(body);
-    await load();
+    await load(silent: true);
   }
 
   Future<void> recordExpense(Map<String, dynamic> body) async {
     await _repository.recordExpense(body);
-    await load();
+    await load(silent: true);
   }
 
   Future<void> transfer(Map<String, dynamic> body) async {
     await _repository.transfer(body);
-    await load();
+    await load(silent: true);
   }
 
   void reset() {

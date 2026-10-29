@@ -51,7 +51,8 @@ public sealed class PurchaseOrder : AggregateRoot
         IEnumerable<(Guid ProductId, decimal Quantity, decimal UnitPrice)> lines,
         string? reference = null,
         DateTime? expectedDate = null,
-        string? notes = null)
+        string? notes = null,
+        Guid? id = null)
     {
         if (supplierId == Guid.Empty)
         {
@@ -70,7 +71,7 @@ public sealed class PurchaseOrder : AggregateRoot
         }
 
         var po = new PurchaseOrder(
-            Guid.NewGuid(), tenantId, supplierId, warehouseId, branchId,
+            id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid(), tenantId, supplierId, warehouseId, branchId,
             reference, expectedDate, notes);
 
         foreach (var line in lineList)

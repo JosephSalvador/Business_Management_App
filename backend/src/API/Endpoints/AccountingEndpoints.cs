@@ -219,13 +219,24 @@ public static class AccountingEndpoints
 
     private static async Task<IResult> CreateExpenseAsync(
         CreateExpenseRequest request,
+        HttpRequest httpRequest,
         ISender sender,
         CancellationToken cancellationToken)
-        => (await sender.Send(
+    {
+        var idempotencyKey = httpRequest.Headers.TryGetValue("Idempotency-Key", out var value)
+            ? value.ToString()
+            : null;
+        var expenseId = Guid.TryParse(idempotencyKey, out var keyId)
+            ? keyId
+            : request.Id;
+
+        return (await sender.Send(
             new CreateExpenseCommand(
                 request.Description, request.Amount, request.ExpenseDate,
-                request.CategoryId, request.PaymentMethod, request.Reference, request.Notes),
+                request.CategoryId, request.PaymentMethod, request.Reference, request.Notes,
+                expenseId),
             cancellationToken)).ToApiResult();
+    }
 
     private static async Task<IResult> UpdateExpenseAsync(
         Guid id,
@@ -285,7 +296,8 @@ public static class AccountingEndpoints
 
     private sealed record CreateExpenseRequest(
         string Description, decimal Amount, DateTime ExpenseDate,
-        Guid? CategoryId, string? PaymentMethod, string? Reference, string? Notes);
+        Guid? CategoryId, string? PaymentMethod, string? Reference, string? Notes,
+        Guid? Id = null);
 
     private sealed record CreateExpenseCategoryRequest(string Name);
 

@@ -43,6 +43,32 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Remove dedicated "Tax" / "Kodi" section in `settings_page.dart` and merge TIN into Organization Information.
 - [x] Task 6: Clean up TRA / Tax marketing copy in `module_upgrade_sheet.dart`, documentation, and ARB localization files.
 - [x] Task 7: Increment version code in `pubspec.yaml` (1.0.0+59).
-- [ ] Task 8: Commit, push changes, and trigger `build-clients.yml` to generate the updated APK.
+- [x] Task 8: Commit, push changes, and trigger `build-clients.yml` (Run 40120044671) to generate the updated APK.
 
+## Implementation Plan — True Local-First Offline Operating System
+- [x] Task 1.1: Backend - Update `Customer.Create` and `CreateCustomerCommand` to accept optional `Guid? id = null` with idempotency replay.
+- [x] Task 1.2: Backend - Update `Expense.Create` and `CreateExpenseCommand` to accept optional `Guid? id = null` with idempotency replay.
+- [x] Task 1.3: Backend - Update `CashSession.Open` and `OpenCashSessionCommand` to accept optional `Guid? id = null` with idempotency replay.
+- [x] Task 1.4: Backend - Update `Product.Create`, `Supplier.Create`, and `PurchaseOrder.Create` to accept optional `Guid? id = null` with idempotency replay.
+- [x] Task 2.1: Frontend - Add dedicated Drift SQLite tables for `LocalCustomers`, `LocalExpenses`, and `LocalCashSessions` in `tables.dart`.
+- [x] Task 3.1: Frontend - Refactor `CustomerRepository` & `CustomersController` to be local-first (read from SQLite, write to SQLite + queue, zero failure screens).
+- [x] Task 3.2: Frontend - Refactor `ExpenseRepository` & `ExpensesController` to be local-first (read from SQLite, write to SQLite + queue, zero failure screens).
+- [x] Task 3.3: Frontend - Refactor `MoneyAccountRepository` & `CashSessionController` to be local-first (read from SQLite, write to SQLite + queue, zero failure screens).
+- [x] Task 3.4: Frontend - Refactor `ProductRepository`, `CatalogController`, and `ProductsController` to be local-first (offline catalog fallbacks, deterministic IDs, zero failure screens).
+- [x] Task 3.5: Frontend - Refactor `SupplierRepository`, `PurchaseRepository`, `PurchasesController`, `InvoiceRepository`, `InvoicesController`, `ReportsController`, `SalesHistoryController`, and `SettingsController` to eliminate failure screens and operate offline-first.
+- [x] Task 4.1: Frontend - Update `SyncEngine` to pass deterministic client IDs and handle idempotent delivery smoothly across sales, customers, expenses, products, suppliers, cash sessions, inventory, and purchases.
+- [x] Task 5.1: Bump version code in `pubspec.yaml` (1.0.0+60).
+
+## Implementation Plan — Grafana Loki Real-Time Backend Monitoring
+- [x] Task 1: Create Loki deployment configuration (`deploy/monitoring/loki/loki-config.yaml`) and provision Loki datasource in Grafana (`deploy/monitoring/grafana/provisioning/datasources/loki.yaml`).
+- [ ] Task 2: Launch `loki` container on port 3100 with `--restart always` and connect it with Grafana.
+- [ ] Task 3: Create real-time backend errors & warnings Grafana dashboard (`deploy/monitoring/grafana/dashboards/backend-realtime-logs.json`).
+- [ ] Task 4: Add Serilog Loki sink to `BusinessOS.API` with environment configuration and non-blocking fallback.
+- [ ] Task 5: Verify end-to-end ingestion and live streaming in Grafana.
+## Implementation Plan — Production APK Build
+- [x] Task 1: Update `.github/workflows/build-clients.yml` to automatically publish `jolinx-android.apk` to GitHub Release `latest` on production builds.
+- [x] Task 2: Bump version code to `1.0.0+61` in `pubspec.yaml` to ensure clean in-place app updates.
+- [ ] Task 3: Commit and push changes on branch `feature/mobile-pos-foundation`.
+- [ ] Task 4: Trigger GitHub Actions workflow `build-clients.yml` with `deploy_target: production`.
+- [ ] Task 5: Monitor remote workflow execution until production APK is published to `https://github.com/JosephSalvador/Business_Management_App/releases/tag/latest`.
 

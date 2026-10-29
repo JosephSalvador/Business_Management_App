@@ -512,10 +512,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         ref.read(subscriptionEntitlementControllerProvider.notifier).refresh(),
       );
     } on NetworkException {
-      setState(() {
-        _saving = false;
-        _error = context.loc.productFormNetwork;
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.loc.offlineSavedOfflineNotice),
+          ),
+        );
+        context.pop();
+      }
     } on AppException catch (error) {
       setState(() {
         _saving = false;

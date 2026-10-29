@@ -200,6 +200,8 @@ class SyncEngine {
         return _deliverExpense(op, outcome);
       case 'customer.create':
         return _deliverCustomerCreate(op, outcome);
+      case 'customer.update':
+        return _deliverCustomerUpdate(op, outcome);
       case 'customer.debt_payment':
         return _deliverCustomerDebtPayment(op, outcome);
       case 'cash_session.open':
@@ -220,6 +222,10 @@ class SyncEngine {
         return _deliverSupplierUpdate(op, outcome);
       case 'purchase.create':
         return _deliverPurchaseCreate(op, outcome);
+      case 'purchase.submit':
+        return _deliverPurchaseSubmit(op, outcome);
+      case 'purchase.cancel':
+        return _deliverPurchaseCancel(op, outcome);
       default:
         await _salesService.markQueueFailed(
           op.operationId,
@@ -331,7 +337,12 @@ class SyncEngine {
     }
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
-      final result = await _expenseRepository.create(body, remoteOnly: true);
+      body['id'] ??= op.aggregateId;
+      final result = await _expenseRepository.create(
+        body,
+        remoteOnly: true,
+        idempotencyKey: op.operationId,
+      );
       final serverId = result['id']?.toString() ?? op.aggregateId;
       await _salesService.queue.markSynced(op.operationId, serverId);
       outcome.synced++;
@@ -421,9 +432,59 @@ class SyncEngine {
     }
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
-      final result = await _customerRepository.create(body, remoteOnly: true);
+      body['id'] ??= op.aggregateId;
+      final result = await _customerRepository.create(
+        body,
+        remoteOnly: true,
+        idempotencyKey: op.operationId,
+      );
       final serverId = result['id']?.toString() ?? op.aggregateId;
       await _salesService.queue.markSynced(op.operationId, serverId);
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverCustomerUpdate(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_customerRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final id = body['id']?.toString() ?? op.aggregateId;
+      await _customerRepository.update(
+        id,
+        body,
+        remoteOnly: true,
+      );
+      await _salesService.queue.markSynced(op.operationId, id);
       outcome.synced++;
       return _DeliveryResult.continue_;
     } on ValidationException catch (error) {
@@ -462,9 +523,11 @@ class SyncEngine {
     }
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      body['id'] ??= op.aggregateId;
       final result = await _moneyAccountRepository.openSession(
         body,
         remoteOnly: true,
+        idempotencyKey: op.operationId,
       );
       final serverId = result['id']?.toString() ?? op.aggregateId;
       await _salesService.queue.markSynced(op.operationId, serverId);
@@ -619,8 +682,17 @@ class SyncEngine {
         taxCategoryId: body['taxCategoryId'] as String?,
         costPrice: (body['costPrice'] as num?)?.toDouble(),
       );
-      final result = await _productRepository.create(draft, remoteOnly: true);
+      final result = await _productRepository.create(
+        draft,
+        id: op.aggregateId,
+        remoteOnly: true,
+      );
       await _salesService.queue.markSynced(op.operationId, result.id);
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ConflictException {
+      // Already created on server (idempotent replay)
+      await _salesService.queue.markSynced(op.operationId, op.aggregateId);
       outcome.synced++;
       return _DeliveryResult.continue_;
     } on ValidationException catch (error) {
@@ -770,11 +842,17 @@ class SyncEngine {
     }
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
-      final result = await _supplierRepository.create(body, remoteOnly: true);
-      await _salesService.queue.markSynced(
-        op.operationId,
-        (result['id'] as String?) ?? 'synced',
+      body['id'] ??= op.aggregateId;
+      final result = await _supplierRepository.create(
+        body,
+        remoteOnly: true,
       );
+      final serverId = (result['id'] as String?) ?? op.aggregateId;
+      await _salesService.queue.markSynced(op.operationId, serverId);
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ConflictException {
+      await _salesService.queue.markSynced(op.operationId, op.aggregateId);
       outcome.synced++;
       return _DeliveryResult.continue_;
     } on ValidationException catch (error) {
@@ -856,6 +934,100 @@ class SyncEngine {
     try {
       final body = jsonDecode(op.payload) as Map<String, dynamic>;
       await _purchaseRepository.create(body, remoteOnly: true);
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ConflictException {
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverPurchaseSubmit(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_purchaseRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final id = (body['id'] as String?) ?? op.aggregateId;
+      await _purchaseRepository.submit(id, remoteOnly: true);
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ConflictException {
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverPurchaseCancel(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_purchaseRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final id = (body['id'] as String?) ?? op.aggregateId;
+      await _purchaseRepository.cancel(id, remoteOnly: true);
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ConflictException {
       await _salesService.queue.markSynced(op.operationId, 'synced');
       outcome.synced++;
       return _DeliveryResult.continue_;

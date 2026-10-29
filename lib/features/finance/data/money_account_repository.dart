@@ -171,29 +171,32 @@ class MoneyAccountRepository {
         await _cache.save('cash_session_$accountId', session);
       }
       return session;
-    } on NetworkException {
+    } catch (_) {
       if (_cache != null) {
         final cached = await _cache.load('cash_session_$accountId');
         if (cached != null) return cached;
       }
-      rethrow;
-    } on TimeoutException {
-      if (_cache != null) {
-        final cached = await _cache.load('cash_session_$accountId');
-        if (cached != null) return cached;
-      }
-      rethrow;
+      return null;
     }
   }
 
   Future<Map<String, dynamic>> openSession(
     Map<String, dynamic> body, {
     bool remoteOnly = false,
+    String? idempotencyKey,
   }) async {
+    final sessionId = (body['id'] as String?) ?? idempotencyKey ?? _uuid.v4();
+    final enrichedBody = Map<String, dynamic>.from(body);
+    enrichedBody['id'] = sessionId;
+
     try {
       final response = await _apiClient.post<dynamic>(
         '/api/v1/cash-sessions',
-        body: body,
+        body: enrichedBody,
+        headers: {
+          if (idempotencyKey != null || sessionId.isNotEmpty)
+            'Idempotency-Key': idempotencyKey ?? sessionId,
+        },
       );
       if (response.statusCode != 200 || response.data is! Map) {
         throw ServerException('Jibu la mfumo halijui muundo sahihi.');
@@ -206,7 +209,6 @@ class MoneyAccountRepository {
     } on AppException {
       if (remoteOnly) rethrow;
       // Offline cash session open
-      final sessionId = _uuid.v4();
       final accountId = body['accountId']?.toString() ?? 'default';
       final openingCash = (body['openingCash'] as num?)?.toDouble() ?? 0.0;
       final localSession = {
@@ -238,7 +240,7 @@ class MoneyAccountRepository {
           operationType: 'cash_session.open',
           aggregateType: 'cash_session',
           aggregateId: sessionId,
-          payload: jsonEncode(body),
+          payload: jsonEncode(enrichedBody),
         );
       }
 

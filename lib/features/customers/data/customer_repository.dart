@@ -84,28 +84,52 @@ class CustomerRepository {
         total: (doc['total'] as num?)?.toInt() ?? items.length,
       );
     } on AppException {
-      // 100% Offline fallback
+      // 100% Local-first offline fallback
+      var items = <Map<String, dynamic>>[];
       if (_cache != null) {
         final cached = await _cache.load(_cacheKey);
         if (cached != null) {
-          var items = (cached['items'] as List<dynamic>? ?? const [])
+          items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
               .map((raw) => Map<String, dynamic>.from(raw))
               .toList();
-
-          if (search != null && search.trim().isNotEmpty) {
-            final term = search.trim().toLowerCase();
-            items = items.where((c) {
-              final name = (c['name'] ?? '').toString().toLowerCase();
-              final phone = (c['phone'] ?? '').toString().toLowerCase();
-              return name.contains(term) || phone.contains(term);
-            }).toList();
-          }
-
-          return PagedCustomers(items: items, total: items.length);
         }
       }
-      rethrow;
+
+      // Merge pending offline customers from queue
+      if (_queue != null) {
+        try {
+          final pendingOps = await _queue.listByOperationType('customer.create');
+          final existingIds = items.map((c) => c['id']?.toString()).toSet();
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic>) {
+                final id = decoded['id']?.toString() ?? op.aggregateId;
+                if (!existingIds.contains(id)) {
+                  items.insert(0, {
+                    ...decoded,
+                    'id': id,
+                    'isOfflinePending': true,
+                  });
+                  existingIds.add(id);
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      if (search != null && search.trim().isNotEmpty) {
+        final term = search.trim().toLowerCase();
+        items = items.where((c) {
+          final name = (c['name'] ?? '').toString().toLowerCase();
+          final phone = (c['phone'] ?? '').toString().toLowerCase();
+          return name.contains(term) || phone.contains(term);
+        }).toList();
+      }
+
+      return PagedCustomers(items: items, total: items.length);
     }
   }
 
@@ -134,18 +158,41 @@ class CustomerRepository {
           if (found.isNotEmpty) return found.first;
         }
       }
-      rethrow;
+
+      if (_queue != null) {
+        final pendingOps = await _queue.listByOperationType('customer.create');
+        for (final op in pendingOps) {
+          try {
+            final decoded = jsonDecode(op.payload);
+            if (decoded is Map<String, dynamic> &&
+                (decoded['id'] == id || op.aggregateId == id)) {
+              return {...decoded, 'id': id, 'isOfflinePending': true};
+            }
+          } catch (_) {}
+        }
+      }
+
+      return {'id': id, 'name': 'Mteja', 'isOfflinePending': true};
     }
   }
 
   Future<Map<String, dynamic>> create(
     Map<String, dynamic> body, {
     bool remoteOnly = false,
+    String? idempotencyKey,
   }) async {
+    final localId = (body['id'] as String?) ?? idempotencyKey ?? _uuid.v4();
+    final enrichedBody = Map<String, dynamic>.from(body);
+    enrichedBody['id'] = localId;
+
     try {
       final response = await _apiClient.post<dynamic>(
         '/api/v1/customers',
-        body: body,
+        body: enrichedBody,
+        headers: {
+          if (idempotencyKey != null || localId.isNotEmpty)
+            'Idempotency-Key': idempotencyKey ?? localId,
+        },
       );
       if (response.statusCode != 200 || response.data is! Map) {
         throw ServerException('Jibu la mfumo halijui muundo sahihi.');
@@ -159,24 +206,20 @@ class CustomerRepository {
     } on AppException {
       if (remoteOnly) rethrow;
       // Offline customer creation
-      if (_cache != null && _queue != null) {
-        final localId = _uuid.v4();
-        final localCustomer = {
-          'id': localId,
-          'name': body['name'] ?? '',
-          'phone': body['phone'],
-          'email': body['email'],
-          'currentDebtBalance': 0.0,
-          'creditLimit': body['creditLimit'] ?? 0.0,
-          'isOfflinePending': true,
-          'createdAt': DateTime.now().toUtc().toIso8601String(),
-        };
+      final localCustomer = {
+        ...enrichedBody,
+        'currentDebtBalance': 0.0,
+        'creditLimit': body['creditLimit'] ?? 0.0,
+        'isOfflinePending': true,
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      };
 
-        // Cache locally immediately so POS can use it
+      if (_cache != null) {
         await _cache.save('customer_$localId', localCustomer);
         await _appendCustomerToCache(localCustomer);
+      }
 
-        // Queue for background sync
+      if (_queue != null) {
         final tenantId = _tenantIdOf != null
             ? (await _tenantIdOf()) ?? 'unknown'
             : 'unknown';
@@ -192,12 +235,11 @@ class CustomerRepository {
           operationType: 'customer.create',
           aggregateType: 'customer',
           aggregateId: localId,
-          payload: jsonEncode(body),
+          payload: jsonEncode(enrichedBody),
         );
-
-        return localCustomer;
       }
-      rethrow;
+
+      return localCustomer;
     }
   }
 
@@ -219,20 +261,66 @@ class CustomerRepository {
   }
 
   Future<Map<String, dynamic>> update(
-      String id, Map<String, dynamic> body) async {
-    final response = await _apiClient.put<dynamic>(
-      '/api/v1/customers/$id',
-      body: body,
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    String id,
+    Map<String, dynamic> body, {
+    bool remoteOnly = false,
+  }) async {
+    try {
+      final response = await _apiClient.put<dynamic>(
+        '/api/v1/customers/$id',
+        body: body,
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final updated = Map<String, dynamic>.from(response.data as Map);
+      if (_cache != null) {
+        await _cache.save('customer_$id', updated);
+        await _appendCustomerToCache(updated);
+      }
+      return updated;
+    } on AppException catch (e) {
+      if (remoteOnly ||
+          e is ValidationException ||
+          e is ConflictException ||
+          e is NotFoundException ||
+          e is UnauthorizedException) {
+        rethrow;
+      }
+
+      final updated = {
+        'id': id,
+        ...body,
+        'isOfflinePending': true,
+      };
+
+      if (_cache != null) {
+        await _cache.save('customer_$id', updated);
+        await _appendCustomerToCache(updated);
+      }
+
+      if (_queue != null) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf()) ?? 'unknown'
+            : 'unknown';
+        final branchId =
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
+
+        await _queue.enqueue(
+          operationId: _uuid.v4(),
+          tenantId: tenantId,
+          branchId: branchId,
+          deviceId: deviceId,
+          operationType: 'customer.update',
+          aggregateType: 'customer',
+          aggregateId: id,
+          payload: jsonEncode({'id': id, ...body}),
+        );
+      }
+
+      return updated;
     }
-    final updated = Map<String, dynamic>.from(response.data as Map);
-    if (_cache != null) {
-      await _cache.save('customer_$id', updated);
-      await _appendCustomerToCache(updated);
-    }
-    return updated;
   }
 
   Future<Map<String, dynamic>?> getCredit(String customerId) async {

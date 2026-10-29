@@ -211,7 +211,8 @@ public sealed class VoidJournalEntryCommandHandler
 // ── Create Expense ──────────────────────────────────────────────
 public sealed record CreateExpenseCommand(
     string Description, decimal Amount, DateTime ExpenseDate,
-    Guid? CategoryId, string? PaymentMethod, string? Reference, string? Notes)
+    Guid? CategoryId, string? PaymentMethod, string? Reference, string? Notes,
+    Guid? Id = null)
     : IRequest<Result<ExpenseDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateExpenseCommandHandler
@@ -231,6 +232,19 @@ public sealed class CreateExpenseCommandHandler
     {
         var tenantId = _tenantContext.TenantId;
 
+        // Idempotency: replay existing expense if ClientId already exists
+        if (command.Id.HasValue && command.Id.Value != Guid.Empty)
+        {
+            var existing = await _expenses.GetByIdAsync(tenantId, command.Id.Value, cancellationToken);
+            if (existing is not null)
+            {
+                var existingCategory = existing.CategoryId.HasValue
+                    ? await _expenses.GetCategoryByIdAsync(tenantId, existing.CategoryId.Value, cancellationToken)
+                    : null;
+                return Result.Success(AccountingMappers.ToDto(existing, existingCategory?.Name));
+            }
+        }
+
         ExpenseCategory? category = null;
         if (command.CategoryId.HasValue)
         {
@@ -247,7 +261,8 @@ public sealed class CreateExpenseCommandHandler
         {
             expense = Expense.Create(
                 tenantId, command.Description, command.Amount, command.ExpenseDate,
-                command.CategoryId, command.PaymentMethod, command.Reference, command.Notes);
+                command.CategoryId, command.PaymentMethod, command.Reference, command.Notes,
+                command.Id);
         }
         catch (ArgumentException ex)
         {

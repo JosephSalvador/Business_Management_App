@@ -115,10 +115,22 @@ public static class FinanceEndpoints
             cancellationToken)).ToApiResult();
 
     private static async Task<IResult> OpenCashSessionAsync(
-        OpenCashSessionRequest request, ISender sender, CancellationToken cancellationToken)
-        => (await sender.Send(
-            new OpenCashSessionCommand(request.AccountId, request.OpeningCash),
+        OpenCashSessionRequest request,
+        HttpRequest httpRequest,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var idempotencyKey = httpRequest.Headers.TryGetValue("Idempotency-Key", out var value)
+            ? value.ToString()
+            : null;
+        var sessionId = Guid.TryParse(idempotencyKey, out var keyId)
+            ? keyId
+            : request.Id;
+
+        return (await sender.Send(
+            new OpenCashSessionCommand(request.AccountId, request.OpeningCash, sessionId),
             cancellationToken)).ToApiResult();
+    }
 
     private static async Task<IResult> CloseCashSessionAsync(
         Guid id, CloseCashSessionRequest request, ISender sender, CancellationToken cancellationToken)
@@ -140,7 +152,7 @@ public static class FinanceEndpoints
         Guid AccountId, decimal Amount, string Description);
 
     private sealed record OpenCashSessionRequest(
-        Guid AccountId, decimal OpeningCash);
+        Guid AccountId, decimal OpeningCash, Guid? Id = null);
 
     private sealed record CloseCashSessionRequest(
         decimal ClosingCash, string? Notes);

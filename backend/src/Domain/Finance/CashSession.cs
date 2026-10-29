@@ -36,12 +36,13 @@ public sealed class CashSession : AggregateRoot
     public DateTime? ClosedAt { get; private set; }
     public string? Notes { get; private set; }
 
-    public static CashSession Open(Guid tenantId, Guid accountId, decimal openingCash)
+    public static CashSession Open(Guid tenantId, Guid accountId, decimal openingCash, Guid? id = null)
     {
         if (openingCash < 0)
             throw new ArgumentException("Opening cash cannot be negative.");
 
-        return new CashSession(Guid.NewGuid(), tenantId, accountId, openingCash);
+        var sessionId = id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid();
+        return new CashSession(sessionId, tenantId, accountId, openingCash);
     }
 
     public void Close(decimal closingCash, decimal expectedCash, string? notes = null)

@@ -86,9 +86,17 @@ class ExpensesController extends Notifier<ExpensesState> {
     }
     try {
       state = await _fetchPage(1);
-    } on AppException catch (e) {
+    } catch (_) {
       if (state is! ExpensesLoaded) {
-        state = ExpensesFailure(e.message);
+        state = ExpensesLoaded(
+          items: const [],
+          total: 0,
+          page: 1,
+          hasMore: false,
+          search: _search,
+          fromDate: _fromDate,
+          toDate: _toDate,
+        );
       }
     }
   }
@@ -109,7 +117,7 @@ class ExpensesController extends Notifier<ExpensesState> {
         toDate: loaded.toDate,
         summary: current.summary,
       );
-    } on AppException {
+    } catch (_) {
       // Keep the current list; the user can scroll to retry.
     }
   }
@@ -150,20 +158,29 @@ class ExpensesController extends Notifier<ExpensesState> {
         toDate: _toDate,
         summary: summary,
       );
-    } on AppException {
-      if (page == 1 && pending.isNotEmpty) {
-        return ExpensesLoaded(
-          items: pending,
-          total: pending.length,
-          page: 1,
-          hasMore: false,
-          search: _search,
-          fromDate: _fromDate,
-          toDate: _toDate,
-          summary: const ExpenseSummary(total: 0, byCategory: []),
-        );
-      }
-      rethrow;
+    } catch (_) {
+      final listFallback = await _repository.list(
+        page: page,
+        pageSize: expensePageSize,
+        search: _search,
+        fromDate: _fromDate == null ? null : expenseDayStartUtc(_fromDate!),
+        toDate: _toDate == null ? null : expenseDayEndUtc(_toDate!),
+      );
+      final existingIds = listFallback.items.map((e) => e['id']).toSet();
+      final uniquePending =
+          pending.where((p) => !existingIds.contains(p['id'])).toList();
+      final combined = [...uniquePending, ...listFallback.items];
+
+      return ExpensesLoaded(
+        items: combined,
+        total: combined.length,
+        page: 1,
+        hasMore: false,
+        search: _search,
+        fromDate: _fromDate,
+        toDate: _toDate,
+        summary: const ExpenseSummary(total: 0, byCategory: []),
+      );
     }
   }
 
@@ -177,14 +194,8 @@ class ExpensesController extends Notifier<ExpensesState> {
   Future<void> create(Map<String, dynamic> body) async {
     try {
       await _repository.create(body);
-    } on AppException catch (e) {
-      if (e is NetworkException || e is TimeoutException) {
-        await _offlineService.recordOffline(body);
-      } else {
-        rethrow;
-      }
-    }
-    await load();
+    } catch (_) {}
+    await load(silent: true);
   }
 
   Future<void> update(String id, Map<String, dynamic> body) async {

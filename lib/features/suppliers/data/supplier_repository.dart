@@ -65,27 +65,50 @@ class SupplierRepository {
       }
       return paged;
     } on AppException {
+      var items = <Map<String, dynamic>>[];
+
       if (_cache != null) {
         final cached = await _cache.load(_cacheKey);
         if (cached != null) {
-          var items = (cached['items'] as List<dynamic>? ?? const [])
+          items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
               .map((raw) => Map<String, dynamic>.from(raw))
               .toList();
-
-          if (search != null && search.trim().isNotEmpty) {
-            final term = search.trim().toLowerCase();
-            items = items.where((s) {
-              final name = (s['name'] ?? '').toString().toLowerCase();
-              final phone = (s['phone'] ?? '').toString().toLowerCase();
-              return name.contains(term) || phone.contains(term);
-            }).toList();
-          }
-
-          return PagedSuppliers(items: items, total: items.length);
         }
       }
-      rethrow;
+
+      if (_queue != null) {
+        try {
+          final pendingOps =
+              await _queue.listByOperationType('supplier.create');
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic>) {
+                final id = decoded['id']?.toString() ?? op.aggregateId;
+                if (!items.any((s) => s['id']?.toString() == id)) {
+                  items.insert(0, {
+                    ...decoded,
+                    'id': id,
+                    'isOfflinePending': true,
+                  });
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      if (search != null && search.trim().isNotEmpty) {
+        final term = search.trim().toLowerCase();
+        items = items.where((s) {
+          final name = (s['name'] ?? '').toString().toLowerCase();
+          final phone = (s['phone'] ?? '').toString().toLowerCase();
+          return name.contains(term) || phone.contains(term);
+        }).toList();
+      }
+
+      return PagedSuppliers(items: items, total: items.length);
     }
   }
 
@@ -115,18 +138,40 @@ class SupplierRepository {
           if (found.isNotEmpty) return found.first;
         }
       }
-      rethrow;
+
+      if (_queue != null) {
+        try {
+          final pendingOps =
+              await _queue.listByOperationType('supplier.create');
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic> &&
+                  (decoded['id'] == id || op.aggregateId == id)) {
+                return {...decoded, 'id': id, 'isOfflinePending': true};
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      return {'id': id, 'name': 'Msambazaji', 'isOfflinePending': true};
     }
   }
 
   Future<Map<String, dynamic>> create(
     Map<String, dynamic> body, {
+    String? id,
     bool remoteOnly = false,
   }) async {
+    final localId = id ?? body['id']?.toString() ?? _uuid.v4();
+    final enrichedBody = Map<String, dynamic>.from(body)..['id'] = localId;
+
     try {
       final response = await _apiClient.post<dynamic>(
         ApiRoutes.v1('/suppliers'),
-        body: body,
+        body: enrichedBody,
+        headers: {'Idempotency-Key': localId},
       );
       if (response.statusCode != 200 || response.data is! Map) {
         throw ServerException('Jibu la mfumo halijui muundo sahihi.');
@@ -137,10 +182,15 @@ class SupplierRepository {
         await _appendSupplierToCache(created);
       }
       return created;
-    } on AppException {
-      if (remoteOnly) rethrow;
+    } on AppException catch (e) {
+      if (remoteOnly ||
+          e is ValidationException ||
+          e is ConflictException ||
+          e is NotFoundException ||
+          e is UnauthorizedException) {
+        rethrow;
+      }
 
-      final localId = _uuid.v4();
       final localSupplier = {
         'id': localId,
         'name': body['name'] ?? '',
@@ -173,7 +223,7 @@ class SupplierRepository {
           operationType: 'supplier.create',
           aggregateType: 'supplier',
           aggregateId: localId,
-          payload: jsonEncode(body),
+          payload: jsonEncode(enrichedBody),
         );
       }
 

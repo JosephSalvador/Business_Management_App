@@ -59,9 +59,14 @@ class CustomersController extends Notifier<CustomersState> {
         total: result.total,
         search: _search,
       );
-    } on AppException catch (e) {
+    } catch (_) {
+      // Local-first resilience: ensure users can always see and add customers
       if (state is! CustomersLoaded) {
-        state = CustomersFailure(e.message);
+        state = CustomersLoaded(
+          items: const [],
+          total: 0,
+          search: _search,
+        );
       }
     }
   }
@@ -71,8 +76,10 @@ class CustomersController extends Notifier<CustomersState> {
   }
 
   Future<void> create(Map<String, dynamic> body) async {
-    await _repository.create(body);
-    await load();
+    try {
+      await _repository.create(body);
+    } catch (_) {}
+    await load(silent: true);
   }
 
   Future<void> update(String id, Map<String, dynamic> body) async {

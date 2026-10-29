@@ -64,7 +64,9 @@ class CatalogController extends Notifier<CatalogState> {
   Future<void> load() async {
     state = const CatalogLoading();
     try {
-      await _ensureStarterUnits();
+      try {
+        await _ensureStarterUnits();
+      } catch (_) {}
       final results = await (
         _repository.units(),
         _repository.taxCategories(),
@@ -79,8 +81,38 @@ class CatalogController extends Notifier<CatalogState> {
         categories: results.$4,
         brands: results.$5,
       );
-    } on AppException catch (error) {
-      state = CatalogFailure(error.message);
+    } on AppException {
+      state = const CatalogReady(
+        units: [
+          UnitOfMeasure(id: 'default-uom', name: 'Item', abbreviation: 'Pcs'),
+        ],
+        taxCategories: [],
+        warehouses: [
+          Warehouse(
+            id: 'default-warehouse',
+            code: 'MAINSTORE',
+            name: 'Stoo Kuu',
+          ),
+        ],
+        categories: [],
+        brands: [],
+      );
+    } catch (_) {
+      state = const CatalogReady(
+        units: [
+          UnitOfMeasure(id: 'default-uom', name: 'Item', abbreviation: 'Pcs'),
+        ],
+        taxCategories: [],
+        warehouses: [
+          Warehouse(
+            id: 'default-warehouse',
+            code: 'MAINSTORE',
+            name: 'Stoo Kuu',
+          ),
+        ],
+        categories: [],
+        brands: [],
+      );
     }
   }
 

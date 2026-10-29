@@ -190,7 +190,7 @@ public sealed class RecordAccountExpenseCommandHandler
 
 // ── Open Cash Session ───────────────────────────────────────────
 public sealed record OpenCashSessionCommand(
-    Guid AccountId, decimal OpeningCash)
+    Guid AccountId, decimal OpeningCash, Guid? Id = null)
     : IRequest<Result<CashSessionDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class OpenCashSessionCommandHandler
@@ -215,11 +215,28 @@ public sealed class OpenCashSessionCommandHandler
         var account = await _accounts.GetByIdAsync(tenantId, command.AccountId, cancellationToken);
         if (account is null) return Error.NotFound("Account not found.");
 
+        // Idempotency: if specific SessionId was supplied, check if that session already exists
+        if (command.Id.HasValue && command.Id.Value != Guid.Empty)
+        {
+            var existingById = await _sessions.GetByIdAsync(tenantId, command.Id.Value, cancellationToken);
+            if (existingById is not null)
+            {
+                return Result.Success(FinanceMappers.ToDto(existingById));
+            }
+        }
+
         var existing = await _sessions.GetOpenSessionAsync(tenantId, command.AccountId, cancellationToken);
         if (existing is not null)
+        {
+            // If the client sent an Id matching the existing open session, replay it
+            if (command.Id.HasValue && existing.Id == command.Id.Value)
+            {
+                return Result.Success(FinanceMappers.ToDto(existing));
+            }
             return Error.Conflict("A cash session is already open for this account.");
+        }
 
-        var session = CashSession.Open(tenantId, command.AccountId, command.OpeningCash);
+        var session = CashSession.Open(tenantId, command.AccountId, command.OpeningCash, command.Id);
         await _sessions.AddAsync(session, cancellationToken);
         return Result.Success(FinanceMappers.ToDto(session));
     }
@@ -248,6 +265,12 @@ public sealed class CloseCashSessionCommandHandler
         var tenantId = _tenantContext.TenantId;
         var session = await _sessions.GetByIdAsync(tenantId, command.SessionId, cancellationToken);
         if (session is null) return Error.NotFound("Cash session not found.");
+
+        // Idempotency: if session was already closed, return it safely
+        if (session.Status == CashSessionStatus.Closed)
+        {
+            return Result.Success(FinanceMappers.ToDto(session));
+        }
 
         // Expected = opening + net sales (simplified: for now just use opening as expected)
         var expected = session.OpeningCash;

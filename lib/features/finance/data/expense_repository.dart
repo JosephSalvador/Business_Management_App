@@ -118,29 +118,57 @@ class ExpenseRepository {
         total: (doc['total'] as num?)?.toInt() ?? items.length,
       );
     } on AppException {
-      // Offline fallback: load from local cache
+      // 100% Local-first offline fallback
+      var items = <Map<String, dynamic>>[];
       if (_cache != null) {
         final cached = await _cache.load(_cacheKey);
-        var items = (cached?['items'] as List<dynamic>? ?? const [])
+        items = (cached?['items'] as List<dynamic>? ?? const [])
             .whereType<Map<dynamic, dynamic>>()
             .map((raw) => Map<String, dynamic>.from(raw))
             .toList();
-
-        if (search != null && search.trim().isNotEmpty) {
-          final term = search.trim().toLowerCase();
-          items = items.where((e) {
-            final desc = (e['description'] ?? '').toString().toLowerCase();
-            final ref = (e['reference'] ?? '').toString().toLowerCase();
-            return desc.contains(term) || ref.contains(term);
-          }).toList();
-        }
-
-        return PagedExpenses(
-          items: items,
-          total: items.length,
-        );
       }
-      rethrow;
+
+      if (_offlineService != null) {
+        try {
+          final pending = await _offlineService.listPendingExpenses();
+          final existingIds = items.map((e) => e['id']?.toString()).toSet();
+          for (final p in pending) {
+            final id = p['id']?.toString();
+            if (id != null && !existingIds.contains(id)) {
+              items.insert(0, p);
+              existingIds.add(id);
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (fromDate != null || toDate != null) {
+        final fromDt = fromDate != null ? DateTime.tryParse(fromDate) : null;
+        final toDt = toDate != null ? DateTime.tryParse(toDate) : null;
+        items = items.where((e) {
+          final dtStr = e['expenseDate'] ?? e['createdAt'];
+          if (dtStr == null) return true;
+          final dt = DateTime.tryParse(dtStr.toString());
+          if (dt == null) return true;
+          if (fromDt != null && dt.isBefore(fromDt)) return false;
+          if (toDt != null && dt.isAfter(toDt)) return false;
+          return true;
+        }).toList();
+      }
+
+      if (search != null && search.trim().isNotEmpty) {
+        final term = search.trim().toLowerCase();
+        items = items.where((e) {
+          final desc = (e['description'] ?? '').toString().toLowerCase();
+          final ref = (e['reference'] ?? '').toString().toLowerCase();
+          return desc.contains(term) || ref.contains(term);
+        }).toList();
+      }
+
+      return PagedExpenses(
+        items: items,
+        total: items.length,
+      );
     }
   }
 
@@ -152,6 +180,11 @@ class ExpenseRepository {
       }
       return Map<String, dynamic>.from(response.data as Map);
     } on AppException {
+      if (_offlineService != null) {
+        final pending = await _offlineService.listPendingExpenses();
+        final localMatch = pending.where((e) => e['id'] == id).firstOrNull;
+        if (localMatch != null) return localMatch;
+      }
       if (_cache != null) {
         final listCached = await _cache.load(_cacheKey);
         if (listCached != null) {
@@ -162,18 +195,27 @@ class ExpenseRepository {
           if (found.isNotEmpty) return found.first;
         }
       }
-      rethrow;
+      return {'id': id, 'description': 'Matumizi', 'amount': 0.0, 'pendingLocally': true};
     }
   }
 
   Future<Map<String, dynamic>> create(
     Map<String, dynamic> body, {
     bool remoteOnly = false,
+    String? idempotencyKey,
   }) async {
+    final expenseId = (body['id'] as String?) ?? idempotencyKey ?? const Uuid().v4();
+    final enrichedBody = Map<String, dynamic>.from(body);
+    enrichedBody['id'] = expenseId;
+
     try {
       final response = await _apiClient.post<dynamic>(
         '/api/v1/expenses',
-        body: body,
+        body: enrichedBody,
+        headers: {
+          if (idempotencyKey != null || expenseId.isNotEmpty)
+            'Idempotency-Key': idempotencyKey ?? expenseId,
+        },
       );
       if (response.statusCode != 200 || response.data is! Map) {
         throw ServerException('Jibu la mfumo halijui muundo sahihi.');
@@ -183,13 +225,10 @@ class ExpenseRepository {
         await _appendExpenseToCache(created);
       }
       return created;
-    } on AppException catch (e) {
+    } on AppException {
       if (remoteOnly) rethrow;
-      if (_offlineService != null &&
-          (e is NetworkException ||
-              e is TimeoutException ||
-              e is ServerException)) {
-        final offlineExpense = await _offlineService.recordOffline(body);
+      if (_offlineService != null) {
+        final offlineExpense = await _offlineService.recordOffline(enrichedBody);
         if (_cache != null) {
           await _appendExpenseToCache(offlineExpense);
         }
@@ -253,28 +292,91 @@ class ExpenseRepository {
     }
   }
 
+  static const _defaultExpenseCategories = [
+    ExpenseCategory(id: 'cat_general', name: 'Matumizi ya Jumla'),
+    ExpenseCategory(id: 'cat_rent', name: 'Kodi ya Pango'),
+    ExpenseCategory(id: 'cat_electricity', name: 'Umeme / Luku'),
+    ExpenseCategory(id: 'cat_water', name: 'Maji'),
+    ExpenseCategory(id: 'cat_transport', name: 'Usafiri / Nauli'),
+    ExpenseCategory(id: 'cat_food', name: 'Chakula cha Wafanyakazi'),
+    ExpenseCategory(id: 'cat_comm', name: 'Mawasiliano / Vocha'),
+    ExpenseCategory(id: 'cat_repair', name: 'Ukarabati / Matengenezo'),
+  ];
+
   Future<List<ExpenseCategory>> listCategories() async {
-    final response =
-        await _apiClient.get<dynamic>('/api/v1/expenses/categories');
-    if (response.statusCode != 200 || response.data is! List) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    try {
+      final response =
+          await _apiClient.get<dynamic>('/api/v1/expenses/categories');
+      if (response.statusCode != 200 || response.data is! List) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final list = (response.data as List)
+          .whereType<Map<dynamic, dynamic>>()
+          .map((raw) => ExpenseCategory.fromJson(Map<String, dynamic>.from(raw)))
+          .toList(growable: false);
+      if (_cache != null) {
+        await _cache.save('expense_categories', {
+          'items': list.map((c) => {'id': c.id, 'name': c.name}).toList(),
+        });
+      }
+      return list;
+    } on AppException {
+      if (_cache != null) {
+        final cached = await _cache.load('expense_categories');
+        if (cached != null && cached['items'] is List) {
+          final items = (cached['items'] as List)
+              .whereType<Map<dynamic, dynamic>>()
+              .map((raw) =>
+                  ExpenseCategory.fromJson(Map<String, dynamic>.from(raw)))
+              .toList(growable: false);
+          if (items.isNotEmpty) return items;
+        }
+      }
+      return _defaultExpenseCategories;
     }
-    return (response.data as List)
-        .whereType<Map<dynamic, dynamic>>()
-        .map((raw) => ExpenseCategory.fromJson(Map<String, dynamic>.from(raw)))
-        .toList(growable: false);
   }
 
   Future<ExpenseCategory> createCategory(String name) async {
-    final response = await _apiClient.post<dynamic>(
-      '/api/v1/expenses/categories',
-      body: {'name': name},
-    );
-    if (response.statusCode != 200 || response.data is! Map) {
-      throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+    try {
+      final response = await _apiClient.post<dynamic>(
+        '/api/v1/expenses/categories',
+        body: {'name': name},
+      );
+      if (response.statusCode != 200 || response.data is! Map) {
+        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+      }
+      final created = ExpenseCategory.fromJson(
+          Map<String, dynamic>.from(response.data as Map));
+      if (_cache != null) {
+        try {
+          final cached = await _cache.load('expense_categories');
+          final items = (cached?['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((r) => Map<String, dynamic>.from(r))
+              .toList();
+          items.add({'id': created.id, 'name': created.name});
+          await _cache.save('expense_categories', {'items': items});
+        } catch (_) {}
+      }
+      return created;
+    } on AppException {
+      final localCategory = ExpenseCategory(
+        id: _uuid.v4(),
+        name: name.trim(),
+      );
+      if (_cache != null) {
+        try {
+          final cached = await _cache.load('expense_categories');
+          final items = (cached?['items'] as List<dynamic>? ?? const [])
+              .whereType<Map<dynamic, dynamic>>()
+              .map((r) => Map<String, dynamic>.from(r))
+              .toList();
+          items.add({'id': localCategory.id, 'name': localCategory.name});
+          await _cache.save('expense_categories', {'items': items});
+        } catch (_) {}
+      }
+      return localCategory;
     }
-    return ExpenseCategory.fromJson(
-        Map<String, dynamic>.from(response.data as Map));
   }
 
   Future<ExpenseSummary> getSummary({String? fromDate, String? toDate}) async {

@@ -44,7 +44,8 @@ public sealed class Expense : AggregateRoot
         Guid? categoryId = null,
         string? paymentMethod = null,
         string? reference = null,
-        string? notes = null)
+        string? notes = null,
+        Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
@@ -56,8 +57,10 @@ public sealed class Expense : AggregateRoot
             throw new ArgumentException("Expense amount must be greater than zero.", nameof(amount));
         }
 
+        var expenseId = id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid();
+
         return new Expense(
-            Guid.NewGuid(),
+            expenseId,
             tenantId,
             categoryId,
             description.Trim(),

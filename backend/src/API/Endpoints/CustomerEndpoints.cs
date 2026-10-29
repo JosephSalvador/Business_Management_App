@@ -58,13 +58,24 @@ public static class CustomerEndpoints
 
     private static async Task<IResult> CreateCustomerAsync(
         CreateCustomerRequest request,
+        HttpRequest httpRequest,
         ISender sender,
         CancellationToken cancellationToken)
-        => (await sender.Send(
+    {
+        var idempotencyKey = httpRequest.Headers.TryGetValue("Idempotency-Key", out var value)
+            ? value.ToString()
+            : null;
+        var customerId = Guid.TryParse(idempotencyKey, out var keyId)
+            ? keyId
+            : request.Id;
+
+        return (await sender.Send(
             new CreateCustomerCommand(
                 request.Name, request.ContactName, request.Email, request.Phone,
-                request.Address, request.Tin, request.IsVatRegistered, request.Notes),
+                request.Address, request.Tin, request.IsVatRegistered, request.Notes,
+                customerId),
             cancellationToken)).ToApiResult();
+    }
 
     private static async Task<IResult> UpdateCustomerAsync(
         Guid id,
@@ -79,7 +90,8 @@ public static class CustomerEndpoints
 
     private sealed record CreateCustomerRequest(
         string Name, string? ContactName, string? Email, string? Phone,
-        string? Address, string? Tin, bool IsVatRegistered, string? Notes);
+        string? Address, string? Tin, bool IsVatRegistered, string? Notes,
+        Guid? Id = null);
 
     private sealed record UpdateCustomerRequest(
         string? Name, string? ContactName, string? Email, string? Phone,

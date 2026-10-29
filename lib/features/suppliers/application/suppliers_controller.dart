@@ -56,16 +56,20 @@ class SuppliersController extends Notifier<SuppliersState> {
         total: page.total,
         search: _search,
       );
-    } on AppException catch (error) {
+    } catch (_) {
       if (state is! SuppliersLoaded) {
-        state = SuppliersFailure(error.message);
+        state = SuppliersLoaded(
+          items: const [],
+          total: 0,
+          search: _search,
+        );
       }
     }
   }
 
   Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
     final supplier = await _repository.create(body);
-    await load();
+    await load(silent: true);
     return supplier;
   }
 
@@ -74,7 +78,7 @@ class SuppliersController extends Notifier<SuppliersState> {
     Map<String, dynamic> body,
   ) async {
     final supplier = await _repository.update(id, body);
-    await load();
+    await load(silent: true);
     return supplier;
   }
 

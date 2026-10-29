@@ -188,9 +188,15 @@ class InvoicesController extends Notifier<InvoicesState> {
           search: _search,
           status: _status,
         );
-      } on AppException catch (error) {
+      } catch (_) {
         if (state is! InvoicesLoaded) {
-          state = InvoicesFailure(error.message);
+          state = InvoicesLoaded(
+            items: const [],
+            total: 0,
+            page: 1,
+            search: _search,
+            status: _status,
+          );
         }
       }
     }();

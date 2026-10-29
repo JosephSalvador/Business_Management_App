@@ -38,8 +38,8 @@ class CashSessionController extends Notifier<CashSessionState> {
     try {
       final session = await _repository.getCurrentSession(accountId);
       state = CashSessionLoaded(session: session);
-    } on AppException catch (e) {
-      state = CashSessionFailure(e.message);
+    } catch (_) {
+      state = const CashSessionLoaded(session: null);
     }
   }
 
@@ -51,7 +51,7 @@ class CashSessionController extends Notifier<CashSessionState> {
       'accountId': accountId,
       'openingCash': openingCash,
     });
-    await load(accountId);
+    state = CashSessionLoaded(session: session);
     return session;
   }
 
@@ -63,11 +63,12 @@ class CashSessionController extends Notifier<CashSessionState> {
     double? expectedCash,
   }) async {
     final session = await _repository.closeSession(sessionId, {
+      'accountId': accountId,
       'closingCash': closingCash,
       if (expectedCash != null) 'expectedCash': expectedCash,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     });
-    await load(accountId);
+    state = const CashSessionLoaded(session: null);
     return session;
   }
 

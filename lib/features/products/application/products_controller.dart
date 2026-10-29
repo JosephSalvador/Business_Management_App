@@ -72,9 +72,13 @@ class ProductsController extends Notifier<ProductsState> {
     try {
       final page = await _repository.list(search: _search);
       state = await _enrich(page);
-    } on AppException catch (error) {
+    } catch (_) {
       if (state is! ProductsLoaded) {
-        state = ProductsFailure(error.message);
+        state = ProductsLoaded(
+          items: const [],
+          total: 0,
+          search: _search,
+        );
       }
     }
   }
@@ -183,29 +187,36 @@ class ProductsController extends Notifier<ProductsState> {
     double? sellingPrice, {
     double? wholesalePrice,
   }) async {
-    final product = await _repository.create(draft);
+    final product = await _repository.create(
+      draft,
+      retailPrice: sellingPrice,
+    );
     if (sellingPrice != null || wholesalePrice != null) {
       await _ensureDefaultPriceList();
     }
     if (sellingPrice != null && sellingPrice > 0 && _defaultPriceList != null) {
-      await _repository.setSellingPrice(
-        priceList: _defaultPriceList!,
-        productId: product.id,
-        price: sellingPrice,
-        priceType: _retailPriceType,
-      );
+      try {
+        await _repository.setSellingPrice(
+          priceList: _defaultPriceList!,
+          productId: product.id,
+          price: sellingPrice,
+          priceType: _retailPriceType,
+        );
+      } catch (_) {}
     }
     if (wholesalePrice != null &&
         wholesalePrice > 0 &&
         _defaultPriceList != null) {
-      await _repository.setSellingPrice(
-        priceList: _defaultPriceList!,
-        productId: product.id,
-        price: wholesalePrice,
-        priceType: _wholesalePriceType,
-      );
+      try {
+        await _repository.setSellingPrice(
+          priceList: _defaultPriceList!,
+          productId: product.id,
+          price: wholesalePrice,
+          priceType: _wholesalePriceType,
+        );
+      } catch (_) {}
     }
-    await load();
+    await load(silent: true);
     return product;
   }
 
@@ -220,24 +231,28 @@ class ProductsController extends Notifier<ProductsState> {
       await _ensureDefaultPriceList();
     }
     if (sellingPrice != null && sellingPrice > 0 && _defaultPriceList != null) {
-      await _repository.setSellingPrice(
-        priceList: _defaultPriceList!,
-        productId: id,
-        price: sellingPrice,
-        priceType: _retailPriceType,
-      );
+      try {
+        await _repository.setSellingPrice(
+          priceList: _defaultPriceList!,
+          productId: id,
+          price: sellingPrice,
+          priceType: _retailPriceType,
+        );
+      } catch (_) {}
     }
     if (wholesalePrice != null &&
         wholesalePrice > 0 &&
         _defaultPriceList != null) {
-      await _repository.setSellingPrice(
-        priceList: _defaultPriceList!,
-        productId: id,
-        price: wholesalePrice,
-        priceType: _wholesalePriceType,
-      );
+      try {
+        await _repository.setSellingPrice(
+          priceList: _defaultPriceList!,
+          productId: id,
+          price: wholesalePrice,
+          priceType: _wholesalePriceType,
+        );
+      } catch (_) {}
     }
-    await load();
+    await load(silent: true);
   }
 
   void reset() {

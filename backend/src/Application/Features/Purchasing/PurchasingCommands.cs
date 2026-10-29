@@ -40,7 +40,7 @@ public static class PurchasingMappers
 // ── Create Supplier ────────────────────────────────────────────────
 public sealed record CreateSupplierCommand(
     string Name, string? ContactName, string? Email, string? Phone,
-    string? Address, string? Tin, string? Notes)
+    string? Address, string? Tin, string? Notes, Guid? Id = null)
     : IRequest<Result<SupplierDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateSupplierCommandHandler
@@ -59,15 +59,30 @@ public sealed class CreateSupplierCommandHandler
         CreateSupplierCommand command, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
-        var existing = await _suppliers.ListAsync(tenantId, 1, 1, command.Name, cancellationToken);
-        if (existing.Any(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase)))
+
+        if (command.Id.HasValue && command.Id.Value != Guid.Empty)
         {
+            var existingById = await _suppliers.GetByIdAsync(tenantId, command.Id.Value, cancellationToken);
+            if (existingById is not null)
+            {
+                return Result.Success(PurchasingMappers.ToDto(existingById));
+            }
+        }
+
+        var existing = await _suppliers.ListAsync(tenantId, 1, 1, command.Name, cancellationToken);
+        var match = existing.FirstOrDefault(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase));
+        if (match is not null)
+        {
+            if (command.Id.HasValue && match.Id == command.Id.Value)
+            {
+                return Result.Success(PurchasingMappers.ToDto(match));
+            }
             return Error.Conflict($"A supplier named '{command.Name}' already exists.");
         }
 
         var supplier = Supplier.Create(
             tenantId, command.Name, command.ContactName, command.Email,
-            command.Phone, command.Address, command.Tin, command.Notes);
+            command.Phone, command.Address, command.Tin, command.Notes, command.Id);
 
         await _suppliers.AddAsync(supplier, cancellationToken);
         return Result.Success(PurchasingMappers.ToDto(supplier));
@@ -82,7 +97,8 @@ public sealed record CreatePurchaseOrderCommand(
     string? Reference,
     DateTime? ExpectedDate,
     string? Notes,
-    IReadOnlyList<PurchaseOrderLineInput> Lines)
+    IReadOnlyList<PurchaseOrderLineInput> Lines,
+    Guid? Id = null)
     : IRequest<Result<PurchaseOrderDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed record PurchaseOrderLineInput(
@@ -114,6 +130,20 @@ public sealed class CreatePurchaseOrderCommandHandler
     {
         var tenantId = _tenantContext.TenantId;
 
+        if (command.Id.HasValue && command.Id.Value != Guid.Empty)
+        {
+            var existing = await _purchaseOrders.GetByIdAsync(tenantId, command.Id.Value, cancellationToken);
+            if (existing is not null)
+            {
+                var s = await _suppliers.GetByIdAsync(tenantId, existing.SupplierId, cancellationToken);
+                var w = await _warehouses.GetByIdAsync(tenantId, existing.WarehouseId, cancellationToken);
+                var existingLines = existing.Lines.Select(l => new PurchaseOrderLineDto(
+                    l.Id, l.ProductId, string.Empty, l.Quantity, l.UnitPrice, l.LineTotal)).ToList();
+                return Result.Success(PurchasingMappers.ToDto(
+                    existing, s?.Name ?? "Supplier", w?.Name ?? "Warehouse", existingLines));
+            }
+        }
+
         var supplier = await _suppliers.GetByIdAsync(tenantId, command.SupplierId, cancellationToken);
         if (supplier is null) return Error.NotFound("Supplier not found.");
         if (!supplier.IsActive) return Error.Validation("Supplier is not active.");
@@ -135,7 +165,8 @@ public sealed class CreatePurchaseOrderCommandHandler
         var order = PurchaseOrder.Create(
             tenantId, command.SupplierId, command.WarehouseId, command.BranchId,
             command.Lines.Select(l => (l.ProductId, l.Quantity, l.UnitPrice)),
-            command.Reference, command.ExpectedDate, command.Notes);
+            command.Reference, command.ExpectedDate, command.Notes,
+            id: command.Id);
 
         await _purchaseOrders.AddAsync(order, cancellationToken);
 
@@ -174,13 +205,19 @@ public sealed class SubmitPurchaseOrderCommandHandler
         var order = await _purchaseOrders.GetByIdAsync(tenantId, command.Id, cancellationToken);
         if (order is null) return Error.NotFound("Purchase order not found.");
 
-        order.Submit(DateTime.UtcNow);
-        await _purchaseOrders.UpdateAsync(order, cancellationToken);
-
         var supplier = await _suppliers.GetByIdAsync(tenantId, order.SupplierId, cancellationToken);
         var warehouse = await _warehouses.GetByIdAsync(tenantId, order.WarehouseId, cancellationToken);
         var lines = order.Lines.Select(l => new PurchaseOrderLineDto(
             l.Id, l.ProductId, string.Empty, l.Quantity, l.UnitPrice, l.LineTotal)).ToList();
+
+        if (order.Status == PurchaseOrderStatus.Submitted)
+        {
+            return Result.Success(PurchasingMappers.ToDto(
+                order, supplier?.Name ?? "Unknown", warehouse?.Name ?? "Unknown", lines));
+        }
+
+        order.Submit(DateTime.UtcNow);
+        await _purchaseOrders.UpdateAsync(order, cancellationToken);
 
         return Result.Success(PurchasingMappers.ToDto(
             order, supplier?.Name ?? "Unknown", warehouse?.Name ?? "Unknown", lines));
@@ -296,13 +333,19 @@ public sealed class CancelPurchaseOrderCommandHandler
         var order = await _purchaseOrders.GetByIdAsync(tenantId, command.Id, cancellationToken);
         if (order is null) return Error.NotFound("Purchase order not found.");
 
-        order.Cancel(DateTime.UtcNow);
-        await _purchaseOrders.UpdateAsync(order, cancellationToken);
-
         var supplier = await _suppliers.GetByIdAsync(tenantId, order.SupplierId, cancellationToken);
         var warehouse = await _warehouses.GetByIdAsync(tenantId, order.WarehouseId, cancellationToken);
         var lines = order.Lines.Select(l => new PurchaseOrderLineDto(
             l.Id, l.ProductId, string.Empty, l.Quantity, l.UnitPrice, l.LineTotal)).ToList();
+
+        if (order.Status == PurchaseOrderStatus.Cancelled)
+        {
+            return Result.Success(PurchasingMappers.ToDto(
+                order, supplier?.Name ?? "Unknown", warehouse?.Name ?? "Unknown", lines));
+        }
+
+        order.Cancel(DateTime.UtcNow);
+        await _purchaseOrders.UpdateAsync(order, cancellationToken);
 
         return Result.Success(PurchasingMappers.ToDto(
             order, supplier?.Name ?? "Unknown", warehouse?.Name ?? "Unknown", lines));

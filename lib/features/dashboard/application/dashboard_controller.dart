@@ -132,7 +132,30 @@ class DashboardController extends Notifier<DashboardState> {
           .listSales(from: windowStart, to: todayEnd, limit: 5000);
 
       if (windowSales.isEmpty && cached == null) {
-        return null;
+        final trendData = List.generate(
+          trendDays,
+          (i) => SalesTrendPoint(
+            label: now
+                .subtract(Duration(days: trendDays - 1 - i))
+                .toIso8601String()
+                .substring(0, 10),
+            saleCount: 0,
+            revenue: 0,
+          ),
+        );
+        return DashboardLoaded(
+          summary: const DashboardSummary(
+            branchName: 'Duka Langu',
+            revenueToday: 0,
+            totalProducts: 0,
+          ),
+          lowStock: const [],
+          recentActivity: const [],
+          trendData: trendData,
+          topProducts: const [],
+          isFromCache: true,
+          lastUpdated: now,
+        );
       }
 
       var todayRevenue = 0.0;
@@ -371,12 +394,30 @@ class DashboardController extends Notifier<DashboardState> {
           } catch (_) {}
         }
 
-        final message = error is AppException
-            ? error.message
-            : error is async.TimeoutException
-                ? 'Muunganisho ulikwama. Jaribu tena.'
-                : 'Imeshindwa kupakia dashibodi.';
-        state = DashboardFailure(message);
+        state = (await _buildOfflineDashboardState(trendDays, cached)) ??
+            DashboardLoaded(
+              summary: const DashboardSummary(
+                branchName: 'Duka Langu',
+                revenueToday: 0,
+                totalProducts: 0,
+              ),
+              lowStock: const [],
+              recentActivity: const [],
+              trendData: List.generate(
+                trendDays,
+                (i) => SalesTrendPoint(
+                  label: DateTime.now()
+                      .subtract(Duration(days: trendDays - 1 - i))
+                      .toIso8601String()
+                      .substring(0, 10),
+                  saleCount: 0,
+                  revenue: 0,
+                ),
+              ),
+              topProducts: const [],
+              isFromCache: true,
+              lastUpdated: DateTime.now(),
+            );
       }
     }
   }

@@ -56,26 +56,38 @@ class PurchasesController extends Notifier<PurchasesState> {
         total: page.total,
         search: _search,
       );
-    } on AppException catch (error) {
+    } on AppException {
       if (state is! PurchasesLoaded) {
-        state = PurchasesFailure(error.message);
+        state = PurchasesLoaded(
+          items: const [],
+          total: 0,
+          search: _search,
+        );
+      }
+    } catch (_) {
+      if (state is! PurchasesLoaded) {
+        state = PurchasesLoaded(
+          items: const [],
+          total: 0,
+          search: _search,
+        );
       }
     }
   }
 
   Future<void> create(Map<String, dynamic> body) async {
     await _repository.create(body);
-    await load();
+    await load(silent: true);
   }
 
   Future<void> submit(String id) async {
     await _repository.submit(id);
-    await load();
+    await load(silent: true);
   }
 
   Future<void> cancel(String id) async {
     await _repository.cancel(id);
-    await load();
+    await load(silent: true);
   }
 
   void reset() {

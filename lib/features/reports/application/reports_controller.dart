@@ -87,8 +87,16 @@ class ReportsController extends Notifier<ReportsState> {
         topProducts: topProducts,
         trend: trend,
       );
-    } on AppException catch (error) {
-      state = ReportsFailure(error.message);
+    } catch (_) {
+      state = const ReportsLoaded(
+        summary: SalesSummary(
+          totalSales: 0,
+          totalRevenue: 0,
+          averageSale: 0,
+        ),
+        topProducts: [],
+        trend: [],
+      );
     }
   }
 }

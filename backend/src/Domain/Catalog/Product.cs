@@ -65,10 +65,11 @@ public sealed class Product : AggregateRoot
         ProductType productType,
         ProductStatus status = ProductStatus.Draft,
         Guid? taxCategoryId = null,
-        decimal? costPrice = null)
+        decimal? costPrice = null,
+        Guid? id = null)
     {
         var product = new Product(
-            Guid.NewGuid(),
+            id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid(),
             tenantId,
             name.Trim(),
             description,

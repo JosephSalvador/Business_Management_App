@@ -64,28 +64,53 @@ class PurchaseRepository {
       }
       return paged;
     } on AppException {
+      var items = <Map<String, dynamic>>[];
+
       if (_cache != null) {
         final cached = await _cache.load(_cacheKey);
         if (cached != null) {
-          var items = (cached['items'] as List<dynamic>? ?? const [])
+          items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
               .map((raw) => Map<String, dynamic>.from(raw))
               .toList();
-
-          if (search != null && search.trim().isNotEmpty) {
-            final term = search.trim().toLowerCase();
-            items = items.where((p) {
-              final number = (p['orderNumber'] ?? '').toString().toLowerCase();
-              final supplier =
-                  (p['supplierName'] ?? '').toString().toLowerCase();
-              return number.contains(term) || supplier.contains(term);
-            }).toList();
-          }
-
-          return PagedPurchases(items: items, total: items.length);
         }
       }
-      rethrow;
+
+      if (_queue != null) {
+        try {
+          final pendingOps =
+              await _queue.listByOperationType('purchase.create');
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic>) {
+                final id = decoded['id']?.toString() ?? op.aggregateId;
+                if (!items.any((p) => p['id']?.toString() == id)) {
+                  items.insert(0, {
+                    ...decoded,
+                    'id': id,
+                    'orderNumber': decoded['orderNumber'] ??
+                        'PO-OFFLINE-${id.substring(0, 6).toUpperCase()}',
+                    'status': 0,
+                    'isOfflinePending': true,
+                  });
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      if (search != null && search.trim().isNotEmpty) {
+        final term = search.trim().toLowerCase();
+        items = items.where((p) {
+          final number = (p['orderNumber'] ?? '').toString().toLowerCase();
+          final supplier = (p['supplierName'] ?? '').toString().toLowerCase();
+          return number.contains(term) || supplier.contains(term);
+        }).toList();
+      }
+
+      return PagedPurchases(items: items, total: items.length);
     }
   }
 
@@ -115,23 +140,44 @@ class PurchaseRepository {
           if (found.isNotEmpty) return found.first;
         }
       }
-      rethrow;
+
+      if (_queue != null) {
+        try {
+          final pendingOps =
+              await _queue.listByOperationType('purchase.create');
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic> &&
+                  (decoded['id'] == id || op.aggregateId == id)) {
+                return {...decoded, 'id': id, 'isOfflinePending': true};
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      return {'id': id, 'orderNumber': 'PO-$id', 'isOfflinePending': true};
     }
   }
 
   Future<void> create(
     Map<String, dynamic> body, {
+    String? id,
     bool remoteOnly = false,
   }) async {
+    final localId = id ?? body['id']?.toString() ?? _uuid.v4();
+    final enrichedBody = Map<String, dynamic>.from(body)..['id'] = localId;
+
     try {
       await _apiClient.post<dynamic>(
         ApiRoutes.v1('/purchase-orders'),
-        body: body,
+        body: enrichedBody,
+        headers: {'Idempotency-Key': localId},
       );
     } on AppException {
       if (remoteOnly) rethrow;
 
-      final localId = _uuid.v4();
       final localOrder = {
         'id': localId,
         'orderNumber': 'PO-OFFLINE-${localId.substring(0, 6).toUpperCase()}',
@@ -164,7 +210,7 @@ class PurchaseRepository {
           operationType: 'purchase.create',
           aggregateType: 'purchase',
           aggregateId: localId,
-          payload: jsonEncode(body),
+          payload: jsonEncode(enrichedBody),
         );
       }
     }
@@ -187,16 +233,76 @@ class PurchaseRepository {
     } catch (_) {}
   }
 
-  Future<void> submit(String id) async {
-    await _apiClient.post<dynamic>(
-      ApiRoutes.v1('/purchase-orders/$id/submit'),
-    );
+  Future<void> submit(String id, {bool remoteOnly = false}) async {
+    try {
+      await _apiClient.post<dynamic>(
+        ApiRoutes.v1('/purchase-orders/$id/submit'),
+      );
+    } on AppException {
+      if (remoteOnly) rethrow;
+      if (_cache != null) {
+        final cached = await _cache.load('purchase_$id');
+        if (cached != null) {
+          final updated = Map<String, dynamic>.from(cached)..['status'] = 1;
+          await _cache.save('purchase_$id', updated);
+          await _appendPurchaseToCache(updated);
+        }
+      }
+      if (_queue != null) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf()) ?? 'unknown'
+            : 'unknown';
+        final branchId =
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
+        await _queue.enqueue(
+          operationId: _uuid.v4(),
+          tenantId: tenantId,
+          branchId: branchId,
+          deviceId: deviceId,
+          operationType: 'purchase.submit',
+          aggregateType: 'purchase',
+          aggregateId: id,
+          payload: jsonEncode({'id': id}),
+        );
+      }
+    }
   }
 
-  Future<void> cancel(String id) async {
-    await _apiClient.post<dynamic>(
-      ApiRoutes.v1('/purchase-orders/$id/cancel'),
-    );
+  Future<void> cancel(String id, {bool remoteOnly = false}) async {
+    try {
+      await _apiClient.post<dynamic>(
+        ApiRoutes.v1('/purchase-orders/$id/cancel'),
+      );
+    } on AppException {
+      if (remoteOnly) rethrow;
+      if (_cache != null) {
+        final cached = await _cache.load('purchase_$id');
+        if (cached != null) {
+          final updated = Map<String, dynamic>.from(cached)..['status'] = 3;
+          await _cache.save('purchase_$id', updated);
+          await _appendPurchaseToCache(updated);
+        }
+      }
+      if (_queue != null) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf()) ?? 'unknown'
+            : 'unknown';
+        final branchId =
+            _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
+        final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
+        await _queue.enqueue(
+          operationId: _uuid.v4(),
+          tenantId: tenantId,
+          branchId: branchId,
+          deviceId: deviceId,
+          operationType: 'purchase.cancel',
+          aggregateType: 'purchase',
+          aggregateId: id,
+          payload: jsonEncode({'id': id}),
+        );
+      }
+    }
   }
 
   Future<PagedSuppliers> suppliers({

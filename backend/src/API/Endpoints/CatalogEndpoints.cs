@@ -77,10 +77,21 @@ public static class CatalogEndpoints
         => (await sender.Send(new GetProductQuery(id), cancellationToken)).ToApiResult();
 
     private static async Task<IResult> CreateProductAsync(
+        HttpContext context,
         CreateProductCommand command,
         ISender sender,
         CancellationToken cancellationToken)
-        => (await sender.Send(command, cancellationToken)).ToApiResult();
+    {
+        var effectiveCommand = command;
+        if (!effectiveCommand.Id.HasValue &&
+            context.Request.Headers.TryGetValue("Idempotency-Key", out var rawKey) &&
+            Guid.TryParse(rawKey.ToString(), out var idempotencyGuid))
+        {
+            effectiveCommand = effectiveCommand with { Id = idempotencyGuid };
+        }
+
+        return (await sender.Send(effectiveCommand, cancellationToken)).ToApiResult();
+    }
 
     private static async Task<IResult> EnsureQuickSaleProductAsync(
         ISender sender,

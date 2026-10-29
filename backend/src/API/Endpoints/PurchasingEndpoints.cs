@@ -110,14 +110,25 @@ public static class PurchasingEndpoints
         => (await sender.Send(new GetSupplierQuery(id), cancellationToken)).ToApiResult();
 
     private static async Task<IResult> CreateSupplierAsync(
+        HttpContext context,
         CreateSupplierRequest request,
         ISender sender,
         CancellationToken cancellationToken)
-        => (await sender.Send(
+    {
+        var id = request.Id;
+        if (!id.HasValue &&
+            context.Request.Headers.TryGetValue("Idempotency-Key", out var rawKey) &&
+            Guid.TryParse(rawKey.ToString(), out var idempotencyGuid))
+        {
+            id = idempotencyGuid;
+        }
+
+        return (await sender.Send(
             new CreateSupplierCommand(
                 request.Name, request.ContactName, request.Email,
-                request.Phone, request.Address, request.Tin, request.Notes),
+                request.Phone, request.Address, request.Tin, request.Notes, id),
             cancellationToken)).ToApiResult();
+    }
 
     private static async Task<IResult> UpdateSupplierAsync(
         Guid id,
@@ -145,10 +156,20 @@ public static class PurchasingEndpoints
         => (await sender.Send(new GetPurchaseOrderQuery(id), cancellationToken)).ToApiResult();
 
     private static async Task<IResult> CreatePurchaseOrderAsync(
+        HttpContext httpContext,
         CreatePurchaseOrderRequest request,
         ISender sender,
         CancellationToken cancellationToken)
-        => (await sender.Send(
+    {
+        Guid? resolvedId = request.Id;
+        if (!resolvedId.HasValue &&
+            httpContext.Request.Headers.TryGetValue("Idempotency-Key", out var ik) &&
+            Guid.TryParse(ik.ToString(), out var parsedIk))
+        {
+            resolvedId = parsedIk;
+        }
+
+        return (await sender.Send(
             new CreatePurchaseOrderCommand(
                 request.SupplierId,
                 request.WarehouseId,
@@ -156,8 +177,10 @@ public static class PurchasingEndpoints
                 request.Reference,
                 request.ExpectedDate,
                 request.Notes,
-                request.Lines),
+                request.Lines,
+                resolvedId),
             cancellationToken)).ToApiResult();
+    }
 
     private static async Task<IResult> SubmitPurchaseOrderAsync(
         Guid id,
@@ -232,7 +255,8 @@ public static class PurchasingEndpoints
         string? Phone,
         string? Address,
         string? Tin,
-        string? Notes);
+        string? Notes,
+        Guid? Id = null);
 
     private sealed record UpdateSupplierRequest(
         string Name,
@@ -251,7 +275,8 @@ public static class PurchasingEndpoints
         string? Reference,
         DateTime? ExpectedDate,
         string? Notes,
-        IReadOnlyList<PurchaseOrderLineInput> Lines);
+        IReadOnlyList<PurchaseOrderLineInput> Lines,
+        Guid? Id = null);
 
     private sealed record CreateSupplierBillRequest(
         Guid PurchaseOrderId,

@@ -83,9 +83,9 @@ class TopProductsController extends Notifier<TopProductsState> {
       await _cacheDao.save(cacheKey, {
         'items': products.map((p) => p.toJson()).toList(),
       });
-    } on AppException catch (error) {
+    } catch (_) {
       if (state is! TopProductsLoaded) {
-        state = TopProductsFailure(error.message);
+        state = const TopProductsLoaded([]);
       }
     }
   }

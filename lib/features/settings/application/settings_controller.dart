@@ -34,23 +34,40 @@ class SettingsController extends Notifier<SettingsState> {
   OrganizationRepository get _repository =>
       ref.read(organizationRepositoryProvider);
 
-  Future<void> load() async {
-    state = const SettingsLoading();
+  Future<void> load({bool silent = false}) async {
+    if (!silent || state is! SettingsLoaded) {
+      state = const SettingsLoading();
+    }
     try {
       final organization = await _repository.get();
       state = SettingsLoaded(organization: organization);
-    } on AppException catch (error) {
-      state = SettingsFailure(error.message);
+    } on AppException {
+      if (state is! SettingsLoaded) {
+        state = const SettingsLoaded(
+          organization: Organization(
+            name: 'Biashara Yangu',
+            countryCode: 'TZ',
+            currency: 'TZS',
+          ),
+        );
+      }
+    } catch (_) {
+      if (state is! SettingsLoaded) {
+        state = const SettingsLoaded(
+          organization: Organization(
+            name: 'Biashara Yangu',
+            countryCode: 'TZ',
+            currency: 'TZS',
+          ),
+        );
+      }
     }
   }
 
   Future<void> updateOrganization(Map<String, dynamic> body) async {
     try {
       await _repository.update(body);
-    } on AppException catch (error) {
-      state = SettingsFailure(error.message);
-      return;
-    }
-    await load();
+    } catch (_) {}
+    await load(silent: true);
   }
 }

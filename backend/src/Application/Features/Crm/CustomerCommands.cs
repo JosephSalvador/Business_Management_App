@@ -15,7 +15,8 @@ public static class CustomerMappers
 // ── Create Customer ─────────────────────────────────────────────
 public sealed record CreateCustomerCommand(
     string Name, string? ContactName, string? Email, string? Phone,
-    string? Address, string? Tin, bool IsVatRegistered, string? Notes)
+    string? Address, string? Tin, bool IsVatRegistered, string? Notes,
+    Guid? Id = null)
     : IRequest<Result<CustomerDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateCustomerCommandHandler
@@ -35,13 +36,23 @@ public sealed class CreateCustomerCommandHandler
     {
         var tenantId = _tenantContext.TenantId;
 
+        // Idempotency: replay existing customer if ClientId already exists
+        if (command.Id.HasValue && command.Id.Value != Guid.Empty)
+        {
+            var existing = await _customers.GetByIdAsync(tenantId, command.Id.Value, cancellationToken);
+            if (existing is not null)
+            {
+                return Result.Success(CustomerMappers.ToDto(existing));
+            }
+        }
+
         Customer customer;
         try
         {
             customer = Customer.Create(
                 tenantId, command.Name, command.ContactName, command.Email,
                 command.Phone, command.Address, command.Tin,
-                command.IsVatRegistered, command.Notes);
+                command.IsVatRegistered, command.Notes, command.Id);
         }
         catch (ArgumentException ex)
         {
