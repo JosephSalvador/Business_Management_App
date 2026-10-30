@@ -114,7 +114,10 @@ void main() {
       await tester.pump();
       await submitWaitingForTerms(tester);
 
-      expect(find.textContaining('alama maalum'), findsOneWidget);
+      expect(
+        find.textContaining('linapaswa kuwa na alama maalum'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('strength meter appears while typing a password',
