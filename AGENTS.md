@@ -91,4 +91,4 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Frontend - Add localization strings in `app_en.arb` and `app_sw.arb` for step indicators, headers, and navigation buttons.
 - [x] Task 6: Frontend & Backend Tests - Update unit and widget tests (`auth_controller_journey_test.dart`, `auth_forms_widget_test.dart`).
 - [x] Task 7: Bump version code to `1.0.0+66` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 8: Commit, push to `feature/mobile-pos-foundation`, and trigger GitHub Actions `build-clients.yml` to publish updated production APK.
+- [x] Task 8: Commit, push to `feature/mobile-pos-foundation`, and trigger GitHub Actions `build-clients.yml` to publish updated production APK (Run 41063888991).
