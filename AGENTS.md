@@ -76,5 +76,5 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 3: Update `register_page.dart` and `reset_password_page.dart` to bind `validatePasswordPolicy`, show `PasswordRequirementsView`, pass `errorText`, and prevent submission until all requirements are met.
 - [x] Task 4: Update unit and widget tests (`password_strength_test.dart` and `auth_forms_widget_test.dart`) to verify local rejection of non-compliant passwords.
 - [x] Task 5: Bump version code to `1.0.0+64` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 6: Commit, push to `feature/mobile-pos-foundation`, and trigger GitHub Actions build to publish the updated APK.
+- [x] Task 6: Commit (`53c39d5`), push to `feature/mobile-pos-foundation`, and trigger GitHub Actions `build-clients.yml` (Run 41023114036) to publish the updated APK.
 
