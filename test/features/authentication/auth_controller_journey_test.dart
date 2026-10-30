@@ -91,6 +91,18 @@ class FakeAuthRepository implements AuthRepository {
         expiresAt: DateTime.fromMicrosecondsSinceEpoch(0),
       );
 
+  bool checkEmailAvailable = true;
+  bool checkPhoneAvailable = true;
+
+  @override
+  Future<({bool emailAvailable, bool phoneAvailable})> checkAvailability({
+    String? email,
+    String? phone,
+  }) async => (
+    emailAvailable: checkEmailAvailable,
+    phoneAvailable: checkPhoneAvailable,
+  );
+
   @override
   Future<({String code, DateTime expiresAtUtc})> issueInvitation() async =>
       (code: 'FAKE', expiresAtUtc: DateTime.now().toUtc());
@@ -517,6 +529,24 @@ void main() {
         ),
         throwsA(isA<ConflictException>()),
       );
+    });
+
+    test('checkAvailability reports availability status correctly', () async {
+      final repository = FakeAuthRepository()
+        ..checkEmailAvailable = false
+        ..checkPhoneAvailable = true;
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      await Future.microtask(() {});
+
+      final result = await controller.checkAvailability(
+        email: 'taken@example.com',
+        phone: '+255712345678',
+      );
+
+      expect(result.emailAvailable, isFalse);
+      expect(result.phoneAvailable, isTrue);
     });
 
     test('verifyEmail consumes the code then returns to unauthenticated',

@@ -83,3 +83,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Fix `deploy/cloudflare-failover-worker.js` proxy forward logic (remove forbidden Host header override and ensure safe abort controller).
 - [x] Task 5: Bump version code to `1.0.0+65` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 6: Commit, push to `feature/mobile-pos-foundation`, and trigger GitHub Actions `build-clients.yml` to publish updated production APK (Run 41041507461).
+## Implementation Plan — Multi-Step Registration & Instant Availability Verification (Microsoft-Style)
+- [x] Task 1: Backend - Add `/api/v1/auth/check-availability` endpoint for fast pre-validation of email and phone.
+- [x] Task 2: Frontend - Add `checkAvailability` in `AuthRepository` and wire pre-check into `AuthController`.
+- [x] Task 3: Frontend - Transform `register_page.dart` into a smooth 2-step wizard (Step 1: Identity & Contact with live availability check; Step 2: Password, Policy Checklist & Terms).
+- [x] Task 4: Frontend - Add step indicator progress UI, smooth step transition animations, and back-step navigation in `register_page.dart`.
+- [x] Task 5: Frontend - Add localization strings in `app_en.arb` and `app_sw.arb` for step indicators, headers, and navigation buttons.
+- [x] Task 6: Frontend & Backend Tests - Update unit and widget tests (`auth_controller_journey_test.dart`, `auth_forms_widget_test.dart`).
+- [x] Task 7: Bump version code to `1.0.0+66` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 8: Commit, push to `feature/mobile-pos-foundation`, and trigger GitHub Actions `build-clients.yml` to publish updated production APK.

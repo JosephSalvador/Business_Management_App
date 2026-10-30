@@ -71,6 +71,41 @@ class AuthRepository {
   /// The offline credential store for offline authentication.
   OfflineCredentialStore get offlineCredentialStore => _offlineCredentialStore;
 
+  /// Checks availability of an email and/or phone number before registration.
+  Future<({bool emailAvailable, bool phoneAvailable})> checkAvailability({
+    String? email,
+    String? phone,
+  }) async {
+    final queryParams = <String, String>{};
+    if (email != null && email.trim().isNotEmpty) {
+      queryParams['email'] = email.trim().toLowerCase();
+    }
+    if (phone != null && phone.trim().isNotEmpty) {
+      queryParams['phone'] = phone.trim();
+    }
+    if (queryParams.isEmpty) {
+      return (emailAvailable: true, phoneAvailable: true);
+    }
+
+    try {
+      final response = await _apiClient.get<dynamic>(
+        '/api/v1/auth/check-availability',
+        queryParameters: queryParams,
+        extra: _authExchangeExtra,
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map<dynamic, dynamic>;
+        return (
+          emailAvailable: data['emailAvailable'] as bool? ?? true,
+          phoneAvailable: data['phoneAvailable'] as bool? ?? true,
+        );
+      }
+    } catch (_) {
+      // Non-fatal pre-check: allow user to continue if probe fails
+    }
+    return (emailAvailable: true, phoneAvailable: true);
+  }
+
   /// Registers a new business owner. `organizationName` doubles as the
   /// business name — registration provisions tenant + HQ branch + owner role.
   /// Returns the account only; a verification code is emailed separately and

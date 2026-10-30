@@ -382,6 +382,13 @@ class AuthController extends Notifier<AuthState> {
     return trimmed.contains('@') ? trimmed : '';
   }
 
+  /// Pre-validates availability of email and phone before moving to step 2.
+  Future<({bool emailAvailable, bool phoneAvailable})> checkAvailability({
+    String? email,
+    String? phone,
+  }) =>
+      _repository.checkAvailability(email: email, phone: phone);
+
   Future<void> register({
     required String email,
     required String password,

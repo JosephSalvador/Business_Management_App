@@ -23,6 +23,7 @@ public static class AuthEndpoints
             .WithTags("Auth")
             .RequireRateLimiting("auth");
 
+        auth.MapGet("/check-availability", CheckAvailabilityAsync).WithName("CheckAvailability");
         auth.MapPost("/register", RegisterAsync).WithName("Register");
         auth.MapPost("/register-staff", RegisterStaffAsync).WithName("RegisterStaff");
         auth.MapPost("/login", LoginAsync).WithName("Login");
@@ -83,6 +84,13 @@ public static class AuthEndpoints
 
         return app;
     }
+
+    private static async Task<IResult> CheckAvailabilityAsync(
+        string? email,
+        string? phone,
+        ISender sender,
+        CancellationToken cancellationToken)
+        => (await sender.Send(new CheckAvailabilityQuery(email, phone), cancellationToken)).ToApiResult();
 
     private static async Task<IResult> RegisterAsync(
         RegisterUserCommand command,

@@ -104,3 +104,7 @@ public sealed record AuthSessionDto(
     string? IpAddress,
     DateTime StartedAt,
     bool IsCurrent);
+
+public sealed record AvailabilityResultDto(
+    bool EmailAvailable,
+    bool PhoneAvailable);

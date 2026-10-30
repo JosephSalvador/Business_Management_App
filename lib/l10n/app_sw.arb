@@ -40,6 +40,21 @@
   "acceptTermsSuffix": " ya huduma.",
   "acceptTermsRequired": "Kubali masharti ya huduma ili kuendelea.",
   "createAccount": "Fungua akaunti",
+  "registerStepIdentity": "Utambulisho",
+  "registerStepSecurity": "Usalama",
+  "registerStepIndicator": "Hatua {current} kati ya {total}",
+  "@registerStepIndicator": {
+    "description": "Step indicator in multi-step registration",
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "nextStep": "Endelea",
+  "previousStep": "Rudi",
+  "emailAlreadyTaken": "Barua pepe hii imeshasajiliwa.",
+  "phoneAlreadyTaken": "Namba hii ya simu imeshasajiliwa.",
+  "checkingAvailability": "Inakagua upatikanaji...",
   "haveAccount": "Una akaunti? Ingia",
   "forgotTitle": "Neno la siri liliosahaulika",
   "forgotIntro": "Weka barua pepe uliotumia kujisajili. Tutakutumia namba ya kuweka upya neno la siri.",

@@ -78,6 +78,40 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    Future<void> continueToStep2(WidgetTester tester) async {
+      await fillIdentity(tester);
+      await tester.ensureVisible(find.text('Endelea'));
+      await tester.tap(find.text('Endelea'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('step 1 validates identity fields and moves to step 2 on continue',
+        (tester) async {
+      await pumpRegister(tester);
+
+      expect(find.text('Utambulisho'), findsOneWidget);
+      expect(find.text('Usalama'), findsOneWidget);
+      expect(find.byType(PasswordField), findsNothing);
+
+      await continueToStep2(tester);
+
+      expect(find.byType(PasswordField), findsNWidgets(2));
+      expect(find.text('Fungua akaunti'), findsOneWidget);
+    });
+
+    testWidgets('step 2 back button returns to step 1', (tester) async {
+      await pumpRegister(tester);
+      await continueToStep2(tester);
+
+      expect(find.byType(PasswordField), findsNWidgets(2));
+
+      await tester.tap(find.text('Rudi'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextFormField, 'Jina lako kamili'), findsOneWidget);
+      expect(find.byType(PasswordField), findsNothing);
+    });
+
     Future<void> submitWaitingForTerms(WidgetTester tester) async {
       await tester.ensureVisible(find.text('Fungua akaunti'));
       await tester.tap(find.text('Fungua akaunti'));
@@ -87,7 +121,7 @@ void main() {
     testWidgets('mismatched confirmation is rejected locally', (tester) async {
       await pumpRegister(tester);
 
-      await fillIdentity(tester);
+      await continueToStep2(tester);
       final passwordFields = find.byType(PasswordField);
       await tester.enterText(passwordFields.first, 'Passw0rd!');
       await tester.enterText(passwordFields.last, 'Different1!');
@@ -104,7 +138,7 @@ void main() {
         (tester) async {
       await pumpRegister(tester);
 
-      await fillIdentity(tester);
+      await continueToStep2(tester);
       final passwordFields = find.byType(PasswordField);
       await tester.enterText(passwordFields.first, 'Jolinx12345');
       await tester.enterText(passwordFields.last, 'Jolinx12345');
@@ -124,6 +158,7 @@ void main() {
         (tester) async {
       await pumpRegister(tester);
 
+      await continueToStep2(tester);
       final passwordFields = find.byType(PasswordField);
       await tester.enterText(passwordFields.first, 'Passw0rd!');
       await tester.pump();

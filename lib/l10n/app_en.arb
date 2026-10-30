@@ -40,6 +40,21 @@
   "acceptTermsSuffix": ".",
   "acceptTermsRequired": "Accept the terms of service to continue.",
   "createAccount": "Create account",
+  "registerStepIdentity": "Identity",
+  "registerStepSecurity": "Security",
+  "registerStepIndicator": "Step {current} of {total}",
+  "@registerStepIndicator": {
+    "description": "Step indicator in multi-step registration",
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "nextStep": "Continue",
+  "previousStep": "Back",
+  "emailAlreadyTaken": "This email is already registered.",
+  "phoneAlreadyTaken": "This phone number is already registered.",
+  "checkingAvailability": "Checking availability...",
   "haveAccount": "Already have an account? Sign in",
   "forgotTitle": "Forgot password",
   "forgotIntro": "Enter the email you registered with. We will send you a reset code.",
