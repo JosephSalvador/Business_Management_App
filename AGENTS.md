@@ -70,6 +70,11 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 2: Commit and push changes on branch `feature/mobile-pos-foundation`.
 - [x] Task 3: Trigger GitHub Actions workflow `build-clients.yml` with `deploy_target: production` (Run 40874518788).
 - [x] Task 4: Monitor remote workflow execution until production APK is published to `https://github.com/JosephSalvador/Business_Management_App/releases/tag/latest`.
-
-
+## Implementation Plan — Password Policy UI & Submission Guardrails
+- [x] Task 1: Add password policy ARB localization strings for length, uppercase, lowercase, numbers, and special characters (`app_en.arb`, `app_sw.arb`).
+- [x] Task 2: Enhance `password_field.dart` with `PasswordRequirements`, client-side validator `validatePasswordPolicy`, live `PasswordRequirementsView` checklist, and `errorText` support.
+- [x] Task 3: Update `register_page.dart` and `reset_password_page.dart` to bind `validatePasswordPolicy`, show `PasswordRequirementsView`, pass `errorText`, and prevent submission until all requirements are met.
+- [x] Task 4: Update unit and widget tests (`password_strength_test.dart` and `auth_forms_widget_test.dart`) to verify local rejection of non-compliant passwords.
+- [x] Task 5: Bump version code to `1.0.0+64` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 6: Commit, push to `feature/mobile-pos-foundation`, and trigger GitHub Actions build to publish the updated APK.
 

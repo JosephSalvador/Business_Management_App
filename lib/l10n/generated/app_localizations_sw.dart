@@ -82,6 +82,37 @@ class AppLocalizationsSw extends AppLocalizations {
   String get passwordTooShort => 'Neno la siri fupi mno (angalau herufi 8)';
 
   @override
+  String get passwordRequiresUppercase =>
+      'Neno la siri linapaswa kuwa na herufi kubwa (A-Z)';
+
+  @override
+  String get passwordRequiresLowercase =>
+      'Neno la siri linapaswa kuwa na herufi ndogo (a-z)';
+
+  @override
+  String get passwordRequiresDigit =>
+      'Neno la siri linapaswa kuwa na namba (0-9)';
+
+  @override
+  String get passwordRequiresSpecial =>
+      'Neno la siri linapaswa kuwa na alama maalum (!@#\$%...)';
+
+  @override
+  String get passwordRuleLength => 'Angalau herufi 8';
+
+  @override
+  String get passwordRuleUppercase => 'Herufi kubwa (A-Z)';
+
+  @override
+  String get passwordRuleLowercase => 'Herufi ndogo (a-z)';
+
+  @override
+  String get passwordRuleDigit => 'Namba (0-9)';
+
+  @override
+  String get passwordRuleSpecial => 'Alama maalum (!@#\$%...)';
+
+  @override
   String get confirmPasswordLabel => 'Rudia neno la siri';
 
   @override

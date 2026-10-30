@@ -170,13 +170,17 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                     labelText: loc.newPasswordLabel,
                     autofillHints: const [AutofillHints.newPassword],
                     onFieldSubmitted: (_) => _submit(),
-                    validator: (value) =>
-                        (value ?? '').length < 8 ? loc.passwordTooShort : null,
+                    validator: (value) => validatePasswordPolicy(context, value),
                   ),
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _passwordController,
-                    builder: (_, value, __) =>
+                    builder: (_, value, __) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                         PasswordStrengthMeter(password: value.text),
+                        PasswordRequirementsView(password: value.text),
+                      ],
+                    ),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 16),

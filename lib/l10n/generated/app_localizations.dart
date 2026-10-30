@@ -242,6 +242,33 @@ abstract class AppLocalizations {
   /// **'Password is too short (at least 8 characters)'**
   String get passwordTooShort;
 
+  /// No description provided for @passwordRequiresUppercase.
+  String get passwordRequiresUppercase;
+
+  /// No description provided for @passwordRequiresLowercase.
+  String get passwordRequiresLowercase;
+
+  /// No description provided for @passwordRequiresDigit.
+  String get passwordRequiresDigit;
+
+  /// No description provided for @passwordRequiresSpecial.
+  String get passwordRequiresSpecial;
+
+  /// No description provided for @passwordRuleLength.
+  String get passwordRuleLength;
+
+  /// No description provided for @passwordRuleUppercase.
+  String get passwordRuleUppercase;
+
+  /// No description provided for @passwordRuleLowercase.
+  String get passwordRuleLowercase;
+
+  /// No description provided for @passwordRuleDigit.
+  String get passwordRuleDigit;
+
+  /// No description provided for @passwordRuleSpecial.
+  String get passwordRuleSpecial;
+
   /// No description provided for @confirmPasswordLabel.
   ///
   /// In en, this message translates to:

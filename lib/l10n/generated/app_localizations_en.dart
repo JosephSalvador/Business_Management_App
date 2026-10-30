@@ -83,6 +83,37 @@ class AppLocalizationsEn extends AppLocalizations {
       'Password is too short (at least 8 characters)';
 
   @override
+  String get passwordRequiresUppercase =>
+      'Password must contain an uppercase letter (A-Z)';
+
+  @override
+  String get passwordRequiresLowercase =>
+      'Password must contain a lowercase letter (a-z)';
+
+  @override
+  String get passwordRequiresDigit =>
+      'Password must contain a number (0-9)';
+
+  @override
+  String get passwordRequiresSpecial =>
+      'Password must contain a special character (!@#\$%...)';
+
+  @override
+  String get passwordRuleLength => 'At least 8 characters';
+
+  @override
+  String get passwordRuleUppercase => 'Uppercase letter (A-Z)';
+
+  @override
+  String get passwordRuleLowercase => 'Lowercase letter (a-z)';
+
+  @override
+  String get passwordRuleDigit => 'Number (0-9)';
+
+  @override
+  String get passwordRuleSpecial => 'Special character (!@#\$%...)';
+
+  @override
   String get confirmPasswordLabel => 'Repeat password';
 
   @override

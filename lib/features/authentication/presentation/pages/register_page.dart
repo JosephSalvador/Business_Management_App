@@ -85,7 +85,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       final mapped = mapAuthError(error);
       setState(() => _errors = mapped);
       if (mounted) {
-        final message = mapped.banner ?? error.message;
+        final message = mapped.fieldErrors.isNotEmpty
+            ? mapped.fieldErrors.values.first
+            : (mapped.banner ?? error.message);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
@@ -249,15 +251,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     controller: _passwordController,
                     labelText: loc.passwordLabel,
                     helperText: loc.passwordHelper,
+                    errorText: errorForField(errors, const ['Password', 'NewPassword']),
                     autofillHints: const [AutofillHints.newPassword],
                     textInputAction: TextInputAction.next,
-                    validator: (value) =>
-                        (value ?? '').length < 8 ? loc.passwordTooShort : null,
+                    validator: (value) => validatePasswordPolicy(context, value),
                   ),
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _passwordController,
-                    builder: (_, value, __) =>
+                    builder: (_, value, __) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                         PasswordStrengthMeter(password: value.text),
+                        PasswordRequirementsView(password: value.text),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 14),
                   PasswordField(

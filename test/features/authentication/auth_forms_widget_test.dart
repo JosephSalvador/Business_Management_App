@@ -100,6 +100,23 @@ void main() {
       expect(find.text('Maneno ya siri hayafanani'), findsOneWidget);
     });
 
+    testWidgets('password missing special character is rejected locally',
+        (tester) async {
+      await pumpRegister(tester);
+
+      await fillIdentity(tester);
+      final passwordFields = find.byType(PasswordField);
+      await tester.enterText(passwordFields.first, 'Jolinx12345');
+      await tester.enterText(passwordFields.last, 'Jolinx12345');
+
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      await submitWaitingForTerms(tester);
+
+      expect(find.textContaining('alama maalum'), findsOneWidget);
+    });
+
     testWidgets('strength meter appears while typing a password',
         (tester) async {
       await pumpRegister(tester);
