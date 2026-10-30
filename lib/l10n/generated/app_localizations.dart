@@ -233,7 +233,7 @@ abstract class AppLocalizations {
   /// No description provided for @passwordHelper.
   ///
   /// In en, this message translates to:
-  /// **'At least 8 characters'**
+  /// **'At least 8 characters with letters, numbers & symbols'**
   String get passwordHelper;
 
   /// No description provided for @passwordTooShort.
@@ -243,30 +243,57 @@ abstract class AppLocalizations {
   String get passwordTooShort;
 
   /// No description provided for @passwordRequiresUppercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain an uppercase letter (A-Z)'**
   String get passwordRequiresUppercase;
 
   /// No description provided for @passwordRequiresLowercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain a lowercase letter (a-z)'**
   String get passwordRequiresLowercase;
 
   /// No description provided for @passwordRequiresDigit.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain a number (0-9)'**
   String get passwordRequiresDigit;
 
   /// No description provided for @passwordRequiresSpecial.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain a special character (!@#\$%...)'**
   String get passwordRequiresSpecial;
 
   /// No description provided for @passwordRuleLength.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 8 characters'**
   String get passwordRuleLength;
 
   /// No description provided for @passwordRuleUppercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Uppercase letter (A-Z)'**
   String get passwordRuleUppercase;
 
   /// No description provided for @passwordRuleLowercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Lowercase letter (a-z)'**
   String get passwordRuleLowercase;
 
   /// No description provided for @passwordRuleDigit.
+  ///
+  /// In en, this message translates to:
+  /// **'Number (0-9)'**
   String get passwordRuleDigit;
 
   /// No description provided for @passwordRuleSpecial.
+  ///
+  /// In en, this message translates to:
+  /// **'Special character (!@#\$%...)'**
   String get passwordRuleSpecial;
 
   /// No description provided for @confirmPasswordLabel.
@@ -310,6 +337,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create account'**
   String get createAccount;
+
+  /// No description provided for @registerStepIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get registerStepIdentity;
+
+  /// No description provided for @registerStepSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get registerStepSecurity;
+
+  /// Step indicator in multi-step registration
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current} of {total}'**
+  String registerStepIndicator(int current, int total);
+
+  /// No description provided for @nextStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get nextStep;
+
+  /// No description provided for @previousStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get previousStep;
+
+  /// No description provided for @emailAlreadyTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This email is already registered.'**
+  String get emailAlreadyTaken;
+
+  /// No description provided for @phoneAlreadyTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone number is already registered.'**
+  String get phoneAlreadyTaken;
+
+  /// No description provided for @checkingAvailability.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking availability...'**
+  String get checkingAvailability;
 
   /// No description provided for @haveAccount.
   ///
@@ -982,6 +1057,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'units'**
   String get dashboardItemUnits;
+
+  /// No description provided for @dashboardCachedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewing offline data (cached). Pull to refresh when connected.'**
+  String get dashboardCachedBanner;
+
+  /// No description provided for @dashboardUpdatedJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get dashboardUpdatedJustNow;
 
   /// No description provided for @posTitle.
   ///
@@ -1984,18 +2071,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'sold'**
   String get reportsSoldLabel;
-
-  /// No description provided for @dashboardCachedBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Viewing offline data (cached). Pull to refresh when connected.'**
-  String get dashboardCachedBanner;
-
-  /// No description provided for @dashboardUpdatedJustNow.
-  ///
-  /// In en, this message translates to:
-  /// **'Just now'**
-  String get dashboardUpdatedJustNow;
 
   /// No description provided for @reportsProfitLabel.
   ///

@@ -76,7 +76,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneInvalid => 'That phone number is not valid';
 
   @override
-  String get passwordHelper => 'At least 8 characters';
+  String get passwordHelper =>
+      'At least 8 characters with letters, numbers & symbols';
 
   @override
   String get passwordTooShort =>
@@ -91,8 +92,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Password must contain a lowercase letter (a-z)';
 
   @override
-  String get passwordRequiresDigit =>
-      'Password must contain a number (0-9)';
+  String get passwordRequiresDigit => 'Password must contain a number (0-9)';
 
   @override
   String get passwordRequiresSpecial =>
@@ -133,6 +133,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createAccount => 'Create account';
+
+  @override
+  String get registerStepIdentity => 'Identity';
+
+  @override
+  String get registerStepSecurity => 'Security';
+
+  @override
+  String registerStepIndicator(int current, int total) {
+    return 'Step $current of $total';
+  }
+
+  @override
+  String get nextStep => 'Continue';
+
+  @override
+  String get previousStep => 'Back';
+
+  @override
+  String get emailAlreadyTaken => 'This email is already registered.';
+
+  @override
+  String get phoneAlreadyTaken => 'This phone number is already registered.';
+
+  @override
+  String get checkingAvailability => 'Checking availability...';
 
   @override
   String get haveAccount => 'Already have an account? Sign in';
@@ -491,6 +517,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardItemUnits => 'units';
+
+  @override
+  String get dashboardCachedBanner =>
+      'Viewing offline data (cached). Pull to refresh when connected.';
+
+  @override
+  String get dashboardUpdatedJustNow => 'Just now';
 
   @override
   String get posTitle => 'Point of Sale';
@@ -1016,13 +1049,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportsSoldLabel => 'sold';
-
-  @override
-  String get dashboardCachedBanner =>
-      'Viewing offline data (cached). Pull to refresh when connected.';
-
-  @override
-  String get dashboardUpdatedJustNow => 'Just now';
 
   @override
   String get reportsProfitLabel => 'Profit';
@@ -1708,7 +1734,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get productFormCostPriceInvalid => 'Cost price cannot be negative';
 
   @override
-  String get productFormCostPriceGuidance => 'Required to calculate real profit and inventory valuation.';
+  String get productFormCostPriceGuidance =>
+      'Required to calculate real profit and inventory valuation.';
 
   @override
   String get navHome => 'Home';

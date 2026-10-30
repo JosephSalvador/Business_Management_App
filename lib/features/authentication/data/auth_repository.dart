@@ -90,7 +90,7 @@ class AuthRepository {
     try {
       final response = await _apiClient.get<dynamic>(
         '/api/v1/auth/check-availability',
-        queryParameters: queryParams,
+        query: queryParams,
         extra: _authExchangeExtra,
       );
       if (response.statusCode == 200 && response.data is Map) {

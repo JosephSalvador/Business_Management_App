@@ -76,7 +76,8 @@ class AppLocalizationsSw extends AppLocalizations {
   String get phoneInvalid => 'Namba ya simu si sahihi';
 
   @override
-  String get passwordHelper => 'Angalau herufi 8';
+  String get passwordHelper =>
+      'Angalau herufi 8 zenye herufi, namba na alama maalum';
 
   @override
   String get passwordTooShort => 'Neno la siri fupi mno (angalau herufi 8)';
@@ -132,6 +133,32 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get createAccount => 'Fungua akaunti';
+
+  @override
+  String get registerStepIdentity => 'Utambulisho';
+
+  @override
+  String get registerStepSecurity => 'Usalama';
+
+  @override
+  String registerStepIndicator(int current, int total) {
+    return 'Hatua $current kati ya $total';
+  }
+
+  @override
+  String get nextStep => 'Endelea';
+
+  @override
+  String get previousStep => 'Rudi';
+
+  @override
+  String get emailAlreadyTaken => 'Barua pepe hii imeshasajiliwa.';
+
+  @override
+  String get phoneAlreadyTaken => 'Namba hii ya simu imeshasajiliwa.';
+
+  @override
+  String get checkingAvailability => 'Inakagua upatikanaji...';
 
   @override
   String get haveAccount => 'Una akaunti? Ingia';
@@ -491,6 +518,13 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get dashboardItemUnits => 'vipimo';
+
+  @override
+  String get dashboardCachedBanner =>
+      'Unaangalia taarifa za awali (bila intaneti). Vuta chini kuonyesha upya ukiwa hewani.';
+
+  @override
+  String get dashboardUpdatedJustNow => 'Hivi sasa';
 
   @override
   String get posTitle => 'Mauzo';
@@ -1015,13 +1049,6 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get reportsSoldLabel => 'zimeuzwa';
-
-  @override
-  String get dashboardCachedBanner =>
-      'Unaangalia taarifa za awali (bila intaneti). Vuta chini kuonyesha upya ukiwa hewani.';
-
-  @override
-  String get dashboardUpdatedJustNow => 'Hivi sasa';
 
   @override
   String get reportsProfitLabel => 'Faida';

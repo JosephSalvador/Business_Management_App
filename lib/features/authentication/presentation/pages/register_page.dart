@@ -6,6 +6,7 @@ import '../../../../app/providers.dart';
 import '../../../../app/router.dart';
 import '../../../../core/network/app_exception.dart';
 import '../../../../l10n/loc.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../widgets/auth_background.dart';
 import '../widgets/auth_brand_mark.dart';
