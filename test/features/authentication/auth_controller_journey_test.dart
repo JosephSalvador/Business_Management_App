@@ -44,6 +44,8 @@ class FakeAuthRepository implements AuthRepository {
   String? lastVerifyCode;
   String? registeredEmail;
 
+  Object? registerError;
+  Object? registerStaffError;
   Object? verifyError;
 
   Object? loginError;
@@ -103,6 +105,10 @@ class FakeAuthRepository implements AuthRepository {
   }) async {
     registerCalls++;
     registeredEmail = email.trim().toLowerCase();
+    final error = registerError;
+    if (error != null) {
+      throw error;
+    }
     return RegisteredUser(
       id: 'u1',
       tenantId: 't1',
@@ -123,6 +129,10 @@ class FakeAuthRepository implements AuthRepository {
     registerStaffCalls++;
     lastInvitationCode = invitationCode;
     registeredEmail = email.trim().toLowerCase();
+    final error = registerStaffError;
+    if (error != null) {
+      throw error;
+    }
     return RegisteredUser(
       id: 'u2',
       tenantId: 't1',
@@ -421,6 +431,92 @@ void main() {
 
       expect(controller.state, isA<AuthAuthenticated>());
       expect(repository.loginIdentifier, 'owner@test.local');
+    });
+
+    test(
+        'register recovers on ConflictException if account credentials match and email needs verification',
+        () async {
+      final repository = FakeAuthRepository()
+        ..registerError = ConflictException('Barua pepe imeshasajiliwa.')
+        ..loginError = AccountNotVerifiedException(
+          'Thibitisha barua pepe kabla ya kuingia.',
+          email: 'owner@test.local',
+        );
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      await Future.microtask(() {});
+
+      await controller.register(
+        email: 'Owner@Test.Local',
+        password: 'Passw0rd!',
+        fullName: 'Mama',
+        phone: '+255712345678',
+      );
+
+      expect(controller.state, isA<AuthNeedsVerification>());
+      final state = controller.state as AuthNeedsVerification;
+      expect(state.email, 'owner@test.local');
+      expect(repository.loginIdentifier, 'owner@test.local');
+    });
+
+    test(
+        'register recovers on ConflictException if account credentials match and email is verified',
+        () async {
+      final repository = FakeAuthRepository()
+        ..registerError = ConflictException('Namba ya simu imeshasajiliwa.')
+        ..loginOutcome = AuthenticatedLogin(
+          Session(
+            user: const AuthUser(
+              id: 'u1',
+              tenantId: 't1',
+              email: 'owner@test.local',
+              fullName: 'Mama',
+              phone: '+255712345678',
+              isActive: true,
+              emailVerified: true,
+              permissions: ['*'],
+            ),
+            accessTokenExpiresAt:
+                DateTime.now().toUtc().add(const Duration(hours: 1)),
+          ),
+        );
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      await Future.microtask(() {});
+
+      await controller.register(
+        email: 'owner@test.local',
+        password: 'Passw0rd!',
+        fullName: 'Mama',
+        phone: '+255712345678',
+      );
+
+      expect(controller.state, isA<AuthAuthenticated>());
+      expect(repository.loginIdentifier, 'owner@test.local');
+    });
+
+    test(
+        'register rethrows ConflictException if login fails with invalid credentials',
+        () async {
+      final repository = FakeAuthRepository()
+        ..registerError = ConflictException('Barua pepe imeshasajiliwa.')
+        ..loginError = UnauthorizedException('Neno la siri si sahihi.');
+      final container = _container(repository: repository);
+      addTearDown(container.dispose);
+      final controller = container.read(authControllerProvider.notifier);
+      await Future.microtask(() {});
+
+      expect(
+        () => controller.register(
+          email: 'owner@test.local',
+          password: 'WrongPassword!',
+          fullName: 'Mama',
+          phone: '+255712345678',
+        ),
+        throwsA(isA<ConflictException>()),
+      );
     });
 
     test('verifyEmail consumes the code then returns to unauthenticated',

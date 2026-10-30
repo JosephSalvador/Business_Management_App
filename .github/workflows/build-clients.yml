@@ -90,8 +90,8 @@ jobs:
           if [ "$TARGET" = "production" ]; then
             CF_BRANCH="main"
             APP_ENV="production"
-            API_URL="https://api.joberthix.xyz"
-            FALLBACK_URL="https://jolinx-api.kindsky-ea584b9f.centralindia.azurecontainerapps.io"
+            API_URL="https://jolinx-api.kindsky-ea584b9f.centralindia.azurecontainerapps.io"
+            FALLBACK_URL="https://api.joberthix.xyz"
           else
             CF_BRANCH="staging"
             APP_ENV="staging"

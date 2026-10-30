@@ -204,8 +204,19 @@ class ApiClient {
   }
 
   bool _canFailover(DioException error) {
+    if (error.requestOptions.extra['skip_retry'] == true) {
+      return false;
+    }
     final fallback = _fallbackBaseUrl;
     if (fallback == null || fallback.isEmpty || fallback == _primaryBaseUrl) {
+      return false;
+    }
+    final method = error.requestOptions.method.toUpperCase();
+    final isMutating =
+        method == 'POST' || method == 'PATCH' || method == 'DELETE';
+    if (isMutating &&
+        (error.type == DioExceptionType.receiveTimeout ||
+            error.response?.statusCode == 504)) {
       return false;
     }
     final status = error.response?.statusCode;
@@ -213,8 +224,7 @@ class ApiClient {
       return true;
     }
     return error.type == DioExceptionType.connectionError ||
-        error.type == DioExceptionType.connectionTimeout ||
-        error.type == DioExceptionType.receiveTimeout;
+        error.type == DioExceptionType.connectionTimeout;
   }
 
   void _switchActiveHost() {

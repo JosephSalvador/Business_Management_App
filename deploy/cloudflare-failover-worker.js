@@ -151,9 +151,7 @@ export default {
 };
 
 async function forwardRequest(originalRequest, targetUrl, bodyBuffer, timeoutMs) {
-  const targetHost = new URL(targetUrl).host;
   const headers = new Headers(originalRequest.headers);
-  headers.set("Host", targetHost);
   headers.set("X-Forwarded-Host", new URL(originalRequest.url).host);
   headers.set("X-Forwarded-Proto", "https");
 

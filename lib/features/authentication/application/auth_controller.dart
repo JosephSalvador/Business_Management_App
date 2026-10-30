@@ -389,17 +389,35 @@ class AuthController extends Notifier<AuthState> {
     required String phone,
     String? organizationName,
   }) async {
-    final registered = await _repository.register(
-      email: email,
-      password: password,
-      fullName: fullName,
-      organizationName: organizationName,
-      phone: phone,
-    );
+    final trimmedEmail = email.trim().toLowerCase();
+    RegisteredUser registered;
+    try {
+      registered = await _repository.register(
+        email: trimmedEmail,
+        password: password,
+        fullName: fullName,
+        organizationName: organizationName,
+        phone: phone,
+      );
+    } on ConflictException {
+      // If a previous attempt succeeded on the backend before the client received the
+      // response (e.g. gateway timeout, retry collision, or slow provisioning), the
+      // account has already been inserted in the database.
+      // Verify ownership by attempting to authenticate with the provided credentials.
+      try {
+        await login(identifier: trimmedEmail, password: password);
+        return;
+      } catch (_) {
+        // If login fails (e.g. wrong password), this is a genuine conflict for
+        // an existing user's account — rethrow the ConflictException so the UI displays it.
+        rethrow;
+      }
+    }
+
     if (registered.emailVerified) {
-      await login(identifier: email, password: password);
+      await login(identifier: trimmedEmail, password: password);
     } else {
-      state = AuthNeedsVerification(email: email.trim().toLowerCase());
+      state = AuthNeedsVerification(email: trimmedEmail);
     }
   }
 
@@ -412,17 +430,29 @@ class AuthController extends Notifier<AuthState> {
     required String phone,
     required String invitationCode,
   }) async {
-    final registered = await _repository.registerStaff(
-      email: email,
-      password: password,
-      fullName: fullName,
-      phone: phone,
-      invitationCode: invitationCode,
-    );
+    final trimmedEmail = email.trim().toLowerCase();
+    RegisteredUser registered;
+    try {
+      registered = await _repository.registerStaff(
+        email: trimmedEmail,
+        password: password,
+        fullName: fullName,
+        phone: phone,
+        invitationCode: invitationCode,
+      );
+    } on ConflictException {
+      try {
+        await login(identifier: trimmedEmail, password: password);
+        return;
+      } catch (_) {
+        rethrow;
+      }
+    }
+
     if (registered.emailVerified) {
-      await login(identifier: email, password: password);
+      await login(identifier: trimmedEmail, password: password);
     } else {
-      state = AuthNeedsVerification(email: email.trim().toLowerCase());
+      state = AuthNeedsVerification(email: trimmedEmail);
     }
   }
 
