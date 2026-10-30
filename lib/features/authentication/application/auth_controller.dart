@@ -399,7 +399,7 @@ class AuthController extends Notifier<AuthState> {
         organizationName: organizationName,
         phone: phone,
       );
-    } on ConflictException {
+    } on ConflictException catch (conflict) {
       // If a previous attempt succeeded on the backend before the client received the
       // response (e.g. gateway timeout, retry collision, or slow provisioning), the
       // account has already been inserted in the database.
@@ -409,8 +409,8 @@ class AuthController extends Notifier<AuthState> {
         return;
       } catch (_) {
         // If login fails (e.g. wrong password), this is a genuine conflict for
-        // an existing user's account — rethrow the ConflictException so the UI displays it.
-        rethrow;
+        // an existing user's account — throw the ConflictException so the UI displays it.
+        throw conflict;
       }
     }
 
@@ -440,12 +440,12 @@ class AuthController extends Notifier<AuthState> {
         phone: phone,
         invitationCode: invitationCode,
       );
-    } on ConflictException {
+    } on ConflictException catch (conflict) {
       try {
         await login(identifier: trimmedEmail, password: password);
         return;
       } catch (_) {
-        rethrow;
+        throw conflict;
       }
     }
 
