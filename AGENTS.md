@@ -137,5 +137,14 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 7: Database Migration & Model Snapshot — Migration `20261031190000_AddDocumentTemplatesAndTenantConfigurations.cs` and synced `BusinessDbContextModelSnapshot.cs`.
 - [x] Task 8: Comprehensive Unit Tests — `HtmlSanitizerServiceTests`, `TemplateRenderServiceTests` (validating sub-50ms render), and `TemplateValidatorsTests`.
 
+## Implementation Plan — Template Marketplace & Live Print Preview Frontend
+- [x] Task 1: Domain & Data Layer — `DocumentType`, `DocumentTemplateSummary`, `DocumentTemplateDetail`, `TenantDocumentConfiguration`, `DocumentTemplateRepository`, and `documentTemplateRepositoryProvider`.
+- [x] Task 2: State Management & Debouncing — `DocumentTemplateController` handling template switching, hex color presets/inputs, 300ms preview debounce, and PUT configuration updates.
+- [x] Task 3: Isolated Preview & Cashier Print Frame — `preview_frame` architecture with `DocumentPreviewFrameWeb` injecting HTML into an isolated `<iframe>` with `@media print` visibility rules, and `DocumentPreviewFrameStub` for cross-platform fallback.
+- [x] Task 4: Template Marketplace Canvas & Pickers — `TemplateMarketplaceGrid` with visual layout cards, 80mm POS slip badges, and `ColorHexPicker` with swatches and live hex chips.
+- [x] Task 5: Document Settings Workspace — `DocumentTemplatesPage` with desktop/tablet split-screen layout, mobile segmented view, 80mm thermal container constraints, and `PrintDocumentButton`.
+- [x] Task 6: Navigation Integration — Added `/settings/document-templates` route in `router.dart`, shortcuts in `settings_page.dart` and `invoices_page.dart`, and HTML template print button in `invoice_detail_page.dart`.
+
+
 
 

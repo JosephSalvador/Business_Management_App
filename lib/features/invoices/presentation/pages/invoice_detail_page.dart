@@ -10,10 +10,12 @@ import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../application/invoices_controller.dart';
+import '../../data/invoice_providers.dart';
 import '../../domain/invoice.dart';
 import '../services/customer_invoice_pdf_service.dart';
 import '../widgets/invoice_a4_preview_card.dart';
 import '../widgets/invoice_branding_sheet.dart';
+import '../widgets/preview_frame/preview_frame.dart';
 
 class InvoiceDetailPage extends ConsumerStatefulWidget {
   const InvoiceDetailPage({super.key, required this.invoiceId});
@@ -219,6 +221,28 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                     : () => _shareA4Pdf(invoice, organization, isSwahili),
                 icon: const Icon(Icons.share_outlined, size: 16),
                 label: Text(isSwahili ? 'A4 PDF' : 'Share PDF'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0F172A),
+                ),
+                onPressed: () async {
+                  try {
+                    final html = await ref
+                        .read(documentTemplateRepositoryProvider)
+                        .getInvoiceHtml(invoice.id);
+                    await documentPreviewFrame.printDocument(html);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Hitilafu: $e')),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.print_outlined, size: 16),
+                label: Text(isSwahili ? 'Chapisha' : 'Print'),
               ),
             ],
           ),

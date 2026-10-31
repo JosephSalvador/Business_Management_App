@@ -32,6 +32,7 @@ import '../features/finance/presentation/pages/transfer_money_page.dart';
 import '../features/products/presentation/pages/product_detail_page.dart';
 import '../features/products/presentation/pages/product_form_page.dart';
 import '../features/invoices/presentation/pages/create_invoice_page.dart';
+import '../features/invoices/presentation/pages/document_templates_page.dart';
 import '../features/invoices/presentation/pages/invoice_detail_page.dart';
 import '../features/invoices/presentation/pages/invoices_page.dart';
 import '../features/invoices/presentation/pages/module_locked_page.dart';
@@ -117,6 +118,7 @@ abstract final class Routes {
   static const users = '/users';
   static const roles = '/roles';
   static const settings = '/settings';
+  static const documentTemplates = '/settings/document-templates';
   static const receiptSettings = '/settings/receipt';
   static const security = '/settings/security';
   static const billing = '/billing';
@@ -614,6 +616,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (_, __) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: Routes.documentTemplates,
+        builder: (_, __) => const DocumentTemplatesPage(),
       ),
       GoRoute(
         path: Routes.receiptSettings,

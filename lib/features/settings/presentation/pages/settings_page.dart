@@ -144,6 +144,14 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
             _SettingsTile(
+              icon: Icons.design_services_outlined,
+              title: isSw ? 'Violezo vya Ankara na Delivery' : 'Invoice & Delivery Templates',
+              subtitle: isSw
+                  ? 'Chagua violezo vya A4, Risiti ya POS (80mm), na rangi za chapa'
+                  : 'Customize A4 layout, POS slip (80mm) and branding colors',
+              onTap: () => context.push(Routes.documentTemplates),
+            ),
+            _SettingsTile(
               icon: Icons.public_outlined,
               title: loc.settingsCountry,
               subtitle: organization.countryCode ?? 'TZ',

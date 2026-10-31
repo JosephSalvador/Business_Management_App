@@ -62,6 +62,11 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         title: Text(loc.invoicesTitle),
         actions: [
           IconButton(
+            icon: const Icon(Icons.design_services_outlined),
+            tooltip: isSw ? 'Violezo vya Ankara' : 'Document Templates',
+            onPressed: () => context.push(Routes.documentTemplates),
+          ),
+          IconButton(
             icon: const Icon(Icons.palette_outlined),
             tooltip:
                 isSw ? 'Nembo & Maelezo ya Benki' : 'Invoice Logo & Bank Info',
