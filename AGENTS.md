@@ -99,5 +99,5 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 3: Frontend - Add supplier refresh and quick "+ Ongeza Msambazaji" action in `purchase_form_page.dart`.
 - [x] Task 4: Frontend - Fix light mode visibility across all expense screens (`expenses_page.dart`, `expense_form_page.dart`, `record_account_expense_page.dart`, `cash_session_page.dart`).
 - [x] Task 5: Bump version code to `1.0.0+67` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 6: Deploy updated backend to Azure Container Apps production (`deploy-azure.yml`) so `/check-availability` is active in production.
-- [ ] Task 7: Build and publish production APK v1.0.0+67 via GitHub Actions (`build-clients.yml`).
+- [x] Task 6: Deploy updated backend to Azure Container Apps production (`deploy-azure.yml`) so `/check-availability` is active in production.
+- [x] Task 7: Build and publish production APK v1.0.0+67 via GitHub Actions (`build-clients.yml`).
