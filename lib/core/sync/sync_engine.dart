@@ -10,6 +10,8 @@ import '../../features/finance/data/money_account_repository.dart';
 import '../../features/inventory/data/inventory_repository.dart';
 import '../../features/products/data/product_repository.dart';
 import '../../features/products/domain/catalog.dart' show PriceList;
+import '../../features/invoices/data/delivery_note_repository.dart';
+import '../../features/invoices/data/invoice_repository.dart';
 import '../../features/purchases/data/purchase_repository.dart';
 import '../../features/sales/data/sale_repository.dart';
 import '../../features/sales/domain/sale.dart' show QuickSaleDefaults;
@@ -60,6 +62,8 @@ class SyncEngine {
     ProductRepository? productRepository,
     SupplierRepository? supplierRepository,
     PurchaseRepository? purchaseRepository,
+    InvoiceRepository? invoiceRepository,
+    DeliveryNoteRepository? deliveryNoteRepository,
   })  : _salesService = salesService,
         _repository = repository,
         _expenseRepository = expenseRepository,
@@ -68,7 +72,9 @@ class SyncEngine {
         _moneyAccountRepository = moneyAccountRepository,
         _productRepository = productRepository,
         _supplierRepository = supplierRepository,
-        _purchaseRepository = purchaseRepository;
+        _purchaseRepository = purchaseRepository,
+        _invoiceRepository = invoiceRepository,
+        _deliveryNoteRepository = deliveryNoteRepository;
 
   final LocalSalesService _salesService;
   final SaleRepository _repository;
@@ -79,6 +85,8 @@ class SyncEngine {
   final ProductRepository? _productRepository;
   final SupplierRepository? _supplierRepository;
   final PurchaseRepository? _purchaseRepository;
+  final InvoiceRepository? _invoiceRepository;
+  final DeliveryNoteRepository? _deliveryNoteRepository;
 
   Future<void> Function(SyncOutcome)? onDrained;
 
@@ -226,6 +234,10 @@ class SyncEngine {
         return _deliverPurchaseSubmit(op, outcome);
       case 'purchase.cancel':
         return _deliverPurchaseCancel(op, outcome);
+      case 'invoice.create':
+        return _deliverInvoiceCreate(op, outcome);
+      case 'delivery_note.create':
+        return _deliverDeliveryNoteCreate(op, outcome);
       default:
         await _salesService.markQueueFailed(
           op.operationId,
@@ -1028,6 +1040,116 @@ class SyncEngine {
       outcome.synced++;
       return _DeliveryResult.continue_;
     } on ConflictException {
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverInvoiceCreate(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_invoiceRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final id = (body['id'] as String?) ?? op.aggregateId;
+      final response = await _repository.apiClient.post<dynamic>(
+        '/api/v1/invoices',
+        body: body,
+        headers: {'Idempotency-Key': id},
+      );
+      String? serverNumber;
+      if (response.data is Map) {
+        serverNumber = (response.data as Map)['number']?.toString();
+      }
+      await _invoiceRepository.markSynced(id, serverNumber: serverNumber);
+      await _salesService.queue.markSynced(op.operationId, serverNumber ?? 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ConflictException {
+      await _invoiceRepository.markSynced(op.aggregateId);
+      await _salesService.queue.markSynced(op.operationId, 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ValidationException catch (error) {
+      await _conflict(op, outcome, 'VALIDATION', error.message);
+      return _DeliveryResult.continue_;
+    } on UnauthorizedException {
+      await _salesService.releaseUnattempted(op.operationId);
+      outcome.pausedForSession = true;
+      return _DeliveryResult.stop;
+    } on ForbiddenException catch (error) {
+      await _fail(op, outcome, 'PERMISSION', error.message);
+      return _DeliveryResult.continue_;
+    } on NetworkException {
+      await _retryLater(op, outcome);
+      outcome.wentOffline = true;
+      return _DeliveryResult.stop;
+    } on TimeoutException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.stop;
+    } on ServerException {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    } catch (e) {
+      await _fail(op, outcome, 'UNKNOWN_ERROR', e.toString());
+      return _DeliveryResult.continue_;
+    }
+  }
+
+  Future<_DeliveryResult> _deliverDeliveryNoteCreate(
+    QueuedOperation op,
+    SyncOutcome outcome,
+  ) async {
+    if (_deliveryNoteRepository == null) {
+      await _retryLater(op, outcome);
+      return _DeliveryResult.continue_;
+    }
+    try {
+      final body = jsonDecode(op.payload) as Map<String, dynamic>;
+      final id = (body['id'] as String?) ?? op.aggregateId;
+      final response = await _repository.apiClient.post<dynamic>(
+        '/api/v1/delivery-notes',
+        body: body,
+        headers: {'Idempotency-Key': id},
+      );
+      String? serverNumber;
+      if (response.data is Map) {
+        serverNumber = (response.data as Map)['number']?.toString();
+      }
+      await _deliveryNoteRepository.markSynced(id, serverNumber: serverNumber);
+      await _salesService.queue.markSynced(op.operationId, serverNumber ?? 'synced');
+      outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on ConflictException {
+      await _deliveryNoteRepository.markSynced(op.aggregateId);
       await _salesService.queue.markSynced(op.operationId, 'synced');
       outcome.synced++;
       return _DeliveryResult.continue_;

@@ -7,12 +7,17 @@ import 'package:pdf/pdf.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:printing/printing.dart';
 
+import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../../sales/data/sales_providers.dart'
+    show connectionQualityProvider;
+import '../../../settings/data/organization_repository.dart';
 import '../../data/invoice_providers.dart';
 import '../../domain/document_template.dart';
+import '../services/local_pdf_document_generator.dart';
 import '../widgets/commercial_palette_picker.dart';
 import '../widgets/print_profile_selector.dart';
 import '../widgets/uniform_command_bar.dart';
@@ -55,6 +60,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
   late bool _isThermal;
   late String _themePrimaryHex;
   late String _themeSecondaryHex;
+  bool? _isSynced;
 
   Timer? _debounceTimer;
 
@@ -106,23 +112,96 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       _errorMessage = null;
     });
 
+    final connectionQuality = ref.read(connectionQualityProvider);
+    final isOffline = connectionQuality == ConnectionQuality.offline ||
+        connectionQuality == ConnectionQuality.unreachable;
+
+    if (!isOffline) {
+      try {
+        final repository = ref.read(documentTemplateRepositoryProvider);
+        final List<int> bytesList = widget.documentType == DocumentType.invoice
+            ? await repository.getInvoicePdfBytes(
+                widget.documentId,
+                isThermal: _isThermal,
+                primaryHex: _themePrimaryHex,
+              )
+            : await repository.getDeliveryNotePdfBytes(
+                widget.documentId,
+                isThermal: _isThermal,
+                primaryHex: _themePrimaryHex,
+              );
+
+        final pdfBytes = Uint8List.fromList(bytesList);
+
+        // Open thread-safe native PdfDocument structure from raw binary
+        final document = await PdfDocument.openData(pdfBytes);
+
+        _pdfController?.dispose();
+        final controller = PdfPageController(page: 1);
+
+        if (!mounted) return;
+
+        setState(() {
+          _rawPdfBytes = pdfBytes;
+          _pdfDocument = document;
+          _pdfController = controller;
+          _isLoading = false;
+          _isSynced = true;
+        });
+        return;
+      } catch (_) {
+        // Network or server error: smoothly fall through to on-device native PDF compiler
+      }
+    }
+
+    // ON-DEVICE NATIVE PDF LAYOUT COMPILER (WebView-Free Offline Print Engine)
     try {
-      final repository = ref.read(documentTemplateRepositoryProvider);
-      final List<int> bytesList = widget.documentType == DocumentType.invoice
-          ? await repository.getInvoicePdfBytes(
-              widget.documentId,
-              isThermal: _isThermal,
-              primaryHex: _themePrimaryHex,
-            )
-          : await repository.getDeliveryNotePdfBytes(
-              widget.documentId,
-              isThermal: _isThermal,
-              primaryHex: _themePrimaryHex,
-            );
+      final localCompiler = ref.read(localPdfDocumentGeneratorProvider);
+      final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
+      Organization? org;
+      try {
+        org = await ref.read(organizationRepositoryProvider).getOrganization();
+      } catch (_) {}
 
-      final pdfBytes = Uint8List.fromList(bytesList);
+      final Uint8List pdfBytes;
+      bool isDocSynced = false;
+      if (widget.documentType == DocumentType.invoice) {
+        final invoice =
+            await ref.read(invoiceRepositoryProvider).getById(widget.documentId);
+        isDocSynced = invoice.isSynced;
+        pdfBytes = _isThermal
+            ? await localCompiler.generateInvoiceThermal80mm(
+                invoice: invoice,
+                organization: org,
+                isSwahili: isSwahili,
+              )
+            : await localCompiler.generateInvoiceA4(
+                invoice: invoice,
+                organization: org,
+                primaryHex: _themePrimaryHex,
+                secondaryHex: _themeSecondaryHex,
+                isSwahili: isSwahili,
+              );
+      } else {
+        final note = await ref
+            .read(deliveryNoteRepositoryProvider)
+            .getById(widget.documentId);
+        isDocSynced = note.isSynced;
+        pdfBytes = _isThermal
+            ? await localCompiler.generateDeliveryNoteThermal80mm(
+                note: note,
+                organization: org,
+                isSwahili: isSwahili,
+              )
+            : await localCompiler.generateDeliveryNoteA4(
+                note: note,
+                organization: org,
+                primaryHex: _themePrimaryHex,
+                secondaryHex: _themeSecondaryHex,
+                isSwahili: isSwahili,
+              );
+      }
 
-      // Open thread-safe native PdfDocument structure from raw binary
       final document = await PdfDocument.openData(pdfBytes);
 
       _pdfController?.dispose();
@@ -135,6 +214,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         _pdfDocument = document;
         _pdfController = controller;
         _isLoading = false;
+        _isSynced = isDocSynced;
       });
     } catch (e) {
       if (!mounted) return;
@@ -299,6 +379,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
             isThermal: _isThermal,
             saveSuccess: false,
             isSwahili: isSw,
+            isSynced: _isSynced,
             onPrint: _spoolToHardwarePrinter,
             onSave: () => Navigator.of(context).pop(),
           ),
@@ -398,6 +479,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                       isThermal: _isThermal,
                       saveSuccess: false,
                       isSwahili: isSw,
+                      isSynced: _isSynced,
                       onPrint: _spoolToHardwarePrinter,
                       onSave: () => Navigator.of(context).pop(),
                     ),
@@ -459,6 +541,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
             isThermal: _isThermal,
             saveSuccess: false,
             isSwahili: isSw,
+            isSynced: _isSynced,
             onPrint: _spoolToHardwarePrinter,
             onSave: () => Navigator.of(context).pop(),
           ),

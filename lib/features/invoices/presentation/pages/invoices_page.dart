@@ -344,11 +344,36 @@ class _InvoiceTile extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                invoice.number,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      invoice.number,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: invoice.isSynced
+                        ? (isSwahili
+                            ? 'Imelandanishwa mtandaoni'
+                            : 'Synced to cloud')
+                        : (isSwahili
+                            ? 'Imehifadhiwa ndani (Inasubiri mtandao)'
+                            : 'Local draft (Pending sync)'),
+                    child: Icon(
+                      invoice.isSynced
+                          ? Icons.check_circle_rounded
+                          : Icons.access_time_rounded,
+                      size: 13,
+                      color: invoice.isSynced
+                          ? AppColors.success
+                          : AppColors.outline,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

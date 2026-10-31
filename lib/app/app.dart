@@ -11,6 +11,7 @@ import '../core/storage/theme_store.dart';
 import '../features/authentication/application/auth_controller.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
+import '../features/invoices/application/sync_queue_processor.dart';
 import '../l10n/generated/app_localizations.dart';
 
 class BusinessOsApp extends ConsumerStatefulWidget {
@@ -54,6 +55,7 @@ class _BusinessOsAppState extends ConsumerState<BusinessOsApp>
       ref.read(printerControllerProvider.notifier).restore();
       ref.read(localSalesServiceProvider).recoverFromRestart();
       ref.read(syncEngineProvider);
+      ref.read(syncQueueProcessorProvider);
       ref.read(syncStatusProvider.notifier).refresh();
     });
   }

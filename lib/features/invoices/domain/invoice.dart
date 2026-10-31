@@ -102,6 +102,7 @@ class CustomerInvoice {
     this.paymentInstructions,
     this.authorizedSignatoryName,
     this.authorizedSignatoryTitle,
+    this.isSynced = true,
   });
 
   final String id;
@@ -134,6 +135,7 @@ class CustomerInvoice {
   final String? paymentReference;
   final DateTime? paidAtUtc;
   final List<InvoiceLine> lines;
+  final bool isSynced;
 
   String get customerLabel =>
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
@@ -163,6 +165,7 @@ class CustomerInvoice {
         documentTitle: documentTitle,
         referenceNumber: referenceNumber,
         currency: currency,
+        isSynced: isSynced,
       );
 
   CustomerInvoice copyWith({
@@ -172,6 +175,7 @@ class CustomerInvoice {
     String? paymentMethod,
     String? paymentReference,
     DateTime? paidAtUtc,
+    bool? isSynced,
   }) =>
       CustomerInvoice(
         id: id,
@@ -204,6 +208,7 @@ class CustomerInvoice {
         paymentReference: paymentReference ?? this.paymentReference,
         paidAtUtc: paidAtUtc ?? this.paidAtUtc,
         lines: lines,
+        isSynced: isSynced ?? this.isSynced,
       );
 
   Map<String, dynamic> toJson() => {
@@ -237,6 +242,7 @@ class CustomerInvoice {
         'paymentReference': paymentReference,
         'paidAtUtc': paidAtUtc?.toIso8601String(),
         'lines': [for (final line in lines) line.toJson()],
+        'isSynced': isSynced,
       };
 
   factory CustomerInvoice.fromJson(Map<String, dynamic> json) {
@@ -272,6 +278,7 @@ class CustomerInvoice {
       paymentMethod: _optionalString(json, 'paymentMethod'),
       paymentReference: _optionalString(json, 'paymentReference'),
       paidAtUtc: _optionalDateTime(json, 'paidAtUtc'),
+      isSynced: (json['isSynced'] as bool?) ?? true,
       lines: rawLines is List
           ? rawLines
               .whereType<Map<dynamic, dynamic>>()
@@ -298,6 +305,7 @@ class CustomerInvoiceSummary {
     this.documentTitle = 'INVOICE',
     this.referenceNumber,
     this.currency = 'TZS',
+    this.isSynced = true,
   });
 
   final String id;
@@ -313,6 +321,7 @@ class CustomerInvoiceSummary {
   final double totalAmount;
   final double amountPaid;
   final double balanceDue;
+  final bool isSynced;
 
   String get customerLabel =>
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
@@ -338,6 +347,7 @@ class CustomerInvoiceSummary {
       totalAmount: _requiredDouble(json, 'totalAmount'),
       amountPaid: _requiredDouble(json, 'amountPaid'),
       balanceDue: _requiredDouble(json, 'balanceDue'),
+      isSynced: (json['isSynced'] as bool?) ?? true,
     );
   }
 
@@ -355,6 +365,7 @@ class CustomerInvoiceSummary {
         'totalAmount': totalAmount,
         'amountPaid': amountPaid,
         'balanceDue': balanceDue,
+        'isSynced': isSynced,
       };
 }
 

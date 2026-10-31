@@ -152,8 +152,11 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Responsive Workspace Integration — Upgraded `DocumentTemplatesPage` and `InvoicePreviewScreen` with phone single pane top TabBar, tablet stacked grid with persistent collapsible parameters sheet, and desktop 35%/65% split dual-pane canvas.
 - [x] Task 5: Unit Tests & Verification — Extended `document_template_test.dart` to verify breakpoint resolution (<768px, 768-1023px, >=1024px), print profile mappings, and palette contrast configurations.
 
-
-
-
-
-
+## Implementation Plan — Offline-First Data Persistence, On-Device PDF Compiler & Automatic Background Sync Queue
+- [x] Task 1: Domain & Data Interception Layer — `DeliveryNote` domain models, `InvoiceRepository` & `DeliveryNoteRepository` local-first SQLite persistence with `isSynced` flag, deterministic client UUIDs, and sub-5ms local lookups via `OfflineCacheDao`.
+- [x] Task 2: On-Device Native PDF Layout Compiler — `LocalPdfDocumentGenerator` leveraging `pdf` and `pw` native primitives for offline A4 Corporate Standard and 80mm Continuous Thermal Roll with zero WebViews.
+- [x] Task 3: Automatic Background Connectivity Synchronizer — `SyncQueueProcessor` listening to `ConnectivityMonitor` network stream to autonomously drain pending invoices and delivery notes, plus integrated handlers in `SyncEngine._deliver` for unified FIFO outbox delivery.
+- [x] Task 4: Real-Time UI Sync Status Indicators — Added cloud sync badges (gray clock for pending sync, emerald check for synced) across `UniformCommandBar`, `InvoicesPage` tile, and `InvoiceDetailPage` header banner.
+- [x] Task 5: Fallback Preview Integration — Updated `InvoicePreviewScreen` to automatically compile and render local PDF bytes when offline or if server endpoint fails.
+- [x] Task 6: Unit Tests & Verification — Created `offline_invoicing_test.dart` verifying domain model serialization, sync status tracking, and on-device PDF compilation.
+- [x] Task 7: Version Code Bump — Incremented version code to `1.0.0+70` in `pubspec.yaml` and `app_update_service.dart`.

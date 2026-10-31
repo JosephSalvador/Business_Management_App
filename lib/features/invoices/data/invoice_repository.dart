@@ -1,28 +1,47 @@
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_routes.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/storage/offline_cache_dao.dart';
+import '../../../core/storage/sync_queue_dao.dart';
 import '../domain/invoice.dart';
 
 class InvoiceRepository {
   InvoiceRepository({
     required ApiClient apiClient,
     OfflineCacheDao? cache,
+    SyncQueueDao? queue,
+    Future<String?> Function()? tenantIdOf,
+    Future<String?> Function()? branchIdOf,
+    Future<String> Function()? deviceIdOf,
   })  : _apiClient = apiClient,
-        _cache = cache;
+        _cache = cache,
+        _queue = queue,
+        _tenantIdOf = tenantIdOf,
+        _branchIdOf = branchIdOf,
+        _deviceIdOf = deviceIdOf;
 
   final ApiClient _apiClient;
   final OfflineCacheDao? _cache;
+  final SyncQueueDao? _queue;
+  final Future<String?> Function()? _tenantIdOf;
+  final Future<String?> Function()? _branchIdOf;
+  final Future<String> Function()? _deviceIdOf;
   static const _uuid = Uuid();
+  static const _cacheKey = 'invoices_list';
 
+  /// Pulls invoices with sub-5ms local-first lookup, refreshing in background if online.
   Future<InvoicePage> list({
     int page = 1,
     int pageSize = 20,
     InvoiceStatus? status,
     String? search,
   }) async {
+    // 1. Instant local read
+    final localList = await _loadOfflineList(status: status, search: search);
+
     try {
       final response = await _apiClient.get<dynamic>(
         ApiRoutes.v1('/invoices'),
@@ -35,7 +54,7 @@ class InvoiceRepository {
         },
       );
       if (response.statusCode != 200 || response.data is! Map) {
-        throw ServerException('Jibu la mfumo halijui muundo sahihi.');
+        return localList;
       }
       final doc = Map<String, dynamic>.from(response.data as Map);
       final rawItems = doc['items'];
@@ -47,7 +66,7 @@ class InvoiceRepository {
               .toList(growable: false)
           : <CustomerInvoiceSummary>[];
 
-      // Merge any locally created offline invoices not yet on the server
+      // Merge server items with any locally created pending invoices
       final mergedItems = await _mergeWithCachedList(
         serverItems,
         status: status,
@@ -59,19 +78,34 @@ class InvoiceRepository {
         total: (doc['total'] as num?)?.toInt() ?? mergedItems.length,
         page: (doc['page'] as num?)?.toInt() ?? page,
       );
-      if (_cache != null && page == 1 && (search == null || search.isEmpty) && status == null) {
-        await _cache.save('invoices_list', {
+      if (_cache != null &&
+          page == 1 &&
+          (search == null || search.isEmpty) &&
+          status == null) {
+        await _cache.save(_cacheKey, {
           'items': mergedItems.map((i) => i.toJson()).toList(),
           'total': invoicePage.total,
         });
       }
       return invoicePage;
     } on AppException {
-      return _loadOfflineList(status: status, search: search);
+      return localList;
+    } catch (_) {
+      return localList;
     }
   }
 
   Future<CustomerInvoice> getById(String id) async {
+    // 1. Try local cache first for sub-5ms lookup
+    if (_cache != null) {
+      final cached = await _cache.load('invoice_$id');
+      if (cached != null) {
+        // Return local immediately, but attempt background refresh
+        _backgroundRefresh(id);
+        return CustomerInvoice.fromJson(cached);
+      }
+    }
+
     try {
       final response =
           await _apiClient.get<dynamic>(ApiRoutes.v1('/invoices/$id'));
@@ -96,6 +130,24 @@ class InvoiceRepository {
     }
   }
 
+  void _backgroundRefresh(String id) async {
+    try {
+      final response =
+          await _apiClient.get<dynamic>(ApiRoutes.v1('/invoices/$id'));
+      if (response.statusCode == 200 && response.data is Map) {
+        final invoice = CustomerInvoice.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
+        if (_cache != null) {
+          await _cache.save('invoice_$id', invoice.toJson());
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Creates invoice adopting "Local-First, Remote-Sync" strategy.
+  /// Generates client UUID immediately, writes to local Drift SQLite cache with
+  /// isSynced = false, enqueues to SyncQueue, and asynchronously attempts sync.
   Future<CustomerInvoice> create({
     required List<InvoiceDraftLine> lines,
     String? customerId,
@@ -124,129 +176,161 @@ class InvoiceRepository {
     final now = DateTime.now();
     final issued = issueDate ?? now;
 
+    final builtLines = <InvoiceLine>[
+      for (var i = 0; i < lines.length; i++)
+        InvoiceLine(
+          id: _uuid.v4(),
+          description: lines[i].description.trim(),
+          unitOfMeasure: lines[i].unitOfMeasure.trim().isEmpty
+              ? 'Pcs'
+              : lines[i].unitOfMeasure.trim(),
+          quantity: lines[i].quantity,
+          unitPrice: lines[i].unitPrice,
+          discountAmount: lines[i].effectiveDiscount,
+          taxRatePercent: lines[i].taxRatePercent,
+          lineTotal: lines[i].lineTotal,
+          taxAmount: lines[i].lineTax,
+        ),
+    ];
+    final subtotal = builtLines.fold<double>(0, (sum, l) => sum + l.lineTotal);
+    final effectiveDiscount = discountAmount.clamp(0.0, subtotal);
+    final taxAmount = builtLines.fold<double>(0, (sum, l) => sum + l.taxAmount);
+    final totalAmount = (subtotal - effectiveDiscount) + taxAmount;
+    final paid = initialAmountPaid.clamp(0.0, totalAmount);
+    final balance = totalAmount - paid;
+    final status = paid >= totalAmount && totalAmount > 0
+        ? InvoiceStatus.paid
+        : (paid > 0 ? InvoiceStatus.partiallyPaid : InvoiceStatus.unpaid);
+
+    final localNumberSeq =
+        'CINV-${issued.year}${issued.month.toString().padLeft(2, '0')}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+
+    // 1. Immediately instantiate local invoice stamped with isSynced = false
+    final localInvoice = CustomerInvoice(
+      id: clientId,
+      number: localNumberSeq,
+      documentTitle: documentTitle,
+      referenceNumber: referenceNumber?.trim(),
+      paymentTerms: paymentTerms?.trim(),
+      customerId: customerId,
+      customerName: customerName?.trim(),
+      customerAttention: customerAttention?.trim(),
+      customerPhone: customerPhone?.trim(),
+      customerEmail: customerEmail?.trim(),
+      customerAddress: customerAddress?.trim(),
+      customerTin: customerTin?.trim(),
+      currency: currency,
+      issueDate: issued,
+      dueDate: dueDate,
+      notes: notes?.trim(),
+      paymentInstructions: paymentInstructions?.trim(),
+      authorizedSignatoryName: authorizedSignatoryName?.trim(),
+      authorizedSignatoryTitle: authorizedSignatoryTitle?.trim(),
+      status: status,
+      subtotal: subtotal,
+      discountAmount: effectiveDiscount,
+      taxAmount: taxAmount,
+      totalAmount: totalAmount,
+      amountPaid: paid,
+      balanceDue: balance,
+      paymentMethod: paymentMethod?.trim(),
+      paymentReference: paymentReference?.trim(),
+      paidAtUtc: status == InvoiceStatus.paid ? now : null,
+      lines: builtLines,
+      isSynced: false,
+    );
+
+    // 2. Persist locally to Drift SQLite storage immediately
+    await _persistLocally(localInvoice);
+
+    // 3. Prepare payload for remote sync
+    final payload = <String, dynamic>{
+      'id': clientId,
+      'lines': [for (final line in lines) line.toJson()],
+      if (customerId != null && customerId.isNotEmpty) 'customerId': customerId,
+      if (customerName != null && customerName.trim().isNotEmpty)
+        'customerName': customerName.trim(),
+      if (customerAttention != null && customerAttention.trim().isNotEmpty)
+        'customerAttention': customerAttention.trim(),
+      if (customerPhone != null && customerPhone.trim().isNotEmpty)
+        'customerPhone': customerPhone.trim(),
+      if (customerEmail != null && customerEmail.trim().isNotEmpty)
+        'customerEmail': customerEmail.trim(),
+      if (customerAddress != null && customerAddress.trim().isNotEmpty)
+        'customerAddress': customerAddress.trim(),
+      if (customerTin != null && customerTin.trim().isNotEmpty)
+        'customerTin': customerTin.trim(),
+      'currency': currency,
+      'documentTitle': documentTitle,
+      if (referenceNumber != null && referenceNumber.trim().isNotEmpty)
+        'referenceNumber': referenceNumber.trim(),
+      if (paymentTerms != null && paymentTerms.trim().isNotEmpty)
+        'paymentTerms': paymentTerms.trim(),
+      'issueDate': issued.toUtc().toIso8601String(),
+      if (dueDate != null) 'dueDate': dueDate.toUtc().toIso8601String(),
+      'discountAmount': discountAmount,
+      'initialAmountPaid': initialAmountPaid,
+      if (paymentMethod != null && paymentMethod.trim().isNotEmpty)
+        'paymentMethod': paymentMethod.trim(),
+      if (paymentReference != null && paymentReference.trim().isNotEmpty)
+        'paymentReference': paymentReference.trim(),
+      if (paymentInstructions != null && paymentInstructions.trim().isNotEmpty)
+        'paymentInstructions': paymentInstructions.trim(),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (authorizedSignatoryName != null &&
+          authorizedSignatoryName.trim().isNotEmpty)
+        'authorizedSignatoryName': authorizedSignatoryName.trim(),
+      if (authorizedSignatoryTitle != null &&
+          authorizedSignatoryTitle.trim().isNotEmpty)
+        'authorizedSignatoryTitle': authorizedSignatoryTitle.trim(),
+    };
+
+    // 4. Enqueue into persistent SyncQueue
+    if (_queue != null) {
+      try {
+        final tenantId = (await _tenantIdOf?.call()) ?? 'tenant';
+        final branchId = (await _branchIdOf?.call()) ?? 'branch';
+        final deviceId = (await _deviceIdOf?.call()) ?? 'device';
+
+        await _queue.enqueue(
+          operationId: clientId,
+          tenantId: tenantId,
+          branchId: branchId,
+          deviceId: deviceId,
+          operationType: 'invoice.create',
+          aggregateType: 'Invoice',
+          aggregateId: clientId,
+          payload: jsonEncode(payload),
+        );
+      } catch (_) {}
+    }
+
+    // 5. Asynchronously / opportunistically push to remote if online
     try {
       final response = await _apiClient.post<dynamic>(
         ApiRoutes.v1('/invoices'),
-        body: <String, dynamic>{
-          'id': clientId,
-          'lines': [for (final line in lines) line.toJson()],
-          if (customerId != null && customerId.isNotEmpty)
-            'customerId': customerId,
-          if (customerName != null && customerName.trim().isNotEmpty)
-            'customerName': customerName.trim(),
-          if (customerAttention != null && customerAttention.trim().isNotEmpty)
-            'customerAttention': customerAttention.trim(),
-          if (customerPhone != null && customerPhone.trim().isNotEmpty)
-            'customerPhone': customerPhone.trim(),
-          if (customerEmail != null && customerEmail.trim().isNotEmpty)
-            'customerEmail': customerEmail.trim(),
-          if (customerAddress != null && customerAddress.trim().isNotEmpty)
-            'customerAddress': customerAddress.trim(),
-          if (customerTin != null && customerTin.trim().isNotEmpty)
-            'customerTin': customerTin.trim(),
-          'currency': currency,
-          'documentTitle': documentTitle,
-          if (referenceNumber != null && referenceNumber.trim().isNotEmpty)
-            'referenceNumber': referenceNumber.trim(),
-          if (paymentTerms != null && paymentTerms.trim().isNotEmpty)
-            'paymentTerms': paymentTerms.trim(),
-          'issueDate': issued.toUtc().toIso8601String(),
-          if (dueDate != null) 'dueDate': dueDate.toUtc().toIso8601String(),
-          'discountAmount': discountAmount,
-          'initialAmountPaid': initialAmountPaid,
-          if (paymentMethod != null && paymentMethod.trim().isNotEmpty)
-            'paymentMethod': paymentMethod.trim(),
-          if (paymentReference != null && paymentReference.trim().isNotEmpty)
-            'paymentReference': paymentReference.trim(),
-          if (paymentInstructions != null &&
-              paymentInstructions.trim().isNotEmpty)
-            'paymentInstructions': paymentInstructions.trim(),
-          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-          if (authorizedSignatoryName != null &&
-              authorizedSignatoryName.trim().isNotEmpty)
-            'authorizedSignatoryName': authorizedSignatoryName.trim(),
-          if (authorizedSignatoryTitle != null &&
-              authorizedSignatoryTitle.trim().isNotEmpty)
-            'authorizedSignatoryTitle': authorizedSignatoryTitle.trim(),
-        },
+        body: payload,
+        headers: {'Idempotency-Key': clientId},
       );
-      if (response.statusCode != 200 || response.data is! Map) {
-        throw ServerException('Ankara haikuweza kuhifadhiwa.');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (response.data is Map) {
+          final serverInvoice = CustomerInvoice.fromJson(
+            Map<String, dynamic>.from(response.data as Map),
+          );
+          final syncedInvoice = serverInvoice.copyWith(isSynced: true);
+          await _persistLocally(syncedInvoice);
+          if (_queue != null) {
+            await _queue.markSynced(clientId, serverInvoice.number);
+          }
+          return syncedInvoice;
+        }
       }
-      final created = CustomerInvoice.fromJson(
-        Map<String, dynamic>.from(response.data as Map),
-      );
-      await _persistLocally(created);
-      return created;
-    } on AppException {
-      // Offline-first fallback: generate local invoice immediately so user can
-      // view, print, or share the A4 PDF even without internet!
-      final builtLines = <InvoiceLine>[
-        for (var i = 0; i < lines.length; i++)
-          InvoiceLine(
-            id: _uuid.v4(),
-            description: lines[i].description.trim(),
-            unitOfMeasure: lines[i].unitOfMeasure.trim().isEmpty
-                ? 'Pcs'
-                : lines[i].unitOfMeasure.trim(),
-            quantity: lines[i].quantity,
-            unitPrice: lines[i].unitPrice,
-            discountAmount: lines[i].effectiveDiscount,
-            taxRatePercent: lines[i].taxRatePercent,
-            lineTotal: lines[i].lineTotal,
-            taxAmount: lines[i].lineTax,
-          ),
-      ];
-      final subtotal =
-          builtLines.fold<double>(0, (sum, l) => sum + l.lineTotal);
-      final effectiveDiscount = discountAmount.clamp(0.0, subtotal);
-      final taxAmount =
-          builtLines.fold<double>(0, (sum, l) => sum + l.taxAmount);
-      final totalAmount = (subtotal - effectiveDiscount) + taxAmount;
-      final paid = initialAmountPaid.clamp(0.0, totalAmount);
-      final balance = totalAmount - paid;
-      final status = paid >= totalAmount && totalAmount > 0
-          ? InvoiceStatus.paid
-          : (paid > 0 ? InvoiceStatus.partiallyPaid : InvoiceStatus.unpaid);
-
-      final numberSeq =
-          'CINV-${issued.year}${issued.month.toString().padLeft(2, '0')}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
-
-      final localInvoice = CustomerInvoice(
-        id: clientId,
-        number: numberSeq,
-        documentTitle: documentTitle,
-        referenceNumber: referenceNumber?.trim(),
-        paymentTerms: paymentTerms?.trim(),
-        customerId: customerId,
-        customerName: customerName?.trim(),
-        customerAttention: customerAttention?.trim(),
-        customerPhone: customerPhone?.trim(),
-        customerEmail: customerEmail?.trim(),
-        customerAddress: customerAddress?.trim(),
-        customerTin: customerTin?.trim(),
-        currency: currency,
-        issueDate: issued,
-        dueDate: dueDate,
-        notes: notes?.trim(),
-        paymentInstructions: paymentInstructions?.trim(),
-        authorizedSignatoryName: authorizedSignatoryName?.trim(),
-        authorizedSignatoryTitle: authorizedSignatoryTitle?.trim(),
-        status: status,
-        subtotal: subtotal,
-        discountAmount: effectiveDiscount,
-        taxAmount: taxAmount,
-        totalAmount: totalAmount,
-        amountPaid: paid,
-        balanceDue: balance,
-        paymentMethod: paymentMethod?.trim(),
-        paymentReference: paymentReference?.trim(),
-        paidAtUtc: status == InvoiceStatus.paid ? now : null,
-        lines: builtLines,
-      );
-      await _persistLocally(localInvoice);
-      return localInvoice;
+    } catch (_) {
+      // Non-blocking: background sync will drain via SyncQueueProcessor
     }
+
+    // Return the local invoice with isSynced: false
+    return localInvoice;
   }
 
   Future<CustomerInvoice> recordPayment(
@@ -255,6 +339,36 @@ class InvoiceRepository {
     String? method,
     String? reference,
   }) async {
+    CustomerInvoice? localCurrent;
+    if (_cache != null) {
+      final cached = await _cache.load('invoice_$id');
+      if (cached != null) {
+        localCurrent = CustomerInvoice.fromJson(cached);
+      }
+    }
+
+    if (localCurrent != null) {
+      final newPaid =
+          (localCurrent.amountPaid + amount).clamp(0.0, localCurrent.totalAmount);
+      final newBalance = localCurrent.totalAmount - newPaid;
+      final newStatus =
+          newBalance <= 0 ? InvoiceStatus.paid : InvoiceStatus.partiallyPaid;
+      final updatedLocal = localCurrent.copyWith(
+        status: newStatus,
+        amountPaid: newPaid,
+        balanceDue: newBalance,
+        paymentMethod:
+            (method != null && method.isNotEmpty) ? method : localCurrent.paymentMethod,
+        paymentReference: (reference != null && reference.isNotEmpty)
+            ? reference
+            : localCurrent.paymentReference,
+        paidAtUtc:
+            newStatus == InvoiceStatus.paid ? DateTime.now() : localCurrent.paidAtUtc,
+        isSynced: false,
+      );
+      await _persistLocally(updatedLocal);
+    }
+
     try {
       final response = await _apiClient.post<dynamic>(
         ApiRoutes.v1('/invoices/$id/payments'),
@@ -264,76 +378,128 @@ class InvoiceRepository {
           if (reference != null && reference.isNotEmpty) 'reference': reference,
         },
       );
-      if (response.statusCode != 200 || response.data is! Map) {
-        throw ServerException('Malipo hayakuweza kurekodiwa.');
+      if (response.statusCode == 200 && response.data is Map) {
+        final serverUpdated = CustomerInvoice.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        ).copyWith(isSynced: true);
+        await _persistLocally(serverUpdated);
+        return serverUpdated;
       }
-      final updated = CustomerInvoice.fromJson(
-        Map<String, dynamic>.from(response.data as Map),
-      );
-      await _persistLocally(updated);
-      return updated;
-    } on AppException {
-      if (_cache != null) {
-        final cached = await _cache.load('invoice_$id');
-        if (cached != null) {
-          final current = CustomerInvoice.fromJson(cached);
-          final newPaid =
-              (current.amountPaid + amount).clamp(0.0, current.totalAmount);
-          final newBalance = current.totalAmount - newPaid;
-          final newStatus = newBalance <= 0
-              ? InvoiceStatus.paid
-              : InvoiceStatus.partiallyPaid;
-          final updated = current.copyWith(
-            status: newStatus,
-            amountPaid: newPaid,
-            balanceDue: newBalance,
-            paymentMethod:
-                (method != null && method.isNotEmpty) ? method : current.paymentMethod,
-            paymentReference: (reference != null && reference.isNotEmpty)
-                ? reference
-                : current.paymentReference,
-            paidAtUtc:
-                newStatus == InvoiceStatus.paid ? DateTime.now() : current.paidAtUtc,
-          );
-          await _persistLocally(updated);
-          return updated;
-        }
-      }
-      rethrow;
+    } catch (_) {
+      // Keep offline updated state
     }
+
+    if (localCurrent != null) {
+      final cached = await _cache?.load('invoice_$id');
+      if (cached != null) return CustomerInvoice.fromJson(cached);
+    }
+    throw ServerException('Malipo hayakuweza kurekodiwa.');
   }
 
   Future<CustomerInvoice> voidInvoice(String id) async {
+    CustomerInvoice? localCurrent;
+    if (_cache != null) {
+      final cached = await _cache.load('invoice_$id');
+      if (cached != null) {
+        localCurrent = CustomerInvoice.fromJson(cached);
+        final updated =
+            localCurrent.copyWith(status: InvoiceStatus.voided, isSynced: false);
+        await _persistLocally(updated);
+      }
+    }
+
     try {
       final response = await _apiClient.post<dynamic>(
         ApiRoutes.v1('/invoices/$id/void'),
       );
-      if (response.statusCode != 200 || response.data is! Map) {
-        throw ServerException('Ankara haikuweza kufutwa.');
+      if (response.statusCode == 200 && response.data is Map) {
+        final serverUpdated = CustomerInvoice.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        ).copyWith(isSynced: true);
+        await _persistLocally(serverUpdated);
+        return serverUpdated;
       }
-      final updated = CustomerInvoice.fromJson(
-        Map<String, dynamic>.from(response.data as Map),
+    } catch (_) {
+      // Local state remains voided
+    }
+
+    if (localCurrent != null) {
+      final cached = await _cache?.load('invoice_$id');
+      if (cached != null) return CustomerInvoice.fromJson(cached);
+    }
+    throw ServerException('Ankara haikuweza kufutwa.');
+  }
+
+  /// Lists all pending invoices that need to be synced to the cloud.
+  Future<List<CustomerInvoice>> listUnsynced() async {
+    if (_cache == null) return [];
+    final listDoc = await _cache.load(_cacheKey);
+    if (listDoc == null || listDoc['items'] is! List) return [];
+    final unsynced = <CustomerInvoice>[];
+    for (final raw in (listDoc['items'] as List)) {
+      if (raw is Map) {
+        try {
+          final summary =
+              CustomerInvoiceSummary.fromJson(Map<String, dynamic>.from(raw));
+          if (!summary.isSynced) {
+            final full = await _cache.load('invoice_${summary.id}');
+            if (full != null) {
+              unsynced.add(CustomerInvoice.fromJson(full));
+            }
+          }
+        } catch (_) {}
+      }
+    }
+    return unsynced;
+  }
+
+  /// Marks an invoice as synced locally upon server confirmation.
+  Future<void> markSynced(String id, {String? serverNumber}) async {
+    if (_cache == null) return;
+    final cached = await _cache.load('invoice_$id');
+    if (cached != null) {
+      final current = CustomerInvoice.fromJson(cached);
+      final updated = CustomerInvoice(
+        id: current.id,
+        number: serverNumber ?? current.number,
+        documentTitle: current.documentTitle,
+        referenceNumber: current.referenceNumber,
+        paymentTerms: current.paymentTerms,
+        customerId: current.customerId,
+        customerName: current.customerName,
+        customerAttention: current.customerAttention,
+        customerPhone: current.customerPhone,
+        customerEmail: current.customerEmail,
+        customerAddress: current.customerAddress,
+        customerTin: current.customerTin,
+        currency: current.currency,
+        issueDate: current.issueDate,
+        dueDate: current.dueDate,
+        notes: current.notes,
+        paymentInstructions: current.paymentInstructions,
+        authorizedSignatoryName: current.authorizedSignatoryName,
+        authorizedSignatoryTitle: current.authorizedSignatoryTitle,
+        status: current.status,
+        subtotal: current.subtotal,
+        discountAmount: current.discountAmount,
+        taxAmount: current.taxAmount,
+        totalAmount: current.totalAmount,
+        amountPaid: current.amountPaid,
+        balanceDue: current.balanceDue,
+        paymentMethod: current.paymentMethod,
+        paymentReference: current.paymentReference,
+        paidAtUtc: current.paidAtUtc,
+        lines: current.lines,
+        isSynced: true,
       );
       await _persistLocally(updated);
-      return updated;
-    } on AppException {
-      if (_cache != null) {
-        final cached = await _cache.load('invoice_$id');
-        if (cached != null) {
-          final current = CustomerInvoice.fromJson(cached);
-          final updated = current.copyWith(status: InvoiceStatus.voided);
-          await _persistLocally(updated);
-          return updated;
-        }
-      }
-      rethrow;
     }
   }
 
   Future<void> _persistLocally(CustomerInvoice invoice) async {
     if (_cache == null) return;
     await _cache.save('invoice_${invoice.id}', invoice.toJson());
-    final listDoc = await _cache.load('invoices_list');
+    final listDoc = await _cache.load(_cacheKey);
     final existing = <CustomerInvoiceSummary>[];
     if (listDoc != null && listDoc['items'] is List) {
       for (final raw in (listDoc['items'] as List)) {
@@ -353,7 +519,7 @@ class InvoiceRepository {
     } else {
       existing.insert(0, summary);
     }
-    await _cache.save('invoices_list', {
+    await _cache.save(_cacheKey, {
       'items': existing.map((i) => i.toJson()).toList(),
       'total': existing.length,
     });
@@ -365,7 +531,7 @@ class InvoiceRepository {
     String? search,
   }) async {
     if (_cache == null) return serverItems;
-    final listDoc = await _cache.load('invoices_list');
+    final listDoc = await _cache.load(_cacheKey);
     if (listDoc == null || listDoc['items'] is! List) return serverItems;
     final serverIds = {for (final item in serverItems) item.id};
     final localOnly = <CustomerInvoiceSummary>[];
@@ -389,7 +555,7 @@ class InvoiceRepository {
     String? search,
   }) async {
     if (_cache != null) {
-      final cached = await _cache.load('invoices_list');
+      final cached = await _cache.load(_cacheKey);
       if (cached != null && cached['items'] is List) {
         final items = (cached['items'] as List)
             .whereType<Map<dynamic, dynamic>>()

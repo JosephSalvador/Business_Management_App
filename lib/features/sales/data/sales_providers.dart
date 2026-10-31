@@ -32,6 +32,8 @@ import '../../finance/data/expense_providers.dart'
         offlineExpenseServiceProvider;
 import '../../finance/data/money_account_providers.dart'
     show moneyAccountRepositoryProvider;
+import '../../invoices/data/invoice_providers.dart'
+    show deliveryNoteRepositoryProvider, invoiceRepositoryProvider;
 import '../../inventory/data/inventory_providers.dart'
     show inventoryRepositoryProvider;
 import '../../products/data/product_providers.dart'
@@ -82,6 +84,8 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   dynamic productRepo;
   dynamic supplierRepo;
   dynamic purchaseRepo;
+  dynamic invoiceRepo;
+  dynamic deliveryNoteRepo;
 
   try {
     expenseRepo = ref.watch(expenseRepositoryProvider);
@@ -104,6 +108,12 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   try {
     purchaseRepo = ref.watch(purchaseRepositoryProvider);
   } catch (_) {}
+  try {
+    invoiceRepo = ref.watch(invoiceRepositoryProvider);
+  } catch (_) {}
+  try {
+    deliveryNoteRepo = ref.watch(deliveryNoteRepositoryProvider);
+  } catch (_) {}
 
   final engine = SyncEngine(
     salesService: ref.watch(localSalesServiceProvider),
@@ -115,6 +125,8 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
     productRepository: productRepo,
     supplierRepository: supplierRepo,
     purchaseRepository: purchaseRepo,
+    invoiceRepository: invoiceRepo,
+    deliveryNoteRepository: deliveryNoteRepo,
   );
   final monitor = ref.watch(connectivityMonitorProvider.notifier);
   Timer? timer;

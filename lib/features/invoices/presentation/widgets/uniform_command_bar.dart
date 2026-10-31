@@ -12,6 +12,7 @@ class UniformCommandBar extends StatelessWidget {
     this.isThermal = false,
     this.saveSuccess = false,
     this.isSwahili = false,
+    this.isSynced,
   });
 
   final VoidCallback? onPrint;
@@ -21,6 +22,7 @@ class UniformCommandBar extends StatelessWidget {
   final bool isThermal;
   final bool saveSuccess;
   final bool isSwahili;
+  final bool? isSynced;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +75,46 @@ class UniformCommandBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+
+            // Real-time Cloud Sync Indicator
+            if (isSynced != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSynced!
+                      ? AppColors.successContainer
+                      : AppColors.outlineVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSynced!
+                          ? Icons.check_circle_rounded
+                          : Icons.access_time_rounded,
+                      size: 13,
+                      color: isSynced! ? AppColors.success : AppColors.outline,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isSynced!
+                          ? (isSwahili ? 'Imelandanishwa' : 'Synced')
+                          : (isSwahili ? 'Inasubiri mtandao' : 'Pending sync'),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: isSynced!
+                            ? AppColors.onSuccessContainer
+                            : AppColors.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
 
             if (saveSuccess) ...[
               Container(

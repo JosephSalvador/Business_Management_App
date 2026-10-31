@@ -170,6 +170,54 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
+        // Sync State Banner
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: invoice.isSynced
+                ? AppColors.successContainer.withOpacity(0.4)
+                : AppColors.neutralContainer,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: invoice.isSynced
+                  ? AppColors.success.withOpacity(0.3)
+                  : AppColors.outlineVariant,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                invoice.isSynced
+                    ? Icons.check_circle_rounded
+                    : Icons.access_time_rounded,
+                size: 16,
+                color: invoice.isSynced ? AppColors.success : AppColors.outline,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  invoice.isSynced
+                      ? (isSwahili
+                          ? 'Ankara imelandanishwa kwenye wingu (Cloud Synced)'
+                          : 'Invoice is verified and synced to cloud')
+                      : (isSwahili
+                          ? 'Imehifadhiwa ndani ya simu (Inasubiri intaneti kulandanishwa)'
+                          : 'Stored locally on-device (Waiting for connection to sync)'),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: invoice.isSynced
+                        ? AppColors.onSuccessContainer
+                        : AppColors.resolveTextSecondary(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Top Action Bar: Share / Print A4 PDF + Record Payment
         Container(
           padding: const EdgeInsets.all(12),
