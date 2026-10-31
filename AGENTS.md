@@ -92,3 +92,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Frontend & Backend Tests - Update unit and widget tests (`auth_controller_journey_test.dart`, `auth_forms_widget_test.dart`).
 - [x] Task 7: Bump version code to `1.0.0+66` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 8: Commit, push to `feature/mobile-pos-foundation`, and trigger GitHub Actions `build-clients.yml` to publish updated production APK (Run 41196720293).
+
+## Implementation Plan — UI Polish, Recent Activity Business Overhaul & Cloud Deployment
+- [x] Task 1: Backend - Exclude query handlers from audit logging in `AuditBehavior.cs` and filter non-business commands in `ListRecentActivityAsync`.
+- [x] Task 2: Frontend - Redesign `_ActivityFeed` in `dashboard_page.dart`: map actions to clean human-readable business phrases, distinct semantic icons/colors, and locale-aware relative timestamps.
+- [x] Task 3: Frontend - Add supplier refresh and quick "+ Ongeza Msambazaji" action in `purchase_form_page.dart`.
+- [x] Task 4: Frontend - Fix light mode visibility across all expense screens (`expenses_page.dart`, `expense_form_page.dart`, `record_account_expense_page.dart`, `cash_session_page.dart`).
+- [x] Task 5: Bump version code to `1.0.0+67` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 6: Deploy updated backend to Azure Container Apps production (`deploy-azure.yml`) so `/check-availability` is active in production.
+- [ ] Task 7: Build and publish production APK v1.0.0+67 via GitHub Actions (`build-clients.yml`).

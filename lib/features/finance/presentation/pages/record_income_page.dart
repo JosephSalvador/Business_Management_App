@@ -30,6 +30,9 @@ class _RecordIncomePageState extends ConsumerState<RecordIncomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(context.loc.recordIncomeTitle),
@@ -40,36 +43,67 @@ class _RecordIncomePageState extends ConsumerState<RecordIncomePage> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              TextFormField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: context.loc.recordAmountLabel,
-                  prefixIcon: const Icon(Icons.attach_money),
+              Card(
+                elevation: isDark ? 0 : 0.5,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: theme.colorScheme.outlineVariant
+                        .withValues(alpha: isDark ? 0.3 : 0.7),
+                  ),
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return context.loc.recordAmountRequired;
-                  }
-                  final amount = double.tryParse(v.trim());
-                  if (amount == null || amount <= 0) {
-                    return context.loc.recordAmountPositive;
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  labelText: context.loc.recordDescriptionLabel,
-                  prefixIcon: const Icon(Icons.description),
+                color: theme.colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: context.loc.recordAmountLabel,
+                          prefixIcon: const Icon(Icons.attach_money),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.3),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return context.loc.recordAmountRequired;
+                          }
+                          final amount = double.tryParse(v.trim());
+                          if (amount == null || amount <= 0) {
+                            return context.loc.recordAmountPositive;
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _descriptionController,
+                        decoration: InputDecoration(
+                          labelText: context.loc.recordDescriptionLabel,
+                          prefixIcon: const Icon(Icons.description),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.3),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? context.loc.recordDescriptionRequired
+                            : null,
+                      ),
+                    ],
+                  ),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? context.loc.recordDescriptionRequired
-                    : null,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -78,6 +112,9 @@ class _RecordIncomePageState extends ConsumerState<RecordIncomePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: _saving
                       ? const SizedBox(

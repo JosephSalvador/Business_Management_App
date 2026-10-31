@@ -1473,14 +1473,15 @@ public sealed class DashboardRepository : IDashboardRepository
     {
         var meaningfulTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "Sale", "Product", "Customer", "Expense", "Purchase", "StockMovement", "User", "PriceList",
-
-            // Generic audit rows written by AuditBehavior for every mutation command.
-            "Command"
+            "Sale", "Product", "Customer", "Expense", "Purchase", "StockMovement", "User", "PriceList"
         };
 
         var logs = await _db.AuditLogs
-            .Where(a => a.TenantId == tenantId && meaningfulTypes.Contains(a.EntityType))
+            .Where(a => a.TenantId == tenantId &&
+                        meaningfulTypes.Contains(a.EntityType) &&
+                        !a.Action.EndsWith("Query") &&
+                        !a.Action.StartsWith("Get") &&
+                        !a.Action.StartsWith("List"))
             .OrderByDescending(a => a.CreatedAt)
             .ThenByDescending(a => a.Id)
             .Take(limit)

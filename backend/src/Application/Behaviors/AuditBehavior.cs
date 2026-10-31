@@ -35,7 +35,15 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
     {
         var response = await next();
 
-        if (typeof(TRequest).Name.StartsWith("Get", StringComparison.Ordinal) || response.IsFailure)
+        var requestName = typeof(TRequest).Name;
+        // Queries and read operations must never generate mutation audit records
+        if (requestName.EndsWith("Query", StringComparison.OrdinalIgnoreCase) ||
+            requestName.StartsWith("Get", StringComparison.OrdinalIgnoreCase) ||
+            requestName.StartsWith("List", StringComparison.OrdinalIgnoreCase) ||
+            requestName.StartsWith("Search", StringComparison.OrdinalIgnoreCase) ||
+            requestName.StartsWith("Check", StringComparison.OrdinalIgnoreCase) ||
+            !requestName.EndsWith("Command", StringComparison.OrdinalIgnoreCase) ||
+            response.IsFailure)
         {
             return response;
         }

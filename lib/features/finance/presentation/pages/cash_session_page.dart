@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../../l10n/loc.dart';
@@ -65,6 +66,9 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
 
   Widget _buildClosedOrNone(
       BuildContext context, WidgetRef ref, Map<String, dynamic>? session) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -74,6 +78,15 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
             const SizedBox(height: 24),
           ],
           Card(
+            elevation: isDark ? 0 : 0.5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: theme.colorScheme.outlineVariant
+                    .withValues(alpha: isDark ? 0.3 : 0.7),
+              ),
+            ),
+            color: theme.colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -87,7 +100,10 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
                   const SizedBox(height: 8),
                   Text(
                     context.loc.cashOpenInstructions,
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.resolveTextSecondary(context),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _OpenSessionForm(accountId: widget.accountId),
@@ -102,6 +118,8 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
 
   Widget _buildOpenSession(
       BuildContext context, WidgetRef ref, Map<String, dynamic> session) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final openingCash = (session['openingCash'] ?? 0).toDouble();
     final openedAtStr = session['openedAt'] ?? '';
     final openedAt =
@@ -123,8 +141,19 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF16A34A).withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF16A34A).withValues(alpha: isDark ? 0.4 : 0.3),
+                  ),
+                  boxShadow: [
+                    if (!isDark)
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                  ],
                 ),
                 child: Column(
                   children: [
@@ -155,9 +184,13 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade200),
+                        color: theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: isDark ? 0.3 : 0.7),
+                        ),
                       ),
                       child: Column(
                         children: [
@@ -166,7 +199,7 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
+                              color: AppColors.resolveTextSecondary(context),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -201,7 +234,7 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
                         context.loc.cashOpenedAt(DateFormat('dd/MM/yyyy HH:mm')
                             .format(openedAt.toLocal())),
                         style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade500),
+                            fontSize: 12, color: AppColors.resolveTextSecondary(context)),
                       ),
                     ],
                   ],
@@ -234,6 +267,8 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
   }
 
   Widget _buildSessionSummary(Map<String, dynamic> session) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final openingCash = (session['openingCash'] ?? 0).toDouble();
     final closingCash = (session['closingCash'] as num?)?.toDouble();
     final expectedCash = (session['expectedCash'] as num?)?.toDouble();
@@ -243,6 +278,15 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
         closedAtStr != null ? DateTime.tryParse(closedAtStr) : null;
 
     return Card(
+      elevation: isDark ? 0 : 0.5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant
+              .withValues(alpha: isDark ? 0.3 : 0.7),
+        ),
+      ),
+      color: theme.colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -293,7 +337,9 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
               Text(
                 context.loc.cashClosedAt(
                     DateFormat('dd/MM/yyyy HH:mm').format(closedAt.toLocal())),
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.resolveTextSecondary(context)),
               ),
             ],
           ],
@@ -303,18 +349,25 @@ class _CashSessionPageState extends ConsumerState<CashSessionPage> {
   }
 
   Widget _summaryRow(String label, String value, {Color? valueColor}) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.resolveTextSecondary(context),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: valueColor,
+              color: valueColor ?? theme.colorScheme.onSurface,
             ),
           ),
         ],
@@ -474,6 +527,14 @@ class _OpenSessionFormState extends ConsumerState<_OpenSessionForm> {
             decoration: InputDecoration(
               labelText: context.loc.cashOpeningInput,
               prefixIcon: const Icon(Icons.attach_money),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: 0.3),
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) {

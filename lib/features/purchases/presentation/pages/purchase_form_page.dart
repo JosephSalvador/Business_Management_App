@@ -64,6 +64,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(suppliersProvider);
       final productsState = ref.read(productsControllerProvider);
       if (productsState is! ProductsLoaded) {
         ref.read(productsControllerProvider.notifier).load();
@@ -248,38 +249,147 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                       ),
                       const SizedBox(height: 16),
 
+                      // Supplier Section Header with Action Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              loc.purchasesSupplier,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: const Text('Msambazaji'),
+                            onPressed: () async {
+                              await context.push('/suppliers/new');
+                              ref.invalidate(suppliersProvider);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            tooltip: 'Onyesha Upya',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => ref.invalidate(suppliersProvider),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+
                       // Supplier Dropdown
                       suppliersAsync.when(
-                        loading: () => const LinearProgressIndicator(),
-                        error: (e, _) => Text(loc.commonWithError('$e')),
-                        data: (pagedSuppliers) =>
-                            DropdownButtonFormField<String>(
-                          initialValue: _selectedSupplierId,
-                          decoration: InputDecoration(
-                            labelText: loc.purchasesSupplier,
-                            prefixIcon:
-                                const Icon(Icons.business_outlined, size: 20),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 14),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: LinearProgressIndicator(),
+                        ),
+                        error: (e, _) => Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.errorContainer
+                                .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          items: pagedSuppliers.items
-                              .map<DropdownMenuItem<String>>((s) {
-                            return DropdownMenuItem(
-                              value: s['id'] as String,
-                              child: Text(
-                                s['name'] as String,
-                                overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline,
+                                  color: theme.colorScheme.error, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  loc.commonWithError('$e'),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.error,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.refresh, size: 18),
+                                onPressed: () =>
+                                    ref.invalidate(suppliersProvider),
+                              ),
+                            ],
+                          ),
+                        ),
+                        data: (pagedSuppliers) {
+                          if (pagedSuppliers.items.isEmpty) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: theme.colorScheme.outlineVariant
+                                      .withValues(alpha: 0.6),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.business_outlined,
+                                      size: 20,
+                                      color: theme.colorScheme.primary),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Hakuna wasambazaji waliopo bado.',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(fontSize: 13),
+                                    ),
+                                  ),
+                                  FilledButton.tonalIcon(
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    onPressed: () async {
+                                      await context.push('/suppliers/new');
+                                      ref.invalidate(suppliersProvider);
+                                    },
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('Ongeza Sasa'),
+                                  ),
+                                ],
                               ),
                             );
-                          }).toList(),
-                          onChanged: (v) =>
-                              setState(() => _selectedSupplierId = v),
-                          validator: (v) =>
-                              v == null ? loc.purchasesSupplierRequired : null,
-                        ),
+                          }
+                          return DropdownButtonFormField<String>(
+                            initialValue: _selectedSupplierId,
+                            decoration: InputDecoration(
+                              hintText: 'Chagua msambazaji...',
+                              prefixIcon:
+                                  const Icon(Icons.business_outlined, size: 20),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 14),
+                            ),
+                            items: pagedSuppliers.items
+                                .map<DropdownMenuItem<String>>((s) {
+                              return DropdownMenuItem(
+                                value: s['id'] as String,
+                                child: Text(
+                                  s['name'] as String,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedSupplierId = v),
+                            validator: (v) =>
+                                v == null ? loc.purchasesSupplierRequired : null,
+                          );
+                        },
                       ),
                       const SizedBox(height: 14),
 

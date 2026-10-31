@@ -331,25 +331,73 @@ class PurchaseRepository {
         query: {'page': page, 'pageSize': pageSize},
       );
       final paged = _decodeSuppliers(response);
+      var items = List<Map<String, dynamic>>.from(paged.items);
+
+      if (_queue != null) {
+        try {
+          final pendingOps =
+              await _queue.listByOperationType('supplier.create');
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic>) {
+                final id = decoded['id']?.toString() ?? op.aggregateId;
+                if (!items.any((s) => s['id']?.toString() == id)) {
+                  items.insert(0, {
+                    ...decoded,
+                    'id': id,
+                    'isOfflinePending': true,
+                  });
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      final result = PagedSuppliers(items: items, total: items.length);
       if (_cache != null) {
         await _cache.save('suppliers_list', {
-          'items': paged.items,
-          'total': paged.total,
+          'items': result.items,
+          'total': result.total,
         });
       }
-      return paged;
+      return result;
     } on AppException {
+      var items = <Map<String, dynamic>>[];
       if (_cache != null) {
         final cached = await _cache.load('suppliers_list');
         if (cached != null) {
-          final items = (cached['items'] as List<dynamic>? ?? const [])
+          items = (cached['items'] as List<dynamic>? ?? const [])
               .whereType<Map<dynamic, dynamic>>()
               .map((raw) => Map<String, dynamic>.from(raw))
               .toList();
-          return PagedSuppliers(items: items, total: items.length);
         }
       }
-      return const PagedSuppliers(items: [], total: 0);
+
+      if (_queue != null) {
+        try {
+          final pendingOps =
+              await _queue.listByOperationType('supplier.create');
+          for (final op in pendingOps) {
+            try {
+              final decoded = jsonDecode(op.payload);
+              if (decoded is Map<String, dynamic>) {
+                final id = decoded['id']?.toString() ?? op.aggregateId;
+                if (!items.any((s) => s['id']?.toString() == id)) {
+                  items.insert(0, {
+                    ...decoded,
+                    'id': id,
+                    'isOfflinePending': true,
+                  });
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      return PagedSuppliers(items: items, total: items.length);
     }
   }
 

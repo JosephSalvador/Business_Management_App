@@ -969,12 +969,62 @@ class _ActivityFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Filter out internal queries or raw developer command entries
+    final cleanItems = items.where((item) {
+      final action = (item['action'] ?? '').toString().toLowerCase();
+      final entityType = (item['entityType'] ?? '').toString().toLowerCase();
+      if (action.endsWith('query') ||
+          action.contains('query') ||
+          action.startsWith('get') ||
+          action.startsWith('list') ||
+          entityType == 'command') {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    if (cleanItems.isEmpty) {
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Center(
+            child: Text(
+              loc.dashboardNoActivity,
+              style: TextStyle(
+                color: AppColors.resolveTextTertiary(context),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+      ),
       child: Column(
         children: [
-          for (var i = 0; i < items.length; i++) ...[
-            _ActivityTile(item: items[i], loc: loc),
-            if (i < items.length - 1) const Divider(height: 1, indent: 56),
+          for (var i = 0; i < cleanItems.length; i++) ...[
+            _ActivityTile(item: cleanItems[i], loc: loc),
+            if (i < cleanItems.length - 1)
+              Divider(
+                height: 1,
+                indent: 56,
+                color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
           ],
         ],
       ),
@@ -990,23 +1040,24 @@ class _ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final action = (item['action'] ?? '').toString().toLowerCase();
-    final entityType = item['entityType'] ?? '';
+    final entityType = (item['entityType'] ?? '').toString().toLowerCase();
     final entityName = item['entityName'] as String?;
     final amount = item['amount'] as num?;
     final status = item['status'] as String?;
     final occurredAt = item['occurredAt'] as String?;
+    final actorEmail = item['actorEmail'] as String?;
 
     final iconData = _iconForEntityType(entityType);
-    final color = _colorForAction(action, status);
-    final timeAgo = _relativeTime(occurredAt);
-    final description = _friendlyDescription(action, entityType, entityName);
+    final color = _colorForEntityType(entityType, action, status);
+    final timeAgo = _relativeTime(occurredAt, Localizations.localeOf(context).languageCode);
+    final description = _friendlyDescription(action, entityType, entityName, context);
 
     return ListTile(
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(10),
         ),
         alignment: Alignment.center,
@@ -1016,13 +1067,13 @@ class _ActivityTile extends StatelessWidget {
         description,
         style: TextStyle(
           fontSize: 14,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
           color: AppColors.resolveTextPrimary(context),
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: _buildSubtitle(context, amount, status, action),
+      subtitle: _buildSubtitle(context, amount, status, actorEmail),
       trailing: timeAgo != null
           ? Text(
               timeAgo,
@@ -1036,13 +1087,17 @@ class _ActivityTile extends StatelessWidget {
   }
 
   Widget? _buildSubtitle(
-      BuildContext context, num? amount, String? status, String action) {
+      BuildContext context, num? amount, String? status, String? actorEmail) {
     final parts = <String>[];
     if (amount != null && amount > 0) {
       parts.add(formatMoney(amount.toDouble()));
     }
     if (status != null && status.isNotEmpty) {
       parts.add(status);
+    }
+    if (actorEmail != null && actorEmail.isNotEmpty) {
+      final name = actorEmail.split('@').first;
+      parts.add(name);
     }
     if (parts.isEmpty) return null;
     return Text(
@@ -1051,12 +1106,12 @@ class _ActivityTile extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w500,
         color: status == 'Paid'
-            ? AppColors.success
+            ? const Color(0xFF10B981)
             : status == 'Pending'
                 ? AppColors.warning
                 : status == 'Voided'
                     ? AppColors.error
-                    : AppColors.resolveTextTertiary(context),
+                    : AppColors.resolveTextSecondary(context),
       ),
     );
   }
@@ -1066,74 +1121,116 @@ class _ActivityTile extends StatelessWidget {
       case 'sale':
         return Icons.point_of_sale_rounded;
       case 'product':
-        return Icons.inventory_2_outlined;
+        return Icons.inventory_2_rounded;
       case 'customer':
-        return Icons.person_outline_rounded;
+        return Icons.person_rounded;
       case 'expense':
-        return Icons.receipt_long_rounded;
+        return Icons.account_balance_wallet_rounded;
       case 'purchase':
-        return Icons.shopping_cart_rounded;
+        return Icons.local_shipping_rounded;
+      case 'stockmovement':
+        return Icons.swap_vert_rounded;
+      case 'user':
+        return Icons.badge_outlined;
       default:
-        return Icons.info_outline_rounded;
+        return Icons.receipt_long_rounded;
     }
   }
 
-  Color _colorForAction(String action, String? status) {
-    if (status == 'Voided') return AppColors.error;
-    if (action.contains('delete') || action.contains('remove')) {
+  Color _colorForEntityType(String entityType, String action, String? status) {
+    if (status == 'Voided' || action.contains('delete') || action.contains('remove')) {
       return AppColors.error;
     }
-    if (action.contains('create') || action.contains('add')) {
-      return AppColors.success;
+    switch (entityType.toLowerCase()) {
+      case 'sale':
+        return const Color(0xFF10B981); // Emerald
+      case 'expense':
+        return const Color(0xFFF43F5E); // Rose/Red
+      case 'purchase':
+        return const Color(0xFF8B5CF6); // Purple
+      case 'product':
+        return const Color(0xFF0EA5E9); // Ocean Blue
+      case 'customer':
+        return const Color(0xFF3B82F6); // Blue
+      case 'stockmovement':
+        return const Color(0xFFF59E0B); // Amber
+      default:
+        return AppColors.primary;
     }
-    if (action.contains('update') || action.contains('edit')) {
-      return AppColors.primary;
-    }
-    return AppColors.primary;
   }
 
   String _friendlyDescription(
-      String action, String entityType, String? entityName) {
-    final entity = entityName ?? _entityLabel(entityType);
-    if (action.contains('create') || action.contains('add')) {
-      return loc.dashboardActivityAdded(entity);
-    }
-    if (action.contains('update') || action.contains('edit')) {
-      return loc.dashboardActivityUpdated(entity);
-    }
-    if (action.contains('delete') || action.contains('remove')) {
-      return loc.dashboardActivityDeleted(entity);
-    }
-    return loc.dashboardActivityDefault(action, entity);
-  }
-
-  String _entityLabel(String entityType) {
+      String action, String entityType, String? entityName, BuildContext context) {
+    final isSw = Localizations.localeOf(context).languageCode.toLowerCase().startsWith('sw');
     switch (entityType.toLowerCase()) {
       case 'sale':
-        return 'Mauzo';
-      case 'product':
-        return 'Bidhaa';
-      case 'customer':
-        return 'Mteja';
+        return entityName != null && entityName.isNotEmpty
+            ? (isSw ? 'Mauzo: $entityName' : 'Sale: $entityName')
+            : (isSw ? 'Mauzo Mapya' : 'New Sale');
       case 'expense':
-        return 'Gharama';
+        return entityName != null && entityName.isNotEmpty
+            ? (isSw ? 'Gharama: $entityName' : 'Expense: $entityName')
+            : (isSw ? 'Gharama Iliyorekodiwa' : 'Recorded Expense');
       case 'purchase':
-        return 'Ununuzi';
+        return entityName != null && entityName.isNotEmpty
+            ? (isSw ? 'Ununuzi: $entityName' : 'Purchase: $entityName')
+            : (isSw ? 'Agizo la Ununuzi' : 'Purchase Order');
+      case 'product':
+        final name = entityName ?? (isSw ? 'Bidhaa' : 'Product');
+        if (action.contains('create') || action.contains('add')) {
+          return isSw ? 'Bidhaa Mpya: $name' : 'New Product: $name';
+        }
+        if (action.contains('delete') || action.contains('remove')) {
+          return isSw ? 'Bidhaa Imefutwa: $name' : 'Deleted Product: $name';
+        }
+        return isSw ? 'Bidhaa Imesasishwa: $name' : 'Updated Product: $name';
+      case 'customer':
+        final name = entityName ?? (isSw ? 'Mteja' : 'Customer');
+        if (action.contains('create') || action.contains('add')) {
+          return isSw ? 'Mteja Mpya: $name' : 'New Customer: $name';
+        }
+        return isSw ? 'Mteja Amesasishwa: $name' : 'Updated Customer: $name';
+      case 'stockmovement':
+        return isSw ? 'Marekebisho ya Stoo' : 'Stock Adjustment';
+      case 'user':
+        return entityName != null && entityName.isNotEmpty
+            ? (isSw ? 'Mtumiaji: $entityName' : 'User: $entityName')
+            : (isSw ? 'Mtumiaji Mpya' : 'New User');
       default:
-        return entityType;
+        return entityName ?? (isSw ? 'Shughuli ya Mfumo' : 'System Activity');
     }
   }
 
-  String? _relativeTime(String? isoDate) {
+  String? _relativeTime(String? isoDate, String locale) {
     if (isoDate == null) return null;
     try {
       final date = DateTime.parse(isoDate).toLocal();
       final diff = DateTime.now().difference(date);
-      if (diff.inSeconds < 60) return 'Sasa hivi';
-      if (diff.inMinutes < 60) return '${diff.inMinutes} dk';
-      if (diff.inHours < 24) return '${diff.inHours} saa';
-      if (diff.inDays < 7) return '${diff.inDays} siku';
-      return DateFormat('d/M').format(date);
+      final isSw = locale.toLowerCase().startsWith('sw');
+
+      if (diff.inSeconds < 45) {
+        return isSw ? 'Sasa hivi' : 'Just now';
+      }
+      if (diff.inMinutes < 60) {
+        final m = diff.inMinutes;
+        return isSw
+            ? (m == 1 ? 'Dakika 1 iliyopita' : 'Dakika $m zilizopita')
+            : (m == 1 ? '1 min ago' : '$m mins ago');
+      }
+      if (diff.inHours < 24) {
+        final h = diff.inHours;
+        return isSw
+            ? (h == 1 ? 'Saa 1 lililopita' : 'Masaa $h yaliyopita')
+            : (h == 1 ? '1 hour ago' : '$h hours ago');
+      }
+      if (diff.inDays == 1) {
+        return isSw ? 'Jana' : 'Yesterday';
+      }
+      if (diff.inDays < 7) {
+        final d = diff.inDays;
+        return isSw ? 'Siku $d zilizopita' : '$d days ago';
+      }
+      return DateFormat('d MMM').format(date);
     } catch (_) {
       return null;
     }

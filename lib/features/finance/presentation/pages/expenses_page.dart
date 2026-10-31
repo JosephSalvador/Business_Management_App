@@ -186,8 +186,22 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                       filled: true,
                       fillColor: Theme.of(context).colorScheme.surface,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outlineVariant
+                              .withValues(alpha: 0.7),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outlineVariant
+                              .withValues(alpha: 0.7),
+                        ),
                       ),
                     ),
                   ),
@@ -358,8 +372,19 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
       if (category != null && category.trim().isNotEmpty) category,
     ];
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      elevation: isDark ? 0 : 0.5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.3 : 0.6),
+        ),
+      ),
+      color: theme.colorScheme.surface,
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
@@ -375,22 +400,31 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
             size: 20,
           ),
         ),
-        title: Text(description,
-            style: const TextStyle(fontWeight: FontWeight.w500)),
+        title: Text(
+          description,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
         subtitle: detail.isEmpty
             ? null
             : Text(
                 detail.join(' · '),
                 style: TextStyle(
                   fontSize: 12,
-                  color: isPending ? Colors.amber.shade900 : Colors.grey.shade500,
+                  color: isPending
+                      ? Colors.amber.shade900
+                      : AppColors.resolveTextSecondary(context),
                   fontWeight: isPending ? FontWeight.w500 : FontWeight.normal,
                 ),
               ),
         trailing: Text(
           formatMoney(amount),
           style: const TextStyle(
-              fontWeight: FontWeight.w600, color: Color(0xFFFF4757)),
+            fontWeight: FontWeight.w700,
+            color: Color(0xFFFF4757),
+          ),
         ),
         onTap: () => context.push('/expenses/${expense['id']}/edit'),
       ),
@@ -406,6 +440,8 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final categories = summary.byCategory.take(3).toList();
 
     return Container(
@@ -413,8 +449,13 @@ class _SummaryCard extends StatelessWidget {
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
+        color: isDark
+            ? AppColors.primary.withValues(alpha: 0.15)
+            : AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: isDark ? 0.3 : 0.25),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,7 +463,10 @@ class _SummaryCard extends StatelessWidget {
           Text(
             loc.expenseSummaryTitle,
             style: TextStyle(
-                fontSize: 13, color: AppColors.resolveTextTertiary(context)),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.resolveTextSecondary(context),
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -440,7 +484,10 @@ class _SummaryCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
                   '${line.categoryName ?? loc.expenseCategoryNone} — ${formatMoney(line.total)}',
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
               ),
           ] else ...[
@@ -448,7 +495,9 @@ class _SummaryCard extends StatelessWidget {
             Text(
               loc.expenseSummaryEmpty,
               style: TextStyle(
-                  fontSize: 13, color: AppColors.resolveTextTertiary(context)),
+                fontSize: 13,
+                color: AppColors.resolveTextTertiary(context),
+              ),
             ),
           ],
         ],

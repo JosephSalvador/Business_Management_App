@@ -147,10 +147,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   children: [
                     // ── Amount Card (Hero) ──────────────────────────
                     Card(
-                      elevation: 0,
+                      elevation: theme.brightness == Brightness.dark ? 0 : 0.5,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: theme.brightness == Brightness.dark ? 0.3 : 0.7),
+                        ),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -201,8 +204,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               children: _quickAmounts.map((val) {
                                 return ActionChip(
                                   label: Text('+${formatMoney(val.toDouble())}'),
-                                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                  backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                  labelStyle: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                                  side: BorderSide(
+                                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  ),
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
                                   onPressed: () => _addQuickAmount(val),
                                 );
@@ -216,10 +226,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
                     // ── Description Card ───────────────────────────
                     Card(
-                      elevation: 0,
+                      elevation: theme.brightness == Brightness.dark ? 0 : 0.5,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: theme.brightness == Brightness.dark ? 0.3 : 0.7),
+                        ),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -241,10 +254,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               decoration: InputDecoration(
                                 hintText: 'Mfano: Kodi ya mwezi, Luku ya duka...',
                                 filled: true,
-                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide.none,
+                                  borderSide: BorderSide(
+                                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  ),
                                 ),
                                 isDense: true,
                               ),
@@ -268,7 +289,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               children: _quickSuggestions.map((suggestion) {
                                 return ActionChip(
                                   label: Text(suggestion),
-                                  labelStyle: const TextStyle(fontSize: 12),
+                                  labelStyle: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                  side: BorderSide(
+                                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                  ),
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
                                   onPressed: () {
                                     setState(() {
@@ -286,10 +315,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
                     // ── Category Card ──────────────────────────────
                     Card(
-                      elevation: 0,
+                      elevation: theme.brightness == Brightness.dark ? 0 : 0.5,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: theme.brightness == Brightness.dark ? 0.3 : 0.7),
+                        ),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -384,10 +416,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
                     // ── Payment Method & Date Card ─────────────────
                     Card(
-                      elevation: 0,
+                      elevation: theme.brightness == Brightness.dark ? 0 : 0.5,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: theme.brightness == Brightness.dark ? 0.3 : 0.7),
+                        ),
                       ),
                       color: theme.colorScheme.surface,
                       child: Padding(
@@ -452,10 +487,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
                     // ── More Details (Collapsible) ─────────────────
                     Card(
-                      elevation: 0,
+                      elevation: theme.brightness == Brightness.dark ? 0 : 0.5,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: theme.brightness == Brightness.dark ? 0.3 : 0.7),
+                        ),
                       ),
                       color: theme.colorScheme.surface,
                       child: ExpansionTile(
@@ -484,10 +522,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     labelText: loc.expenseReference,
                                     hintText: 'Namba ya risiti au rejea',
                                     filled: true,
-                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide.none,
+                                      borderSide: BorderSide(
+                                        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                      ),
                                     ),
                                     isDense: true,
                                   ),
@@ -499,10 +545,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     labelText: loc.expenseNotes,
                                     hintText: 'Maelezo ya ziada kuhusu gharama hii...',
                                     filled: true,
-                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide.none,
+                                      borderSide: BorderSide(
+                                        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                      ),
                                     ),
                                     isDense: true,
                                   ),
