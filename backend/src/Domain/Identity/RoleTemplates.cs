@@ -31,6 +31,7 @@ public static class RoleTemplates
                 PermissionNames.ExpensesView, PermissionNames.ExpensesCreate, PermissionNames.ExpensesUpdate,
                 PermissionNames.ReceiptsView, PermissionNames.ReceiptsPrint, PermissionNames.ReceiptsManageLayouts,
                 PermissionNames.InvoicesView, PermissionNames.InvoicesCreate, PermissionNames.InvoicesManage,
+                PermissionNames.DeliveryNotesView, PermissionNames.DeliveryNotesCreate, PermissionNames.DeliveryNotesManage,
                 PermissionNames.NotificationsView, PermissionNames.NotificationsManage,
             ]),
         new(
@@ -72,6 +73,7 @@ public static class RoleTemplates
                 PermissionNames.ExpensesView, PermissionNames.ExpensesCreate, PermissionNames.ExpensesUpdate, PermissionNames.ExpensesDelete,
                 PermissionNames.ReceiptsView, PermissionNames.ReceiptsPrint,
                 PermissionNames.InvoicesView,
+                PermissionNames.DeliveryNotesView,
                 PermissionNames.AuditView,
                 PermissionNames.NotificationsView,
             ]),

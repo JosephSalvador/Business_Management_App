@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/providers.dart';
 import '../../../../app/router.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../core/platform/logo_picker_service.dart';
 import '../../../../core/storage/locale_store.dart';
 import '../../../../core/storage/theme_store.dart';
 import '../../../../l10n/loc.dart';
@@ -13,6 +14,7 @@ import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/settings_controller.dart';
 import '../../data/organization_repository.dart';
 import '../../../authentication/presentation/widgets/quick_pin_setup_sheet.dart';
+import '../../../invoices/presentation/widgets/invoice_branding_sheet.dart';
 import '../../../receipts/domain/receipt_format.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -46,12 +48,60 @@ class SettingsPage extends ConsumerWidget {
     Organization organization,
   ) {
     final loc = context.loc;
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
+    final logoBytes = LogoPickerService.decodeLogoBytes(organization.logoBase64);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _Section(
           title: loc.settingsBusinessInfo,
           children: [
+            ListTile(
+              leading: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.resolveBorder(context)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: logoBytes != null
+                    ? Image.memory(logoBytes, fit: BoxFit.contain)
+                    : const Icon(Icons.add_photo_alternate_outlined,
+                        color: AppColors.primary, size: 22),
+              ),
+              title: Text(
+                isSw
+                    ? 'Nembo ya Kampuni na Mipangilio ya Ankara'
+                    : 'Company Logo & Invoice Branding',
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                logoBytes != null
+                    ? (isSw
+                        ? 'Nembo imewekwa • Benki & Lipa Namba'
+                        : 'Logo active • Bank & Mobile Money details')
+                    : (isSw
+                        ? 'Gusa kuweka nembo, benki na sahihi ya ankara'
+                        : 'Tap to upload logo, bank details & signatory'),
+                style: TextStyle(
+                  color: logoBytes != null
+                      ? AppColors.success
+                      : AppColors.resolveTextSecondary(context),
+                  fontSize: 12.5,
+                ),
+              ),
+              trailing: Icon(Icons.chevron_right,
+                  color: AppColors.resolveTextTertiary(context), size: 20),
+              onTap: () => showInvoiceBrandingSheet(
+                context,
+                organization: organization,
+              ),
+            ),
+            const Divider(height: 1),
             _SettingsTile(
               icon: Icons.store_outlined,
               title: loc.settingsBusinessName,
@@ -81,6 +131,17 @@ class SettingsPage extends ConsumerWidget {
               title: loc.settingsTIN,
               subtitle: organization.taxId ?? '-',
               onTap: () => _editOrganization(context, ref, organization),
+            ),
+            _SettingsTile(
+              icon: Icons.account_balance_outlined,
+              title: isSw ? 'Akaunti ya Malipo ya Ankara' : 'Invoice Payment Accounts',
+              subtitle: organization.formattedPaymentInstructions.isNotEmpty
+                  ? organization.formattedPaymentInstructions
+                  : (isSw ? 'Weka Benki na Lipa Namba' : 'Set Bank & Mobile Money'),
+              onTap: () => showInvoiceBrandingSheet(
+                context,
+                organization: organization,
+              ),
             ),
             _SettingsTile(
               icon: Icons.public_outlined,

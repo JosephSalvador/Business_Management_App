@@ -23,9 +23,25 @@ namespace BusinessOS.Infrastructure.Persistence;
 
 public sealed class BusinessDbContext : DbContext, IUnitOfWork
 {
+    private readonly ITenantContext? _tenantContext;
+
     public BusinessDbContext(DbContextOptions<BusinessDbContext> options) : base(options)
     {
     }
+
+    public BusinessDbContext(DbContextOptions<BusinessDbContext> options, ITenantContext? tenantContext)
+        : base(options)
+    {
+        _tenantContext = tenantContext;
+    }
+
+    /// <summary>
+    /// Tenant used by the global query filters on invoicing documents. <c>null</c> means no
+    /// tenant context was supplied (design-time, tools, unit tests) so the filter is inert.
+    /// A supplied context always filters, and an anonymous caller (<see cref="Guid.Empty"/>)
+    /// therefore matches no rows.
+    /// </summary>
+    private Guid? FilterTenantId => _tenantContext?.TenantId;
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Branch> Branches => Set<Branch>();
@@ -93,6 +109,8 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<PaymentInstruction> PaymentInstructions => Set<PaymentInstruction>();
     public DbSet<CustomerInvoice> CustomerInvoices => Set<CustomerInvoice>();
     public DbSet<CustomerInvoiceLine> CustomerInvoiceLines => Set<CustomerInvoiceLine>();
+    public DbSet<DeliveryNote> DeliveryNotes => Set<DeliveryNote>();
+    public DbSet<DeliveryNoteItem> DeliveryNoteItems => Set<DeliveryNoteItem>();
     public DbSet<AppNotification> Notifications => Set<AppNotification>();
     public DbSet<UserDevice> UserDevices => Set<UserDevice>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
@@ -109,6 +127,15 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(t => t.Address).HasColumnType("text");
             entity.Property(t => t.Currency).IsRequired().HasMaxLength(3);
             entity.Property(t => t.TaxId).HasMaxLength(64);
+            entity.Property(t => t.LogoBase64).HasColumnType("text");
+            entity.Property(t => t.BankName).HasMaxLength(150);
+            entity.Property(t => t.BankAccountName).HasMaxLength(200);
+            entity.Property(t => t.BankAccountNumber).HasMaxLength(100);
+            entity.Property(t => t.BankBranchOrSwift).HasMaxLength(150);
+            entity.Property(t => t.MobileMoneyDetails).HasMaxLength(300);
+            entity.Property(t => t.InvoiceTerms).HasColumnType("text");
+            entity.Property(t => t.AuthorizedSignatoryName).HasMaxLength(150);
+            entity.Property(t => t.AuthorizedSignatoryTitle).HasMaxLength(150);
             entity.Property(t => t.DatabaseSchema).HasMaxLength(64);
             entity.HasIndex(t => t.Name).IsUnique();
         });
@@ -1095,36 +1122,97 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.ToTable(Tables.Invoicing.CustomerInvoices, Schemas.Invoicing);
                 entity.HasKey(i => i.Id);
                 entity.Property(i => i.Number).IsRequired().HasMaxLength(50);
+                entity.Property(i => i.DocumentTitle).IsRequired().HasMaxLength(50);
+                entity.Property(i => i.ReferenceNumber).HasMaxLength(100);
+                entity.Property(i => i.PaymentTerms).HasMaxLength(100);
                 entity.Property(i => i.CustomerName).HasMaxLength(200);
+                entity.Property(i => i.CustomerAttention).HasMaxLength(200);
+                entity.Property(i => i.CustomerPhone).HasMaxLength(50);
+                entity.Property(i => i.CustomerEmail).HasMaxLength(320);
+                entity.Property(i => i.CustomerAddress).HasColumnType("text");
+                entity.Property(i => i.CustomerTin).HasMaxLength(64);
                 entity.Property(i => i.Currency).IsRequired().HasMaxLength(3);
                 entity.Property(i => i.Status).IsRequired();
                 entity.Property(i => i.Subtotal).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(i => i.DiscountAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.TaxAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.TotalAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.AmountPaid).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.PaymentMethod).HasMaxLength(50);
                 entity.Property(i => i.PaymentReference).HasMaxLength(100);
+                entity.Property(i => i.PaymentInstructions).HasColumnType("text");
                 entity.Property(i => i.Notes).HasColumnType("text");
+                entity.Property(i => i.AuthorizedSignatoryName).HasMaxLength(150);
+                entity.Property(i => i.AuthorizedSignatoryTitle).HasMaxLength(150);
                 entity.HasIndex(i => i.TenantId);
                 entity.HasIndex(i => new { i.TenantId, i.Status });
                 entity.HasIndex(i => new { i.TenantId, i.Number }).IsUnique();
+                entity.HasIndex(i => new { i.TenantId, i.CreatedAt });
                 entity.HasMany(i => i.Lines)
                     .WithOne()
                     .HasForeignKey(l => l.CustomerInvoiceId)
                     .OnDelete(DeleteBehavior.Cascade);
+                entity.HasQueryFilter(i => FilterTenantId == null || i.TenantId == FilterTenantId);
             });
 
             modelBuilder.Entity<CustomerInvoiceLine>(entity =>
             {
                 entity.ToTable(Tables.Invoicing.CustomerInvoiceLines, Schemas.Invoicing);
                 entity.HasKey(l => l.Id);
+                entity.Property(l => l.TenantId).IsRequired();
                 entity.Property(l => l.Description).IsRequired().HasMaxLength(500);
+                entity.Property(l => l.UnitOfMeasure).IsRequired().HasMaxLength(50);
                 entity.Property(l => l.Quantity).IsRequired().HasColumnType("decimal(18,4)");
                 entity.Property(l => l.UnitPrice).IsRequired().HasColumnType("decimal(18,2)");
+                entity.Property(l => l.DiscountAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(l => l.TaxRatePercent).IsRequired().HasColumnType("decimal(9,4)");
                 entity.Property(l => l.LineTotal).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(l => l.TaxAmount).IsRequired().HasColumnType("decimal(18,2)");
                 entity.HasIndex(l => l.CustomerInvoiceId);
+                entity.HasIndex(l => new { l.TenantId, l.CreatedAt });
+                entity.HasQueryFilter(l => FilterTenantId == null || l.TenantId == FilterTenantId);
+            });
+
+            modelBuilder.Entity<DeliveryNote>(entity =>
+            {
+                entity.ToTable(Tables.Invoicing.DeliveryNotes, Schemas.Invoicing);
+                entity.HasKey(d => d.Id);
+                entity.Property(d => d.TenantId).IsRequired();
+                entity.Property(d => d.Number).IsRequired().HasMaxLength(50);
+                entity.Property(d => d.InvoiceNumber).HasMaxLength(50);
+                entity.Property(d => d.CustomerName).HasMaxLength(200);
+                entity.Property(d => d.CustomerAttention).HasMaxLength(200);
+                entity.Property(d => d.CustomerPhone).HasMaxLength(50);
+                entity.Property(d => d.DeliveryAddress).HasColumnType("text");
+                entity.Property(d => d.Status).IsRequired();
+                entity.Property(d => d.VehicleNumber).HasMaxLength(50);
+                entity.Property(d => d.DriverName).HasMaxLength(150);
+                entity.Property(d => d.DriverPhone).HasMaxLength(50);
+                entity.Property(d => d.ReceivedByName).HasMaxLength(150);
+                entity.Property(d => d.Notes).HasColumnType("text");
+                entity.HasIndex(d => new { d.TenantId, d.Number }).IsUnique();
+                entity.HasIndex(d => new { d.TenantId, d.CreatedAt });
+                entity.HasIndex(d => new { d.TenantId, d.Status });
+                entity.HasIndex(d => new { d.TenantId, d.InvoiceId });
+                entity.HasMany(d => d.Items)
+                    .WithOne()
+                    .HasForeignKey(i => i.DeliveryNoteId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasQueryFilter(d => FilterTenantId == null || d.TenantId == FilterTenantId);
+            });
+
+            modelBuilder.Entity<DeliveryNoteItem>(entity =>
+            {
+                entity.ToTable(Tables.Invoicing.DeliveryNoteItems, Schemas.Invoicing);
+                entity.HasKey(i => i.Id);
+                entity.Property(i => i.TenantId).IsRequired();
+                entity.Property(i => i.Description).IsRequired().HasMaxLength(500);
+                entity.Property(i => i.UnitOfMeasure).IsRequired().HasMaxLength(50);
+                entity.Property(i => i.QuantityOrdered).IsRequired().HasColumnType("decimal(18,4)");
+                entity.Property(i => i.QuantityDelivered).IsRequired().HasColumnType("decimal(18,4)");
+                entity.HasIndex(i => i.DeliveryNoteId);
+                entity.HasIndex(i => new { i.TenantId, i.CreatedAt });
+                entity.HasQueryFilter(i => FilterTenantId == null || i.TenantId == FilterTenantId);
             });
 
         modelBuilder.Entity<AppNotification>(entity =>

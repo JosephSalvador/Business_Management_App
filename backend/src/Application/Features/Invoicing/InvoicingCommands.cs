@@ -30,9 +30,22 @@ public static class CustomerInvoiceMappers
             .OrderBy(line => line.OrderIndex)
             .Select(line => new CustomerInvoiceLineDto(
                 line.Id, line.Description, line.Quantity, line.UnitPrice,
-                line.TaxRatePercent, line.LineTotal, line.TaxAmount))
+                line.TaxRatePercent, line.LineTotal, line.TaxAmount,
+                line.UnitOfMeasure, line.DiscountAmount))
             .ToList(),
-        invoice.CreatedAt);
+        invoice.CreatedAt,
+        invoice.DocumentTitle,
+        invoice.ReferenceNumber,
+        invoice.PaymentTerms,
+        invoice.CustomerAttention,
+        invoice.CustomerPhone,
+        invoice.CustomerEmail,
+        invoice.CustomerAddress,
+        invoice.CustomerTin,
+        invoice.DiscountAmount,
+        invoice.PaymentInstructions,
+        invoice.AuthorizedSignatoryName,
+        invoice.AuthorizedSignatoryTitle);
 
     public static CustomerInvoiceSummaryDto ToSummary(CustomerInvoice invoice) => new(
         invoice.Id,
@@ -45,7 +58,10 @@ public static class CustomerInvoiceMappers
         invoice.TotalAmount,
         invoice.AmountPaid,
         invoice.BalanceDue,
-        invoice.CreatedAt);
+        invoice.CreatedAt,
+        invoice.DocumentTitle,
+        invoice.ReferenceNumber,
+        invoice.Currency);
 }
 
 // ── Create Customer Invoice ─────────────────────────────────────────
@@ -53,7 +69,9 @@ public sealed record CustomerInvoiceLineRequest(
     string Description,
     decimal Quantity,
     decimal UnitPrice,
-    decimal TaxRatePercent = 0m);
+    decimal TaxRatePercent = 0m,
+    string UnitOfMeasure = "Pcs",
+    decimal DiscountAmount = 0m);
 
 public sealed record CreateCustomerInvoiceCommand(
     IReadOnlyList<CustomerInvoiceLineRequest> Lines,
@@ -61,7 +79,24 @@ public sealed record CreateCustomerInvoiceCommand(
     string Currency = "TZS",
     DateTime? IssueDate = null,
     DateTime? DueDate = null,
-    string? Notes = null)
+    string? Notes = null,
+    string? DocumentTitle = null,
+    string? ReferenceNumber = null,
+    string? PaymentTerms = null,
+    string? CustomerName = null,
+    string? CustomerAttention = null,
+    string? CustomerPhone = null,
+    string? CustomerEmail = null,
+    string? CustomerAddress = null,
+    string? CustomerTin = null,
+    decimal DiscountAmount = 0m,
+    decimal InitialAmountPaid = 0m,
+    string? PaymentMethod = null,
+    string? PaymentReference = null,
+    string? PaymentInstructions = null,
+    string? AuthorizedSignatoryName = null,
+    string? AuthorizedSignatoryTitle = null,
+    Guid? Id = null)
     : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateCustomerInvoiceCommandHandler
@@ -70,15 +105,18 @@ public sealed class CreateCustomerInvoiceCommandHandler
     private readonly ITenantContext _tenantContext;
     private readonly ICustomerInvoiceRepository _invoices;
     private readonly ICustomerRepository _customers;
+    private readonly IInvoiceNumberSequenceService _numbers;
 
     public CreateCustomerInvoiceCommandHandler(
         ITenantContext tenantContext,
         ICustomerInvoiceRepository invoices,
-        ICustomerRepository customers)
+        ICustomerRepository customers,
+        IInvoiceNumberSequenceService numbers)
     {
         _tenantContext = tenantContext;
         _invoices = invoices;
         _customers = customers;
+        _numbers = numbers;
     }
 
     public async Task<Result<CustomerInvoiceDto>> Handle(
@@ -87,7 +125,22 @@ public sealed class CreateCustomerInvoiceCommandHandler
         var tenantId = _tenantContext.TenantId;
         var now = DateTime.UtcNow;
 
-        string? customerName = null;
+        if (command.Id is { } explicitId && explicitId != Guid.Empty)
+        {
+            var existing = await _invoices.GetByIdAsync(tenantId, explicitId, cancellationToken);
+            if (existing is not null)
+            {
+                return Result.Success(CustomerInvoiceMappers.ToDto(existing));
+            }
+        }
+
+        string? customerName = command.CustomerName;
+        string? customerAttention = command.CustomerAttention;
+        string? customerPhone = command.CustomerPhone;
+        string? customerEmail = command.CustomerEmail;
+        string? customerAddress = command.CustomerAddress;
+        string? customerTin = command.CustomerTin;
+
         if (command.CustomerId is { } customerId)
         {
             var customer = await _customers.GetByIdAsync(tenantId, customerId, cancellationToken);
@@ -96,7 +149,12 @@ public sealed class CreateCustomerInvoiceCommandHandler
                 return Error.NotFound("Customer not found.");
             }
 
-            customerName = customer.Name;
+            if (string.IsNullOrWhiteSpace(customerName)) customerName = customer.Name;
+            if (string.IsNullOrWhiteSpace(customerAttention)) customerAttention = customer.ContactName;
+            if (string.IsNullOrWhiteSpace(customerPhone)) customerPhone = customer.Phone;
+            if (string.IsNullOrWhiteSpace(customerEmail)) customerEmail = customer.Email;
+            if (string.IsNullOrWhiteSpace(customerAddress)) customerAddress = customer.Address;
+            if (string.IsNullOrWhiteSpace(customerTin)) customerTin = customer.Tin;
         }
 
         if (command.Lines is null || command.Lines.Count == 0)
@@ -111,11 +169,16 @@ public sealed class CreateCustomerInvoiceCommandHandler
 
         var specs = command.Lines
             .Select(line => new CustomerInvoiceLineSpec(
-                line.Description, line.Quantity, line.UnitPrice, line.TaxRatePercent))
+                line.Description,
+                line.Quantity,
+                line.UnitPrice,
+                line.TaxRatePercent,
+                line.UnitOfMeasure,
+                line.DiscountAmount))
             .ToList();
 
-        var number = await _invoices.AllocateNumberAsync(
-            tenantId, command.IssueDate ?? now, cancellationToken);
+        var number = await _numbers.NextAsync(
+            tenantId, DocumentKind.CustomerInvoice, command.IssueDate ?? now, cancellationToken);
 
         CustomerInvoice invoice;
         try
@@ -130,7 +193,34 @@ public sealed class CreateCustomerInvoiceCommandHandler
                 command.IssueDate,
                 command.DueDate,
                 command.Notes,
-                now);
+                now,
+                command.DocumentTitle,
+                command.ReferenceNumber,
+                command.PaymentTerms,
+                customerAttention,
+                customerPhone,
+                customerEmail,
+                customerAddress,
+                customerTin,
+                command.DiscountAmount,
+                command.PaymentInstructions,
+                command.AuthorizedSignatoryName,
+                command.AuthorizedSignatoryTitle,
+                command.Id);
+
+            if (command.InitialAmountPaid > 0)
+            {
+                var deposit = Math.Min(command.InitialAmountPaid, invoice.TotalAmount);
+                if (deposit > 0)
+                {
+                    invoice.RecordPayment(
+                        deposit,
+                        command.PaymentMethod,
+                        command.PaymentReference,
+                        _tenantContext.UserId,
+                        now);
+                }
+            }
         }
         catch (ArgumentException exception)
         {

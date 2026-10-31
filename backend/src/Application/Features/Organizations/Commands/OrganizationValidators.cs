@@ -10,13 +10,25 @@ public sealed class UpdateOrganizationCommandValidator : AbstractValidator<Updat
         RuleFor(x => x.ContactEmail)
             .EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.ContactEmail))
             .MaximumLength(320);
+        RuleFor(x => x.Email)
+            .EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.Email))
+            .MaximumLength(320);
         RuleFor(x => x.ContactPhone).MaximumLength(30);
+        RuleFor(x => x.Phone).MaximumLength(30);
         RuleFor(x => x.Address).MaximumLength(500);
         RuleFor(x => x.CountryCode)
             .NotEmpty()
             .Matches("^[A-Z]{2}$")
             .WithMessage("Country code must be a two-letter ISO code in uppercase.");
         RuleFor(x => x.TaxId).MaximumLength(64);
+        RuleFor(x => x.BankName).MaximumLength(150);
+        RuleFor(x => x.BankAccountName).MaximumLength(200);
+        RuleFor(x => x.BankAccountNumber).MaximumLength(100);
+        RuleFor(x => x.BankBranchOrSwift).MaximumLength(150);
+        RuleFor(x => x.MobileMoneyDetails).MaximumLength(300);
+        RuleFor(x => x.InvoiceTerms).MaximumLength(2000);
+        RuleFor(x => x.AuthorizedSignatoryName).MaximumLength(150);
+        RuleFor(x => x.AuthorizedSignatoryTitle).MaximumLength(150);
     }
 }
 

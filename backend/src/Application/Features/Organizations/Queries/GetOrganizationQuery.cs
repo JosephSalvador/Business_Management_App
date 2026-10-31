@@ -36,7 +36,16 @@ public sealed class GetOrganizationQueryHandler : IRequestHandler<GetOrganizatio
             tenant.Currency,
             tenant.CountryCode,
             tenant.TaxId,
-            tenant.IsActive);
+            tenant.IsActive,
+            tenant.LogoBase64,
+            tenant.BankName,
+            tenant.BankAccountName,
+            tenant.BankAccountNumber,
+            tenant.BankBranchOrSwift,
+            tenant.MobileMoneyDetails,
+            tenant.InvoiceTerms,
+            tenant.AuthorizedSignatoryName,
+            tenant.AuthorizedSignatoryTitle);
 
         return Result.Success(dto);
     }

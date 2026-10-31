@@ -81,6 +81,10 @@ public static class PermissionNames
     public const string InvoicesCreate = "Invoices.Create";
     public const string InvoicesManage = "Invoices.Manage";
 
+    public const string DeliveryNotesView = "DeliveryNotes.View";
+    public const string DeliveryNotesCreate = "DeliveryNotes.Create";
+    public const string DeliveryNotesManage = "DeliveryNotes.Manage";
+
     public const string NotificationsView = "Notifications.View";
     public const string NotificationsManage = "Notifications.Manage";
 
@@ -107,6 +111,7 @@ public static class PermissionNames
         ReceiptsView, ReceiptsPrint, ReceiptsManageLayouts,
         BillingView, BillingManage,
         InvoicesView, InvoicesCreate, InvoicesManage,
+        DeliveryNotesView, DeliveryNotesCreate, DeliveryNotesManage,
         NotificationsView, NotificationsManage,
     };
 

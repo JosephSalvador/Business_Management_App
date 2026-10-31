@@ -270,6 +270,7 @@ app.MapFeatureFlagEndpoints();
 app.MapBillingEndpoints();
 app.MapCapabilitiesEndpoints();
 app.MapInvoiceEndpoints();
+app.MapDeliveryNoteEndpoints();
 app.MapNotificationEndpoints();
 app.MapTenantProvisioningEndpoints();
 app.MapAppVersionEndpoints();

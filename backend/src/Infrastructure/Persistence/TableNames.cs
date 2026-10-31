@@ -148,6 +148,8 @@ public static class Tables
     {
         public const string CustomerInvoices = "CustomerInvoices";
         public const string CustomerInvoiceLines = "CustomerInvoiceLines";
+        public const string DeliveryNotes = "DeliveryNotes";
+        public const string DeliveryNoteItems = "DeliveryNoteItems";
     }
 
     public static class Notifications

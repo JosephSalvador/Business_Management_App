@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../app/router.dart';
 import '../../../../l10n/loc.dart';
@@ -13,6 +14,7 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
+import '../widgets/invoice_branding_sheet.dart';
 
 class InvoicesPage extends ConsumerStatefulWidget {
   const InvoicesPage({super.key});
@@ -53,11 +55,18 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(invoicesControllerProvider);
     final loc = context.loc;
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
 
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.invoicesTitle),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.palette_outlined),
+            tooltip:
+                isSw ? 'Nembo & Maelezo ya Benki' : 'Invoice Logo & Bank Info',
+            onPressed: () => showInvoiceBrandingSheet(context),
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: loc.invoicesAdd,
@@ -65,11 +74,16 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push(Routes.invoiceNew),
+        icon: const Icon(Icons.add),
+        label: Text(loc.invoicesAdd),
+      ),
       body: WaveBackground(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: AppSearchBar(
                 controller: _searchController,
                 hintText: loc.invoicesSearch,
@@ -77,14 +91,14 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               ),
             ),
             _StatusFilters(state: state),
-            Expanded(child: _buildBody(state)),
+            Expanded(child: _buildBody(state, isSw)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody(InvoicesState state) {
+  Widget _buildBody(InvoicesState state, bool isSwahili) {
     final loc = context.loc;
     return switch (state) {
       InvoicesLoading() => const Center(child: CircularProgressIndicator()),
@@ -99,10 +113,12 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               ? items
               : items.where((inv) {
                   final num = inv.number.toLowerCase();
-                  final name = (inv.customerName ?? '').toLowerCase();
+                  final name = inv.customerName.toLowerCase();
+                  final refNo = (inv.referenceNumber ?? '').toLowerCase();
                   final amount = inv.totalAmount.toString();
                   return num.contains(_filter) ||
                       name.contains(_filter) ||
+                      refNo.contains(_filter) ||
                       amount.contains(_filter);
                 }).toList();
 
@@ -110,7 +126,9 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
             if (_filter.isNotEmpty) {
               return Center(
                 child: Text(
-                  'Hakuna ankara iliyopatikana kwa "$_filter"',
+                  isSwahili
+                      ? 'Hakuna ankara iliyopatikana kwa "$_filter"'
+                      : 'No invoices found matching "$_filter"',
                   style:
                       TextStyle(color: AppColors.resolveTextSecondary(context)),
                 ),
@@ -125,18 +143,115 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
             );
           }
 
+          final activeItems = filtered
+              .where((i) => i.status != InvoiceStatus.voided)
+              .toList(growable: false);
+          final totalBilled =
+              activeItems.fold<double>(0, (s, i) => s + i.totalAmount);
+          final totalOutstanding =
+              activeItems.fold<double>(0, (s, i) => s + i.balanceDue);
+
           return RefreshIndicator(
             onRefresh: () =>
                 ref.read(invoicesControllerProvider.notifier).refresh(),
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) =>
-                  _InvoiceTile(invoice: filtered[index]),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+              itemCount: filtered.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return _InvoicesSummaryStrip(
+                    totalBilled: totalBilled,
+                    totalOutstanding: totalOutstanding,
+                    isSwahili: isSwahili,
+                  );
+                }
+                return _InvoiceTile(
+                  invoice: filtered[index - 1],
+                  isSwahili: isSwahili,
+                );
+              },
             ),
           );
         }(),
     };
+  }
+}
+
+class _InvoicesSummaryStrip extends StatelessWidget {
+  const _InvoicesSummaryStrip({
+    required this.totalBilled,
+    required this.totalOutstanding,
+    required this.isSwahili,
+  });
+
+  final double totalBilled;
+  final double totalOutstanding;
+  final bool isSwahili;
+
+  @override
+  Widget build(BuildContext context) {
+    final collected =
+        (totalBilled - totalOutstanding).clamp(0.0, double.infinity);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _metric(
+              isSwahili ? 'Jumla ya Ankara' : 'Total Billed',
+              formatMoney(totalBilled),
+              Colors.white,
+            ),
+          ),
+          Container(width: 1, height: 28, color: const Color(0xFF334155)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _metric(
+              isSwahili ? 'Kilicholipwa' : 'Collected',
+              formatMoney(collected),
+              const Color(0xFF4ADE80),
+            ),
+          ),
+          Container(width: 1, height: 28, color: const Color(0xFF334155)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _metric(
+              isSwahili ? 'Salio (Deni)' : 'Outstanding',
+              formatMoney(totalOutstanding),
+              const Color(0xFFFBBF24),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metric(String label, String value, Color valueColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+            color: valueColor,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -189,45 +304,102 @@ class _StatusFilters extends ConsumerWidget {
 }
 
 class _InvoiceTile extends StatelessWidget {
-  const _InvoiceTile({required this.invoice});
+  const _InvoiceTile({
+    required this.invoice,
+    required this.isSwahili,
+  });
 
   final CustomerInvoiceSummary invoice;
+  final bool isSwahili;
 
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
     final overdue = invoice.isOverdue;
+    final dateFmt = DateFormat('dd MMM yyyy');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text(
-          invoice.number,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                invoice.documentTitle.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                invoice.number,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
-        subtitle: Text(
-          invoice.customerId == null
-              ? loc.invoiceWalkIn
-              : invoice.customerLabel,
-          style: TextStyle(
-            color: overdue
-                ? AppColors.error
-                : AppColors.resolveTextSecondary(context),
-            fontSize: 13,
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                invoice.customerName.isEmpty
+                    ? loc.invoiceWalkIn
+                    : invoice.customerName,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.resolveTextPrimary(context),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                [
+                  '${isSwahili ? "Mwisho" : "Due"}: ${dateFmt.format(invoice.dueDate.toLocal())}',
+                  if (invoice.referenceNumber != null &&
+                      invoice.referenceNumber!.trim().isNotEmpty)
+                    'Ref: ${invoice.referenceNumber!.trim()}',
+                ].join('  •  '),
+                style: TextStyle(
+                  color: overdue
+                      ? AppColors.error
+                      : AppColors.resolveTextSecondary(context),
+                  fontSize: 11.5,
+                ),
+              ),
+            ],
           ),
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(formatMoney(invoice.totalAmount)),
+            Text(
+              formatMoney(invoice.totalAmount),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            ),
             const SizedBox(height: 2),
             Text(
-              invoiceStatusLabel(context, invoice.status),
+              overdue && invoice.status != InvoiceStatus.paid
+                  ? (isSwahili ? 'Imechelewa' : 'Overdue')
+                  : invoiceStatusLabel(context, invoice.status),
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: invoiceStatusColor(context, invoice.status),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: overdue && invoice.status != InvoiceStatus.paid
+                    ? AppColors.error
+                    : invoiceStatusColor(context, invoice.status),
               ),
             ),
           ],

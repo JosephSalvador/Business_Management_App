@@ -1803,6 +1803,7 @@ public sealed class NumberSequenceRepository : INumberSequenceRepository
             {
                 "Sale" => null,
                 "CustomerInvoice" => "CINV",
+                "DeliveryNote" => "DN",
                 _ => scope[..Math.Min(3, scope.Length)],
             };
 
@@ -2818,7 +2819,8 @@ public sealed class CustomerInvoiceRepository : ICustomerInvoiceRepository
             var search = filter.Search.Trim();
             query = query.Where(i =>
                 EF.Functions.ILike(i.Number, $"%{search}%") ||
-                EF.Functions.ILike(i.CustomerName!, $"%{search}%"));
+                EF.Functions.ILike(i.CustomerName!, $"%{search}%") ||
+                EF.Functions.ILike(i.ReferenceNumber!, $"%{search}%"));
         }
 
         return await query
@@ -2849,7 +2851,8 @@ public sealed class CustomerInvoiceRepository : ICustomerInvoiceRepository
             var search = filter.Search.Trim();
             query = query.Where(i =>
                 EF.Functions.ILike(i.Number, $"%{search}%") ||
-                EF.Functions.ILike(i.CustomerName!, $"%{search}%"));
+                EF.Functions.ILike(i.CustomerName!, $"%{search}%") ||
+                EF.Functions.ILike(i.ReferenceNumber!, $"%{search}%"));
         }
 
         return await query.CountAsync(cancellationToken);
@@ -2858,6 +2861,109 @@ public sealed class CustomerInvoiceRepository : ICustomerInvoiceRepository
     public Task<string> AllocateNumberAsync(
         Guid tenantId, DateTime date, CancellationToken cancellationToken = default)
         => _numberSequences.AllocateAsync(tenantId, "CustomerInvoice", date, cancellationToken);
+}
+
+public sealed class DeliveryNoteRepository : IDeliveryNoteRepository
+{
+    private readonly BusinessDbContext _db;
+    private readonly INumberSequenceRepository _numberSequences;
+
+    public DeliveryNoteRepository(BusinessDbContext db, INumberSequenceRepository numberSequences)
+    {
+        _db = db;
+        _numberSequences = numberSequences;
+    }
+
+    public Task AddAsync(DeliveryNote deliveryNote, CancellationToken cancellationToken = default)
+        => _db.DeliveryNotes.AddAsync(deliveryNote, cancellationToken).AsTask();
+
+    public Task UpdateAsync(DeliveryNote deliveryNote, CancellationToken cancellationToken = default)
+    {
+        _db.DeliveryNotes.Update(deliveryNote);
+        return Task.CompletedTask;
+    }
+
+    public Task<DeliveryNote?> GetByIdAsync(
+        Guid tenantId, Guid id, CancellationToken cancellationToken = default)
+        => _db.DeliveryNotes
+            .Include(d => d.Items)
+            .FirstOrDefaultAsync(d => d.TenantId == tenantId && d.Id == id, cancellationToken);
+
+    public Task<DeliveryNote?> GetByNumberAsync(
+        Guid tenantId, string number, CancellationToken cancellationToken = default)
+        => _db.DeliveryNotes
+            .Include(d => d.Items)
+            .FirstOrDefaultAsync(
+                d => d.TenantId == tenantId && d.Number == number, cancellationToken);
+
+    public async Task<IReadOnlyList<DeliveryNote>> ListAsync(
+        Guid tenantId, int page, int pageSize, DeliveryNoteListFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.DeliveryNotes
+            .AsNoTracking()
+            .Where(d => d.TenantId == tenantId);
+
+        if (filter.Status is { } status)
+        {
+            query = query.Where(d => d.Status == status);
+        }
+
+        if (filter.InvoiceId is { } invoiceId)
+        {
+            query = query.Where(d => d.InvoiceId == invoiceId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim();
+            query = query.Where(d =>
+                EF.Functions.ILike(d.Number, $"%{search}%") ||
+                EF.Functions.ILike(d.CustomerName!, $"%{search}%") ||
+                (d.InvoiceNumber != null && EF.Functions.ILike(d.InvoiceNumber, $"%{search}%")) ||
+                (d.VehicleRegistration != null && EF.Functions.ILike(d.VehicleRegistration, $"%{search}%")) ||
+                (d.DriverName != null && EF.Functions.ILike(d.DriverName, $"%{search}%")));
+        }
+
+        return await query
+            .OrderByDescending(d => d.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountAsync(
+        Guid tenantId, DeliveryNoteListFilter filter, CancellationToken cancellationToken = default)
+    {
+        var query = _db.DeliveryNotes.Where(d => d.TenantId == tenantId);
+
+        if (filter.Status is { } status)
+        {
+            query = query.Where(d => d.Status == status);
+        }
+
+        if (filter.InvoiceId is { } invoiceId)
+        {
+            query = query.Where(d => d.InvoiceId == invoiceId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim();
+            query = query.Where(d =>
+                EF.Functions.ILike(d.Number, $"%{search}%") ||
+                EF.Functions.ILike(d.CustomerName!, $"%{search}%") ||
+                (d.InvoiceNumber != null && EF.Functions.ILike(d.InvoiceNumber, $"%{search}%")) ||
+                (d.VehicleRegistration != null && EF.Functions.ILike(d.VehicleRegistration, $"%{search}%")) ||
+                (d.DriverName != null && EF.Functions.ILike(d.DriverName, $"%{search}%")));
+        }
+
+        return await query.CountAsync(cancellationToken);
+    }
+
+    public Task<string> AllocateNumberAsync(
+        Guid tenantId, DateTime date, CancellationToken cancellationToken = default)
+        => _numberSequences.AllocateAsync(tenantId, "DeliveryNote", date, cancellationToken);
 }
 
 public sealed class AppNotificationRepository : IAppNotificationRepository

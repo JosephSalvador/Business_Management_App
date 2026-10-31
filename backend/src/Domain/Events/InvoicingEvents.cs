@@ -30,3 +30,35 @@ public sealed record CustomerInvoiceVoidedEvent(
     string InvoiceNumber,
     decimal TotalAmount,
     string Currency) : IDomainEvent, ITenantScopedEvent;
+
+public sealed record DeliveryNoteCreatedEvent(
+    Guid EventId,
+    DateTime OccurredAt,
+    Guid DeliveryNoteId,
+    Guid TenantId,
+    string DeliveryNoteNumber,
+    Guid? InvoiceId,
+    Guid? CustomerId,
+    int ItemCount) : IDomainEvent, ITenantScopedEvent;
+
+public sealed record DeliveryNoteDispatchedEvent(
+    Guid EventId,
+    DateTime OccurredAt,
+    Guid DeliveryNoteId,
+    Guid TenantId,
+    string DeliveryNoteNumber) : IDomainEvent, ITenantScopedEvent;
+
+public sealed record DeliveryNoteDeliveredEvent(
+    Guid EventId,
+    DateTime OccurredAt,
+    Guid DeliveryNoteId,
+    Guid TenantId,
+    string DeliveryNoteNumber,
+    string ReceivedByName) : IDomainEvent, ITenantScopedEvent;
+
+public sealed record DeliveryNoteCancelledEvent(
+    Guid EventId,
+    DateTime OccurredAt,
+    Guid DeliveryNoteId,
+    Guid TenantId,
+    string DeliveryNoteNumber) : IDomainEvent, ITenantScopedEvent;

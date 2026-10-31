@@ -23,7 +23,9 @@ public static class DependencyInjection
     {
         services.AddHttpContextAccessor();
 
-        services.AddDbContextPool<BusinessDbContext>((serviceProvider, options) =>
+        // Not pooled on purpose: the context captures the scoped ITenantContext for its global
+        // tenant query filters, and a pooled instance would carry a stale tenant between requests.
+        services.AddDbContext<BusinessDbContext>((serviceProvider, options) =>
         {
             var config = serviceProvider.GetRequiredService<IConfiguration>();
             var connectionString = config.GetConnectionString("Default")
@@ -83,6 +85,8 @@ public static class DependencyInjection
         services.AddScoped<IPaymentInstructionRepository, PaymentInstructionRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<ICustomerInvoiceRepository, CustomerInvoiceRepository>();
+        services.AddScoped<IDeliveryNoteRepository, DeliveryNoteRepository>();
+        services.AddScoped<IInvoiceNumberSequenceService, InvoiceNumberSequenceService>();
         services.AddScoped<IAppNotificationRepository, AppNotificationRepository>();
         services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
         services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();

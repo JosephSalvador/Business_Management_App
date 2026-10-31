@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/providers.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../../settings/application/settings_controller.dart';
+import '../../../settings/data/organization_repository.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
-import 'invoices_page.dart' show invoiceStatusColor, invoiceStatusLabel;
+import '../services/customer_invoice_pdf_service.dart';
+import '../widgets/invoice_a4_preview_card.dart';
+import '../widgets/invoice_branding_sheet.dart';
 
 class InvoiceDetailPage extends ConsumerStatefulWidget {
   const InvoiceDetailPage({super.key, required this.invoiceId});
@@ -23,11 +28,15 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
   CustomerInvoice? _invoice;
   String? _error;
   bool _working = false;
+  bool _sharingPdf = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    Future.microtask(() {
+      ref.read(settingsControllerProvider.notifier).load();
+      _load();
+    });
   }
 
   Future<void> _load() async {
@@ -59,18 +68,77 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     });
   }
 
+  Organization _resolveOrganization() {
+    final settingsState = ref.watch(settingsControllerProvider);
+    if (settingsState is SettingsLoaded) {
+      return settingsState.organization;
+    }
+    return const Organization(
+      id: 'local',
+      name: 'Your Business',
+      currency: 'TZS',
+    );
+  }
+
+  Future<void> _shareA4Pdf(
+    CustomerInvoice invoice,
+    Organization organization,
+    bool isSwahili,
+  ) async {
+    if (_sharingPdf) return;
+    setState(() => _sharingPdf = true);
+    try {
+      await ref.read(customerInvoicePdfServiceProvider).shareA4Pdf(
+            invoice: invoice,
+            organization: organization,
+            isSwahili: isSwahili,
+          );
+    } finally {
+      if (mounted) {
+        setState(() => _sharingPdf = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
     final invoice = _invoice;
+    final organization = _resolveOrganization();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           invoice == null
               ? loc.invoiceDetailTitle
-              : '${loc.invoiceDetailTitle} ${invoice.number}',
+              : '${invoice.documentTitle} ${invoice.number}',
         ),
+        actions: [
+          if (invoice != null) ...[
+            IconButton(
+              tooltip: isSw
+                  ? 'Hariri Nembo & Maelezo ya Benki'
+                  : 'Edit Logo & Bank Info',
+              icon: const Icon(Icons.palette_outlined),
+              onPressed: () => showInvoiceBrandingSheet(context),
+            ),
+            IconButton(
+              tooltip:
+                  isSw ? 'Pakua / Shiriki A4 PDF' : 'Share / Download A4 PDF',
+              icon: _sharingPdf
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+              onPressed: _sharingPdf
+                  ? null
+                  : () => _shareA4Pdf(invoice, organization, isSw),
+            ),
+          ],
+        ],
       ),
       body: WaveBackground(
         child: invoice == null
@@ -80,10 +148,11 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                     : Text(
                         _error!,
                         style: TextStyle(
-                            color: AppColors.resolveTextSecondary(context)),
+                          color: AppColors.resolveTextSecondary(context),
+                        ),
                       ),
               )
-            : _buildInvoice(context, invoice, loc),
+            : _buildInvoice(context, invoice, organization, loc, isSw),
       ),
     );
   }
@@ -91,118 +160,83 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
   Widget _buildInvoice(
     BuildContext context,
     CustomerInvoice invoice,
+    Organization organization,
     AppLocalizations loc,
+    bool isSwahili,
   ) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        // Top Action Bar: Share / Print A4 PDF + Record Payment
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.print_outlined,
+                color: Color(0xFF2DD4BF),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        invoice.number,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    Text(
+                      isSwahili
+                          ? 'Muundo wa A4 Tayari Kuchapishwa'
+                          : 'Print-Ready A4 Invoice Format',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
                       ),
                     ),
                     Text(
-                      invoiceStatusLabel(context, invoice.status),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: invoiceStatusColor(context, invoice.status),
+                      isSwahili
+                          ? 'Tuma WhatsApp/Email au chapisha kwenye karatasi ya A4'
+                          : 'Share via WhatsApp/Email or print directly on A4 paper',
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 11,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  invoice.customerId == null
-                      ? loc.invoiceWalkIn
-                      : invoice.customerLabel,
-                  style:
-                      TextStyle(color: AppColors.resolveTextSecondary(context)),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
                 ),
-                if (invoice.dueDate != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '${loc.invoiceDueDate}: ${_date(invoice.dueDate!)}',
-                    style: TextStyle(
-                      color: invoice.isOverdue ? AppColors.error : null,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-                const Divider(height: 24),
-                for (final line in invoice.lines)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${line.description} × ${formatPriceValue(line.quantity)}',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        Text(formatPriceValue(line.lineTotal + line.taxAmount)),
-                      ],
-                    ),
-                  ),
-                const Divider(height: 16),
-                _SummaryRow(
-                  label: loc.invoiceTotal,
-                  value: formatMoney(invoice.totalAmount, alwaysDecimals: true),
-                  bold: true,
-                ),
-                if (invoice.amountPaid > 0)
-                  _SummaryRow(
-                    label: loc.invoicePaymentAmount,
-                    value:
-                        formatMoney(invoice.amountPaid, alwaysDecimals: true),
-                  ),
-                if (invoice.status.isOpen)
-                  _SummaryRow(
-                    label: loc.invoiceBalance,
-                    value:
-                        formatMoney(invoice.balanceDue, alwaysDecimals: true),
-                    bold: true,
-                  ),
-                if (invoice.paymentMethod != null ||
-                    invoice.paymentReference != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      [
-                        if (invoice.paymentMethod != null)
-                          '${loc.invoicePaymentMethod}: ${invoice.paymentMethod}',
-                        if (invoice.paymentReference != null)
-                          '${loc.invoicePaymentReference}: ${invoice.paymentReference}',
-                      ].join(' • '),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.resolveTextSecondary(context),
-                      ),
-                    ),
-                  ),
-                if (invoice.notes != null && invoice.notes!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(invoice.notes!),
-                  ),
-              ],
-            ),
+                onPressed: _sharingPdf
+                    ? null
+                    : () => _shareA4Pdf(invoice, organization, isSwahili),
+                icon: const Icon(Icons.share_outlined, size: 16),
+                label: Text(isSwahili ? 'A4 PDF' : 'Share PDF'),
+              ),
+            ],
           ),
         ),
+
+        const SizedBox(height: 14),
+
+        // Live A4 Visual Preview Card
+        InvoiceA4PreviewCard(
+          invoice: invoice,
+          organization: organization,
+          isSwahili: isSwahili,
+          onConfigureBranding: () => showInvoiceBrandingSheet(context),
+        ),
+
         const SizedBox(height: 16),
+
+        // Payment & Void Action Buttons
         Row(
           children: [
             if (invoice.canTakePayment)
@@ -210,7 +244,7 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                 child: FilledButton.icon(
                   onPressed: _working
                       ? null
-                      : () => _showPaymentSheet(context, invoice),
+                      : () => _showPaymentSheet(context, invoice, isSwahili),
                   icon: const Icon(Icons.payments_outlined),
                   label: Text(loc.invoiceRecordPayment),
                 ),
@@ -234,81 +268,108 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
   Future<void> _showPaymentSheet(
     BuildContext context,
     CustomerInvoice invoice,
+    bool isSwahili,
   ) async {
     final amountController =
-        TextEditingController(text: invoice.balanceDue.toStringAsFixed(2));
-    final methodController = TextEditingController();
+        TextEditingController(text: invoice.balanceDue.toStringAsFixed(0));
+    final methodController = TextEditingController(text: 'Bank Transfer');
     final referenceController = TextEditingController();
     final loc = context.loc;
+    const methods = [
+      'Bank Transfer',
+      'Mobile Money',
+      'Cash',
+      'Cheque',
+      'Card',
+    ];
 
     try {
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (sheetContext) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  loc.invoiceRecordPayment,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600),
+          return StatefulBuilder(
+            builder: (sheetContext, setSheetState) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: amountController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: loc.invoicePaymentAmount,
-                    helperText:
-                        '${loc.invoiceBalance}: ${formatMoney(invoice.balanceDue)}',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: methodController,
-                  decoration:
-                      InputDecoration(labelText: loc.invoicePaymentMethod),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: referenceController,
-                  decoration:
-                      InputDecoration(labelText: loc.invoicePaymentReference),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () async {
-                    final amount =
-                        double.tryParse(amountController.text.trim());
-                    if (amount == null || amount <= 0) return;
-                    final method = _orNull(methodController.text);
-                    final reference = _orNull(referenceController.text);
-                    Navigator.of(sheetContext).pop();
-                    await _run(
-                      () => ref
-                          .read(invoicesControllerProvider.notifier)
-                          .recordPayment(
-                            invoice.id,
-                            amount: amount,
-                            method: method,
-                            reference: reference,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      loc.invoiceRecordPayment,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: amountController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: loc.invoicePaymentAmount,
+                        helperText:
+                            '${loc.invoiceBalance}: ${formatMoney(invoice.balanceDue)}',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        for (final m in methods)
+                          ChoiceChip(
+                            label: Text(m),
+                            selected: methodController.text == m,
+                            onSelected: (_) => setSheetState(
+                              () => methodController.text = m,
+                            ),
                           ),
-                    );
-                  },
-                  child: Text(loc.invoiceRecordPayment),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: referenceController,
+                      decoration: InputDecoration(
+                        labelText: loc.invoicePaymentReference,
+                        hintText: isSwahili
+                            ? 'Namba ya muamala / Stakabadhi'
+                            : 'Transaction ID / Receipt No.',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () async {
+                        final amount =
+                            double.tryParse(amountController.text.trim());
+                        if (amount == null || amount <= 0) return;
+                        final method = _orNull(methodController.text);
+                        final reference = _orNull(referenceController.text);
+                        Navigator.of(sheetContext).pop();
+                        await _run(
+                          () => ref
+                              .read(invoicesControllerProvider.notifier)
+                              .recordPayment(
+                                invoice.id,
+                                amount: amount,
+                                method: method,
+                                reference: reference,
+                              ),
+                        );
+                      },
+                      child: Text(loc.invoiceRecordPayment),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           );
         },
       );
@@ -348,35 +409,5 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
   static String? _orNull(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
-  }
-
-  static String _date(DateTime value) =>
-      '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-      '${value.day.toString().padLeft(2, '0')}';
-}
-
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow(
-      {required this.label, required this.value, this.bold = false});
-
-  final String label;
-  final String value;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(
-      fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
-      fontSize: bold ? 15 : 14,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: style)),
-          Text(value, style: style),
-        ],
-      ),
-    );
   }
 }

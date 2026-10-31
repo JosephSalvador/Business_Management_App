@@ -835,6 +835,28 @@ public interface ICustomerInvoiceRepository
     Task UpdateAsync(CustomerInvoice invoice, CancellationToken cancellationToken = default);
 }
 
+public sealed record DeliveryNoteListFilter(
+    DeliveryNoteStatus? Status,
+    Guid? InvoiceId,
+    string? Search);
+
+public interface IDeliveryNoteRepository
+{
+    Task<DeliveryNote?> GetByIdAsync(
+        Guid tenantId, Guid id, CancellationToken cancellationToken = default);
+    Task<DeliveryNote?> GetByNumberAsync(
+        Guid tenantId, string number, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DeliveryNote>> ListAsync(
+        Guid tenantId, int page, int pageSize, DeliveryNoteListFilter filter,
+        CancellationToken cancellationToken = default);
+    Task<int> CountAsync(
+        Guid tenantId, DeliveryNoteListFilter filter, CancellationToken cancellationToken = default);
+    Task<string> AllocateNumberAsync(
+        Guid tenantId, DateTime date, CancellationToken cancellationToken = default);
+    Task AddAsync(DeliveryNote deliveryNote, CancellationToken cancellationToken = default);
+    Task UpdateAsync(DeliveryNote deliveryNote, CancellationToken cancellationToken = default);
+}
+
 public sealed record NotificationListFilter(
     string? Category,
     bool? UnreadOnly);

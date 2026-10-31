@@ -9,7 +9,9 @@ public sealed record CustomerInvoiceLineDto(
     decimal UnitPrice,
     decimal TaxRatePercent,
     decimal LineTotal,
-    decimal TaxAmount);
+    decimal TaxAmount,
+    string UnitOfMeasure = "Pcs",
+    decimal DiscountAmount = 0m);
 
 public sealed record CustomerInvoiceDto(
     Guid Id,
@@ -31,7 +33,19 @@ public sealed record CustomerInvoiceDto(
     DateTime? PaidAtUtc,
     DateTime? VoidedAtUtc,
     IReadOnlyList<CustomerInvoiceLineDto> Lines,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string DocumentTitle = "INVOICE",
+    string? ReferenceNumber = null,
+    string? PaymentTerms = null,
+    string? CustomerAttention = null,
+    string? CustomerPhone = null,
+    string? CustomerEmail = null,
+    string? CustomerAddress = null,
+    string? CustomerTin = null,
+    decimal DiscountAmount = 0m,
+    string? PaymentInstructions = null,
+    string? AuthorizedSignatoryName = null,
+    string? AuthorizedSignatoryTitle = null);
 
 public sealed record CustomerInvoiceSummaryDto(
     Guid Id,
@@ -44,4 +58,8 @@ public sealed record CustomerInvoiceSummaryDto(
     decimal TotalAmount,
     decimal AmountPaid,
     decimal BalanceDue,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string DocumentTitle = "INVOICE",
+    string? ReferenceNumber = null,
+    string Currency = "TZS");
+

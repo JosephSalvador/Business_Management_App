@@ -119,3 +119,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Bump version code to `1.0.0+69` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 7: Commit, push to `feature/mobile-pos-foundation`, deploy backend to Azure production, and trigger client build on GitHub Actions.
 
+## Implementation Plan — Enterprise-Grade High-Speed Invoicing & Delivery Note Management
+- [x] Task 1: Database & Persistence Layer — EF Core models (`CustomerInvoice`, `CustomerInvoiceLine`, `DeliveryNote`, `DeliveryNoteItem`) with strict `TenantId`, composite indexes `(TenantId, CreatedAt)`, `(TenantId, Number)` unique, and global query filters `HasQueryFilter(e => FilterTenantId == null || e.TenantId == FilterTenantId)`.
+- [x] Task 2: Sequence Concurrency Service — Thread-safe `IInvoiceNumberSequenceService` and `InvoiceNumberSequenceService` acquiring tenant advisory lock with `SELECT FOR UPDATE` to guarantee contiguous, gap-free, collision-free numbers.
+- [x] Task 3: Transactional Outbox Integration — MediatR command handlers (`CreateCustomerInvoiceCommand`, `CreateDeliveryNoteCommand`) executing inside explicit database transaction, atomically persisting entities and domain events into `OutboxMessages`.
+- [x] Task 4: Endpoints & Application CQRS — Minimal APIs for `/api/v1/invoices` and `/api/v1/delivery-notes` (`List`, `Get`, `Create`, `Dispatch`, `Deliver`, `Cancel`) with `.AsNoTracking()` projections and permission security.
+- [x] Task 5: Database Migration & Snapshot — Migration `20261031180000_AddDeliveryNotesAndDocumentIndexes` and updated `BusinessDbContextModelSnapshot`.
+- [x] Task 6: Comprehensive Tests — Unit and integration tests covering aggregate lifecycle, status transitions, sequential document numbering, outbox persistence, and strict multi-tenant query filter isolation.
+
+

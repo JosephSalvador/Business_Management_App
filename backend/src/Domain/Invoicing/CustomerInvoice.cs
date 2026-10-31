@@ -16,36 +16,72 @@ public sealed class CustomerInvoice : AggregateRoot
         Guid id,
         Guid tenantId,
         string number,
+        string documentTitle,
+        string? referenceNumber,
+        string? paymentTerms,
         Guid? customerId,
         string? customerName,
+        string? customerAttention,
+        string? customerPhone,
+        string? customerEmail,
+        string? customerAddress,
+        string? customerTin,
         string currency,
         DateTime issueDate,
         DateTime? dueDate,
-        string? notes)
+        decimal discountAmount,
+        string? paymentInstructions,
+        string? notes,
+        string? authorizedSignatoryName,
+        string? authorizedSignatoryTitle)
         : base(id)
     {
         TenantId = tenantId;
         Number = number;
+        DocumentTitle = documentTitle;
+        ReferenceNumber = referenceNumber;
+        PaymentTerms = paymentTerms;
         CustomerId = customerId;
         CustomerName = customerName;
+        CustomerAttention = customerAttention;
+        CustomerPhone = customerPhone;
+        CustomerEmail = customerEmail;
+        CustomerAddress = customerAddress;
+        CustomerTin = customerTin;
         Currency = currency;
         IssueDate = issueDate;
         DueDate = dueDate;
+        DiscountAmount = discountAmount;
+        PaymentInstructions = paymentInstructions;
         Notes = notes;
+        AuthorizedSignatoryName = authorizedSignatoryName;
+        AuthorizedSignatoryTitle = authorizedSignatoryTitle;
         Status = CustomerInvoiceStatus.Unpaid;
         CreatedAt = DateTime.UtcNow;
     }
 
     public Guid TenantId { get; private set; }
     public string Number { get; private set; }
+    public string DocumentTitle { get; private set; } = "INVOICE";
+    public string? ReferenceNumber { get; private set; }
+    public string? PaymentTerms { get; private set; }
     public Guid? CustomerId { get; private set; }
     public string? CustomerName { get; private set; }
+    public string? CustomerAttention { get; private set; }
+    public string? CustomerPhone { get; private set; }
+    public string? CustomerEmail { get; private set; }
+    public string? CustomerAddress { get; private set; }
+    public string? CustomerTin { get; private set; }
     public string Currency { get; private set; }
     public DateTime IssueDate { get; private set; }
     public DateTime? DueDate { get; private set; }
+    public string? PaymentInstructions { get; private set; }
     public string? Notes { get; private set; }
+    public string? AuthorizedSignatoryName { get; private set; }
+    public string? AuthorizedSignatoryTitle { get; private set; }
     public CustomerInvoiceStatus Status { get; private set; }
     public decimal Subtotal { get; private set; }
+    public decimal DiscountAmount { get; private set; }
     public decimal TaxAmount { get; private set; }
     public decimal TotalAmount { get; private set; }
     public decimal AmountPaid { get; private set; }
@@ -68,7 +104,20 @@ public sealed class CustomerInvoice : AggregateRoot
         DateTime? issueDate = null,
         DateTime? dueDate = null,
         string? notes = null,
-        DateTime? nowUtc = null)
+        DateTime? nowUtc = null,
+        string? documentTitle = null,
+        string? referenceNumber = null,
+        string? paymentTerms = null,
+        string? customerAttention = null,
+        string? customerPhone = null,
+        string? customerEmail = null,
+        string? customerAddress = null,
+        string? customerTin = null,
+        decimal discountAmount = 0m,
+        string? paymentInstructions = null,
+        string? authorizedSignatoryName = null,
+        string? authorizedSignatoryTitle = null,
+        Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(number))
         {
@@ -81,27 +130,51 @@ public sealed class CustomerInvoice : AggregateRoot
             throw new ArgumentException("An invoice needs at least one line.", nameof(lines));
         }
 
+        if (discountAmount < 0)
+        {
+            throw new ArgumentException("Discount amount cannot be negative.", nameof(discountAmount));
+        }
+
         var issued = issueDate ?? (nowUtc ?? DateTime.UtcNow);
         if (dueDate is { } due && due.Date < issued.Date)
         {
             throw new ArgumentException("Due date cannot be before the issue date.", nameof(dueDate));
         }
 
+        var title = string.IsNullOrWhiteSpace(documentTitle)
+            ? "INVOICE"
+            : documentTitle.Trim().ToUpperInvariant();
+
+        var invoiceId = id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid();
+
         var invoice = new CustomerInvoice(
-            Guid.NewGuid(),
+            invoiceId,
             tenantId,
             number.Trim(),
+            title,
+            string.IsNullOrWhiteSpace(referenceNumber) ? null : referenceNumber.Trim(),
+            string.IsNullOrWhiteSpace(paymentTerms) ? null : paymentTerms.Trim(),
             customerId,
-            customerName?.Trim(),
+            string.IsNullOrWhiteSpace(customerName) ? null : customerName.Trim(),
+            string.IsNullOrWhiteSpace(customerAttention) ? null : customerAttention.Trim(),
+            string.IsNullOrWhiteSpace(customerPhone) ? null : customerPhone.Trim(),
+            string.IsNullOrWhiteSpace(customerEmail) ? null : customerEmail.Trim(),
+            string.IsNullOrWhiteSpace(customerAddress) ? null : customerAddress.Trim(),
+            string.IsNullOrWhiteSpace(customerTin) ? null : customerTin.Trim(),
             string.IsNullOrWhiteSpace(currency) ? "TZS" : currency.Trim().ToUpperInvariant(),
             issued,
             dueDate,
-            notes?.Trim());
+            decimal.Round(discountAmount, 2),
+            string.IsNullOrWhiteSpace(paymentInstructions) ? null : paymentInstructions.Trim(),
+            string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            string.IsNullOrWhiteSpace(authorizedSignatoryName) ? null : authorizedSignatoryName.Trim(),
+            string.IsNullOrWhiteSpace(authorizedSignatoryTitle) ? null : authorizedSignatoryTitle.Trim());
 
         for (var index = 0; index < specs.Count; index++)
         {
             var line = CustomerInvoiceLine.Create(specs[index], index);
             line.CustomerInvoiceId = invoice.Id;
+            line.TenantId = tenantId;
             invoice._lines.Add(line);
         }
 
@@ -203,7 +276,9 @@ public sealed class CustomerInvoice : AggregateRoot
     private void RecalculateTotals()
     {
         Subtotal = decimal.Round(_lines.Sum(line => line.LineTotal), 2);
+        var effectiveDiscount = decimal.Round(Math.Clamp(DiscountAmount, 0m, Subtotal), 2);
+        DiscountAmount = effectiveDiscount;
         TaxAmount = decimal.Round(_lines.Sum(line => line.TaxAmount), 2);
-        TotalAmount = Subtotal + TaxAmount;
+        TotalAmount = (Subtotal - effectiveDiscount) + TaxAmount;
     }
 }

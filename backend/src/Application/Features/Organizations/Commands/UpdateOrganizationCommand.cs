@@ -7,11 +7,23 @@ namespace BusinessOS.Application.Features.Organizations.Commands;
 
 public sealed record UpdateOrganizationCommand(
     string Name,
-    string? ContactEmail,
-    string? ContactPhone,
-    string? Address,
-    string CountryCode,
-    string? TaxId) : IRequest<Result<OrganizationDto>>;
+    string? ContactEmail = null,
+    string? ContactPhone = null,
+    string? Address = null,
+    string CountryCode = "TZ",
+    string? TaxId = null,
+    string? Currency = null,
+    string? Email = null,
+    string? Phone = null,
+    string? LogoBase64 = null,
+    string? BankName = null,
+    string? BankAccountName = null,
+    string? BankAccountNumber = null,
+    string? BankBranchOrSwift = null,
+    string? MobileMoneyDetails = null,
+    string? InvoiceTerms = null,
+    string? AuthorizedSignatoryName = null,
+    string? AuthorizedSignatoryTitle = null) : IRequest<Result<OrganizationDto>>;
 
 public sealed class UpdateOrganizationCommandHandler
     : IRequestHandler<UpdateOrganizationCommand, Result<OrganizationDto>>
@@ -34,24 +46,54 @@ public sealed class UpdateOrganizationCommandHandler
             return Error.NotFound("Organization not found.");
         }
 
+        var email = !string.IsNullOrWhiteSpace(command.ContactEmail) ? command.ContactEmail : command.Email;
+        var phone = !string.IsNullOrWhiteSpace(command.ContactPhone) ? command.ContactPhone : command.Phone;
+
         tenant.UpdateProfile(
             command.Name.Trim(),
-            command.ContactEmail?.Trim(),
-            command.ContactPhone?.Trim(),
+            email?.Trim(),
+            phone?.Trim(),
             command.Address?.Trim(),
-            command.TaxId?.Trim());
-        tenant.UpdateCountryCode(command.CountryCode);
+            command.TaxId?.Trim(),
+            command.LogoBase64,
+            command.BankName,
+            command.BankAccountName,
+            command.BankAccountNumber,
+            command.BankBranchOrSwift,
+            command.MobileMoneyDetails,
+            command. InvoiceTerms,
+            command.AuthorizedSignatoryName,
+            command.AuthorizedSignatoryTitle);
+
+        if (!string.IsNullOrWhiteSpace(command.CountryCode))
+        {
+            tenant.UpdateCountryCode(command.CountryCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(command.Currency))
+        {
+            tenant.UpdateCurrency(command.Currency);
+        }
 
         var dto = new OrganizationDto(
             tenant.Id,
-            command.Name.Trim(),
+            tenant.Name,
             tenant.ContactEmail,
             tenant.ContactPhone,
             tenant.Address,
             tenant.Currency,
             tenant.CountryCode,
             tenant.TaxId,
-            tenant.IsActive);
+            tenant.IsActive,
+            tenant.LogoBase64,
+            tenant.BankName,
+            tenant.BankAccountName,
+            tenant.BankAccountNumber,
+            tenant.BankBranchOrSwift,
+            tenant.MobileMoneyDetails,
+            tenant.InvoiceTerms,
+            tenant.AuthorizedSignatoryName,
+            tenant.AuthorizedSignatoryTitle);
 
         return Result.Success(dto);
     }
