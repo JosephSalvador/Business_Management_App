@@ -37,6 +37,39 @@ public sealed class CreateCustomerInvoiceCommandValidator : AbstractValidator<Cr
     }
 }
 
+public sealed class CreateInvoiceCommandValidator : AbstractValidator<CreateInvoiceCommand>
+{
+    public CreateInvoiceCommandValidator()
+    {
+        RuleFor(x => x.Currency).NotEmpty().MaximumLength(3);
+        RuleFor(x => x.DocumentTitle).MaximumLength(50);
+        RuleFor(x => x.ReferenceNumber).MaximumLength(100);
+        RuleFor(x => x.PaymentTerms).MaximumLength(100);
+        RuleFor(x => x.CustomerName).MaximumLength(200);
+        RuleFor(x => x.CustomerAttention).MaximumLength(200);
+        RuleFor(x => x.CustomerPhone).MaximumLength(50);
+        RuleFor(x => x.CustomerEmail).MaximumLength(320);
+        RuleFor(x => x.CustomerAddress).MaximumLength(500);
+        RuleFor(x => x.CustomerTin).MaximumLength(64);
+        RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.InitialAmountPaid).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.PaymentInstructions).MaximumLength(2000);
+        RuleFor(x => x.AuthorizedSignatoryName).MaximumLength(150);
+        RuleFor(x => x.AuthorizedSignatoryTitle).MaximumLength(150);
+        RuleFor(x => x.Notes).MaximumLength(2000);
+        RuleFor(x => x.Lines).NotEmpty();
+        RuleForEach(x => x.Lines).ChildRules(line =>
+        {
+            line.RuleFor(l => l.Description).NotEmpty().MaximumLength(500);
+            line.RuleFor(l => l.UnitOfMeasure).MaximumLength(50);
+            line.RuleFor(l => l.Quantity).GreaterThan(0);
+            line.RuleFor(l => l.UnitPrice).GreaterThanOrEqualTo(0);
+            line.RuleFor(l => l.DiscountAmount).GreaterThanOrEqualTo(0);
+            line.RuleFor(l => l.TaxRatePercent).InclusiveBetween(0, 100);
+        });
+    }
+}
+
 public sealed class RecordCustomerInvoicePaymentCommandValidator
     : AbstractValidator<RecordCustomerInvoicePaymentCommand>
 {

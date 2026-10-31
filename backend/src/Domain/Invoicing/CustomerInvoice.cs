@@ -179,9 +179,19 @@ public sealed class CustomerInvoice : AggregateRoot
         }
 
         invoice.RecalculateTotals();
+        var now = nowUtc ?? DateTime.UtcNow;
         invoice.AddDomainEvent(new CustomerInvoiceIssuedEvent(
             Guid.NewGuid(),
-            nowUtc ?? DateTime.UtcNow,
+            now,
+            invoice.Id,
+            tenantId,
+            invoice.Number,
+            invoice.TotalAmount,
+            invoice.Currency,
+            invoice.CustomerId));
+        invoice.AddDomainEvent(new InvoiceCreatedIntegrationEvent(
+            Guid.NewGuid(),
+            now,
             invoice.Id,
             tenantId,
             invoice.Number,

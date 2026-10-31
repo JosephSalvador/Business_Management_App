@@ -99,6 +99,67 @@ public sealed record CreateCustomerInvoiceCommand(
     Guid? Id = null)
     : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
 
+public sealed record CreateInvoiceCommand(
+    IReadOnlyList<CustomerInvoiceLineRequest> Lines,
+    Guid? CustomerId = null,
+    string Currency = "TZS",
+    DateTime? IssueDate = null,
+    DateTime? DueDate = null,
+    string? Notes = null,
+    string? DocumentTitle = null,
+    string? ReferenceNumber = null,
+    string? PaymentTerms = null,
+    string? CustomerName = null,
+    string? CustomerAttention = null,
+    string? CustomerPhone = null,
+    string? CustomerEmail = null,
+    string? CustomerAddress = null,
+    string? CustomerTin = null,
+    decimal DiscountAmount = 0m,
+    decimal InitialAmountPaid = 0m,
+    string? PaymentMethod = null,
+    string? PaymentReference = null,
+    string? PaymentInstructions = null,
+    string? AuthorizedSignatoryName = null,
+    string? AuthorizedSignatoryTitle = null,
+    Guid? Id = null)
+    : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
+
+public sealed class CreateInvoiceCommandHandler
+    : IRequestHandler<CreateInvoiceCommand, Result<CustomerInvoiceDto>>
+{
+    private readonly ISender _sender;
+
+    public CreateInvoiceCommandHandler(ISender sender) => _sender = sender;
+
+    public Task<Result<CustomerInvoiceDto>> Handle(
+        CreateInvoiceCommand request, CancellationToken cancellationToken)
+        => _sender.Send(new CreateCustomerInvoiceCommand(
+            request.Lines,
+            request.CustomerId,
+            request.Currency,
+            request.IssueDate,
+            request.DueDate,
+            request.Notes,
+            request.DocumentTitle,
+            request.ReferenceNumber,
+            request.PaymentTerms,
+            request.CustomerName,
+            request.CustomerAttention,
+            request.CustomerPhone,
+            request.CustomerEmail,
+            request.CustomerAddress,
+            request.CustomerTin,
+            request.DiscountAmount,
+            request.InitialAmountPaid,
+            request.PaymentMethod,
+            request.PaymentReference,
+            request.PaymentInstructions,
+            request.AuthorizedSignatoryName,
+            request.AuthorizedSignatoryTitle,
+            request.Id), cancellationToken);
+}
+
 public sealed class CreateCustomerInvoiceCommandHandler
     : IRequestHandler<CreateCustomerInvoiceCommand, Result<CustomerInvoiceDto>>
 {

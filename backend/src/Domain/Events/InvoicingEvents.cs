@@ -12,6 +12,16 @@ public sealed record CustomerInvoiceIssuedEvent(
     string Currency,
     Guid? CustomerId) : IDomainEvent, ITenantScopedEvent;
 
+public sealed record InvoiceCreatedIntegrationEvent(
+    Guid EventId,
+    DateTime OccurredAt,
+    Guid InvoiceId,
+    Guid TenantId,
+    string InvoiceNumber,
+    decimal TotalAmount,
+    string Currency,
+    Guid? CustomerId) : IDomainEvent, ITenantScopedEvent;
+
 public sealed record CustomerInvoicePaidEvent(
     Guid EventId,
     DateTime OccurredAt,

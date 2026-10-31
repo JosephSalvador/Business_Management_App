@@ -75,12 +75,12 @@ public sealed class InvoiceAndDeliveryNoteEndpointsTests : IClassFixture<Busines
 
         // Verify outbox integration: domain event saved inside OutboxMessages in same transaction
         using var db = CreateDbContext();
-        var outboxMessage = await db.OutboxMessages
+        var outboxMessages = await db.OutboxMessages
             .Where(m => m.TenantId == tenantId && m.Payload.Contains(invoiceId.ToString()))
-            .FirstOrDefaultAsync();
+            .ToListAsync();
 
-        Assert.NotNull(outboxMessage);
-        Assert.Contains("CustomerInvoiceIssuedEvent", outboxMessage.Type);
+        Assert.NotEmpty(outboxMessages);
+        Assert.Contains(outboxMessages, m => m.Type.Contains("InvoiceCreatedIntegrationEvent") || m.Type.Contains("CustomerInvoiceIssuedEvent"));
     }
 
     [Fact]
