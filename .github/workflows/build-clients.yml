@@ -167,35 +167,35 @@ jobs:
 
       - name: Publish Staging APK to GitHub Release
         if: steps.cf_env.outputs.target == 'staging'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: staging-latest
-          name: "Jolinx Business OS — Staging Build"
-          body: |
-            Continuous Staging Build for Android & Web:
-            - **Target Environment:** Staging
-            - **API:** ${{ steps.cf_env.outputs.api_url }}
-            - **Web:** https://staging.joberthix.xyz
-            - **Build Number:** ${{ github.run_number }}
-          prerelease: true
-          files: |
-            jolinx-android.apk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view staging-latest >/dev/null 2>&1 || gh release create staging-latest jolinx-android.apk --title "Jolinx Business OS — Staging Build" --notes "Continuous Staging Build" --prerelease
+          gh release upload staging-latest jolinx-android.apk --clobber
+          gh release edit staging-latest --title "Jolinx Business OS — Staging Build" --prerelease --notes "$(cat <<EOF
+          Continuous Staging Build for Android & Web:
+          - **Target Environment:** Staging
+          - **API:** ${{ steps.cf_env.outputs.api_url }}
+          - **Web:** https://staging.joberthix.xyz
+          - **Build Number:** ${{ github.run_number }}
+          EOF
+          )"
 
       - name: Publish Production APK to GitHub Release
         if: steps.cf_env.outputs.target == 'production'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: "Jolinx Business OS — Latest Production Release"
-          body: |
-            Automated Production Build:
-            - **Target Environment:** Production
-            - **Primary API:** ${{ steps.cf_env.outputs.api_url }}
-            - **Fallback API:** ${{ steps.cf_env.outputs.fallback_url }}
-            - **Build Number:** ${{ github.run_number }}
-          prerelease: false
-          files: |
-            jolinx-android.apk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view latest >/dev/null 2>&1 || gh release create latest jolinx-android.apk --title "Jolinx Business OS — Latest Production Release" --notes "Automated Production Build"
+          gh release upload latest jolinx-android.apk --clobber
+          gh release edit latest --title "Jolinx Business OS — Latest Production Release" --notes "$(cat <<EOF
+          Automated Production Build:
+          - **Target Environment:** Production
+          - **Primary API:** ${{ steps.cf_env.outputs.api_url }}
+          - **Fallback API:** ${{ steps.cf_env.outputs.fallback_url }}
+          - **Build Number:** ${{ github.run_number }}
+          EOF
+          )"
 
 
       - name: Build Linux Desktop Release
