@@ -8,10 +8,14 @@ import 'package:pdfx/pdfx.dart';
 import 'package:printing/printing.dart';
 
 import '../../../../l10n/loc.dart';
+import '../../../../shared/design_system/app_colors.dart';
+import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../data/invoice_providers.dart';
 import '../../domain/document_template.dart';
-import '../widgets/color_hex_picker.dart';
+import '../widgets/commercial_palette_picker.dart';
+import '../widgets/print_profile_selector.dart';
+import '../widgets/uniform_command_bar.dart';
 
 class InvoicePreviewScreen extends ConsumerStatefulWidget {
   const InvoicePreviewScreen({
@@ -21,6 +25,7 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
     this.documentType = DocumentType.invoice,
     this.initialIsThermal = false,
     this.initialThemePrimaryHex = '#0F172A',
+    this.initialThemeSecondaryHex = '#0D9488',
   });
 
   final String documentId;
@@ -28,13 +33,16 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
   final DocumentType documentType;
   final bool initialIsThermal;
   final String initialThemePrimaryHex;
+  final String initialThemeSecondaryHex;
 
   @override
   ConsumerState<InvoicePreviewScreen> createState() =>
       _InvoicePreviewScreenState();
 }
 
-class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
+class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _phoneTabController;
   PdfDocument? _pdfDocument;
   PdfPageController? _pdfController;
   Uint8List? _rawPdfBytes;
@@ -42,30 +50,44 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
   bool _isLoading = false;
   bool _isPrinting = false;
   String? _errorMessage;
+  bool _tabletSheetCollapsed = true;
 
   late bool _isThermal;
   late String _themePrimaryHex;
+  late String _themeSecondaryHex;
 
   Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
+    _phoneTabController = TabController(length: 2, vsync: this);
     _isThermal = widget.initialIsThermal;
     _themePrimaryHex = widget.initialThemePrimaryHex;
+    _themeSecondaryHex = widget.initialThemeSecondaryHex;
     _fetchAndRenderPdf();
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _phoneTabController.dispose();
     _pdfController?.dispose();
     _pdfDocument?.close();
     super.dispose();
   }
 
-  void _onColorChanged(String hex) {
+  void _onPrimaryColorChanged(String hex) {
     setState(() => _themePrimaryHex = hex);
+    _debounceFetch();
+  }
+
+  void _onSecondaryColorChanged(String hex) {
+    setState(() => _themeSecondaryHex = hex);
+    _debounceFetch();
+  }
+
+  void _debounceFetch() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       _fetchAndRenderPdf();
@@ -103,7 +125,6 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
       // Open thread-safe native PdfDocument structure from raw binary
       final document = await PdfDocument.openData(pdfBytes);
 
-      // Dispose existing controller if already instantiated
       _pdfController?.dispose();
       final controller = PdfPageController(page: 1);
 
@@ -132,8 +153,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
 
     try {
       // Hardware POS Terminal Print Spooling:
-      // Binds downloaded raw invoice bytes directly to native spooler without HTML conversions.
-      // If Thermal Receipt (80mm) profile is active, hardcodes PdfPageFormat.roll80 layout parameters.
+      // Direct raw binary byte binding without HTML conversions.
+      // If Thermal Receipt (80mm) profile is active, hardcodes PdfPageFormat.roll80.
       await Printing.layoutPdf(
         name: '${widget.documentType.name}-${widget.documentNumber}',
         format: _isThermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
@@ -143,8 +164,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hitilafu ya uchapishaji: $e'),
-            backgroundColor: const Color(0xFFDC2626),
+            content: Text('Hitilafu ya printa: $e'),
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -159,11 +180,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
   Widget build(BuildContext context) {
     final isSw = Localizations.localeOf(context).languageCode == 'sw';
     final docTitle = widget.documentType == DocumentType.invoice
-        ? (isSw ? 'Hakiki ya Ankara' : 'Invoice Print Preview')
+        ? (isSw ? 'Hakiki ya Ankara' : 'Customer Invoice Preview')
         : (isSw ? 'Hakiki ya Delivery' : 'Delivery Note Preview');
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 960;
 
     return Scaffold(
       appBar: AppBar(
@@ -172,12 +190,20 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
           children: [
             Text(
               docTitle,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             if (widget.documentNumber.isNotEmpty)
               Text(
                 widget.documentNumber,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  color: AppColors.tertiary,
+                ),
               ),
           ],
         ),
@@ -202,91 +228,242 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: (_rawPdfBytes == null || _isLoading || _isPrinting)
-            ? null
-            : _spoolToHardwarePrinter,
-        backgroundColor:
-            _isThermal ? const Color(0xFF0F172A) : const Color(0xFF0D9488),
-        foregroundColor: Colors.white,
-        icon: _isPrinting
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : Icon(
-                _isThermal ? Icons.receipt_long : Icons.print_outlined,
-                size: 20,
-              ),
-        label: Text(
-          _isPrinting
-              ? (isSw ? 'Inatuma kwenye Printa...' : 'Spooling to Printer...')
-              : (_isThermal
-                  ? (isSw ? 'Chapisha Risiti (80mm)' : 'Print 80mm Roll')
-                  : (isSw ? 'Chapisha Ankara (A4)' : 'Print Document')),
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+      body: WaveBackground(
+        child: ResponsiveLayoutBuilder(
+          builder: (context, constraints, category) {
+            switch (category) {
+              case EnterpriseScreenCategory.phone:
+                return _buildPhoneLayout(context, isSw);
+              case EnterpriseScreenCategory.tablet:
+                return _buildTabletLayout(context, isSw, constraints);
+              case EnterpriseScreenCategory.desktop:
+                return _buildDesktopLayout(context, isSw, constraints);
+            }
+          },
         ),
       ),
-      body: WaveBackground(
-        child: isDesktop
-            ? Row(
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. SMALL SCREENS (< 768px): TabBar Single Pane Switcher
+  // ──────────────────────────────────────────────────────────────────────────
+  Widget _buildPhoneLayout(BuildContext context, bool isSw) {
+    return Column(
+      children: [
+        Container(
+          color: AppColors.surface,
+          child: TabBar(
+            controller: _phoneTabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.onSurfaceVariant,
+            indicatorColor: AppColors.primary,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+            tabs: [
+              Tab(
+                icon: const Icon(Icons.tune_outlined, size: 18),
+                text: isSw ? 'Mipangilio' : 'Parameters',
+              ),
+              Tab(
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                text: isSw ? 'Hakiki ya PDF' : 'PDF Canvas',
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _phoneTabController,
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                child: _buildControls(isSw),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                child: _buildNativeCanvasPreview(isSw),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: UniformCommandBar(
+            isPrinting: _isPrinting,
+            isSaving: false,
+            isThermal: _isThermal,
+            saveSuccess: false,
+            isSwahili: isSw,
+            onPrint: _spoolToHardwarePrinter,
+            onSave: () => Navigator.of(context).pop(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. MEDIUM SCREENS (768px - 1023px): Stacked Grid & Collapsible Sheet
+  // ──────────────────────────────────────────────────────────────────────────
+  Widget _buildTabletLayout(
+      BuildContext context, bool isSw, BoxConstraints constraints) {
+    return Stack(
+      children: [
+        Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  bottom: BorderSide(color: AppColors.outlineVariant),
+                ),
+              ),
+              child: Row(
                 children: [
-                  // Left Config Sidebar
-                  SizedBox(
-                    width: 360,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          right:
-                              BorderSide(color: Color(0xFFE2E8F0), width: 1),
-                        ),
-                      ),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: _buildControls(isSw),
-                      ),
-                    ),
-                  ),
-                  // Right Native Canvas Preview
                   Expanded(
-                    child: Container(
-                      color: const Color(0xFFF1F5F9),
-                      child: _buildNativeCanvasPreview(isSw),
-                    ),
-                  ),
-                ],
-              )
-            : Column(
-                children: [
-                  // Collapsible or Compact Controls
-                  ExpansionTile(
-                    title: Text(
-                      isSw
-                          ? 'Mipangilio ya Rangi & Format'
-                          : 'Color & Format Settings',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700),
-                    ),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: _buildControls(isSw),
-                      ),
-                    ],
-                  ),
-                  Expanded(
-                    child: Container(
-                      color: const Color(0xFFF1F5F9),
-                      child: _buildNativeCanvasPreview(isSw),
+                    child: PrintProfileSelector(
+                      selectedProfile: _isThermal
+                          ? PrintSizeProfile.thermal80mm
+                          : PrintSizeProfile.a4Standard,
+                      onChanged: (p) => _toggleLayoutProfile(p.isThermal),
+                      isSwahili: isSw,
                     ),
                   ),
                 ],
               ),
-      ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                child: _buildNativeCanvasPreview(isSw),
+              ),
+            ),
+          ],
+        ),
+
+        // Persistent collapsible bottom sheet
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 12,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!_tabletSheetCollapsed)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(16),
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 16,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                    border: Border.all(color: AppColors.outlineVariant),
+                  ),
+                  child: SingleChildScrollView(
+                    child: _buildControls(isSw),
+                  ),
+                ),
+              Row(
+                children: [
+                  FloatingActionButton.small(
+                    onPressed: () => setState(
+                        () => _tabletSheetCollapsed = !_tabletSheetCollapsed),
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: AppColors.onSurface,
+                    elevation: 2,
+                    child: Icon(
+                      _tabletSheetCollapsed
+                          ? Icons.tune_outlined
+                          : Icons.keyboard_arrow_down,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: UniformCommandBar(
+                      isPrinting: _isPrinting,
+                      isSaving: false,
+                      isThermal: _isThermal,
+                      saveSuccess: false,
+                      isSwahili: isSw,
+                      onPrint: _spoolToHardwarePrinter,
+                      onSave: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. LARGE SCREENS (>= 1024px): 35% Left Controls / 65% Viewport-Locked Canvas
+  // ──────────────────────────────────────────────────────────────────────────
+  Widget _buildDesktopLayout(
+      BuildContext context, bool isSw, BoxConstraints constraints) {
+    final leftWidth = constraints.maxWidth * 0.35;
+    final rightWidth = constraints.maxWidth * 0.65;
+
+    return Stack(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: leftWidth,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(
+                    right: BorderSide(color: AppColors.outlineVariant, width: 1),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+                  child: _buildControls(isSw),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: rightWidth,
+              child: Container(
+                color: AppColors.surfaceDim,
+                padding: const EdgeInsets.fromLTRB(28, 24, 28, 100),
+                child: _buildNativeCanvasPreview(isSw),
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          left: leftWidth + 24,
+          right: 24,
+          bottom: 16,
+          child: UniformCommandBar(
+            isPrinting: _isPrinting,
+            isSaving: false,
+            isThermal: _isThermal,
+            saveSuccess: false,
+            isSwahili: isSw,
+            onPrint: _spoolToHardwarePrinter,
+            onSave: () => Navigator.of(context).pop(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -294,72 +471,44 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Layout Profile Toggle
-        Text(
-          isSw ? 'Umbizo la Karatasi' : 'Paper Format Profile',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1E293B),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _FormatProfileButton(
-                icon: Icons.description_outlined,
-                title: 'A4 Standard',
-                subtitle: 'A4 Paper (Sheet)',
-                isSelected: !_isThermal,
-                onTap: () => _toggleLayoutProfile(false),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _FormatProfileButton(
-                icon: Icons.receipt_long,
-                title: '80mm Roll',
-                subtitle: 'Thermal POS Hardware',
-                isSelected: _isThermal,
-                onTap: () => _toggleLayoutProfile(true),
-              ),
-            ),
-          ],
+        PrintProfileSelector(
+          selectedProfile: _isThermal
+              ? PrintSizeProfile.thermal80mm
+              : PrintSizeProfile.a4Standard,
+          onChanged: (profile) => _toggleLayoutProfile(profile.isThermal),
+          isSwahili: isSw,
         ),
         const SizedBox(height: 20),
-
-        // Live Hex Color Picker
-        ColorHexPicker(
-          label: isSw ? 'Rangi Kuu ya Chapa' : 'Brand Primary Color',
-          subtitle: isSw
-              ? 'Inatumiwa kusanidi mistari na vichwa kwenye PDF'
-              : 'Applies live styling to PDF headers and separators',
-          selectedHex: _themePrimaryHex,
-          onColorChanged: _onColorChanged,
+        CommercialPalettePicker(
+          primaryHex: _themePrimaryHex,
+          secondaryHex: _themeSecondaryHex,
+          onPrimaryChanged: _onPrimaryColorChanged,
+          onSecondaryChanged: _onSecondaryColorChanged,
+          isSwahili: isSw,
         ),
         const SizedBox(height: 20),
-
-        // Info Badge
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFE0F2FE),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFBAE6FD)),
+            color: AppColors.primaryContainer,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.bolt, size: 18, color: Color(0xFF0284C7)),
+              const Icon(Icons.bolt, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   isSw
-                      ? 'Hakiki hii inatumia PDF binary bila WebView. Inatuma data moja kwa moja kwenye printa bila kugeuza HTML.'
-                      : 'Native canvas PDF engine without WebView. Spools raw binary bytes directly to POS printer hardware.',
-                  style:
-                      const TextStyle(fontSize: 11, color: Color(0xFF0369A1)),
+                      ? 'Hakiki hii inatumia GPU Canvas natively bila WebViews, inatuma binary data moja kwa moja kwenye spooler.'
+                      : 'Native GPU canvas binary PDF preview. Spools directly to POS terminal hardware without WebViews.',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    color: AppColors.onPrimaryContainer,
+                  ),
                 ),
               ),
             ],
@@ -381,7 +530,11 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
               isSw
                   ? 'Inazalisha PDF binary...'
                   : 'Compiling native PDF binary stream...',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: AppColors.tertiary,
+              ),
             ),
           ],
         ),
@@ -396,12 +549,12 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.error_outline,
-                  size: 40, color: Color(0xFFDC2626)),
+                  size: 40, color: AppColors.error),
               const SizedBox(height: 12),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13),
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
@@ -419,12 +572,11 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
       return Center(
         child: Text(
           isSw ? 'Hakuna hati iliyopatikana.' : 'No document available.',
-          style: const TextStyle(color: Color(0xFF64748B)),
+          style: const TextStyle(fontFamily: 'Inter', color: AppColors.tertiary),
         ),
       );
     }
 
-    // Target width for 80mm roll is ~320px
     final double targetWidth = _isThermal ? 320 : 640;
 
     return Center(
@@ -451,12 +603,10 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // Native PdfPageView without webviews
             PdfPageView(
               controller: _pdfController!,
               pageSnapping: false,
             ),
-            // Floating page badge
             Positioned(
               bottom: 12,
               right: 12,
@@ -470,77 +620,13 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen> {
                 child: Text(
                   _isThermal ? '80mm Roll' : 'A4 Sheet',
                   style: const TextStyle(
+                    fontFamily: 'Inter',
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FormatProfileButton extends StatelessWidget {
-  const _FormatProfileButton({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFF0FDFA) : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF0D9488)
-                : const Color(0xFFE2E8F0),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected
-                  ? const Color(0xFF0D9488)
-                  : const Color(0xFF64748B),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isSelected
-                    ? const Color(0xFF0F172A)
-                    : const Color(0xFF334155),
-              ),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
             ),
           ],
         ),

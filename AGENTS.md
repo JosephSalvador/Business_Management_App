@@ -145,12 +145,13 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Document Settings Workspace — `DocumentTemplatesPage` with desktop/tablet split-screen layout, mobile segmented view, 80mm thermal container constraints, and `PrintDocumentButton`.
 - [x] Task 6: Navigation Integration — Added `/settings/document-templates` route in `router.dart`, shortcuts in `settings_page.dart` and `invoices_page.dart`, and HTML template print button in `invoice_detail_page.dart`.
 
-## Implementation Plan — Native WebView-Free PDF Print Preview & Hardware Spooling
-- [x] Task 1: Dependency Setup — Incorporate `pdfx` and `printing` packages into `pubspec.yaml` alongside `pdf`.
-- [x] Task 2: Backend Binary PDF Stream Endpoints — Added `MinimalPdfGenerator` (PDF-1.4 binary assembly), `RenderInvoicePdfQuery`, `RenderDeliveryNotePdfQuery`, and endpoints `GET /api/v1/invoices/{id}/pdf` & `GET /api/v1/delivery-notes/{id}/pdf`.
-- [x] Task 3: Native Canvas Preview Widget Engine — Built `InvoicePreviewScreen` fetching binary PDF stream from `/pdf` endpoint, opening thread-safe `PdfDocument.openData(pdfBytes)`, rendering with `PdfPageView`, and debouncing color adjustments (300ms).
-- [x] Task 4: Hardware POS Terminal Print Spooling — Dedicated cashier floating action button binding downloaded raw bytes directly into `Printing.layoutPdf` with `PdfPageFormat.roll80` hardcoded for 80mm thermal hardware and `PdfPageFormat.a4` for corporate sheets.
-- [x] Task 5: Integration & Verification — Added `/invoices/:id/preview` route in `router.dart`, "Hakiki (PDF)" action in `invoice_detail_page.dart`, and unit tests in `TemplateRenderServiceTests.cs` and `document_template_test.dart`.
+## Implementation Plan — Globally Standardized Adaptive Responsive Template & Preview Workspace
+- [x] Task 1: Breakpoint Responsiveness Architecture — Built `ResponsiveLayoutBuilder` with enterprise breakpoints (<768px phone, 768-1023px tablet, >=1024px desktop) and clean category resolvers.
+- [x] Task 2: Global POS Enterprise Configuration Widgets — Built `DocumentSelectorToggle` (invoicing & logistics iconography), `PrintProfileSelector` (A4 standard vs 80mm continuous roll), `CommercialPalettePicker` (high-contrast accessible commercial palettes), and `CustomOverrideField` (expansible multiline monospace code editor with server sanitization badge).
+- [x] Task 3: Uniform Action Floating Command Bar — Built `UniformCommandBar` sticky transactional footer ribbon featuring 'Print Now' direct hardware spooling, 'Save Configuration' persistence, active profile chip, and international typography.
+- [x] Task 4: Responsive Workspace Integration — Upgraded `DocumentTemplatesPage` and `InvoicePreviewScreen` with phone single pane top TabBar, tablet stacked grid with persistent collapsible parameters sheet, and desktop 35%/65% split dual-pane canvas.
+- [x] Task 5: Unit Tests & Verification — Extended `document_template_test.dart` to verify breakpoint resolution (<768px, 768-1023px, >=1024px), print profile mappings, and palette contrast configurations.
+
 
 
 

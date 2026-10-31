@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jolinx_app/features/invoices/domain/document_template.dart';
 import 'package:jolinx_app/features/invoices/application/document_template_controller.dart';
+import 'package:jolinx_app/features/invoices/domain/document_template.dart';
+import 'package:jolinx_app/features/invoices/presentation/widgets/commercial_palette_picker.dart';
+import 'package:jolinx_app/features/invoices/presentation/widgets/print_profile_selector.dart';
+import 'package:jolinx_app/shared/widgets/responsive_layout_builder.dart';
 
 void main() {
   group('DocumentType Enum', () {
@@ -120,6 +123,30 @@ void main() {
       final sampleHeader = '%PDF-1.4'.codeUnits;
       expect(sampleHeader.length, 8);
       expect(String.fromCharCodes(sampleHeader), '%PDF-1.4');
+    });
+  });
+
+  group('Enterprise Breakpoint Responsiveness Matrix', () {
+    test('resolves phone, tablet, and desktop breakpoints strictly', () {
+      expect(ResponsiveLayoutBuilder.resolveCategory(320), EnterpriseScreenCategory.phone);
+      expect(ResponsiveLayoutBuilder.resolveCategory(767.9), EnterpriseScreenCategory.phone);
+      expect(ResponsiveLayoutBuilder.resolveCategory(768.0), EnterpriseScreenCategory.tablet);
+      expect(ResponsiveLayoutBuilder.resolveCategory(900), EnterpriseScreenCategory.tablet);
+      expect(ResponsiveLayoutBuilder.resolveCategory(1023.9), EnterpriseScreenCategory.tablet);
+      expect(ResponsiveLayoutBuilder.resolveCategory(1024.0), EnterpriseScreenCategory.desktop);
+      expect(ResponsiveLayoutBuilder.resolveCategory(1920), EnterpriseScreenCategory.desktop);
+    });
+
+    test('validates print size profile mapping', () {
+      expect(PrintSizeProfile.a4Standard.isThermal, isFalse);
+      expect(PrintSizeProfile.thermal80mm.isThermal, isTrue);
+    });
+
+    test('contains accessible commercial palette presets', () {
+      expect(CommercialPalettePicker.presets, isNotEmpty);
+      final classic = CommercialPalettePicker.presets.first;
+      expect(classic.primaryHex, '#0F172A');
+      expect(classic.secondaryHex, '#0D9488');
     });
   });
 }
