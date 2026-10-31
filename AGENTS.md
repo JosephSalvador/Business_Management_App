@@ -108,4 +108,4 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 3: Store base64-encoded keystore and credentials securely in GitHub Secrets (`ANDROID_KEYSTORE_BASE64`, `STAGING_ANDROID_KEYSTORE_BASE64`, etc.).
 - [x] Task 4: Update `.github/workflows/build-clients.yml` to automatically decode keystore and write `android/key.properties` before APK build.
 - [x] Task 5: Bump version code to `1.0.0+68` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 6: Commit, push to `feature/mobile-pos-foundation`, and trigger production build workflow on GitHub Actions.
+- [x] Task 6: Commit, push to `feature/mobile-pos-foundation`, and trigger production build workflow on GitHub Actions.
