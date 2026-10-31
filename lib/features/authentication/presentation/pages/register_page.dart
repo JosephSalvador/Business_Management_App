@@ -73,6 +73,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             fieldErrors: {'Email': context.loc.emailAlreadyTaken},
           );
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.loc.emailAlreadyTaken),
+              backgroundColor: AppColors.error,
+              action: SnackBarAction(
+                label: context.loc.haveAccount,
+                textColor: Colors.white,
+                onPressed: () => context.go(Routes.login),
+              ),
+            ),
+          );
+        }
         return;
       }
       if (!availability.phoneAvailable) {
@@ -81,6 +94,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             fieldErrors: {'Phone': context.loc.phoneAlreadyTaken},
           );
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.loc.phoneAlreadyTaken),
+              backgroundColor: AppColors.error,
+              action: SnackBarAction(
+                label: context.loc.haveAccount,
+                textColor: Colors.white,
+                onPressed: () => context.go(Routes.login),
+              ),
+            ),
+          );
+        }
         return;
       }
 
@@ -137,7 +163,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         if (mapped.fieldErrors.containsKey('Email') ||
             mapped.fieldErrors.containsKey('Phone') ||
             mapped.fieldErrors.containsKey('FullName') ||
-            mapped.fieldErrors.containsKey('InvitationCode')) {
+            mapped.fieldErrors.containsKey('InvitationCode') ||
+            error is ConflictException) {
           _currentStep = 0;
         }
       });
@@ -149,6 +176,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           SnackBar(
             content: Text(message),
             backgroundColor: AppColors.error,
+            action: error is ConflictException
+                ? SnackBarAction(
+                    label: context.loc.haveAccount,
+                    textColor: Colors.white,
+                    onPressed: () => context.go(Routes.login),
+                  )
+                : null,
           ),
         );
       }

@@ -412,10 +412,11 @@ class AuthController extends Notifier<AuthState> {
       // account has already been inserted in the database.
       // Verify ownership by attempting to authenticate with the provided credentials.
       try {
-        await login(identifier: trimmedEmail, password: password);
+        await login(identifier: trimmedEmail, password: password)
+            .timeout(const Duration(seconds: 4));
         return;
       } catch (_) {
-        // If login fails (e.g. wrong password), this is a genuine conflict for
+        // If login fails (e.g. wrong password or timeout), this is a genuine conflict for
         // an existing user's account — throw the ConflictException so the UI displays it.
         throw conflict;
       }

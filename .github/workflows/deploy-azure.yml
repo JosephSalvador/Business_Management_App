@@ -107,4 +107,4 @@ jobs:
           az containerapp update \
             --name "${{ steps.target.outputs.app_name }}" \
             --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
-            --image "${{ env.REGISTRY }}/${image_name}:${{ steps.target.outputs.deploy_env }}"
+            --image "${{ env.REGISTRY }}/${{ env.image_name }}:${{ github.sha }}"

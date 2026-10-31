@@ -109,3 +109,13 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Update `.github/workflows/build-clients.yml` to automatically decode keystore and write `android/key.properties` before APK build.
 - [x] Task 5: Bump version code to `1.0.0+68` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 6: Commit, push to `feature/mobile-pos-foundation`, and trigger production build workflow on GitHub Actions.
+
+## Implementation Plan — Registration Deadlock Fix, Auto-Login Guardrails & Azure Production Deployment
+- [x] Task 1: Backend - Move `response.IsFailure` check before `SaveChangesAsync` in `TransactionBehavior.cs` to eliminate saving dirty entities or deadlocks on failed commands.
+- [x] Task 2: Backend - Wrap `FailedLoginCount` and audit logging in non-fatal try-catch in `LoginCommand.cs` to prevent turning invalid credentials into 30s 500 timeouts.
+- [x] Task 3: CI/CD - Fix `deploy-azure.yml` to use unique image tag `${{ env.image_name }}:${{ github.sha }}` ensuring Azure Container Apps deploys a new revision on every run.
+- [x] Task 4: Frontend - Add 4-second timeout to auto-login in `auth_controller.dart` on `ConflictException`, rethrowing conflict immediately on failure.
+- [x] Task 5: Frontend - In `register_page.dart`, reject existing email/phone immediately in Step 1, route to Step 0 on conflict, and provide direct one-tap "Ingia kwenye Akaunti" action.
+- [x] Task 6: Bump version code to `1.0.0+69` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 7: Commit, push to `feature/mobile-pos-foundation`, deploy backend to Azure production, and trigger client build on GitHub Actions.
+

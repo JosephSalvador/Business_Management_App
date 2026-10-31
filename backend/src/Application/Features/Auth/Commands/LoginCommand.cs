@@ -6,6 +6,7 @@ using BusinessOS.Domain.Identity;
 using BusinessOS.Shared;
 using BusinessOS.Shared.Configuration;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace BusinessOS.Application.Features.Auth.Commands;
@@ -16,25 +17,31 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 {
     private readonly IUserRepository _users;
     private readonly IAuditLogRepository _auditLogs;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly TwoFactorChallengeService _twoFactor;
     private readonly AuthSessionIssuer _sessions;
     private readonly SecurityOptions _security;
+    private readonly ILogger<LoginCommandHandler> _logger;
 
     public LoginCommandHandler(
         IUserRepository users,
         IAuditLogRepository auditLogs,
+        IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         TwoFactorChallengeService twoFactor,
         AuthSessionIssuer sessions,
-        IOptions<SecurityOptions> security)
+        IOptions<SecurityOptions> security,
+        ILogger<LoginCommandHandler> logger)
     {
         _users = users;
         _auditLogs = auditLogs;
+        _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _twoFactor = twoFactor;
         _sessions = sessions;
         _security = security.Value;
+        _logger = logger;
     }
 
     public async Task<Result<LoginResponse>> Handle(LoginCommand command, CancellationToken cancellationToken)
@@ -65,15 +72,24 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<L
 
         if (!_passwordHasher.Verify(command.Password, user.PasswordHash))
         {
-            user.RegisterFailedLogin(_security.MaxFailedLoginAttempts, TimeSpan.FromMinutes(_security.LockoutDurationMinutes));
-            await _auditLogs.AddAsync(AuditLog.Create(
-                user.TenantId,
-                user.Id,
-                "Auth.LoginFailed",
-                "User",
-                user.Id.ToString(),
-                System.Text.Json.JsonSerializer.Serialize(new { attempt = user.FailedLoginCount })),
-                cancellationToken);
+            try
+            {
+                user.RegisterFailedLogin(_security.MaxFailedLoginAttempts, TimeSpan.FromMinutes(_security.LockoutDurationMinutes));
+                await _auditLogs.AddAsync(AuditLog.Create(
+                    user.TenantId,
+                    user.Id,
+                    "Auth.LoginFailed",
+                    "User",
+                    user.Id.ToString(),
+                    System.Text.Json.JsonSerializer.Serialize(new { attempt = user.FailedLoginCount })),
+                    cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to record failed login attempt for user {Email}", user.Email);
+            }
+
             return Error.Unauthorized("Invalid email or password.");
         }
 

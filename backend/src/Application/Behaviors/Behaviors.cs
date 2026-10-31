@@ -76,8 +76,6 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         {
             var response = await next();
 
-            var dispatched = await _unitOfWork.SaveChangesAsync(cancellationToken);
-
             if (response.IsFailure)
             {
                 if (requiresLock)
@@ -87,6 +85,8 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
 
                 return response;
             }
+
+            var dispatched = await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             if (requiresLock)
             {
