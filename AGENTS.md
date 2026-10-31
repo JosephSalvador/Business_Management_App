@@ -101,3 +101,11 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Bump version code to `1.0.0+67` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 6: Deploy updated backend to Azure Container Apps production (`deploy-azure.yml`) so `/check-availability` is active in production.
 - [x] Task 7: Build and publish production APK v1.0.0+67 via GitHub Actions (`build-clients.yml`).
+
+## Implementation Plan — Permanent Android Signing Keystore & In-Place Updates
+- [x] Task 1: Generate permanent 2048-bit RSA release keystore (`android/app/upload-keystore.jks`) valid for 10,000 days (until 2054).
+- [x] Task 2: Configure `android/key.properties` and update `android/app/build.gradle.kts` to load release signing config with `key.properties` and fallback to `upload-keystore.jks`.
+- [x] Task 3: Store base64-encoded keystore and credentials securely in GitHub Secrets (`ANDROID_KEYSTORE_BASE64`, `STAGING_ANDROID_KEYSTORE_BASE64`, etc.).
+- [x] Task 4: Update `.github/workflows/build-clients.yml` to automatically decode keystore and write `android/key.properties` before APK build.
+- [x] Task 5: Bump version code to `1.0.0+68` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 6: Commit, push to `feature/mobile-pos-foundation`, and trigger production build workflow on GitHub Actions.
