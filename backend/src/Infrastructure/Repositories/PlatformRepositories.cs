@@ -2966,6 +2966,77 @@ public sealed class DeliveryNoteRepository : IDeliveryNoteRepository
         => _numberSequences.AllocateAsync(tenantId, "DeliveryNote", date, cancellationToken);
 }
 
+public sealed class DocumentTemplateRepository : IDocumentTemplateRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public DocumentTemplateRepository(BusinessDbContext db) => _db = db;
+
+    public Task<DocumentTemplate?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        => _db.DocumentTemplates.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+    public Task<DocumentTemplate?> GetDefaultAsync(DocumentType type, CancellationToken cancellationToken = default)
+        => _db.DocumentTemplates
+            .Where(t => t.DocumentType == type && t.IsActive && t.IsDefault)
+            .OrderBy(t => t.DisplayOrder)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<DocumentTemplate>> ListActiveAsync(
+        DocumentType? type = null, CancellationToken cancellationToken = default)
+    {
+        var query = _db.DocumentTemplates
+            .AsNoTracking()
+            .Where(t => t.IsActive);
+
+        if (type.HasValue)
+        {
+            query = query.Where(t => t.DocumentType == type.Value);
+        }
+
+        return await query
+            .OrderBy(t => t.DisplayOrder)
+            .ThenBy(t => t.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task AddAsync(DocumentTemplate template, CancellationToken cancellationToken = default)
+        => _db.DocumentTemplates.AddAsync(template, cancellationToken).AsTask();
+
+    public Task UpdateAsync(DocumentTemplate template, CancellationToken cancellationToken = default)
+    {
+        _db.DocumentTemplates.Update(template);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class TenantDocumentConfigurationRepository : ITenantDocumentConfigurationRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public TenantDocumentConfigurationRepository(BusinessDbContext db) => _db = db;
+
+    public Task<TenantDocumentConfiguration?> GetAsync(
+        Guid tenantId, DocumentType type, CancellationToken cancellationToken = default)
+        => _db.TenantDocumentConfigurations
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.DocumentType == type, cancellationToken);
+
+    public async Task<IReadOnlyList<TenantDocumentConfiguration>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default)
+        => await _db.TenantDocumentConfigurations
+            .AsNoTracking()
+            .Where(c => c.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
+    public Task AddAsync(TenantDocumentConfiguration config, CancellationToken cancellationToken = default)
+        => _db.TenantDocumentConfigurations.AddAsync(config, cancellationToken).AsTask();
+
+    public Task UpdateAsync(TenantDocumentConfiguration config, CancellationToken cancellationToken = default)
+    {
+        _db.TenantDocumentConfigurations.Update(config);
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class AppNotificationRepository : IAppNotificationRepository
 {
     private readonly BusinessDbContext _db;

@@ -127,4 +127,15 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Database Migration & Snapshot — Migration `20261031180000_AddDeliveryNotesAndDocumentIndexes` and updated `BusinessDbContextModelSnapshot`.
 - [x] Task 6: Comprehensive Tests — Unit and integration tests covering aggregate lifecycle, status transitions, sequential document numbering, outbox persistence, and strict multi-tenant query filter isolation.
 
+## Implementation Plan — Template Marketplace and Fluid.Core Liquid Rendering Engine
+- [x] Task 1: Domain & Persistence Layer — `DocumentTemplate` (system-level marketplace aggregate) and `TenantDocumentConfiguration` (tenant-scoped aggregate) with unique index on `(TenantId, DocumentType)`, global multi-tenant query filter on configurations, and no query filter on shared templates.
+- [x] Task 2: High-Performance Fluid.Core Engine — `InvoiceTemplateRenderService` implementing `IDocumentTemplateRenderService` with `IMemoryCache` caching compiled AST structures under `tpl:{templateId}:{layoutHash}`, sub-50ms execution, and isolated `MemberAccessStrategy` whitelisting flat DTO properties.
+- [x] Task 3: HTML Sanitization & Safety — `HtmlSanitizerService` shielding Liquid tokens (`{{ ... }}` and `{% ... %}`), removing `<script>`, `<iframe>`, `<object>`, inline event handlers, and malicious URIs prior to database storage.
+- [x] Task 4: Validation Pipeline — `UpdateTenantDocumentConfigurationCommandValidator` enforcing valid hex color codes and sanitizing custom layout overrides.
+- [x] Task 5: Seeding & Marketplace Catalog — Seeded 4 marketplace templates in `DatabaseSeeder.cs` (Modern Minimalist Invoice, Classic Corporate Invoice, Standard Logistics Delivery Note, Thermal POS Slip).
+- [x] Task 6: Minimal API Endpoints — `DocumentTemplateEndpoints.cs` mapping `GET /document-templates`, `GET /tenant-document-configurations`, `PUT /tenant-document-configurations/{documentType}`, `GET /invoices/{id}/html`, `GET /delivery-notes/{id}/html`, and `POST /document-templates/preview`.
+- [x] Task 7: Database Migration & Model Snapshot — Migration `20261031190000_AddDocumentTemplatesAndTenantConfigurations.cs` and synced `BusinessDbContextModelSnapshot.cs`.
+- [x] Task 8: Comprehensive Unit Tests — `HtmlSanitizerServiceTests`, `TemplateRenderServiceTests` (validating sub-50ms render), and `TemplateValidatorsTests`.
+
+
 

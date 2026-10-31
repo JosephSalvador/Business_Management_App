@@ -111,6 +111,8 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<CustomerInvoiceLine> CustomerInvoiceLines => Set<CustomerInvoiceLine>();
     public DbSet<DeliveryNote> DeliveryNotes => Set<DeliveryNote>();
     public DbSet<DeliveryNoteItem> DeliveryNoteItems => Set<DeliveryNoteItem>();
+    public DbSet<DocumentTemplate> DocumentTemplates => Set<DocumentTemplate>();
+    public DbSet<TenantDocumentConfiguration> TenantDocumentConfigurations => Set<TenantDocumentConfiguration>();
     public DbSet<AppNotification> Notifications => Set<AppNotification>();
     public DbSet<UserDevice> UserDevices => Set<UserDevice>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
@@ -1213,6 +1215,45 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.HasIndex(i => i.DeliveryNoteId);
                 entity.HasIndex(i => new { i.TenantId, i.CreatedAt });
                 entity.HasQueryFilter(i => FilterTenantId == null || i.TenantId == FilterTenantId);
+            });
+
+            modelBuilder.Entity<DocumentTemplate>(entity =>
+            {
+                entity.ToTable(Tables.Invoicing.DocumentTemplates, Schemas.Invoicing);
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.Name).IsRequired().HasMaxLength(100);
+                entity.Property(t => t.Description).HasMaxLength(500);
+                entity.Property(t => t.DocumentType).IsRequired();
+                entity.Property(t => t.LiquidLayout).IsRequired().HasColumnType("text");
+                entity.Property(t => t.ThumbnailBase64).HasColumnType("text");
+                entity.Property(t => t.EngineVersion).IsRequired().HasMaxLength(50);
+                entity.Property(t => t.IsActive).IsRequired();
+                entity.Property(t => t.IsDefault).IsRequired();
+                entity.Property(t => t.DisplayOrder).IsRequired();
+                entity.HasIndex(t => new { t.DocumentType, t.IsActive, t.DisplayOrder });
+                // Note: DocumentTemplate is a system-level global marketplace asset and has NO query filter.
+            });
+
+            modelBuilder.Entity<TenantDocumentConfiguration>(entity =>
+            {
+                entity.ToTable(Tables.Invoicing.TenantDocumentConfigurations, Schemas.Invoicing);
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.TenantId).IsRequired();
+                entity.Property(c => c.DocumentType).IsRequired();
+                entity.Property(c => c.ActiveTemplateId).IsRequired();
+                entity.Property(c => c.CustomLiquidOverride).HasColumnType("text");
+                entity.Property(c => c.ThemePrimaryHex).HasMaxLength(20);
+                entity.Property(c => c.ThemeSecondaryHex).HasMaxLength(20);
+                entity.Property(c => c.LogoUrl).HasMaxLength(500);
+                entity.Property(c => c.ShowLogo).IsRequired();
+                entity.Property(c => c.FooterNotes).HasColumnType("text");
+                entity.HasIndex(c => new { c.TenantId, c.DocumentType }).IsUnique();
+                entity.HasIndex(c => c.ActiveTemplateId);
+                entity.HasOne<DocumentTemplate>()
+                    .WithMany()
+                    .HasForeignKey(c => c.ActiveTemplateId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasQueryFilter(c => FilterTenantId == null || c.TenantId == FilterTenantId);
             });
 
         modelBuilder.Entity<AppNotification>(entity =>

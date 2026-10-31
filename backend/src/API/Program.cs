@@ -271,6 +271,7 @@ app.MapBillingEndpoints();
 app.MapCapabilitiesEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDeliveryNoteEndpoints();
+app.MapDocumentTemplateEndpoints();
 app.MapNotificationEndpoints();
 app.MapTenantProvisioningEndpoints();
 app.MapAppVersionEndpoints();

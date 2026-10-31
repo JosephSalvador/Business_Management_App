@@ -857,6 +857,25 @@ public interface IDeliveryNoteRepository
     Task UpdateAsync(DeliveryNote deliveryNote, CancellationToken cancellationToken = default);
 }
 
+public interface IDocumentTemplateRepository
+{
+    Task<DocumentTemplate?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<DocumentTemplate?> GetDefaultAsync(DocumentType type, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DocumentTemplate>> ListActiveAsync(DocumentType? type = null, CancellationToken cancellationToken = default);
+    Task AddAsync(DocumentTemplate template, CancellationToken cancellationToken = default);
+    Task UpdateAsync(DocumentTemplate template, CancellationToken cancellationToken = default);
+}
+
+public interface ITenantDocumentConfigurationRepository
+{
+    Task<TenantDocumentConfiguration?> GetAsync(
+        Guid tenantId, DocumentType type, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TenantDocumentConfiguration>> ListAsync(
+        Guid tenantId, CancellationToken cancellationToken = default);
+    Task AddAsync(TenantDocumentConfiguration config, CancellationToken cancellationToken = default);
+    Task UpdateAsync(TenantDocumentConfiguration config, CancellationToken cancellationToken = default);
+}
+
 public sealed record NotificationListFilter(
     string? Category,
     bool? UnreadOnly);

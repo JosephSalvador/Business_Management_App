@@ -150,6 +150,8 @@ public static class Tables
         public const string CustomerInvoiceLines = "CustomerInvoiceLines";
         public const string DeliveryNotes = "DeliveryNotes";
         public const string DeliveryNoteItems = "DeliveryNoteItems";
+        public const string DocumentTemplates = "DocumentTemplates";
+        public const string TenantDocumentConfigurations = "TenantDocumentConfigurations";
     }
 
     public static class Notifications
