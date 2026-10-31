@@ -155,4 +155,46 @@ public sealed class TemplateRenderServiceTests
         Assert.Contains("INV-2026-0001", html);
         Assert.Contains("Mlimani Holdings Ltd", html);
     }
+
+    [Fact]
+    public void MinimalPdfGenerator_GeneratesConformingA4AndThermalPdfs()
+    {
+        var items = new List<(string Description, string Quantity, string Total)>
+        {
+            ("Premium Cement 50kg", "10 Bags", "TZS 180,000"),
+            ("Steel Rods 12mm", "20 Pcs", "TZS 400,000")
+        };
+
+        // 1. A4 Document
+        var a4Bytes = MinimalPdfGenerator.CreateDocument(
+            title: "TAX INVOICE",
+            documentNumber: "INV-2026-0001",
+            organizationName: "Kilimanjaro Hardware Ltd",
+            customerName: "Mbowe Builders",
+            totalFormatted: "TZS 580,000",
+            items: items,
+            isThermal: false,
+            primaryHex: "#0F172A");
+
+        Assert.NotNull(a4Bytes);
+        Assert.NotEmpty(a4Bytes);
+        Assert.StartsWith("%PDF-1.4", System.Text.Encoding.Latin1.GetString(a4Bytes));
+        Assert.EndsWith("%%EOF\n", System.Text.Encoding.Latin1.GetString(a4Bytes));
+
+        // 2. Thermal 80mm Document
+        var thermalBytes = MinimalPdfGenerator.CreateDocument(
+            title: "CASH SALE",
+            documentNumber: "INV-2026-0002",
+            organizationName: "Quick POS Supermarket",
+            customerName: "Walk-in",
+            totalFormatted: "TZS 580,000",
+            items: items,
+            isThermal: true,
+            primaryHex: "#0D9488");
+
+        Assert.NotNull(thermalBytes);
+        Assert.NotEmpty(thermalBytes);
+        Assert.StartsWith("%PDF-1.4", System.Text.Encoding.Latin1.GetString(thermalBytes));
+        Assert.EndsWith("%%EOF\n", System.Text.Encoding.Latin1.GetString(thermalBytes));
+    }
 }

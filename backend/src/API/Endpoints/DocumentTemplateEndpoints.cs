@@ -63,6 +63,10 @@ public static class DocumentTemplateEndpoints
             .RequirePermission(PermissionNames.InvoicesView)
             .WithName("RenderInvoiceHtml");
 
+        invoices.MapGet("/{id:guid}/pdf", RenderInvoicePdfAsync)
+            .RequirePermission(PermissionNames.InvoicesView)
+            .WithName("RenderInvoicePdf");
+
         var deliveryNotes = api.MapGroup("/delivery-notes")
             .WithApiVersionSet(versionSet)
             .WithTags("DeliveryNotes")
@@ -72,6 +76,10 @@ public static class DocumentTemplateEndpoints
         deliveryNotes.MapGet("/{id:guid}/html", RenderDeliveryNoteHtmlAsync)
             .RequirePermission(PermissionNames.DeliveryNotesView)
             .WithName("RenderDeliveryNoteHtml");
+
+        deliveryNotes.MapGet("/{id:guid}/pdf", RenderDeliveryNotePdfAsync)
+            .RequirePermission(PermissionNames.DeliveryNotesView)
+            .WithName("RenderDeliveryNotePdf");
 
         return app;
     }
@@ -149,5 +157,29 @@ public static class DocumentTemplateEndpoints
         }
 
         return Results.Content(result.Value, "text/html; charset=utf-8", Encoding.UTF8);
+    }
+
+    private static async Task<IResult> RenderInvoicePdfAsync(
+        Guid id, bool? isThermal, string? primaryHex, ISender sender, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new RenderInvoicePdfQuery(id, isThermal ?? false, primaryHex), cancellationToken);
+        if (result.IsFailure)
+        {
+            return result.ToApiResult();
+        }
+
+        return Results.File(result.Value, "application/pdf", $"invoice-{id}.pdf");
+    }
+
+    private static async Task<IResult> RenderDeliveryNotePdfAsync(
+        Guid id, bool? isThermal, string? primaryHex, ISender sender, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new RenderDeliveryNotePdfQuery(id, isThermal ?? false, primaryHex), cancellationToken);
+        if (result.IsFailure)
+        {
+            return result.ToApiResult();
+        }
+
+        return Results.File(result.Value, "application/pdf", $"delivery-note-{id}.pdf");
     }
 }

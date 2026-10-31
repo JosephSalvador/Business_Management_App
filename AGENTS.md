@@ -145,6 +145,14 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Document Settings Workspace — `DocumentTemplatesPage` with desktop/tablet split-screen layout, mobile segmented view, 80mm thermal container constraints, and `PrintDocumentButton`.
 - [x] Task 6: Navigation Integration — Added `/settings/document-templates` route in `router.dart`, shortcuts in `settings_page.dart` and `invoices_page.dart`, and HTML template print button in `invoice_detail_page.dart`.
 
+## Implementation Plan — Native WebView-Free PDF Print Preview & Hardware Spooling
+- [x] Task 1: Dependency Setup — Incorporate `pdfx` and `printing` packages into `pubspec.yaml` alongside `pdf`.
+- [x] Task 2: Backend Binary PDF Stream Endpoints — Added `MinimalPdfGenerator` (PDF-1.4 binary assembly), `RenderInvoicePdfQuery`, `RenderDeliveryNotePdfQuery`, and endpoints `GET /api/v1/invoices/{id}/pdf` & `GET /api/v1/delivery-notes/{id}/pdf`.
+- [x] Task 3: Native Canvas Preview Widget Engine — Built `InvoicePreviewScreen` fetching binary PDF stream from `/pdf` endpoint, opening thread-safe `PdfDocument.openData(pdfBytes)`, rendering with `PdfPageView`, and debouncing color adjustments (300ms).
+- [x] Task 4: Hardware POS Terminal Print Spooling — Dedicated cashier floating action button binding downloaded raw bytes directly into `Printing.layoutPdf` with `PdfPageFormat.roll80` hardcoded for 80mm thermal hardware and `PdfPageFormat.a4` for corporate sheets.
+- [x] Task 5: Integration & Verification — Added `/invoices/:id/preview` route in `router.dart`, "Hakiki (PDF)" action in `invoice_detail_page.dart`, and unit tests in `TemplateRenderServiceTests.cs` and `document_template_test.dart`.
+
+
 
 
 

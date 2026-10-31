@@ -34,6 +34,7 @@ import '../features/products/presentation/pages/product_form_page.dart';
 import '../features/invoices/presentation/pages/create_invoice_page.dart';
 import '../features/invoices/presentation/pages/document_templates_page.dart';
 import '../features/invoices/presentation/pages/invoice_detail_page.dart';
+import '../features/invoices/presentation/pages/invoice_preview_screen.dart';
 import '../features/invoices/presentation/pages/invoices_page.dart';
 import '../features/invoices/presentation/pages/module_locked_page.dart';
 import '../features/profile/presentation/pages/profile_page.dart';
@@ -129,6 +130,7 @@ abstract final class Routes {
   static String productDetail(String productId) => '/products/$productId';
   static String customerDetail(String customerId) => '/customers/$customerId';
   static String invoiceDetail(String invoiceId) => '/invoices/$invoiceId';
+  static String invoicePreview(String invoiceId) => '/invoices/$invoiceId/preview';
   static String customerEdit(String customerId) =>
       '/customers/$customerId/edit';
   static String supplierEdit(String supplierId) =>
@@ -436,6 +438,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             _moduleRouteRedirect(ref, BillingFeatureKeys.invoicing),
         builder: (_, state) =>
             InvoiceDetailPage(invoiceId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/invoices/:id/preview',
+        redirect: (_, __) =>
+            _moduleRouteRedirect(ref, BillingFeatureKeys.invoicing),
+        builder: (_, state) =>
+            InvoicePreviewScreen(documentId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: Routes.moduleLocked,

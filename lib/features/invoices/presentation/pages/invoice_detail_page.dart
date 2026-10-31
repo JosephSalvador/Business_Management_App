@@ -16,6 +16,7 @@ import '../services/customer_invoice_pdf_service.dart';
 import '../widgets/invoice_a4_preview_card.dart';
 import '../widgets/invoice_branding_sheet.dart';
 import '../widgets/preview_frame/preview_frame.dart';
+import 'invoice_preview_screen.dart';
 
 class InvoiceDetailPage extends ConsumerStatefulWidget {
   const InvoiceDetailPage({super.key, required this.invoiceId});
@@ -227,22 +228,16 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF0F172A),
                 ),
-                onPressed: () async {
-                  try {
-                    final html = await ref
-                        .read(documentTemplateRepositoryProvider)
-                        .getInvoiceHtml(invoice.id);
-                    await documentPreviewFrame.printDocument(html);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Hitilafu: $e')),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.print_outlined, size: 16),
-                label: Text(isSwahili ? 'Chapisha' : 'Print'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => InvoicePreviewScreen(
+                      documentId: invoice.id,
+                      documentNumber: invoice.invoiceNumber,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                label: Text(isSwahili ? 'Hakiki (PDF)' : 'Native PDF'),
               ),
             ],
           ),

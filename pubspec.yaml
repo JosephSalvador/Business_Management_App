@@ -47,6 +47,8 @@ dependencies:
   share_plus: ^13.3.0
   flutter_bluetooth_printer: ^2.24.0
   pdf: ^3.11.2
+  pdfx: ^2.6.0
+  printing: ^5.13.2
   qr: ^3.0.2
   qr_flutter: ^4.1.0
 

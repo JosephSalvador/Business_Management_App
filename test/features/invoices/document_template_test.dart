@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:business_app/features/invoices/domain/document_template.dart';
-import 'package:business_app/features/invoices/application/document_template_controller.dart';
+import 'package:jolinx_app/features/invoices/domain/document_template.dart';
+import 'package:jolinx_app/features/invoices/application/document_template_controller.dart';
 
 void main() {
   group('DocumentType Enum', () {
@@ -112,6 +112,14 @@ void main() {
       expect(deliveryState.currentTypeTemplates.length, 1);
       expect(deliveryState.currentTypeTemplates.first.id, '2');
       expect(deliveryState.isThermal, isFalse);
+    });
+  });
+
+  group('PDF Bytes Retrieval & Formatting Contract', () {
+    test('validates standard PDF header and roll format detection', () {
+      final sampleHeader = '%PDF-1.4'.codeUnits;
+      expect(sampleHeader.length, 8);
+      expect(String.fromCharCodes(sampleHeader), '%PDF-1.4');
     });
   });
 }

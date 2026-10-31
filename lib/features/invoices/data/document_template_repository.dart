@@ -184,4 +184,65 @@ class DocumentTemplateRepository {
       throw ServerException('Hitilafu ya kupakua muundo wa delivery: $e');
     }
   }
+
+  /// Fetches raw PDF bytes for an invoice from `/api/v1/invoices/{id}/pdf`.
+  Future<List<int>> getInvoicePdfBytes(
+    String invoiceId, {
+    bool isThermal = false,
+    String? primaryHex,
+  }) async {
+    try {
+      final response = await _apiClient.raw.get<List<int>>(
+        ApiRoutes.v1('/invoices/$invoiceId/pdf'),
+        queryParameters: {
+          'isThermal': isThermal,
+          if (primaryHex != null && primaryHex.isNotEmpty) 'primaryHex': primaryHex,
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {'Accept': 'application/pdf'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data!;
+      }
+
+      throw ServerException('Faili la PDF halikupatikana kutoka server.');
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw ServerException('Hitilafu ya kupakua faili la PDF: $e');
+    }
+  }
+
+  /// Fetches raw PDF bytes for a delivery note from `/api/v1/delivery-notes/{id}/pdf`.
+  Future<List<int>> getDeliveryNotePdfBytes(
+    String deliveryNoteId, {
+    bool isThermal = false,
+    String? primaryHex,
+  }) async {
+    try {
+      final response = await _apiClient.raw.get<List<int>>(
+        ApiRoutes.v1('/delivery-notes/$deliveryNoteId/pdf'),
+        queryParameters: {
+          'isThermal': isThermal,
+          if (primaryHex != null && primaryHex.isNotEmpty) 'primaryHex': primaryHex,
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {'Accept': 'application/pdf'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data!;
+      }
+
+      throw ServerException('Faili la PDF halikupatikana kutoka server.');
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw ServerException('Hitilafu ya kupakua faili la PDF: $e');
+    }
+  }
 }
+
