@@ -221,9 +221,9 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
           ),
         ),
 
-        // Top Action Bar: Share / Print A4 PDF + Record Payment
+        // Top Action Bar: Share / Print A4 PDF + Preview
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Theme.of(context).brightness == Brightness.dark
                 ? const Color(0xFF1E293B)
@@ -238,83 +238,103 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                       .withValues(alpha: 0.25),
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                Icons.print_outlined,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF2DD4BF)
-                    : Theme.of(context).colorScheme.primary,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isSwahili
-                          ? 'Muundo wa A4 Tayari Kuchapishwa'
-                          : 'Print-Ready A4 Invoice Format',
-                      style: TextStyle(
-                        color: AppColors.resolveTextPrimary(context),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      isSwahili
-                          ? 'Tuma WhatsApp/Email au chapisha kwenye karatasi ya A4'
-                          : 'Share via WhatsApp/Email or print directly on A4 paper',
-                      style: TextStyle(
-                        color: AppColors.resolveTextSecondary(context),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(context).brightness == Brightness.dark
-                          ? const Color(0xFF0D9488)
-                          : Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: _sharingPdf
-                    ? null
-                    : () => _shareA4Pdf(invoice, organization, isSwahili),
-                icon: const Icon(Icons.share_outlined, size: 16),
-                label: Text(isSwahili ? 'A4 PDF' : 'Share PDF'),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor:
-                      Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.primary,
-                  side: BorderSide(
+              Row(
+                children: [
+                  Icon(
+                    Icons.print_outlined,
                     color: Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xFF64748B)
-                        : Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.5),
+                        ? const Color(0xFF2DD4BF)
+                        : Theme.of(context).colorScheme.primary,
+                    size: 22,
                   ),
-                ),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => InvoicePreviewScreen(
-                      documentId: invoice.id,
-                      documentNumber: invoice.invoiceNumber,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isSwahili
+                              ? 'Muundo wa A4 Tayari Kuchapishwa'
+                              : 'Print-Ready A4 Invoice Format',
+                          style: TextStyle(
+                            color: AppColors.resolveTextPrimary(context),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isSwahili
+                              ? 'Tuma WhatsApp/Email au chapisha moja kwa moja kwenye karatasi ya A4'
+                              : 'Share via WhatsApp/Email or print directly on A4 paper',
+                          style: TextStyle(
+                            color: AppColors.resolveTextSecondary(context),
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
-                label: Text(isSwahili ? 'Hakiki (PDF)' : 'Native PDF'),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor:
+                            Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFF0D9488)
+                                : Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _sharingPdf
+                          ? null
+                          : () => _shareA4Pdf(invoice, organization, isSwahili),
+                      icon: const Icon(Icons.share_outlined, size: 16),
+                      label: Text(
+                        isSwahili ? 'Tuma A4 PDF' : 'Share A4 PDF',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor:
+                            Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.primary,
+                        side: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF64748B)
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.5),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => InvoicePreviewScreen(
+                            documentId: invoice.id,
+                            documentNumber: invoice.invoiceNumber,
+                            initialInvoice: invoice,
+                          ),
+                        ),
+                      ),
+                      icon:
+                          const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                      label: Text(
+                        isSwahili ? 'Hakiki & Chapisha' : 'Preview & Print',
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

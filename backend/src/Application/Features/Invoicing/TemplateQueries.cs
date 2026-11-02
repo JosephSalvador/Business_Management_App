@@ -286,7 +286,7 @@ public sealed class RenderInvoicePdfQueryHandler
             title: invoice.DocumentTitle ?? "INVOICE",
             documentNumber: invoice.Number,
             organizationName: orgName,
-            customerName: invoice.CustomerName ?? "Walk-in Customer",
+            customerName: invoice.CustomerName ?? "Client",
             totalFormatted: totalFormatted,
             items: items,
             isThermal: request.IsThermal,

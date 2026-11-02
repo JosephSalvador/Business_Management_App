@@ -15,6 +15,7 @@ import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
+import '../widgets/invoice_a4_preview_card.dart';
 import '../widgets/invoice_branding_sheet.dart';
 
 class CreateInvoicePage extends ConsumerStatefulWidget {
@@ -75,7 +76,6 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   final _customerPhoneController = TextEditingController();
   final _customerEmailController = TextEditingController();
   final _customerAddressController = TextEditingController();
-  bool _showExtraClientFields = false;
 
   final _lines = <_LineInputs>[_LineInputs()];
   final _invoiceDiscountController = TextEditingController();
@@ -198,8 +198,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   bool get _canContinue {
     switch (_step) {
       case 0:
-        return _customerNameController.text.trim().isNotEmpty ||
-            _customerId == null;
+        return _customerNameController.text.trim().isNotEmpty;
       case 1:
         return _lines.any((line) => line.description.text.trim().isNotEmpty);
       default:
@@ -208,7 +207,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   }
 
   bool get _canSave =>
-      !_saving && _lines.any((line) => line.description.text.trim().isNotEmpty);
+      !_saving &&
+      _customerNameController.text.trim().isNotEmpty &&
+      _lines.any((line) => line.description.text.trim().isNotEmpty);
 
   void _onSelectCustomer(
     String? id,
@@ -230,13 +231,89 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                 .trim();
         _customerAddressController.text =
             ((found['address'] as String?) ?? '').trim();
-        if (_customerTinController.text.isNotEmpty ||
-            _customerAddressController.text.isNotEmpty ||
-            _customerEmailController.text.isNotEmpty) {
-          _showExtraClientFields = true;
-        }
       }
     });
+  }
+
+  CustomerInvoice _buildDraftPreviewInvoice(Organization? org) {
+    final activeLines = _lines
+        .where((l) => l.description.text.trim().isNotEmpty)
+        .toList(growable: false);
+    final invoiceLines = List<InvoiceLine>.generate(activeLines.length, (i) {
+      final line = activeLines[i];
+      return InvoiceLine(
+        id: 'draft-line-$i',
+        productId: line.productId,
+        description: line.description.text.trim(),
+        unitOfMeasure: line.unitOfMeasure,
+        quantity: line.parsedQuantity,
+        unitPrice: line.parsedUnitPrice,
+        discountAmount: line.parsedDiscount,
+        taxRatePercent: 0,
+        lineTotal: line.lineTotal,
+        taxAmount: 0,
+      );
+    });
+    final status = _balanceDue <= 0 && _totalAmount > 0
+        ? InvoiceStatus.paid
+        : (_initialPaid > 0
+            ? InvoiceStatus.partiallyPaid
+            : InvoiceStatus.unpaid);
+    return CustomerInvoice(
+      id: _invoiceId,
+      number: 'PREVIEW',
+      documentTitle: _documentTitle,
+      referenceNumber: _referenceController.text.trim().isEmpty
+          ? null
+          : _referenceController.text.trim(),
+      paymentTerms: _paymentTerms,
+      customerId: _customerId,
+      customerName: _customerNameController.text.trim(),
+      customerAttention: _customerAttentionController.text.trim().isEmpty
+          ? null
+          : _customerAttentionController.text.trim(),
+      customerPhone: _customerPhoneController.text.trim().isEmpty
+          ? null
+          : _customerPhoneController.text.trim(),
+      customerEmail: _customerEmailController.text.trim().isEmpty
+          ? null
+          : _customerEmailController.text.trim(),
+      customerAddress: _customerAddressController.text.trim().isEmpty
+          ? null
+          : _customerAddressController.text.trim(),
+      customerTin: _customerTinController.text.trim().isEmpty
+          ? null
+          : _customerTinController.text.trim(),
+      currency: org?.currency ?? 'TZS',
+      issueDate: _issueDate,
+      dueDate: _dueDate,
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+      paymentInstructions: _paymentInstructionsController.text.trim().isEmpty
+          ? null
+          : _paymentInstructionsController.text.trim(),
+      authorizedSignatoryName: _signatoryNameController.text.trim().isEmpty
+          ? null
+          : _signatoryNameController.text.trim(),
+      authorizedSignatoryTitle: _signatoryTitleController.text.trim().isEmpty
+          ? null
+          : _signatoryTitleController.text.trim(),
+      status: status,
+      subtotal: _subtotal,
+      discountAmount: _invoiceDiscount,
+      taxAmount: 0,
+      totalAmount: _totalAmount,
+      amountPaid: _initialPaid,
+      balanceDue: _balanceDue,
+      paymentMethod: _hasInitialDeposit ? _initialPaymentMethod : null,
+      paymentReference: _hasInitialDeposit &&
+              _initialPaymentReferenceController.text.trim().isNotEmpty
+          ? _initialPaymentReferenceController.text.trim()
+          : null,
+      lines: invoiceLines,
+      isSynced: false,
+    );
   }
 
   void _applyPaymentTermPreset(String term, int? days) {
@@ -483,60 +560,81 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                       _SectionHeader(
                         icon: Icons.person_outline,
                         title: isSw
-                            ? '2. Taarifa za Mteja (Bill To)'
-                            : '2. Client ("Bill To") Details',
+                            ? '2. Taarifa za Mteja / Mpokeaji (Bill To)'
+                            : '2. Receiver ("Bill To") Details',
                       ),
                       const SizedBox(height: 10),
-                      DropdownButtonFormField<String>(
-                        initialValue: _customerId,
-                        isExpanded: true,
-                        dropdownColor: cardBg,
-                        style: TextStyle(
-                          color: textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: loc.invoiceCustomer,
-                          prefixIcon:
-                              const Icon(Icons.people_alt_outlined, size: 18),
-                        ),
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Text(
-                              loc.invoiceWalkIn,
-                              style: TextStyle(color: textPrimary),
+                      if (customerIds.isNotEmpty) ...[
+                        DropdownButtonFormField<String>(
+                          key: ValueKey(_customerId),
+                          initialValue: customerIds.containsKey(_customerId)
+                              ? _customerId
+                              : null,
+                          isExpanded: true,
+                          dropdownColor: cardBg,
+                          style: TextStyle(
+                            color: textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: isSw
+                                ? 'Chagua Mteja Aliyehifadhiwa (Hiari)'
+                                : 'Select Saved Customer (Optional)',
+                            prefixIcon: const Icon(
+                              Icons.people_alt_outlined,
+                              size: 18,
                             ),
                           ),
-                          for (final entry in customerIds.entries)
+                          items: [
                             DropdownMenuItem<String>(
-                              value: entry.key,
+                              value: null,
                               child: Text(
-                                entry.value,
+                                isSw
+                                    ? 'Mteja Mpya (Jaza taarifa hapa chini)'
+                                    : 'New / Custom Receiver (Enter details below)',
                                 style: TextStyle(color: textPrimary),
                               ),
                             ),
-                        ],
-                        onChanged: (value) =>
-                            _onSelectCustomer(value, customerItems),
-                      ),
-                      const SizedBox(height: 10),
+                            for (final entry in customerIds.entries)
+                              DropdownMenuItem<String>(
+                                value: entry.key,
+                                child: Text(
+                                  entry.value,
+                                  style: TextStyle(color: textPrimary),
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) =>
+                              _onSelectCustomer(value, customerItems),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       Row(
                         children: [
                           Expanded(
                             flex: 3,
                             child: TextField(
                               controller: _customerNameController,
-                              onChanged: (_) => setState(() {}),
+                              onChanged: (val) {
+                                final selectedName = _customerId != null
+                                    ? customerIds[_customerId]
+                                    : null;
+                                setState(() {
+                                  if (selectedName != null &&
+                                      val.trim() != selectedName.trim()) {
+                                    _customerId = null;
+                                  }
+                                });
+                              },
                               style: TextStyle(
                                 color: textPrimary,
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: InputDecoration(
                                 labelText: isSw
-                                    ? 'Jina la Mteja / Kampuni'
-                                    : 'Client / Company Name',
+                                    ? 'Jina la Mteja / Kampuni *'
+                                    : 'Receiver / Company Name *',
                                 hintText: isSw
                                     ? 'Mfano: Kilimanjaro Logistics Ltd'
                                     : 'e.g. Acme Builders Ltd',
@@ -549,109 +647,121 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                             child: TextField(
                               controller: _customerPhoneController,
                               keyboardType: TextInputType.phone,
+                              onChanged: (_) => setState(() {}),
                               style: TextStyle(
                                 color: textPrimary,
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: InputDecoration(
                                 labelText:
-                                    isSw ? 'Simu ya Mteja' : 'Client Phone',
+                                    isSw ? 'Simu ya Mteja' : 'Receiver Phone',
                                 hintText: '+255...',
                               ),
                             ),
                           ),
                         ],
                       ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: () => setState(
-                            () =>
-                                _showExtraClientFields = !_showExtraClientFields,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: _customerAddressController,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: isSw
+                                    ? 'Anwani / Mahali pa Mteja'
+                                    : 'Receiver Address / Location',
+                                hintText: isSw
+                                    ? 'Mfano: Sinza Mori, Dar es Salaam'
+                                    : 'e.g. Plot 42, Nyerere Rd, Dar es Salaam',
+                              ),
+                            ),
                           ),
-                          icon: Icon(
-                            _showExtraClientFields
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            size: 18,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: _customerTinController,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText:
+                                    isSw ? 'TIN ya Mteja' : 'Receiver TIN',
+                                hintText: '123-456-789',
+                              ),
+                            ),
                           ),
-                          label: Text(
-                            _showExtraClientFields
-                                ? (isSw
-                                    ? 'Ficha TIN, Anwani & Barua Pepe'
-                                    : 'Hide Client TIN, Address & Email')
-                                : (isSw
-                                    ? 'Ongeza TIN ya Mteja, Anwani & Mhusika'
-                                    : 'Add Client TIN, Attention, Email & Address'),
-                          ),
-                        ),
+                        ],
                       ),
-                      if (_showExtraClientFields) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _customerAttentionController,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: isSw
+                                    ? 'Kwa Uangalizi wa (Attn)'
+                                    : 'Attention / Contact Person',
+                                hintText: isSw
+                                    ? 'Mfano: Meneja Manunuzi'
+                                    : 'e.g. Procurement Manager',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: _customerEmailController,
+                              keyboardType: TextInputType.emailAddress,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: isSw
+                                    ? 'Barua Pepe ya Mteja'
+                                    : 'Receiver Email',
+                                hintText: 'client@company.co.tz',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_customerNameController.text.trim().isEmpty) ...[
+                        const SizedBox(height: 8),
                         Row(
                           children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _customerTinController,
-                                style: TextStyle(
-                                  color: textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText:
-                                      isSw ? 'TIN ya Mteja' : 'Client TIN',
-                                  hintText: '123-456-789',
-                                ),
-                              ),
+                            const Icon(
+                              Icons.info_outline,
+                              size: 15,
+                              color: AppColors.primary,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 6),
                             Expanded(
-                              child: TextField(
-                                controller: _customerAttentionController,
+                              child: Text(
+                                isSw
+                                    ? 'Andika jina la mteja au kampuni kuendelea hatua inayofuata.'
+                                    : 'Enter the receiver or company name to continue to the next step.',
                                 style: TextStyle(
-                                  color: textPrimary,
+                                  fontSize: 12,
+                                  color: textSecondary,
                                   fontWeight: FontWeight.w500,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: isSw
-                                      ? 'Kwa Uangalizi wa (Attn)'
-                                      : 'Attention / Contact Person',
-                                  hintText: isSw
-                                      ? 'Mfano: Meneja Manunuzi'
-                                      : 'e.g. Procurement Manager',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _customerEmailController,
-                                keyboardType: TextInputType.emailAddress,
-                                style: TextStyle(
-                                  color: textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: isSw
-                                      ? 'Barua Pepe ya Mteja'
-                                      : 'Client Email',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                controller: _customerAddressController,
-                                style: TextStyle(
-                                  color: textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText:
-                                      isSw ? 'Anwani ya Mteja' : 'Client Address',
                                 ),
                               ),
                             ),
@@ -960,21 +1070,17 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
             if (_step == 3) ...[
               _ReviewCard(
                 isSwahili: isSw,
-                organization: org,
-                customerName: _customerNameController.text.trim(),
-                documentTitle: _documentTitle,
-                lineCount: _lines
-                    .where((l) => l.description.text.trim().isNotEmpty)
-                    .length,
-                subtotal: _subtotal,
-                discount: _invoiceDiscount,
-                total: _totalAmount,
-                paid: _initialPaid,
-                balance: _balanceDue,
-                paymentInstructions: _paymentInstructionsController.text.trim(),
-                notes: _notesController.text.trim(),
+                organization: org ?? const Organization(),
+                draftInvoice: _buildDraftPreviewInvoice(org),
                 onEditCustomer: () => setState(() => _step = 0),
                 onEditItems: () => setState(() => _step = 1),
+                onEditPayment: () => setState(() => _step = 2),
+                onConfigureBranding: () async {
+                  await showInvoiceBrandingSheet(context);
+                  if (mounted) {
+                    setState(() => _prefilledFromOrg = false);
+                  }
+                },
               ),
             ],
 
@@ -1758,162 +1864,119 @@ class _ReviewCard extends StatelessWidget {
   const _ReviewCard({
     required this.isSwahili,
     required this.organization,
-    required this.customerName,
-    required this.documentTitle,
-    required this.lineCount,
-    required this.subtotal,
-    required this.discount,
-    required this.total,
-    required this.paid,
-    required this.balance,
-    required this.paymentInstructions,
-    required this.notes,
+    required this.draftInvoice,
     required this.onEditCustomer,
     required this.onEditItems,
+    required this.onEditPayment,
+    required this.onConfigureBranding,
   });
 
   final bool isSwahili;
-  final Organization? organization;
-  final String customerName;
-  final String documentTitle;
-  final int lineCount;
-  final double subtotal;
-  final double discount;
-  final double total;
-  final double paid;
-  final double balance;
-  final String paymentInstructions;
-  final String notes;
+  final Organization organization;
+  final CustomerInvoice draftInvoice;
   final VoidCallback onEditCustomer;
   final VoidCallback onEditItems;
+  final VoidCallback onEditPayment;
+  final VoidCallback onConfigureBranding;
 
   @override
   Widget build(BuildContext context) {
     final textPrimary = AppColors.resolveTextPrimary(context);
     final textSecondary = AppColors.resolveTextSecondary(context);
+    final cardBg = AppColors.resolveCardBackground(context);
+    final borderColor = AppColors.resolveBorder(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    Widget row(String label, String value, {bool bold = false}) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: bold ? textPrimary : textSecondary,
-                  fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  color: textPrimary,
-                  fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-                ),
-              ),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          elevation: isDark ? 0 : 0.5,
+          color: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: borderColor),
           ),
-        );
-
-    return Card(
-      elevation: isDark ? 0 : 0.5,
-      color: AppColors.resolveCardBackground(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.resolveBorder(context)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              documentTitle,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${isSwahili ? 'Kutoka' : 'From'}: ${organization?.name ?? '-'}',
-              style: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 4),
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    '${isSwahili ? 'Kwa' : 'To'}: '
-                    '${customerName.isEmpty ? (isSwahili ? 'Mteja wa kawaida' : 'Walk-in customer') : customerName}',
-                    style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.visibility_outlined,
+                      size: 18,
+                      color: AppColors.primary,
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isSwahili
+                            ? 'Mwonekano wa Ankara (Hakikisha taarifa za mpokeaji na bidhaa kabla ya kuhifadhi)'
+                            : 'Live Invoice Preview (Verify receiver and item details before saving)',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  onPressed: onEditCustomer,
-                  icon: Icon(
-                    Icons.edit_outlined,
-                    size: 18,
-                    color: AppColors.primary,
-                  ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: onEditCustomer,
+                      icon: const Icon(Icons.person_outline, size: 16),
+                      label: Text(
+                        isSwahili ? 'Hariri Mpokeaji' : 'Edit Receiver',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: onEditItems,
+                      icon: const Icon(
+                        Icons.format_list_numbered_outlined,
+                        size: 16,
+                      ),
+                      label: Text(
+                        isSwahili ? 'Hariri Bidhaa' : 'Edit Items',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: onEditPayment,
+                      icon: const Icon(Icons.payments_outlined, size: 16),
+                      label: Text(
+                        isSwahili ? 'Hariri Malipo' : 'Edit Payment',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isSwahili
+                      ? 'Namba rasmi ya ankara itatolewa punde utakapobonyeza Hifadhi Ankara.'
+                      : 'The official sequential invoice number will be assigned when you tap Save Invoice.',
+                  style: TextStyle(fontSize: 11, color: textSecondary),
                 ),
               ],
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '$lineCount ${isSwahili ? 'bidhaa / huduma' : 'item(s)'}',
-                    style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: onEditItems,
-                  icon: Icon(
-                    Icons.edit_outlined,
-                    size: 18,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(),
-            row(isSwahili ? 'Jumla Ndogo' : 'Subtotal', formatMoney(subtotal)),
-            if (discount > 0)
-              row(isSwahili ? 'Punguzo' : 'Discount', formatMoney(discount)),
-            row(isSwahili ? 'Jumla' : 'Total', formatMoney(total), bold: true),
-            if (paid > 0)
-              row(isSwahili ? 'Imelipwa' : 'Paid', formatMoney(paid)),
-            row(
-              isSwahili ? 'Salio' : 'Balance due',
-              formatMoney(balance),
-              bold: true,
-            ),
-            if (paymentInstructions.isNotEmpty) ...[
-              const Divider(),
-              Text(
-                paymentInstructions,
-                style: TextStyle(fontSize: 12.5, color: textSecondary),
-              ),
-            ],
-            if (notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                notes,
-                style: TextStyle(fontSize: 12.5, color: textSecondary),
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        InvoiceA4PreviewCard(
+          invoice: draftInvoice,
+          organization: organization,
+          isSwahili: isSwahili,
+          onConfigureBranding: onConfigureBranding,
+        ),
+      ],
     );
   }
 }

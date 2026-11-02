@@ -135,14 +135,111 @@ class InvoiceRepository {
       final response =
           await _apiClient.get<dynamic>(ApiRoutes.v1('/invoices/$id'));
       if (response.statusCode == 200 && response.data is Map) {
-        final invoice = CustomerInvoice.fromJson(
+        var invoice = CustomerInvoice.fromJson(
           Map<String, dynamic>.from(response.data as Map),
         );
         if (_cache != null) {
+          final existingRaw = await _cache.load('invoice_$id');
+          if (existingRaw != null) {
+            final local = CustomerInvoice.fromJson(existingRaw);
+            invoice = _mergePreservingLocalDetails(local, invoice);
+          }
           await _cache.save('invoice_$id', invoice.toJson());
         }
       }
     } catch (_) {}
+  }
+
+  static String? _preferNonEmpty(String? remote, String? local) {
+    if (remote != null && remote.trim().isNotEmpty) return remote.trim();
+    if (local != null && local.trim().isNotEmpty) return local.trim();
+    return null;
+  }
+
+  CustomerInvoice _mergePreservingLocalDetails(
+    CustomerInvoice local,
+    CustomerInvoice remote,
+  ) {
+    final mergedLines = remote.lines.isNotEmpty
+        ? List<InvoiceLine>.generate(remote.lines.length, (i) {
+            final rLine = remote.lines[i];
+            final lLine = i < local.lines.length ? local.lines[i] : null;
+            return InvoiceLine(
+              id: rLine.id,
+              productId: rLine.productId ?? lLine?.productId,
+              description: rLine.description,
+              unitOfMeasure: (rLine.unitOfMeasure.isNotEmpty &&
+                      rLine.unitOfMeasure != 'Pcs')
+                  ? rLine.unitOfMeasure
+                  : (lLine?.unitOfMeasure ?? rLine.unitOfMeasure),
+              quantity: rLine.quantity,
+              unitPrice: rLine.unitPrice,
+              discountAmount: rLine.discountAmount > 0
+                  ? rLine.discountAmount
+                  : (lLine?.discountAmount ?? 0),
+              taxRatePercent: rLine.taxRatePercent,
+              lineTotal: rLine.lineTotal,
+              taxAmount: rLine.taxAmount,
+            );
+          })
+        : local.lines;
+
+    return CustomerInvoice(
+      id: remote.id,
+      number: remote.number.isNotEmpty ? remote.number : local.number,
+      documentTitle: (remote.documentTitle.isNotEmpty &&
+              remote.documentTitle != 'INVOICE')
+          ? remote.documentTitle
+          : local.documentTitle,
+      referenceNumber:
+          _preferNonEmpty(remote.referenceNumber, local.referenceNumber),
+      paymentTerms: _preferNonEmpty(remote.paymentTerms, local.paymentTerms),
+      customerId: remote.customerId ?? local.customerId,
+      customerName: _preferNonEmpty(remote.customerName, local.customerName),
+      customerAttention: _preferNonEmpty(
+        remote.customerAttention,
+        local.customerAttention,
+      ),
+      customerPhone: _preferNonEmpty(remote.customerPhone, local.customerPhone),
+      customerEmail: _preferNonEmpty(remote.customerEmail, local.customerEmail),
+      customerAddress:
+          _preferNonEmpty(remote.customerAddress, local.customerAddress),
+      customerTin: _preferNonEmpty(remote.customerTin, local.customerTin),
+      currency: remote.currency.isNotEmpty ? remote.currency : local.currency,
+      issueDate: remote.issueDate,
+      dueDate: remote.dueDate ?? local.dueDate,
+      notes: _preferNonEmpty(remote.notes, local.notes),
+      paymentInstructions: _preferNonEmpty(
+        remote.paymentInstructions,
+        local.paymentInstructions,
+      ),
+      authorizedSignatoryName: _preferNonEmpty(
+        remote.authorizedSignatoryName,
+        local.authorizedSignatoryName,
+      ),
+      authorizedSignatoryTitle: _preferNonEmpty(
+        remote.authorizedSignatoryTitle,
+        local.authorizedSignatoryTitle,
+      ),
+      status: remote.status,
+      subtotal: remote.subtotal > 0 ? remote.subtotal : local.subtotal,
+      discountAmount: remote.discountAmount > 0
+          ? remote.discountAmount
+          : local.discountAmount,
+      taxAmount: remote.taxAmount,
+      totalAmount:
+          remote.totalAmount > 0 ? remote.totalAmount : local.totalAmount,
+      amountPaid: remote.amountPaid > 0 ? remote.amountPaid : local.amountPaid,
+      balanceDue: remote.totalAmount > 0 ? remote.balanceDue : local.balanceDue,
+      paymentMethod:
+          _preferNonEmpty(remote.paymentMethod, local.paymentMethod),
+      paymentReference:
+          _preferNonEmpty(remote.paymentReference, local.paymentReference),
+      paidAtUtc: remote.paidAtUtc ?? local.paidAtUtc,
+      lines: mergedLines,
+      payments: remote.payments.isNotEmpty ? remote.payments : local.payments,
+      isSynced: true,
+    );
   }
 
   /// Creates invoice adopting "Local-First, Remote-Sync" strategy.
@@ -376,10 +473,15 @@ class InvoiceRepository {
           final serverInvoice = CustomerInvoice.fromJson(
             Map<String, dynamic>.from(response.data as Map),
           );
-          final syncedInvoice = serverInvoice.copyWith(isSynced: true);
-          await _persistLocally(syncedInvoice);
+          final syncedInvoice =
+              _mergePreservingLocalDetails(localInvoice, serverInvoice);
+          await _persistLocally(
+            syncedInvoice,
+            replacedId:
+                syncedInvoice.id != localInvoice.id ? localInvoice.id : null,
+          );
           if (_queue != null) {
-            await _queue.markSynced(clientId, serverInvoice.number);
+            await _queue.markSynced(clientId, syncedInvoice.number);
           }
           return syncedInvoice;
         }
@@ -407,8 +509,8 @@ class InvoiceRepository {
     }
 
     if (localCurrent != null) {
-      final newPaid =
-          (localCurrent.amountPaid + amount).clamp(0.0, localCurrent.totalAmount);
+      final newPaid = (localCurrent.amountPaid + amount)
+          .clamp(0.0, localCurrent.totalAmount);
       final newBalance = localCurrent.totalAmount - newPaid;
       final newStatus =
           newBalance <= 0 ? InvoiceStatus.paid : InvoiceStatus.partiallyPaid;
@@ -416,15 +518,18 @@ class InvoiceRepository {
         status: newStatus,
         amountPaid: newPaid,
         balanceDue: newBalance,
-        paymentMethod:
-            (method != null && method.isNotEmpty) ? method : localCurrent.paymentMethod,
+        paymentMethod: (method != null && method.isNotEmpty)
+            ? method
+            : localCurrent.paymentMethod,
         paymentReference: (reference != null && reference.isNotEmpty)
             ? reference
             : localCurrent.paymentReference,
-        paidAtUtc:
-            newStatus == InvoiceStatus.paid ? DateTime.now() : localCurrent.paidAtUtc,
+        paidAtUtc: newStatus == InvoiceStatus.paid
+            ? DateTime.now()
+            : localCurrent.paidAtUtc,
         isSynced: false,
       );
+      localCurrent = updatedLocal;
       await _persistLocally(updatedLocal);
     }
 
@@ -438,9 +543,13 @@ class InvoiceRepository {
         },
       );
       if (response.statusCode == 200 && response.data is Map) {
-        final serverUpdated = CustomerInvoice.fromJson(
+        var serverUpdated = CustomerInvoice.fromJson(
           Map<String, dynamic>.from(response.data as Map),
         ).copyWith(isSynced: true);
+        if (localCurrent != null) {
+          serverUpdated =
+              _mergePreservingLocalDetails(localCurrent, serverUpdated);
+        }
         await _persistLocally(serverUpdated);
         return serverUpdated;
       }
@@ -461,8 +570,11 @@ class InvoiceRepository {
       final cached = await _cache.load('invoice_$id');
       if (cached != null) {
         localCurrent = CustomerInvoice.fromJson(cached);
-        final updated =
-            localCurrent.copyWith(status: InvoiceStatus.voided, isSynced: false);
+        final updated = localCurrent.copyWith(
+          status: InvoiceStatus.voided,
+          isSynced: false,
+        );
+        localCurrent = updated;
         await _persistLocally(updated);
       }
     }
@@ -472,9 +584,13 @@ class InvoiceRepository {
         ApiRoutes.v1('/invoices/$id/void'),
       );
       if (response.statusCode == 200 && response.data is Map) {
-        final serverUpdated = CustomerInvoice.fromJson(
+        var serverUpdated = CustomerInvoice.fromJson(
           Map<String, dynamic>.from(response.data as Map),
         ).copyWith(isSynced: true);
+        if (localCurrent != null) {
+          serverUpdated =
+              _mergePreservingLocalDetails(localCurrent, serverUpdated);
+        }
         await _persistLocally(serverUpdated);
         return serverUpdated;
       }
@@ -555,18 +671,29 @@ class InvoiceRepository {
     }
   }
 
-  Future<void> _persistLocally(CustomerInvoice invoice) async {
+  Future<void> _persistLocally(
+    CustomerInvoice invoice, {
+    String? replacedId,
+  }) async {
     if (_cache == null) return;
     await _cache.save('invoice_${invoice.id}', invoice.toJson());
+    if (replacedId != null && replacedId != invoice.id) {
+      await _cache.save('invoice_$replacedId', invoice.toJson());
+    }
     final listDoc = await _cache.load(_cacheKey);
     final existing = <CustomerInvoiceSummary>[];
     if (listDoc != null && listDoc['items'] is List) {
       for (final raw in (listDoc['items'] as List)) {
         if (raw is Map) {
           try {
-            existing.add(
-              CustomerInvoiceSummary.fromJson(Map<String, dynamic>.from(raw)),
-            );
+            final item =
+                CustomerInvoiceSummary.fromJson(Map<String, dynamic>.from(raw));
+            if (replacedId != null &&
+                replacedId != invoice.id &&
+                item.id == replacedId) {
+              continue;
+            }
+            existing.add(item);
           } catch (_) {}
         }
       }
@@ -591,21 +718,75 @@ class InvoiceRepository {
   }) async {
     if (_cache == null) return serverItems;
     final listDoc = await _cache.load(_cacheKey);
-    if (listDoc == null || listDoc['items'] is! List) return serverItems;
-    final serverIds = {for (final item in serverItems) item.id};
-    final localOnly = <CustomerInvoiceSummary>[];
-    for (final raw in (listDoc['items'] as List)) {
-      if (raw is Map) {
-        try {
-          final item =
-              CustomerInvoiceSummary.fromJson(Map<String, dynamic>.from(raw));
-          if (!serverIds.contains(item.id)) {
-            localOnly.add(item);
-          }
-        } catch (_) {}
+    final cachedById = <String, CustomerInvoiceSummary>{};
+    if (listDoc != null && listDoc['items'] is List) {
+      for (final raw in (listDoc['items'] as List)) {
+        if (raw is Map) {
+          try {
+            final item =
+                CustomerInvoiceSummary.fromJson(Map<String, dynamic>.from(raw));
+            cachedById[item.id] = item;
+          } catch (_) {}
+        }
       }
     }
-    final combined = [...localOnly, ...serverItems];
+
+    final enrichedServerItems = <CustomerInvoiceSummary>[];
+    for (final sItem in serverItems) {
+      final cachedSummary = cachedById[sItem.id];
+      String? resolvedCustomerName =
+          _preferNonEmpty(sItem.customerName, cachedSummary?.customerName);
+      String? resolvedReference = _preferNonEmpty(
+        sItem.referenceNumber,
+        cachedSummary?.referenceNumber,
+      );
+      String resolvedTitle = (sItem.documentTitle.isNotEmpty &&
+              sItem.documentTitle != 'INVOICE')
+          ? sItem.documentTitle
+          : (cachedSummary?.documentTitle ?? sItem.documentTitle);
+
+      if (resolvedCustomerName == null) {
+        final fullRaw = await _cache.load('invoice_${sItem.id}');
+        if (fullRaw != null) {
+          try {
+            final full = CustomerInvoice.fromJson(fullRaw);
+            resolvedCustomerName =
+                _preferNonEmpty(resolvedCustomerName, full.customerName);
+            resolvedReference =
+                _preferNonEmpty(resolvedReference, full.referenceNumber);
+            if (resolvedTitle == 'INVOICE' && full.documentTitle.isNotEmpty) {
+              resolvedTitle = full.documentTitle;
+            }
+          } catch (_) {}
+        }
+      }
+
+      enrichedServerItems.add(
+        CustomerInvoiceSummary(
+          id: sItem.id,
+          number: sItem.number,
+          customerId: sItem.customerId ?? cachedSummary?.customerId,
+          customerName: resolvedCustomerName,
+          status: sItem.status,
+          issueDate: sItem.issueDate,
+          dueDate: sItem.dueDate ?? cachedSummary?.dueDate,
+          totalAmount: sItem.totalAmount,
+          amountPaid: sItem.amountPaid,
+          balanceDue: sItem.balanceDue,
+          documentTitle: resolvedTitle,
+          referenceNumber: resolvedReference,
+          currency: sItem.currency,
+          isSynced: true,
+        ),
+      );
+    }
+
+    final serverIds = {for (final item in enrichedServerItems) item.id};
+    final localOnly = <CustomerInvoiceSummary>[
+      for (final item in cachedById.values)
+        if (!serverIds.contains(item.id)) item,
+    ];
+    final combined = [...localOnly, ...enrichedServerItems];
     return _filterList(combined, status: status, search: search);
   }
 

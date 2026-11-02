@@ -233,3 +233,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Invoices List & Detail Screens (`invoices_page.dart`, `invoice_detail_page.dart`, `uniform_command_bar.dart`, `invoice_branding_sheet.dart`) — Fix `FilterChip` text visibility, `_InvoiceTile` card/title/amount/status contrast, and replace invisible `AppColors.outline` (`#D1D5DB`) pending-sync badges with `AppColors.resolveTextSecondary(context)`.
 - [x] Task 5: Phone PDF Preview Tab Default (`invoice_preview_screen.dart`) — Default `_phoneTabController` to `initialIndex: 1` (PDF Canvas) so opening invoice preview on a phone immediately shows the rendered invoice PDF.
 - [x] Task 6: Bump version to `1.0.0+79`, commit, push to `feature/invoice-delivery`, and trigger remote GitHub Actions `build-clients.yml`.
+
+## Implementation Plan — Invoice Receiver Details Persistence, Walk-In Removal & Executive Preview Overhaul (Build 80)
+- [x] Task 1: Remove "Walk-in customer" (`Mteja wa kawaida`) from `create_invoice_page.dart` and `TemplateQueries.cs`, make all Receiver ("Bill To") fields directly visible in Step 1, and require Receiver Name before continuing.
+- [x] Task 2: Add `_mergePreservingLocalDetails` in `invoice_repository.dart` so local non-empty receiver and branding fields (`customerName`, `customerAttention`, `customerPhone`, `customerEmail`, `customerAddress`, `customerTin`, `referenceNumber`, `paymentTerms`, `paymentInstructions`, `notes`, `authorizedSignatoryName`, `authorizedSignatoryTitle`) are never overwritten by partial server responses.
+- [x] Task 3: Render full live `InvoiceA4PreviewCard` in Step 4 (`_ReviewCard`) of `create_invoice_page.dart` with quick-edit buttons before saving.
+- [x] Task 4: Fix squished top action banner on phone screens in `invoice_detail_page.dart` and enhance structured Receiver ("Bill To") display in `invoice_a4_preview_card.dart`.
+- [x] Task 5: Upgrade `local_pdf_document_generator.dart` and `invoice_preview_screen.dart` to compile executive corporate A4 and 80mm thermal PDFs locally with logo, full receiver details, bank/mobile-money fallback, and signatory/stamp box inside a true A4 aspect-ratio frame.
+- [x] Task 6: Bump version to `1.0.0+80` in `pubspec.yaml` and `app_update_service.dart`, commit, push, and trigger remote CI/CD (`deploy-azure.yml` and `build-clients.yml`).
+

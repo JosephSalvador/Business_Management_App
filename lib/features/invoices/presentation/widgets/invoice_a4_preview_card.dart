@@ -266,7 +266,9 @@ class InvoiceA4PreviewCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isSwahili ? 'KWA MTEJA (BILL TO)' : 'BILL TO',
+                        isSwahili
+                            ? 'KWA MTEJA / MPOKEAJI (BILL TO)'
+                            : 'BILL TO (RECEIVER)',
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
@@ -278,27 +280,58 @@ class InvoiceA4PreviewCard extends StatelessWidget {
                       Text(
                         invoice.customerLabel,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 14.5,
                           fontWeight: FontWeight.w800,
                           color: _navy,
                         ),
                       ),
-                      if ((invoice.customerAttention?.trim().isNotEmpty ??
-                              false) ||
-                          (invoice.customerTin?.trim().isNotEmpty ?? false) ||
-                          (invoice.customerPhone?.trim().isNotEmpty ?? false) ||
+                      if (invoice.customerAttention != null &&
+                          invoice.customerAttention!.trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            '${isSwahili ? "Kwa Uangalizi wa (Attn)" : "Attn"}: ${invoice.customerAttention!.trim()}',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: _slate700,
+                            ),
+                          ),
+                        ),
+                      if (invoice.customerAddress != null &&
+                          invoice.customerAddress!.trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            invoice.customerAddress!.trim(),
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: _slate700,
+                            ),
+                          ),
+                        ),
+                      if ((invoice.customerPhone?.trim().isNotEmpty ?? false) ||
                           (invoice.customerEmail?.trim().isNotEmpty ?? false) ||
-                          (invoice.customerAddress?.trim().isNotEmpty ??
-                              false)) ...[
+                          (invoice.customerTin?.trim().isNotEmpty ?? false)) ...[
                         const SizedBox(height: 4),
                         Wrap(
-                          spacing: 12,
+                          spacing: 14,
                           runSpacing: 4,
                           children: [
-                            if (invoice.customerAttention != null &&
-                                invoice.customerAttention!.trim().isNotEmpty)
+                            if (invoice.customerPhone != null &&
+                                invoice.customerPhone!.trim().isNotEmpty)
                               Text(
-                                'Attn: ${invoice.customerAttention!.trim()}',
+                                'Tel: ${invoice.customerPhone!.trim()}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: _slate700,
+                                ),
+                              ),
+                            if (invoice.customerEmail != null &&
+                                invoice.customerEmail!.trim().isNotEmpty)
+                              Text(
+                                'Email: ${invoice.customerEmail!.trim()}',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: _slate700,
@@ -311,41 +344,11 @@ class InvoiceA4PreviewCard extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
-                                  color: _slate700,
-                                ),
-                              ),
-                            if (invoice.customerPhone != null &&
-                                invoice.customerPhone!.trim().isNotEmpty)
-                              Text(
-                                'Tel: ${invoice.customerPhone!.trim()}',
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  color: _slate700,
-                                ),
-                              ),
-                            if (invoice.customerEmail != null &&
-                                invoice.customerEmail!.trim().isNotEmpty)
-                              Text(
-                                invoice.customerEmail!.trim(),
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  color: _slate700,
+                                  color: _teal,
                                 ),
                               ),
                           ],
                         ),
-                        if (invoice.customerAddress != null &&
-                            invoice.customerAddress!.trim().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              invoice.customerAddress!.trim(),
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                color: _slate700,
-                              ),
-                            ),
-                          ),
                       ],
                     ],
                   ),

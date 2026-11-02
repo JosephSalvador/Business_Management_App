@@ -7,16 +7,14 @@ import 'package:pdf/pdf.dart' hide PdfDocument;
 import 'package:pdfx/pdfx.dart';
 import 'package:printing/printing.dart';
 
-import '../../../../core/network/connectivity_monitor.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
-import '../../../sales/data/sales_providers.dart'
-    show connectionQualityProvider;
 import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../data/invoice_providers.dart';
 import '../../domain/document_template.dart';
+import '../../domain/invoice.dart';
 import '../services/local_pdf_document_generator.dart';
 import '../widgets/commercial_palette_picker.dart';
 import '../widgets/print_profile_selector.dart';
@@ -28,6 +26,7 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
     required this.documentId,
     this.documentNumber = '',
     this.documentType = DocumentType.invoice,
+    this.initialInvoice,
     this.initialIsThermal = false,
     this.initialThemePrimaryHex = '#0F172A',
     this.initialThemeSecondaryHex = '#0D9488',
@@ -36,6 +35,7 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
   final String documentId;
   final String documentNumber;
   final DocumentType documentType;
+  final CustomerInvoice? initialInvoice;
   final bool initialIsThermal;
   final String initialThemePrimaryHex;
   final String initialThemeSecondaryHex;
@@ -70,7 +70,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     _isThermal = widget.initialIsThermal;
     _themePrimaryHex = widget.initialThemePrimaryHex;
     _themeSecondaryHex = widget.initialThemeSecondaryHex;
-    _fetchAndRenderPdf();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fetchAndRenderPdf();
+    });
   }
 
   @override
@@ -110,47 +112,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       _errorMessage = null;
     });
 
-    final connectionQuality = ref.read(connectionQualityProvider);
-    final isOffline = connectionQuality == ConnectionQuality.offline ||
-        connectionQuality == ConnectionQuality.unreachable;
-
-    if (!isOffline) {
-      try {
-        final repository = ref.read(documentTemplateRepositoryProvider);
-        final List<int> bytesList = widget.documentType == DocumentType.invoice
-            ? await repository.getInvoicePdfBytes(
-                widget.documentId,
-                isThermal: _isThermal,
-                primaryHex: _themePrimaryHex,
-              )
-            : await repository.getDeliveryNotePdfBytes(
-                widget.documentId,
-                isThermal: _isThermal,
-                primaryHex: _themePrimaryHex,
-              );
-
-        final pdfBytes = Uint8List.fromList(bytesList);
-
-        _pdfController?.dispose();
-        final controller = PdfController(
-          document: PdfDocument.openData(pdfBytes),
-        );
-
-        if (!mounted) return;
-
-        setState(() {
-          _rawPdfBytes = pdfBytes;
-          _pdfController = controller;
-          _isLoading = false;
-          _isSynced = true;
-        });
-        return;
-      } catch (_) {
-        // Network or server error: smoothly fall through to on-device native PDF compiler
-      }
-    }
-
-    // ON-DEVICE NATIVE PDF LAYOUT COMPILER (WebView-Free Offline Print Engine)
+    // ON-DEVICE NATIVE PDF LAYOUT COMPILER
+    // Compiles executive corporate A4 or 80mm thermal PDFs with logo,
+    // full receiver details, bank/mobile-money details, and QR code.
     try {
       final localCompiler = ref.read(localPdfDocumentGeneratorProvider);
       final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
@@ -162,8 +126,18 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       final Uint8List pdfBytes;
       bool isDocSynced = false;
       if (widget.documentType == DocumentType.invoice) {
-        final invoice =
-            await ref.read(invoiceRepositoryProvider).getById(widget.documentId);
+        CustomerInvoice invoice;
+        try {
+          invoice = await ref
+              .read(invoiceRepositoryProvider)
+              .getById(widget.documentId);
+        } catch (_) {
+          if (widget.initialInvoice != null) {
+            invoice = widget.initialInvoice!;
+          } else {
+            rethrow;
+          }
+        }
         isDocSynced = invoice.isSynced;
         pdfBytes = _isThermal
             ? await localCompiler.generateInvoiceThermal80mm(
@@ -671,63 +645,81 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       );
     }
 
-    final double targetWidth = _isThermal ? 320 : 640;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Center(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: targetWidth,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(_isThermal ? 4 : 8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-          border: Border.all(
-            color: isDark
-                ? const Color(0xFF475569)
-                : (_isThermal ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
-            width: _isThermal ? 2.0 : 1.0,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            PdfView(
-              controller: _pdfController!,
-              pageSnapping: false,
-            ),
-            Positioned(
-              bottom: 12,
-              right: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (isDark ? const Color(0xFF334155) : const Color(0xFF0F172A))
-                      .withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  _isThermal ? '80mm Roll' : 'A4 Sheet',
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double maxAvailWidth =
+            (constraints.maxWidth - 24).clamp(240.0, _isThermal ? 340.0 : 680.0);
+        final double aspectRatio = _isThermal ? 0.48 : (1 / 1.4142);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: maxAvailWidth,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(_isThermal ? 4 : 8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
+                ],
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF475569)
+                      : (_isThermal
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFFE2E8F0)),
+                  width: _isThermal ? 2.0 : 1.0,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: AspectRatio(
+                aspectRatio: aspectRatio,
+                child: Stack(
+                  children: [
+                    PdfView(
+                      controller: _pdfController!,
+                      pageSnapping: false,
+                    ),
+                    Positioned(
+                      bottom: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFF0F172A))
+                              .withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _isThermal ? '80mm Roll' : 'A4 Sheet',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
