@@ -173,13 +173,15 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: invoice.isSynced
-                ? AppColors.successContainer.withValues(alpha: 0.4)
-                : AppColors.neutralContainer,
+                ? (Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF064E3B).withValues(alpha: 0.45)
+                    : AppColors.successContainer.withValues(alpha: 0.6))
+                : AppColors.resolveSurfaceSecondary(context),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: invoice.isSynced
-                  ? AppColors.success.withValues(alpha: 0.3)
-                  : AppColors.outlineVariant,
+                  ? AppColors.success.withValues(alpha: 0.4)
+                  : AppColors.resolveBorder(context),
             ),
           ),
           child: Row(
@@ -189,7 +191,9 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                     ? Icons.check_circle_rounded
                     : Icons.access_time_rounded,
                 size: 16,
-                color: invoice.isSynced ? AppColors.success : AppColors.outline,
+                color: invoice.isSynced
+                    ? AppColors.success
+                    : AppColors.resolveTextSecondary(context),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -206,7 +210,9 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                     color: invoice.isSynced
-                        ? AppColors.onSuccessContainer
+                        ? (Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFFA7F3D0)
+                            : AppColors.onSuccessContainer)
                         : AppColors.resolveTextSecondary(context),
                   ),
                 ),
@@ -377,6 +383,7 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
+        backgroundColor: AppColors.resolveCardBackground(context),
         builder: (sheetContext) {
           return StatefulBuilder(
             builder: (sheetContext, setSheetState) {
@@ -393,20 +400,28 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                   children: [
                     Text(
                       loc.invoiceRecordPayment,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
+                        color: AppColors.resolveTextPrimary(sheetContext),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: amountController,
+                      style: TextStyle(
+                        color: AppColors.resolveTextPrimary(sheetContext),
+                        fontWeight: FontWeight.w600,
+                      ),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         labelText: loc.invoicePaymentAmount,
                         helperText:
                             '${loc.invoiceBalance}: ${formatMoney(invoice.balanceDue)}',
+                        helperStyle: TextStyle(
+                          color: AppColors.resolveTextSecondary(sheetContext),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -418,6 +433,18 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                           ChoiceChip(
                             label: Text(m),
                             selected: methodController.text == m,
+                            selectedColor: AppColors.primaryContainer,
+                            backgroundColor:
+                                AppColors.resolveSurfaceSecondary(sheetContext),
+                            labelStyle: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: methodController.text == m
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              color: methodController.text == m
+                                  ? AppColors.primary
+                                  : AppColors.resolveTextPrimary(sheetContext),
+                            ),
                             onSelected: (_) => setSheetState(
                               () => methodController.text = m,
                             ),
@@ -427,6 +454,9 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: referenceController,
+                      style: TextStyle(
+                        color: AppColors.resolveTextPrimary(sheetContext),
+                      ),
                       decoration: InputDecoration(
                         labelText: loc.invoicePaymentReference,
                         hintText: isSwahili

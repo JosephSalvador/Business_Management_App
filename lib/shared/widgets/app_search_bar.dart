@@ -19,14 +19,20 @@ class AppSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return TextField(
       controller: controller,
       onChanged: onChanged,
       autofocus: autofocus,
-      style: theme.textTheme.bodyMedium,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: colors.onSurface,
+      ),
       decoration: InputDecoration(
         hintText: hintText ?? 'Tafuta...',
-        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+        hintStyle: TextStyle(
+          fontSize: 14,
           color: colors.onSurfaceVariant,
         ),
         prefixIcon: Icon(
@@ -35,14 +41,18 @@ class AppSearchBar extends StatelessWidget {
           size: 20,
         ),
         filled: true,
-        fillColor: colors.surfaceContainerHigh,
+        fillColor: isDark ? colors.surfaceContainerHigh : colors.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: isDark ? colors.outline : colors.outline,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(
+            color: isDark ? colors.outline : colors.outline,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),

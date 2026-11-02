@@ -22,11 +22,12 @@ Future<void> showInvoiceBrandingSheet(
       org = await container.read(organizationRepositoryProvider).get();
     } catch (_) {}
   }
-  if (!context.mounted) return;
+      if (!context.mounted) return;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    backgroundColor: AppColors.resolveCardBackground(context),
     builder: (_) => InvoiceBrandingSheet(organization: org),
   );
 }
@@ -229,15 +230,19 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                         isSw
                             ? 'Nembo ya Kampuni na Mipangilio ya Ankara'
                             : 'Company Logo & Invoice Setup',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
+                          color: AppColors.resolveTextPrimary(context),
                         ),
                       ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
+                      icon: Icon(
+                        Icons.close,
+                        color: AppColors.resolveTextSecondary(context),
+                      ),
                     ),
                   ],
                 ),
@@ -665,9 +670,10 @@ class _SectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
+                  color: AppColors.resolveTextPrimary(context),
                 ),
               ),
               const SizedBox(height: 2),

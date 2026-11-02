@@ -66,7 +66,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
   @override
   void initState() {
     super.initState();
-    _phoneTabController = TabController(length: 2, vsync: this);
+    _phoneTabController = TabController(length: 2, vsync: this, initialIndex: 1);
     _isThermal = widget.initialIsThermal;
     _themePrimaryHex = widget.initialThemePrimaryHex;
     _themeSecondaryHex = widget.initialThemeSecondaryHex;

@@ -167,12 +167,13 @@ class AppTheme {
 
       // ── Cards ───────────────────────────────────────────────────
       cardTheme: CardThemeData(
-        elevation: 0,
+        elevation: 0.5,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         color: AppColors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.outlineVariant, width: 1),
+          side: const BorderSide(color: AppColors.outline, width: 1),
         ),
         margin: EdgeInsets.zero,
       ),
@@ -180,13 +181,15 @@ class AppTheme {
       // ── Input Fields ────────────────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: AppColors.surfaceContainer,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: const TextStyle(
-          color: AppColors.textTertiary,
+          color: AppColors.textSecondary,
           fontSize: 14,
         ),
+        prefixIconColor: AppColors.onSurfaceVariant,
+        suffixIconColor: AppColors.onSurfaceVariant,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.outline, width: 1),
@@ -208,11 +211,17 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.error, width: 2),
         ),
         labelStyle: const TextStyle(
-          color: AppColors.textSecondary,
+          color: AppColors.onSurfaceVariant,
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
         helperStyle: const TextStyle(
-          color: AppColors.textTertiary,
+          color: AppColors.textSecondary,
           fontSize: 12,
         ),
         errorStyle: const TextStyle(
@@ -384,13 +393,20 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.surfaceContainer,
         selectedColor: AppColors.primaryContainer,
-        side: const BorderSide(color: AppColors.outlineVariant),
+        checkmarkColor: AppColors.onPrimaryContainer,
+        side: const BorderSide(color: AppColors.outline),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
         labelStyle: const TextStyle(
           fontSize: 13,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: AppColors.onPrimaryContainer,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       ),
@@ -413,6 +429,11 @@ class AppTheme {
         subtitleTextStyle: TextStyle(
           fontSize: 13,
           color: AppColors.textSecondary,
+        ),
+        leadingAndTrailingTextStyle: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
         ),
         iconColor: AppColors.textSecondary,
       ),

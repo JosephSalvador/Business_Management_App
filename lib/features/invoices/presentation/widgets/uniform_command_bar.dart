@@ -86,8 +86,13 @@ class UniformCommandBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isSynced!
                       ? AppColors.successContainer
-                      : AppColors.outlineVariant.withValues(alpha: 0.3),
+                      : AppColors.resolveSurfaceSecondary(context),
                   borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSynced!
+                        ? AppColors.success.withValues(alpha: 0.3)
+                        : AppColors.resolveBorder(context),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -97,7 +102,9 @@ class UniformCommandBar extends StatelessWidget {
                           ? Icons.check_circle_rounded
                           : Icons.access_time_rounded,
                       size: 13,
-                      color: isSynced! ? AppColors.success : AppColors.outline,
+                      color: isSynced!
+                          ? AppColors.success
+                          : AppColors.resolveTextSecondary(context),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -110,7 +117,7 @@ class UniformCommandBar extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: isSynced!
                             ? AppColors.onSuccessContainer
-                            : AppColors.outline,
+                            : AppColors.resolveTextSecondary(context),
                       ),
                     ),
                   ],

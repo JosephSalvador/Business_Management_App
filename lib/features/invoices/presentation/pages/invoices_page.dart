@@ -315,9 +315,25 @@ class _StatusFilters extends ConsumerWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final (status, label) = filters[index];
+          final isSelected = selected == status;
           return FilterChip(
             label: Text(label),
-            selected: selected == status,
+            selected: isSelected,
+            selectedColor: AppColors.primaryContainer,
+            backgroundColor: AppColors.resolveCardBackground(context),
+            checkmarkColor: AppColors.primary,
+            side: BorderSide(
+              color: isSelected
+                  ? AppColors.primary
+                  : AppColors.resolveBorder(context),
+            ),
+            labelStyle: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+              color: isSelected
+                  ? AppColors.primary
+                  : AppColors.resolveTextPrimary(context),
+            ),
             onSelected: (_) {
               final controller = ref.read(invoicesControllerProvider.notifier);
               if (status == null) {
@@ -346,8 +362,15 @@ class _InvoiceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final overdue = invoice.isOverdue;
     final dateFmt = DateFormat('dd MMM yyyy');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Card(
+      elevation: isDark ? 0 : 0.5,
+      color: AppColors.resolveCardBackground(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.resolveBorder(context)),
+      ),
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -356,7 +379,7 @@ class _InvoiceTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
+                color: isDark
                     ? const Color(0xFF334155)
                     : Theme.of(context)
                         .colorScheme
@@ -367,7 +390,7 @@ class _InvoiceTile extends StatelessWidget {
               child: Text(
                 invoice.documentTitle.toUpperCase(),
                 style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark
+                  color: isDark
                       ? const Color(0xFFE2E8F0)
                       : Theme.of(context).colorScheme.primary,
                   fontSize: 9.5,
@@ -375,6 +398,7 @@ class _InvoiceTile extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(width: 8),
             Expanded(
               child: Row(
                 children: [
@@ -382,7 +406,11 @@ class _InvoiceTile extends StatelessWidget {
                     child: Text(
                       invoice.number,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.resolveTextPrimary(context),
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -401,7 +429,7 @@ class _InvoiceTile extends StatelessWidget {
                       size: 13,
                       color: invoice.isSynced
                           ? AppColors.success
-                          : AppColors.outline,
+                          : AppColors.resolveTextSecondary(context),
                     ),
                   ),
                 ],
@@ -447,7 +475,11 @@ class _InvoiceTile extends StatelessWidget {
           children: [
             Text(
               formatMoney(invoice.totalAmount),
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: AppColors.resolveTextPrimary(context),
+              ),
             ),
             const SizedBox(height: 2),
             Text(
@@ -481,8 +513,10 @@ String invoiceStatusLabel(BuildContext context, InvoiceStatus status) {
 }
 
 Color invoiceStatusColor(BuildContext context, InvoiceStatus status) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return switch (status) {
-    InvoiceStatus.unpaid => AppColors.resolveTextSecondary(context),
+    InvoiceStatus.unpaid =>
+      isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
     InvoiceStatus.partiallyPaid => AppColors.warning,
     InvoiceStatus.paid => AppColors.success,
     InvoiceStatus.voided => AppColors.resolveTextTertiary(context),

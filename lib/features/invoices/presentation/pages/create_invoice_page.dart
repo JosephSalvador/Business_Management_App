@@ -8,6 +8,7 @@ import '../../../../app/router.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
+import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../products/application/products_controller.dart';
 import '../../../products/domain/product.dart';
 import '../../../settings/application/settings_controller.dart';
@@ -271,6 +272,12 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       _syncDefaultsFromOrganization(org);
     }
 
+    final textPrimary = AppColors.resolveTextPrimary(context);
+    final textSecondary = AppColors.resolveTextSecondary(context);
+    final cardBg = AppColors.resolveCardBackground(context);
+    final borderColor = AppColors.resolveBorder(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.invoiceNewTitle),
@@ -287,551 +294,696 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        children: [
-          _WizardStepper(
-            step: _step,
-            isSwahili: isSw,
-            onTap: (i) {
-              if (i < _step) setState(() => _step = i);
-            },
-          ),
-          const SizedBox(height: 10),
-          if (org != null)
-            _SenderChip(organization: org, isSwahili: isSw),
-          const SizedBox(height: 12),
-
-          if (_step == 0) ...[
-          // 2. Document Type & Tracking Metadata Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionHeader(
-                    icon: Icons.description_outlined,
-                    title: isSw
-                        ? '1. Aina ya Hati & Tarehe'
-                        : '1. Document Type & Dates',
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      for (final docTitle in _documentTitles)
-                        ChoiceChip(
-                          label: Text(docTitle),
-                          selected: _documentTitle == docTitle,
-                          onSelected: (_) =>
-                              setState(() => _documentTitle = docTitle),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    isSw
-                        ? 'Masharti ya Malipo (Payment Terms)'
-                        : 'Payment Terms',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.resolveTextSecondary(context),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      for (final (term, days) in _paymentTermPresets)
-                        ChoiceChip(
-                          label: Text(term),
-                          selected: _paymentTerms == term,
-                          onSelected: (_) =>
-                              _applyPaymentTermPreset(term, days),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _issueDateController,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText:
-                                isSw ? 'Tarehe ya Kutolewa' : 'Issue Date',
-                            prefixIcon:
-                                const Icon(Icons.calendar_today, size: 18),
-                          ),
-                          onTap: _pickIssueDate,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _dueDateController,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: loc.invoiceDueDate,
-                            hintText: 'YYYY-MM-DD',
-                            prefixIcon:
-                                const Icon(Icons.event_outlined, size: 18),
-                          ),
-                          onTap: _pickDueDate,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _referenceController,
-                    decoration: InputDecoration(
-                      labelText: isSw
-                          ? 'Namba ya Kumbukumbu / LPO / Nukuu (Hiari)'
-                          : 'Reference / PO / Quote Number (Optional)',
-                      hintText: isSw
-                          ? 'Mfano: PO-2026-089 au Mkataba #12'
-                          : 'e.g. PO-2026-089 or Quote #104',
-                      prefixIcon: const Icon(Icons.tag, size: 18),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // 3. Client ("Bill To") Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionHeader(
-                    icon: Icons.person_outline,
-                    title: isSw
-                        ? '2. Taarifa za Mteja (Bill To)'
-                        : '2. Client ("Bill To") Details',
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: _customerId,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: loc.invoiceCustomer,
-                      prefixIcon:
-                          const Icon(Icons.people_alt_outlined, size: 18),
-                    ),
-                    items: [
-                      DropdownMenuItem<String>(
-                        value: null,
-                        child: Text(loc.invoiceWalkIn),
-                      ),
-                      for (final entry in customerIds.entries)
-                        DropdownMenuItem<String>(
-                          value: entry.key,
-                          child: Text(entry.value),
-                        ),
-                    ],
-                    onChanged: (value) =>
-                        _onSelectCustomer(value, customerItems),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: _customerNameController,
-                          decoration: InputDecoration(
-                            labelText: isSw
-                                ? 'Jina la Mteja / Kampuni'
-                                : 'Client / Company Name',
-                            hintText: isSw
-                                ? 'Mfano: Kilimanjaro Logistics Ltd'
-                                : 'e.g. Acme Builders Ltd',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: _customerPhoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(
-                            labelText: isSw ? 'Simu ya Mteja' : 'Client Phone',
-                            hintText: '+255...',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => setState(
-                        () => _showExtraClientFields = !_showExtraClientFields,
-                      ),
-                      icon: Icon(
-                        _showExtraClientFields
-                            ? Icons.expand_less
-                            : Icons.expand_more,
-                        size: 18,
-                      ),
-                      label: Text(
-                        _showExtraClientFields
-                            ? (isSw
-                                ? 'Ficha TIN, Anwani & Barua Pepe'
-                                : 'Hide Client TIN, Address & Email')
-                            : (isSw
-                                ? 'Ongeza TIN ya Mteja, Anwani & Mhusika'
-                                : 'Add Client TIN, Attention, Email & Address'),
-                      ),
-                    ),
-                  ),
-                  if (_showExtraClientFields) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _customerTinController,
-                            decoration: InputDecoration(
-                              labelText: isSw ? 'TIN ya Mteja' : 'Client TIN',
-                              hintText: '123-456-789',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: _customerAttentionController,
-                            decoration: InputDecoration(
-                              labelText: isSw
-                                  ? 'Kwa Uangalizi wa (Attn)'
-                                  : 'Attention / Contact Person',
-                              hintText: isSw
-                                  ? 'Mfano: Meneja Manunuzi'
-                                  : 'e.g. Procurement Manager',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _customerEmailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              labelText:
-                                  isSw ? 'Barua Pepe ya Mteja' : 'Client Email',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: _customerAddressController,
-                            decoration: InputDecoration(
-                              labelText:
-                                  isSw ? 'Anwani ya Mteja' : 'Client Address',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          ],
-
-          if (_step == 1) ...[
-          // 4. Itemised Line Items Section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _SectionHeader(
-                icon: Icons.format_list_numbered_outlined,
-                title: isSw
-                    ? '3. Bidhaa au Huduma (Line Items)'
-                    : '3. Itemised Products / Services',
-              ),
-              TextButton.icon(
-                onPressed: _pickFromCatalogForNewLine,
-                icon: const Icon(Icons.inventory_2_outlined, size: 18),
-                label: Text(isSw ? 'Chagua Katalogi' : 'From Catalog'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          for (var i = 0; i < _lines.length; i++)
-            _LineCard(
-              index: i,
-              inputs: _lines[i],
-              unitsOfMeasure: _unitsOfMeasure,
-              canRemove: _lines.length > 1,
+      body: WaveBackground(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          children: [
+            _WizardStepper(
+              step: _step,
               isSwahili: isSw,
-              onChanged: () => setState(() {}),
-              onPickCatalog: () => _pickProductForLine(_lines[i]),
-              onRemove: () {
-                setState(() {
-                  final removed = _lines.removeAt(i);
-                  removed.dispose();
-                });
+              onTap: (i) {
+                if (i < _step) setState(() => _step = i);
               },
             ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () => setState(() => _lines.add(_LineInputs())),
-              icon: const Icon(Icons.add),
-              label: Text(loc.invoiceAddLine),
-            ),
-          ),
+            const SizedBox(height: 10),
+            if (org != null)
+              _SenderChip(organization: org, isSwahili: isSw),
+            const SizedBox(height: 12),
 
-          ],
+            if (_step == 0) ...[
+              // 2. Document Type & Tracking Metadata Card
+              Card(
+                elevation: isDark ? 0 : 0.5,
+                color: cardBg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: borderColor),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionHeader(
+                        icon: Icons.description_outlined,
+                        title: isSw
+                            ? '1. Aina ya Hati & Tarehe'
+                            : '1. Document Type & Dates',
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          for (final docTitle in _documentTitles)
+                            ChoiceChip(
+                              label: Text(docTitle),
+                              selected: _documentTitle == docTitle,
+                              selectedColor: AppColors.primaryContainer,
+                              backgroundColor:
+                                  AppColors.resolveSurfaceSecondary(context),
+                              side: BorderSide(
+                                color: _documentTitle == docTitle
+                                    ? AppColors.primary
+                                    : borderColor,
+                              ),
+                              labelStyle: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: _documentTitle == docTitle
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                color: _documentTitle == docTitle
+                                    ? AppColors.primary
+                                    : textPrimary,
+                              ),
+                              onSelected: (_) =>
+                                  setState(() => _documentTitle = docTitle),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        isSw
+                            ? 'Masharti ya Malipo (Payment Terms)'
+                            : 'Payment Terms',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          for (final (term, days) in _paymentTermPresets)
+                            ChoiceChip(
+                              label: Text(term),
+                              selected: _paymentTerms == term,
+                              selectedColor: AppColors.primaryContainer,
+                              backgroundColor:
+                                  AppColors.resolveSurfaceSecondary(context),
+                              side: BorderSide(
+                                color: _paymentTerms == term
+                                    ? AppColors.primary
+                                    : borderColor,
+                              ),
+                              labelStyle: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: _paymentTerms == term
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                color: _paymentTerms == term
+                                    ? AppColors.primary
+                                    : textPrimary,
+                              ),
+                              onSelected: (_) =>
+                                  _applyPaymentTermPreset(term, days),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _issueDateController,
+                              readOnly: true,
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText:
+                                    isSw ? 'Tarehe ya Kutolewa' : 'Issue Date',
+                                prefixIcon:
+                                    const Icon(Icons.calendar_today, size: 18),
+                              ),
+                              onTap: _pickIssueDate,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: _dueDateController,
+                              readOnly: true,
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: loc.invoiceDueDate,
+                                hintText: 'YYYY-MM-DD',
+                                prefixIcon:
+                                    const Icon(Icons.event_outlined, size: 18),
+                              ),
+                              onTap: _pickDueDate,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _referenceController,
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: isSw
+                              ? 'Namba ya Kumbukumbu / LPO / Nukuu (Hiari)'
+                              : 'Reference / PO / Quote Number (Optional)',
+                          hintText: isSw
+                              ? 'Mfano: PO-2026-089 au Mkataba #12'
+                              : 'e.g. PO-2026-089 or Quote #104',
+                          prefixIcon: const Icon(Icons.tag, size: 18),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-          if (_step == 2) ...[
-          // 5. Financial Summary & Initial Deposit Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              const SizedBox(height: 12),
+
+              // 3. Client ("Bill To") Card
+              Card(
+                elevation: isDark ? 0 : 0.5,
+                color: cardBg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: borderColor),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionHeader(
+                        icon: Icons.person_outline,
+                        title: isSw
+                            ? '2. Taarifa za Mteja (Bill To)'
+                            : '2. Client ("Bill To") Details',
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: _customerId,
+                        isExpanded: true,
+                        dropdownColor: cardBg,
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: loc.invoiceCustomer,
+                          prefixIcon:
+                              const Icon(Icons.people_alt_outlined, size: 18),
+                        ),
+                        items: [
+                          DropdownMenuItem<String>(
+                            value: null,
+                            child: Text(
+                              loc.invoiceWalkIn,
+                              style: TextStyle(color: textPrimary),
+                            ),
+                          ),
+                          for (final entry in customerIds.entries)
+                            DropdownMenuItem<String>(
+                              value: entry.key,
+                              child: Text(
+                                entry.value,
+                                style: TextStyle(color: textPrimary),
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            _onSelectCustomer(value, customerItems),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: _customerNameController,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: isSw
+                                    ? 'Jina la Mteja / Kampuni'
+                                    : 'Client / Company Name',
+                                hintText: isSw
+                                    ? 'Mfano: Kilimanjaro Logistics Ltd'
+                                    : 'e.g. Acme Builders Ltd',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: _customerPhoneController,
+                              keyboardType: TextInputType.phone,
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: InputDecoration(
+                                labelText:
+                                    isSw ? 'Simu ya Mteja' : 'Client Phone',
+                                hintText: '+255...',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => setState(
+                            () =>
+                                _showExtraClientFields = !_showExtraClientFields,
+                          ),
+                          icon: Icon(
+                            _showExtraClientFields
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 18,
+                          ),
+                          label: Text(
+                            _showExtraClientFields
+                                ? (isSw
+                                    ? 'Ficha TIN, Anwani & Barua Pepe'
+                                    : 'Hide Client TIN, Address & Email')
+                                : (isSw
+                                    ? 'Ongeza TIN ya Mteja, Anwani & Mhusika'
+                                    : 'Add Client TIN, Attention, Email & Address'),
+                          ),
+                        ),
+                      ),
+                      if (_showExtraClientFields) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _customerTinController,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText:
+                                      isSw ? 'TIN ya Mteja' : 'Client TIN',
+                                  hintText: '123-456-789',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _customerAttentionController,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: isSw
+                                      ? 'Kwa Uangalizi wa (Attn)'
+                                      : 'Attention / Contact Person',
+                                  hintText: isSw
+                                      ? 'Mfano: Meneja Manunuzi'
+                                      : 'e.g. Procurement Manager',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _customerEmailController,
+                                keyboardType: TextInputType.emailAddress,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: isSw
+                                      ? 'Barua Pepe ya Mteja'
+                                      : 'Client Email',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _customerAddressController,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText:
+                                      isSw ? 'Anwani ya Mteja' : 'Client Address',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
+            if (_step == 1) ...[
+              // 4. Itemised Line Items Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _SectionHeader(
-                    icon: Icons.calculate_outlined,
+                    icon: Icons.format_list_numbered_outlined,
                     title: isSw
-                        ? '4. Muhtasari wa Fedha & Malipo ya Awali'
-                        : '4. Financial Summary & Deposit',
+                        ? '3. Bidhaa au Huduma (Line Items)'
+                        : '3. Itemised Products / Services',
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(isSw ? 'Jumla Ndogo (Subtotal)' : 'Subtotal'),
-                      Text(
-                        formatMoney(_subtotal),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _invoiceDiscountController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      labelText: isSw
-                          ? 'Punguzo la Ankara (Invoice Discount)'
-                          : 'Invoice Discount (Optional)',
-                      prefixIcon:
-                          const Icon(Icons.discount_outlined, size: 18),
-                    ),
-                  ),
-                  const Divider(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        loc.invoiceTotal,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Text(
-                        formatMoney(_totalAmount),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      isSw
-                          ? 'Weka Malipo ya Awali / Advance (Deposit)'
-                          : 'Record Initial Deposit / Advance Paid',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    value: _hasInitialDeposit,
-                    onChanged: (val) =>
-                        setState(() => _hasInitialDeposit = val),
-                  ),
-                  if (_hasInitialDeposit) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _initialPaidController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) => setState(() {}),
-                            decoration: InputDecoration(
-                              labelText: isSw
-                                  ? 'Kiasi Kilicholipwa'
-                                  : 'Amount Paid Now',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _initialPaymentMethod,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: loc.invoicePaymentMethod,
-                            ),
-                            items: [
-                              for (final method in _paymentMethods)
-                                DropdownMenuItem(
-                                  value: method,
-                                  child: Text(method),
-                                ),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => _initialPaymentMethod = val);
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _initialPaymentReferenceController,
-                      decoration: InputDecoration(
-                        labelText: loc.invoicePaymentReference,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? const Color(0xFF1E293B)
-                          : Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFF334155)
-                            : Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isSw ? 'SALIO LA KULIPWA' : 'BALANCE DUE',
-                          style: TextStyle(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFF93C5FD)
-                                : Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
-                        ),
-                        Text(
-                          formatMoney(_balanceDue),
-                          style: TextStyle(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
+                  TextButton.icon(
+                    onPressed: _pickFromCatalogForNewLine,
+                    icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                    label: Text(isSw ? 'Chagua Katalogi' : 'From Catalog'),
                   ),
                 ],
               ),
-            ),
-          ),
+              const SizedBox(height: 8),
+              for (var i = 0; i < _lines.length; i++)
+                _LineCard(
+                  index: i,
+                  inputs: _lines[i],
+                  unitsOfMeasure: _unitsOfMeasure,
+                  canRemove: _lines.length > 1,
+                  isSwahili: isSw,
+                  onChanged: () => setState(() {}),
+                  onPickCatalog: () => _pickProductForLine(_lines[i]),
+                  onRemove: () {
+                    setState(() {
+                      final removed = _lines.removeAt(i);
+                      removed.dispose();
+                    });
+                  },
+                ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() => _lines.add(_LineInputs())),
+                  icon: const Icon(Icons.add),
+                  label: Text(loc.invoiceAddLine),
+                ),
+              ),
+            ],
 
-          const SizedBox(height: 12),
+            if (_step == 2) ...[
+              // 5. Financial Summary & Initial Deposit Card
+              Card(
+                elevation: isDark ? 0 : 0.5,
+                color: cardBg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: borderColor),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _SectionHeader(
+                        icon: Icons.calculate_outlined,
+                        title: isSw
+                            ? '4. Muhtasari wa Fedha & Malipo ya Awali'
+                            : '4. Financial Summary & Deposit',
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isSw ? 'Jumla Ndogo (Subtotal)' : 'Subtotal',
+                            style: TextStyle(
+                              color: textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            formatMoney(_subtotal),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _invoiceDiscountController,
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          labelText: isSw
+                              ? 'Punguzo la Ankara (Invoice Discount)'
+                              : 'Invoice Discount (Optional)',
+                          prefixIcon:
+                              const Icon(Icons.discount_outlined, size: 18),
+                        ),
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            loc.invoiceTotal,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: textPrimary,
+                            ),
+                          ),
+                          Text(
+                            formatMoney(_totalAmount),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          isSw
+                              ? 'Weka Malipo ya Awali / Advance (Deposit)'
+                              : 'Record Initial Deposit / Advance Paid',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: textPrimary,
+                          ),
+                        ),
+                        value: _hasInitialDeposit,
+                        onChanged: (val) =>
+                            setState(() => _hasInitialDeposit = val),
+                      ),
+                      if (_hasInitialDeposit) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _initialPaidController,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                onChanged: (_) => setState(() {}),
+                                decoration: InputDecoration(
+                                  labelText: isSw
+                                      ? 'Kiasi Kilicholipwa'
+                                      : 'Amount Paid Now',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _initialPaymentMethod,
+                                isExpanded: true,
+                                dropdownColor: cardBg,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: loc.invoicePaymentMethod,
+                                ),
+                                items: [
+                                  for (final method in _paymentMethods)
+                                    DropdownMenuItem(
+                                      value: method,
+                                      child: Text(
+                                        method,
+                                        style: TextStyle(color: textPrimary),
+                                      ),
+                                    ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() => _initialPaymentMethod = val);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _initialPaymentReferenceController,
+                          style: TextStyle(
+                            color: textPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: loc.invoicePaymentReference,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              isSw ? 'SALIO LA KULIPWA' : 'BALANCE DUE',
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFF93C5FD)
+                                    : Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              formatMoney(_balanceDue),
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-          _SenderInfoCard(
-            isSwahili: isSw,
-            organization: org,
-            onOpenProfile: () async {
-              await showInvoiceBrandingSheet(context);
-              if (mounted) {
-                setState(() => _prefilledFromOrg = false);
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _notesController,
-            maxLines: 2,
-            decoration: InputDecoration(
-              labelText: loc.invoiceNotes,
-              hintText: isSw
-                  ? 'Maelezo ya ziada kwa ankara hii (hiari)...'
-                  : 'Optional note for this invoice...',
-            ),
-          ),
+              const SizedBox(height: 12),
+
+              _SenderInfoCard(
+                isSwahili: isSw,
+                organization: org,
+                onOpenProfile: () async {
+                  await showInvoiceBrandingSheet(context);
+                  if (mounted) {
+                    setState(() => _prefilledFromOrg = false);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _notesController,
+                maxLines: 2,
+                style: TextStyle(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+                decoration: InputDecoration(
+                  labelText: loc.invoiceNotes,
+                  hintText: isSw
+                      ? 'Maelezo ya ziada kwa ankara hii (hiari)...'
+                      : 'Optional note for this invoice...',
+                ),
+              ),
+            ],
+
+            if (_step == 3) ...[
+              _ReviewCard(
+                isSwahili: isSw,
+                organization: org,
+                customerName: _customerNameController.text.trim(),
+                documentTitle: _documentTitle,
+                lineCount: _lines
+                    .where((l) => l.description.text.trim().isNotEmpty)
+                    .length,
+                subtotal: _subtotal,
+                discount: _invoiceDiscount,
+                total: _totalAmount,
+                paid: _initialPaid,
+                balance: _balanceDue,
+                paymentInstructions: _paymentInstructionsController.text.trim(),
+                notes: _notesController.text.trim(),
+                onEditCustomer: () => setState(() => _step = 0),
+                onEditItems: () => setState(() => _step = 1),
+              ),
+            ],
+
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: AppColors.error)),
+            ],
           ],
-
-          if (_step == 3) ...[
-            _ReviewCard(
-              isSwahili: isSw,
-              organization: org,
-              customerName: _customerNameController.text.trim(),
-              documentTitle: _documentTitle,
-              lineCount: _lines
-                  .where((l) => l.description.text.trim().isNotEmpty)
-                  .length,
-              subtotal: _subtotal,
-              discount: _invoiceDiscount,
-              total: _totalAmount,
-              paid: _initialPaid,
-              balance: _balanceDue,
-              paymentInstructions: _paymentInstructionsController.text.trim(),
-              notes: _notesController.text.trim(),
-              onEditCustomer: () => setState(() => _step = 0),
-              onEditItems: () => setState(() => _step = 1),
-            ),
-          ],
-
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: AppColors.error)),
-          ],
-        ],
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -974,6 +1126,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
     final selected = await showModalBottomSheet<Product>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: AppColors.resolveCardBackground(context),
       builder: (sheetCtx) => _CatalogPickerSheet(
         products: availableProducts,
         prices: availablePrices,
@@ -1078,9 +1231,10 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
+            color: AppColors.resolveTextPrimary(context),
           ),
         ),
       ],
@@ -1140,7 +1294,17 @@ class _LineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = AppColors.resolveTextPrimary(context);
+    final cardBg = AppColors.resolveCardBackground(context);
+
     return Card(
+      elevation: isDark ? 0 : 0.5,
+      color: cardBg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.resolveBorder(context)),
+      ),
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1153,7 +1317,7 @@ class _LineCard extends StatelessWidget {
                   height: 24,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
+                    color: isDark
                         ? const Color(0xFF334155)
                         : Theme.of(context)
                             .colorScheme
@@ -1164,7 +1328,7 @@ class _LineCard extends StatelessWidget {
                   child: Text(
                     '${index + 1}',
                     style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark
+                      color: isDark
                           ? const Color(0xFFE2E8F0)
                           : Theme.of(context).colorScheme.primary,
                       fontSize: 11,
@@ -1177,6 +1341,10 @@ class _LineCard extends StatelessWidget {
                   child: TextField(
                     controller: inputs.description,
                     onChanged: (_) => onChanged(),
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
                     decoration: InputDecoration(
                       labelText: loc.invoiceLineDescription,
                       suffixIcon: IconButton(
@@ -1191,7 +1359,10 @@ class _LineCard extends StatelessWidget {
                 ),
                 if (canRemove)
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: Icon(
+                      Icons.close,
+                      color: AppColors.resolveTextSecondary(context),
+                    ),
                     tooltip: loc.invoiceRemoveLine,
                     onPressed: onRemove,
                   ),
@@ -1207,12 +1378,21 @@ class _LineCard extends StatelessWidget {
                         ? inputs.unitOfMeasure
                         : unitsOfMeasure.first,
                     isExpanded: true,
+                    dropdownColor: cardBg,
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                     decoration: InputDecoration(
                       labelText: isSwahili ? 'Kipimo' : 'Unit',
                     ),
                     items: [
                       for (final u in unitsOfMeasure)
-                        DropdownMenuItem(value: u, child: Text(u)),
+                        DropdownMenuItem(
+                          value: u,
+                          child: Text(u, style: TextStyle(color: textPrimary)),
+                        ),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -1228,6 +1408,10 @@ class _LineCard extends StatelessWidget {
                   child: TextField(
                     controller: inputs.quantity,
                     onChanged: (_) => onChanged(),
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration:
@@ -1240,6 +1424,10 @@ class _LineCard extends StatelessWidget {
                   child: TextField(
                     controller: inputs.unitPrice,
                     onChanged: (_) => onChanged(),
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration:
@@ -1253,9 +1441,10 @@ class _LineCard extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: Text(
                 '${isSwahili ? "Jumla ya Mstari" : "Line Total"}: ${formatMoney(inputs.lineTotal)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
+                  color: textPrimary,
                 ),
               ),
             ),
@@ -1285,6 +1474,8 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final isSw = Localizations.localeOf(context).languageCode == 'sw';
+    final textPrimary = AppColors.resolveTextPrimary(context);
+    final textSecondary = AppColors.resolveTextSecondary(context);
     final filtered = _query.isEmpty
         ? widget.products
         : widget.products
@@ -1310,14 +1501,19 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                 isSw
                     ? 'Chagua Bidhaa au Huduma'
                     : 'Select Product or Service',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
+                  color: textPrimary,
                 ),
               ),
               const SizedBox(height: 10),
               TextField(
                 autofocus: true,
+                style: TextStyle(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
                 onChanged: (v) =>
                     setState(() => _query = v.trim().toLowerCase()),
                 decoration: InputDecoration(
@@ -1333,6 +1529,7 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                           isSw
                               ? 'Hakuna bidhaa iliyopatikana.'
                               : 'No matching products found.',
+                          style: TextStyle(color: textSecondary),
                         ),
                       )
                     : ListView.separated(
@@ -1347,16 +1544,23 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                           return ListTile(
                             title: Text(
                               product.name,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
                             ),
                             subtitle: product.sku != null
-                                ? Text('SKU: ${product.sku}')
+                                ? Text(
+                                    'SKU: ${product.sku}',
+                                    style: TextStyle(color: textSecondary),
+                                  )
                                 : null,
                             trailing: Text(
                               formatMoney(price),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
+                              ),
                             ),
                             onTap: () => Navigator.of(context).pop(product),
                           );
@@ -1506,7 +1710,15 @@ class _SenderInfoCard extends StatelessWidget {
             (org.mobileMoneyDetails?.trim().isNotEmpty ?? false));
     final hasName = org != null && (org.name?.trim().isNotEmpty ?? false);
     final complete = hasBank && hasName;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
+      elevation: isDark ? 0 : 0.5,
+      color: AppColors.resolveCardBackground(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.resolveBorder(context)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -1525,7 +1737,10 @@ class _SenderInfoCard extends StatelessWidget {
                     : (isSwahili
                         ? 'Wasifu wa kampuni haujakamilika. Ongeza benki / Lipa Namba ili ionekane kwenye ankara.'
                         : 'Company Profile is incomplete. Add bank / mobile money so it shows on invoices.'),
-                style: const TextStyle(fontSize: 12.5),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.resolveTextPrimary(context),
+                ),
               ),
             ),
             TextButton(
@@ -1574,15 +1789,26 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = AppColors.resolveTextPrimary(context);
+    final textSecondary = AppColors.resolveTextSecondary(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     Widget row(String label, String value, {bool bold = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 3),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label),
+              Text(
+                label,
+                style: TextStyle(
+                  color: bold ? textPrimary : textSecondary,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
               Text(
                 value,
                 style: TextStyle(
+                  color: textPrimary,
                   fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
@@ -1591,6 +1817,12 @@ class _ReviewCard extends StatelessWidget {
         );
 
     return Card(
+      elevation: isDark ? 0 : 0.5,
+      color: AppColors.resolveCardBackground(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.resolveBorder(context)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -1598,11 +1830,16 @@ class _ReviewCard extends StatelessWidget {
           children: [
             Text(
               documentTitle,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               '${isSwahili ? 'Kutoka' : 'From'}: ${organization?.name ?? '-'}',
+              style: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 4),
             Row(
@@ -1611,11 +1848,19 @@ class _ReviewCard extends StatelessWidget {
                   child: Text(
                     '${isSwahili ? 'Kwa' : 'To'}: '
                     '${customerName.isEmpty ? (isSwahili ? 'Mteja wa kawaida' : 'Walk-in customer') : customerName}',
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 IconButton(
                   onPressed: onEditCustomer,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
                 ),
               ],
             ),
@@ -1624,11 +1869,19 @@ class _ReviewCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '$lineCount ${isSwahili ? 'bidhaa / huduma' : 'item(s)'}',
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 IconButton(
                   onPressed: onEditItems,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
                 ),
               ],
             ),
@@ -1648,12 +1901,15 @@ class _ReviewCard extends StatelessWidget {
               const Divider(),
               Text(
                 paymentInstructions,
-                style: const TextStyle(fontSize: 12.5),
+                style: TextStyle(fontSize: 12.5, color: textSecondary),
               ),
             ],
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(notes, style: const TextStyle(fontSize: 12.5)),
+              Text(
+                notes,
+                style: TextStyle(fontSize: 12.5, color: textSecondary),
+              ),
             ],
           ],
         ),

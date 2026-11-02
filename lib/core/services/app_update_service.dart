@@ -60,7 +60,7 @@ class AppUpdateService {
   static final AppUpdateService instance = AppUpdateService._();
 
   /// Current compile-time fallback build number (incremented on each release).
-  static const int currentClientBuildNumber = 78;
+  static const int currentClientBuildNumber = 79;
   static const String currentClientVersionName = '1.0.0';
 
   final Dio _dio = Dio(
