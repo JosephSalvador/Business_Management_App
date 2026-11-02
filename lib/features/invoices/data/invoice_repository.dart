@@ -148,7 +148,67 @@ class InvoiceRepository {
   /// Creates invoice adopting "Local-First, Remote-Sync" strategy.
   /// Generates client UUID immediately, writes to local Drift SQLite cache with
   /// isSynced = false, enqueues to SyncQueue, and asynchronously attempts sync.
+  final Map<String, Future<CustomerInvoice>> _inFlightCreates = {};
+
   Future<CustomerInvoice> create({
+    String? id,
+    required List<InvoiceDraftLine> lines,
+    String? customerId,
+    String? customerName,
+    String? customerAttention,
+    String? customerPhone,
+    String? customerEmail,
+    String? customerAddress,
+    String? customerTin,
+    String currency = 'TZS',
+    String documentTitle = 'INVOICE',
+    String? referenceNumber,
+    String? paymentTerms,
+    DateTime? issueDate,
+    DateTime? dueDate,
+    double discountAmount = 0,
+    double initialAmountPaid = 0,
+    String? paymentMethod,
+    String? paymentReference,
+    String? paymentInstructions,
+    String? notes,
+    String? authorizedSignatoryName,
+    String? authorizedSignatoryTitle,
+  }) {
+    final clientId = id ?? _uuid.v4();
+    final existing = _inFlightCreates[clientId];
+    if (existing != null) return existing;
+    final future = _createOnce(
+      clientId: clientId,
+      lines: lines,
+      customerId: customerId,
+      customerName: customerName,
+      customerAttention: customerAttention,
+      customerPhone: customerPhone,
+      customerEmail: customerEmail,
+      customerAddress: customerAddress,
+      customerTin: customerTin,
+      currency: currency,
+      documentTitle: documentTitle,
+      referenceNumber: referenceNumber,
+      paymentTerms: paymentTerms,
+      issueDate: issueDate,
+      dueDate: dueDate,
+      discountAmount: discountAmount,
+      initialAmountPaid: initialAmountPaid,
+      paymentMethod: paymentMethod,
+      paymentReference: paymentReference,
+      paymentInstructions: paymentInstructions,
+      notes: notes,
+      authorizedSignatoryName: authorizedSignatoryName,
+      authorizedSignatoryTitle: authorizedSignatoryTitle,
+    );
+    _inFlightCreates[clientId] = future;
+    return future.whenComplete(() => _inFlightCreates.remove(clientId));
+  }
+
+  Future<CustomerInvoice> _createOnce({
+    required String clientId,
     required List<InvoiceDraftLine> lines,
     String? customerId,
     String? customerName,
@@ -172,7 +232,6 @@ class InvoiceRepository {
     String? authorizedSignatoryName,
     String? authorizedSignatoryTitle,
   }) async {
-    final clientId = _uuid.v4();
     final now = DateTime.now();
     final issued = issueDate ?? now;
 

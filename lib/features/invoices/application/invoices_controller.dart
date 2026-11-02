@@ -116,6 +116,7 @@ class InvoicesController extends Notifier<InvoicesState> {
   }
 
   Future<CustomerInvoice?> create({
+    String? id,
     required List<InvoiceDraftLine> lines,
     String? customerId,
     String? customerName,
@@ -141,6 +142,7 @@ class InvoicesController extends Notifier<InvoicesState> {
   }) async {
     try {
       final invoice = await _repository.create(
+        id: id,
         lines: lines,
         customerId: customerId,
         customerName: customerName,

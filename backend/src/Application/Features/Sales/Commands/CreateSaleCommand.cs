@@ -411,8 +411,37 @@ private async Task<ResolvedPrice?> ResolvePriceAsync(
         onDate,
         cancellationToken);
 
-    return PriceResolver.Resolve(
+    var resolved = PriceResolver.Resolve(
         candidates, product.Id, input.VariantId, branchId, PriceType.Retail, input.Quantity, onDate);
+
+    if (resolved is not null)
+    {
+        return resolved;
+    }
+
+    if (input.UnitPrice.HasValue && input.UnitPrice.Value > 0)
+    {
+        return new ResolvedPrice(
+            ProductPriceId: Guid.Empty,
+            PriceListId: priceList.Id,
+            Price: Round(input.UnitPrice.Value),
+            Currency: priceList.Currency,
+            PriceType: PriceType.Retail,
+            MinQuantity: input.Quantity);
+    }
+
+    if (product.CostPrice.HasValue && product.CostPrice.Value > 0)
+    {
+        return new ResolvedPrice(
+            ProductPriceId: Guid.Empty,
+            PriceListId: priceList.Id,
+            Price: Round(product.CostPrice.Value),
+            Currency: priceList.Currency,
+            PriceType: PriceType.Retail,
+            MinQuantity: input.Quantity);
+    }
+
+    return null;
 }
 
     private readonly Dictionary<Guid, string> _taxCategoryCache = new();

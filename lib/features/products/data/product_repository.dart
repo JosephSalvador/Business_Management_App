@@ -351,6 +351,24 @@ class ProductRepository {
         await _cache.save('product_${created.id}', created.toJson());
         await _appendProductToCache(created);
       }
+      if (_catalogDao != null) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf()) ?? 'unknown'
+            : 'unknown';
+        await _catalogDao.upsertProduct(CachedProductsCompanion(
+          tenantId: Value(tenantId),
+          productId: Value(created.id),
+          name: Value(created.name),
+          sku: Value(created.sku ?? ''),
+          barcode: Value(created.barcode ?? ''),
+          retailPrice: Value(retailPrice ?? created.costPrice ?? 0),
+          currency: const Value('TZS'),
+          status: const Value(LocalProductCodes.statusActive),
+          sellable: const Value(true),
+          productType: Value(created.productType),
+          fetchedAt: Value(DateTime.now().toUtc()),
+        ));
+      }
       return created;
     } on AppException catch (e) {
       if (remoteOnly ||
@@ -843,6 +861,16 @@ class ProductRepository {
       if (response.statusCode != 200) {
         throw ServerException('Imeshindikana kuhifadhi bei.');
       }
+      if (_catalogDao != null && priceType == 0) {
+        final tenantId = _tenantIdOf != null
+            ? (await _tenantIdOf()) ?? 'unknown'
+            : 'unknown';
+        await _catalogDao.updateRetailPrice(
+          tenantId: tenantId,
+          productId: productId,
+          retailPrice: price,
+        );
+      }
     } on AppException {
       if (remoteOnly) rethrow;
 
@@ -852,6 +880,14 @@ class ProductRepository {
       final branchId =
           _branchIdOf != null ? (await _branchIdOf()) ?? tenantId : tenantId;
       final deviceId = _deviceIdOf != null ? await _deviceIdOf() : '';
+
+      if (_catalogDao != null && priceType == 0) {
+        await _catalogDao.updateRetailPrice(
+          tenantId: tenantId,
+          productId: productId,
+          retailPrice: price,
+        );
+      }
 
       if (_queue != null) {
         await _queue.enqueue(

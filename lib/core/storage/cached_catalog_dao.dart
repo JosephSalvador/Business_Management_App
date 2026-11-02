@@ -313,6 +313,19 @@ class CachedCatalogDao {
     await _db.into(_db.cachedProducts).insertOnConflictUpdate(product);
   }
 
+  Future<void> updateRetailPrice({
+    required String tenantId,
+    required String productId,
+    required double retailPrice,
+  }) async {
+    await (_db.update(_db.cachedProducts)
+          ..where((t) => t.tenantId.equals(tenantId) & t.productId.equals(productId)))
+        .write(CachedProductsCompanion(
+      retailPrice: Value(retailPrice),
+      fetchedAt: Value(DateTime.now().toUtc()),
+    ));
+  }
+
   /// When the product catalog was last fully replaced via [replaceCatalog].
   /// (`replaceStockBalances` stamps its own `last_stock_refresh` key.)
   Future<DateTime?> lastRefresh() async {

@@ -107,6 +107,8 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
             ? total - _initialPaid
             : 0.0;
 
+    final hasUnpricedLines = cart.lines.any((l) => (l.unitPriceOverride ?? l.unitPrice) <= 0);
+
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
@@ -119,6 +121,33 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (hasUnpricedLines)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        Localizations.localeOf(context).languageCode == 'sw'
+                            ? 'Kuna bidhaa haina bei kwenye kikapu. Weka bei kwanza.'
+                            : 'There is an unpriced item in the cart. Please set its price.',
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Total
             Text(
               loc.posTotal,
@@ -317,6 +346,7 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
             FilledButton(
               onPressed: submitting ||
                       cart.isEmpty ||
+                      hasUnpricedLines ||
                       (isCash && isTenderedShort) ||
                       (_isCredit && _customerId == null)
                   ? null

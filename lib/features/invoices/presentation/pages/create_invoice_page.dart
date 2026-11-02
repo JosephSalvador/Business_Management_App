@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../app/providers.dart';
 import '../../../../app/router.dart';
@@ -91,6 +92,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   bool _prefilledFromOrg = false;
 
   bool _saving = false;
+  final String _invoiceId = const Uuid().v4();
   String? _error;
 
   @override
@@ -944,8 +946,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
+    _saving = true;
     setState(() {
-      _saving = true;
       _error = null;
     });
 
@@ -965,6 +968,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
         .toList(growable: false);
 
     final invoice = await ref.read(invoicesControllerProvider.notifier).create(
+          id: _invoiceId,
           lines: drafts,
           documentTitle: _documentTitle,
           referenceNumber: _referenceController.text,

@@ -259,6 +259,24 @@ class _PosPageState extends ConsumerState<PosPage> {
             unitPriceOverride: enteredPrice,
             quantity: quantity,
           );
+
+      // Persist the price to local catalog SQLite cache so next taps have the price automatically
+      final tenantId = ref.read(sessionContextProvider).$1;
+      if (tenantId != null) {
+        ref
+            .read(localSalesServiceProvider)
+            .catalog
+            .updateRetailPrice(
+              tenantId: tenantId,
+              productId: product.productId,
+              retailPrice: enteredPrice,
+            )
+            .then((_) {
+          try {
+            ref.read(posCatalogControllerProvider.notifier).load();
+          } catch (_) {}
+        }).ignore();
+      }
     }
   }
 
