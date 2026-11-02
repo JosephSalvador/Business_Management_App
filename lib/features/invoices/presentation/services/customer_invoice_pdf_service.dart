@@ -470,10 +470,9 @@ class CustomerInvoicePdfService {
     return pw.Container(
       width: double.infinity,
       padding: const pw.EdgeInsets.all(12),
-      decoration: pw.BoxDecoration(
+      decoration: const pw.BoxDecoration(
         color: _slate50,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-        border: const pw.Border(
+        border: pw.Border(
           left: pw.BorderSide(color: _navy, width: 3.5),
           top: pw.BorderSide(color: _slate200, width: 0.6),
           right: pw.BorderSide(color: _slate200, width: 0.6),
@@ -838,7 +837,7 @@ class CustomerInvoicePdfService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(
-                    '${dateFormat.format(p.paidAt.toLocal())}  •  ${p.paymentMethod}'
+                    '${dateFormat.format(p.paidAt.toLocal())}  |  ${p.paymentMethod}'
                     '${p.reference != null && p.reference!.trim().isNotEmpty ? " (${p.reference!.trim()})" : ""}',
                     style: const pw.TextStyle(fontSize: 8.5, color: _slate700),
                   ),
@@ -969,7 +968,7 @@ class CustomerInvoicePdfService {
                     ),
                   ),
                 pw.Text(
-                  '$signatoryTitle  •  ${isSwahili ? "Sahihi & Muhuri" : "Signature & Official Stamp"}',
+                  '$signatoryTitle  |  ${isSwahili ? "Sahihi & Muhuri" : "Signature & Official Stamp"}',
                   style: const pw.TextStyle(fontSize: 7.5, color: _slate500),
                 ),
               ],
@@ -1006,7 +1005,7 @@ class CustomerInvoicePdfService {
             ),
           ),
           pw.Text(
-            '${invoice.documentTitle} #${invoice.invoiceNumber}  •  '
+            '${invoice.documentTitle} #${invoice.invoiceNumber}  |  '
             '${isSwahili ? "Ukurasa" : "Page"} ${context.pageNumber} / ${context.pagesCount}',
             style: const pw.TextStyle(fontSize: 8, color: _slate500),
           ),

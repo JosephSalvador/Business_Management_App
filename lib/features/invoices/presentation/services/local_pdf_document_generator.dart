@@ -91,7 +91,7 @@ class LocalPdfDocumentGenerator {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text(
-                'Jolinx Business OS  •  $orgName',
+                'Jolinx Business OS  |  $orgName',
                 style: const pw.TextStyle(color: _slate500, fontSize: 8),
               ),
               pw.Text(

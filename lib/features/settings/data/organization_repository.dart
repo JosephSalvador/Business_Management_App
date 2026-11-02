@@ -149,7 +149,14 @@ class OrganizationRepository {
   }
 
   Future<Organization> update(Map<String, dynamic> body) async {
-    final current = await get();
+    Organization? cachedOrg;
+    if (_cache != null) {
+      final cached = await _cache.load(_cacheKey);
+      if (cached != null) {
+        cachedOrg = Organization.fromJson(cached);
+      }
+    }
+    final current = cachedOrg ?? const Organization();
     final optimistic = Organization(
       name: body.containsKey('name') ? body['name'] as String? : current.name,
       address: body.containsKey('address')
