@@ -13,6 +13,9 @@ import '../../../../shared/design_system/responsive.dart';
 import '../../../../shared/format/money.dart';
 import '../../application/dashboard_controller.dart';
 import '../widgets/revenue_line_chart.dart';
+import '../../../../app/router.dart';
+import '../../../capabilities/application/capabilities_controller.dart';
+import '../../../capabilities/domain/capabilities.dart';
 import '../../../notifications/presentation/widgets/notification_bell_button.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
@@ -641,47 +644,91 @@ class _SectionHeader extends StatelessWidget {
 
 // ── Quick Actions ────────────────────────────────────────────────
 
-class _QuickActions extends StatelessWidget {
+class _QuickActions extends ConsumerWidget {
   const _QuickActions({required this.loc});
   final AppLocalizations loc;
 
   @override
-  Widget build(BuildContext context) {
-    final actions = [
-      _ActionData(
-        Icons.point_of_sale_rounded,
-        loc.dashboardSellNow,
-        const Color(0xFF1565C0), // Blue
-        () => context.push('/pos'),
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabledModules = ref.watch(enabledModulesProvider);
+    final hasPos = enabledModules.contains(WorkspaceModule.pos);
+    final hasInvoicing = enabledModules.contains(WorkspaceModule.invoicing);
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
+
+    final actions = <_ActionData>[];
+
+    if (hasPos) {
+      actions.add(
+        _ActionData(
+          Icons.point_of_sale_rounded,
+          loc.dashboardSellNow,
+          const Color(0xFF1565C0), // Blue
+          () => context.push(Routes.pos),
+        ),
+      );
+    }
+
+    if (hasInvoicing) {
+      actions.add(
+        _ActionData(
+          Icons.post_add_rounded,
+          isSw ? 'Ankara Mpya' : 'New Invoice',
+          const Color(0xFF0D9488), // Deep Teal
+          () => context.push(Routes.invoiceNew),
+        ),
+      );
+    }
+
+    actions.add(
       _ActionData(
         Icons.person_add_alt_1_rounded,
         loc.dashboardAddCustomer,
-        const Color(0xFF00B894), // Teal
+        const Color(0xFF00B894), // Green Teal
         () => context.push('/customers/new'),
       ),
-      _ActionData(
-        Icons.receipt_long_rounded,
-        loc.dashboardAddExpense,
-        const Color(0xFFF59E0B), // Amber
-        () => context.push('/expenses/new'),
-      ),
-      _ActionData(
-        Icons.inventory_2_rounded,
-        loc.dashboardViewStock,
-        const Color(0xFF6C5CE7), // Purple
-        () => context.go('/home?tab=1'),
-      ),
-    ];
+    );
+
+    if (hasInvoicing && !hasPos) {
+      actions.add(
+        _ActionData(
+          Icons.receipt_long_outlined,
+          isSw ? 'Orodha ya Ankara' : 'Invoices',
+          const Color(0xFF6366F1), // Indigo
+          () => context.push(Routes.invoices),
+        ),
+      );
+    } else {
+      actions.add(
+        _ActionData(
+          Icons.receipt_long_rounded,
+          loc.dashboardAddExpense,
+          const Color(0xFFF59E0B), // Amber
+          () => context.push('/expenses/new'),
+        ),
+      );
+    }
+
+    if (actions.length < 4) {
+      actions.add(
+        _ActionData(
+          Icons.inventory_2_rounded,
+          loc.dashboardViewStock,
+          const Color(0xFF6C5CE7), // Purple
+          () => context.go('/home?tab=1'),
+        ),
+      );
+    }
+
+    final displayActions = actions.take(4).toList();
 
     return Row(
-      children: List.generate(actions.length, (i) {
-        final a = actions[i];
+      children: List.generate(displayActions.length, (i) {
+        final a = displayActions[i];
         return Expanded(
           child: Padding(
             padding: EdgeInsets.only(
               left: i == 0 ? 0 : 5,
-              right: i == actions.length - 1 ? 0 : 5,
+              right: i == displayActions.length - 1 ? 0 : 5,
             ),
             child: _ActionGridTile(data: a),
           ),
