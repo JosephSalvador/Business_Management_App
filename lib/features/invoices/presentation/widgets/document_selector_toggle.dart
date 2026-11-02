@@ -82,14 +82,14 @@ class _ToggleItem extends StatelessWidget {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
                   ]
                 : null,
             border: isSelected
-                ? Border.all(color: AppColors.primary.withOpacity(0.3), width: 1.5)
+                ? Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5)
                 : Border.all(color: Colors.transparent),
           ),
           child: Row(

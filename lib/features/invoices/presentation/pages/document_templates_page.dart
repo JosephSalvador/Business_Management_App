@@ -280,7 +280,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
+                        color: Colors.black.withValues(alpha: 0.12),
                         blurRadius: 16,
                         offset: const Offset(0, -4),
                       ),
@@ -686,7 +686,7 @@ class _FormSectionCard extends StatelessWidget {
         border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),

@@ -120,7 +120,7 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
                 border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: currentColor.withOpacity(0.3),
+                    color: currentColor.withValues(alpha: 0.3),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -158,7 +158,7 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: color.withOpacity(0.4),
+                            color: color.withValues(alpha: 0.4),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           )

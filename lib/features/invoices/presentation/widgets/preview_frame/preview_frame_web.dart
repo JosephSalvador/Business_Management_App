@@ -84,7 +84,7 @@ ${isThermal ? '@page { size: 80mm auto; margin: 0; } body { width: 80mm; margin:
           borderRadius: BorderRadius.circular(isThermal ? 4 : 8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -100,7 +100,7 @@ ${isThermal ? '@page { size: 80mm auto; margin: 0; } body { width: 80mm; margin:
             HtmlElementView(viewType: _currentViewType),
             if (isLoading)
               Container(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 child: const Center(
                   child: SizedBox(
                     width: 32,

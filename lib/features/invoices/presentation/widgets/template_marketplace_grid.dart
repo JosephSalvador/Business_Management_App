@@ -114,8 +114,8 @@ class _TemplateCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: isSelected
-                    ? const Color(0xFF0D9488).withOpacity(0.15)
-                    : Colors.black.withOpacity(0.04),
+                    ? const Color(0xFF0D9488).withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.04),
                 blurRadius: isSelected ? 12 : 6,
                 offset: const Offset(0, 3),
               ),
@@ -307,7 +307,7 @@ class _DefaultIllustration extends StatelessWidget {
             border: Border.all(color: const Color(0xFFCBD5E1)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -361,7 +361,7 @@ class _DefaultIllustration extends StatelessWidget {
           border: Border.all(color: const Color(0xFFCBD5E1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -380,7 +380,7 @@ class _DefaultIllustration extends StatelessWidget {
             const SizedBox(height: 6),
             Container(height: 1, color: const Color(0xFFE2E8F0)),
             const SizedBox(height: 6),
-            Container(height: 5, color: color.withOpacity(0.15)),
+            Container(height: 5, color: color.withValues(alpha: 0.15)),
             const SizedBox(height: 4),
             Row(
               children: [

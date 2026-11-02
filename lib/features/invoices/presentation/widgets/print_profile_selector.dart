@@ -130,7 +130,7 @@ class _ProfileCard extends StatelessWidget {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -164,7 +164,7 @@ class _ProfileCard extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.primary.withOpacity(0.1)
+                          ? AppColors.primary.withValues(alpha: 0.1)
                           : AppColors.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(4),
                     ),

@@ -173,12 +173,12 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: invoice.isSynced
-                ? AppColors.successContainer.withOpacity(0.4)
+                ? AppColors.successContainer.withValues(alpha: 0.4)
                 : AppColors.neutralContainer,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: invoice.isSynced
-                  ? AppColors.success.withOpacity(0.3)
+                  ? AppColors.success.withValues(alpha: 0.3)
                   : AppColors.outlineVariant,
             ),
           ),

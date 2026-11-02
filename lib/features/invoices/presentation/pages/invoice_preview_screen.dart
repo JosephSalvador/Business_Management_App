@@ -441,7 +441,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
+                        color: Colors.black.withValues(alpha: 0.12),
                         blurRadius: 16,
                         offset: const Offset(0, -4),
                       ),
@@ -570,7 +570,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           decoration: BoxDecoration(
             color: AppColors.primaryContainer,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,7 +667,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           borderRadius: BorderRadius.circular(_isThermal ? 4 : 8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
+              color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -692,7 +692,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withOpacity(0.8),
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
