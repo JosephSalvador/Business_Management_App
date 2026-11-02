@@ -177,5 +177,5 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Clean up unused imports and unused variables across `document_templates_page.dart`, `invoice_detail_page.dart`, `invoices_page.dart`, `customer_invoice_pdf_service.dart`, and `local_pdf_document_generator.dart`.
 - [x] Task 5: Replace deprecated `activeColor` with `activeThumbColor` in `document_templates_page.dart`.
 - [x] Task 6: Bump version code to `1.0.0+72` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 7: Commit and push changes to branch `feature/invoice-delivery`.
-- [ ] Task 8: Trigger GitHub Actions `build-clients.yml` with `deploy_target: production` and monitor until the release APK is published.
+- [x] Task 7: Commit and push changes to branch `feature/invoice-delivery`.
+- [x] Task 8: Trigger GitHub Actions `build-clients.yml` with `deploy_target: production` and monitor until the release APK is published (Run 41408849718).
