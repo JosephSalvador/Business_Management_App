@@ -167,5 +167,15 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 3: Fix `InvoiceDraftLine.productId`, `InvoiceLine.taxRate` / `productId`, and `CustomerInvoice` optional parameters and backward-compatible getters.
 - [x] Task 4: Fix null checks across `customer_invoice_pdf_service.dart`, `local_pdf_document_generator.dart`, `invoice_a4_preview_card.dart`, `invoices_page.dart`, and `invoice_preview_screen.dart` (using `PdfView` & `PdfController`).
 - [x] Task 5: Bump version code to `1.0.0+71` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 6: Commit and push fixes on branch `feature/invoice-delivery`.
-- [ ] Task 7: Trigger remote GitHub Actions workflow `build-clients.yml` with `deploy_target: production` to compile and release the latest signed APK.
+- [x] Task 6: Commit and push fixes on branch `feature/invoice-delivery`.
+- [x] Task 7: Trigger remote GitHub Actions workflow `build-clients.yml` (Run 41404980922).
+
+## Implementation Plan — Clean CI Zero Analyzer Warnings & Production APK Release v1.0.0+72
+- [x] Task 1: Expose `apiClient` getter in `SaleRepository` to fix `SyncEngine` outbox delivery compilation.
+- [x] Task 2: Add `getOrganization()` alias to `OrganizationRepository` and add `resolveSurfaceSecondary` helper to `AppColors`.
+- [x] Task 3: Remove undefined `_pdfDocument` references in `invoice_preview_screen.dart` (managed by `PdfController`).
+- [x] Task 4: Clean up unused imports and unused variables across `document_templates_page.dart`, `invoice_detail_page.dart`, `invoices_page.dart`, `customer_invoice_pdf_service.dart`, and `local_pdf_document_generator.dart`.
+- [x] Task 5: Replace deprecated `activeColor` with `activeThumbColor` in `document_templates_page.dart`.
+- [x] Task 6: Bump version code to `1.0.0+72` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 7: Commit and push changes to branch `feature/invoice-delivery`.
+- [ ] Task 8: Trigger GitHub Actions `build-clients.yml` with `deploy_target: production` and monitor until the release APK is published.

@@ -18,7 +18,6 @@ final localPdfDocumentGeneratorProvider =
 /// on the client canvas/GPU without any WebView or external network dependency.
 class LocalPdfDocumentGenerator {
   static const PdfColor _defaultPrimary = PdfColor.fromInt(0xFF0F172A);
-  static const PdfColor _defaultSecondary = PdfColor.fromInt(0xFF0D9488);
   static const PdfColor _slate700 = PdfColor.fromInt(0xFF334155);
   static const PdfColor _slate500 = PdfColor.fromInt(0xFF64748B);
   static const PdfColor _slate200 = PdfColor.fromInt(0xFFE2E8F0);
@@ -662,9 +661,6 @@ class LocalPdfDocumentGenerator {
 
     final dateFmt = DateFormat('dd MMM yyyy');
     final numFmt = NumberFormat('#,##0.##');
-
-    final qrData =
-        'DN:${note.number}|Client:${note.customerName}|Items:${note.items.length}|Qty:${note.totalQuantity}';
 
     document.addPage(
       pw.MultiPage(

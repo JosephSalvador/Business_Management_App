@@ -103,6 +103,11 @@ class AppColors {
 
   static Color resolveBorder(BuildContext context) => resolveOutline(context);
 
+  static Color resolveSurfaceSecondary(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF0F172A)
+          : surfaceContainer;
+
   // ── Legacy aliases (backward compat) ────────────────────────────
   static const Color primaryColor = primary;
   static const Color secondaryColor = secondary;

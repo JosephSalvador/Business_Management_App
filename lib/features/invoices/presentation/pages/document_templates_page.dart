@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/document_template_controller.dart';
-import '../../domain/document_template.dart';
 import '../widgets/commercial_palette_picker.dart';
 import '../widgets/custom_override_field.dart';
 import '../widgets/document_selector_toggle.dart';
@@ -521,7 +519,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                     color: AppColors.onSurface,
                   ),
                 ),
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
               ),
               const Divider(height: 16),
               TextField(

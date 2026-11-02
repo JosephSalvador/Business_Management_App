@@ -319,7 +319,6 @@ class _InvoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc = context.loc;
     final overdue = invoice.isOverdue;
     final dateFmt = DateFormat('dd MMM yyyy');
 

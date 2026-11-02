@@ -22,6 +22,8 @@ class SaleRepository {
 
   final ApiClient _api;
 
+  ApiClient get apiClient => _api;
+
   /// Creates a sale. [idempotencyKey] must be a stable GUID per logical sale:
   /// replays (double tap, timeout retry, network resend) return the original
   /// sale instead of creating a duplicate.

@@ -21,7 +21,6 @@ class CustomerInvoicePdfService {
   static const PdfColor _slate700 = PdfColor.fromInt(0xFF334155);
   static const PdfColor _slate500 = PdfColor.fromInt(0xFF64748B);
   static const PdfColor _slate200 = PdfColor.fromInt(0xFFE2E8F0);
-  static const PdfColor _slate100 = PdfColor.fromInt(0xFFF1F5F9);
   static const PdfColor _slate50 = PdfColor.fromInt(0xFFF8FAFC);
   static const PdfColor _green700 = PdfColor.fromInt(0xFF15803D);
   static const PdfColor _amber700 = PdfColor.fromInt(0xFFB45309);

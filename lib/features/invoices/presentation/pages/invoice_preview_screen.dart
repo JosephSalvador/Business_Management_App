@@ -79,7 +79,6 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     _debounceTimer?.cancel();
     _phoneTabController.dispose();
     _pdfController?.dispose();
-    _pdfDocument?.close();
     super.dispose();
   }
 
@@ -648,7 +647,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       );
     }
 
-    if (_pdfDocument == null || _pdfController == null) {
+    if (_pdfController == null) {
       return Center(
         child: Text(
           isSw ? 'Hakuna hati iliyopatikana.' : 'No document available.',

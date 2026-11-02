@@ -10,12 +10,10 @@ import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../application/invoices_controller.dart';
-import '../../data/invoice_providers.dart';
 import '../../domain/invoice.dart';
 import '../services/customer_invoice_pdf_service.dart';
 import '../widgets/invoice_a4_preview_card.dart';
 import '../widgets/invoice_branding_sheet.dart';
-import '../widgets/preview_frame/preview_frame.dart';
 import 'invoice_preview_screen.dart';
 
 class InvoiceDetailPage extends ConsumerStatefulWidget {
