@@ -61,5 +61,24 @@ public sealed record TenantOrganizationDto(
         org.InvoiceTerms,
         org.AuthorizedSignatoryName,
         org.AuthorizedSignatoryTitle);
+
+    public static TenantOrganizationDto From(Domain.Tenants.Tenant tenant) => new(
+        tenant.Id,
+        tenant.Name,
+        tenant.ContactEmail,
+        tenant.ContactPhone,
+        tenant.Address,
+        tenant.Currency,
+        tenant.CountryCode,
+        tenant.TaxId,
+        tenant.LogoBase64,
+        tenant.BankName,
+        tenant.BankAccountName,
+        tenant.BankAccountNumber,
+        tenant.BankBranchOrSwift,
+        tenant.MobileMoneyDetails,
+        tenant.InvoiceTerms,
+        tenant.AuthorizedSignatoryName,
+        tenant.AuthorizedSignatoryTitle);
 }
 

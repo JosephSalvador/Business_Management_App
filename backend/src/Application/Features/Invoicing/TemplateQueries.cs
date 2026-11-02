@@ -105,18 +105,18 @@ public sealed class RenderInvoiceHtmlQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly ICustomerInvoiceRepository _invoices;
-    private readonly IOrganizationRepository _organizations;
+    private readonly ITenantRepository _tenants;
     private readonly IDocumentTemplateRenderService _renderService;
 
     public RenderInvoiceHtmlQueryHandler(
         ITenantContext tenantContext,
         ICustomerInvoiceRepository invoices,
-        IOrganizationRepository organizations,
+        ITenantRepository tenants,
         IDocumentTemplateRenderService renderService)
     {
         _tenantContext = tenantContext;
         _invoices = invoices;
-        _organizations = organizations;
+        _tenants = tenants;
         _renderService = renderService;
     }
 
@@ -131,7 +131,7 @@ public sealed class RenderInvoiceHtmlQueryHandler
                 Error.NotFound("INVOICE_NOT_FOUND", $"Customer invoice '{request.InvoiceId}' was not found."));
         }
 
-        var org = await _organizations.GetByIdAsync(tenantId, cancellationToken);
+        var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
         var orgDto = org is not null ? TenantOrganizationDto.From(org) : new TenantOrganizationDto(
             Id: tenantId,
             Name: "Business",
@@ -158,18 +158,18 @@ public sealed class RenderDeliveryNoteHtmlQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IDeliveryNoteRepository _deliveryNotes;
-    private readonly IOrganizationRepository _organizations;
+    private readonly ITenantRepository _tenants;
     private readonly IDocumentTemplateRenderService _renderService;
 
     public RenderDeliveryNoteHtmlQueryHandler(
         ITenantContext tenantContext,
         IDeliveryNoteRepository deliveryNotes,
-        IOrganizationRepository organizations,
+        ITenantRepository tenants,
         IDocumentTemplateRenderService renderService)
     {
         _tenantContext = tenantContext;
         _deliveryNotes = deliveryNotes;
-        _organizations = organizations;
+        _tenants = tenants;
         _renderService = renderService;
     }
 
@@ -184,7 +184,7 @@ public sealed class RenderDeliveryNoteHtmlQueryHandler
                 Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{request.DeliveryNoteId}' was not found."));
         }
 
-        var org = await _organizations.GetByIdAsync(tenantId, cancellationToken);
+        var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
         var orgDto = org is not null ? TenantOrganizationDto.From(org) : new TenantOrganizationDto(
             Id: tenantId,
             Name: "Business",
@@ -248,16 +248,16 @@ public sealed class RenderInvoicePdfQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly ICustomerInvoiceRepository _invoices;
-    private readonly IOrganizationRepository _organizations;
+    private readonly ITenantRepository _tenants;
 
     public RenderInvoicePdfQueryHandler(
         ITenantContext tenantContext,
         ICustomerInvoiceRepository invoices,
-        IOrganizationRepository organizations)
+        ITenantRepository tenants)
     {
         _tenantContext = tenantContext;
         _invoices = invoices;
-        _organizations = organizations;
+        _tenants = tenants;
     }
 
     public async Task<Result<byte[]>> Handle(
@@ -271,7 +271,7 @@ public sealed class RenderInvoicePdfQueryHandler
                 Error.NotFound("INVOICE_NOT_FOUND", $"Customer invoice '{request.InvoiceId}' was not found."));
         }
 
-        var org = await _organizations.GetByIdAsync(tenantId, cancellationToken);
+        var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
         var orgName = org?.Name ?? "Business OS";
 
         var items = invoice.Lines.Select(l => (
@@ -305,16 +305,16 @@ public sealed class RenderDeliveryNotePdfQueryHandler
 {
     private readonly ITenantContext _tenantContext;
     private readonly IDeliveryNoteRepository _deliveryNotes;
-    private readonly IOrganizationRepository _organizations;
+    private readonly ITenantRepository _tenants;
 
     public RenderDeliveryNotePdfQueryHandler(
         ITenantContext tenantContext,
         IDeliveryNoteRepository deliveryNotes,
-        IOrganizationRepository organizations)
+        ITenantRepository tenants)
     {
         _tenantContext = tenantContext;
         _deliveryNotes = deliveryNotes;
-        _organizations = organizations;
+        _tenants = tenants;
     }
 
     public async Task<Result<byte[]>> Handle(
@@ -328,7 +328,7 @@ public sealed class RenderDeliveryNotePdfQueryHandler
                 Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{request.DeliveryNoteId}' was not found."));
         }
 
-        var org = await _organizations.GetByIdAsync(tenantId, cancellationToken);
+        var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
         var orgName = org?.Name ?? "Business OS";
 
         var items = note.Items.Select(i => (

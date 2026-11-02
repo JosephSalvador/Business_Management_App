@@ -28,7 +28,6 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
     'INVOICE',
     'PROFORMA INVOICE',
     'QUOTATION',
-    'TAX INVOICE',
   ];
 
   static const List<(String, int?)> _paymentTermPresets = [
@@ -193,6 +192,20 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
     return bal < 0 ? 0 : bal;
   }
 
+  int _step = 0;
+
+  bool get _canContinue {
+    switch (_step) {
+      case 0:
+        return _customerNameController.text.trim().isNotEmpty ||
+            _customerId == null;
+      case 1:
+        return _lines.any((line) => line.description.text.trim().isNotEmpty);
+      default:
+        return true;
+    }
+  }
+
   bool get _canSave =>
       !_saving && _lines.any((line) => line.description.text.trim().isNotEmpty);
 
@@ -277,20 +290,19 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          // 1. Seller Branding Banner
+          _WizardStepper(
+            step: _step,
+            isSwahili: isSw,
+            onTap: (i) {
+              if (i < _step) setState(() => _step = i);
+            },
+          ),
+          const SizedBox(height: 10),
           if (org != null)
-            _SellerBrandingBanner(
-              organization: org,
-              isSwahili: isSw,
-              onTap: () async {
-                await showInvoiceBrandingSheet(context);
-                if (mounted) {
-                  setState(() => _prefilledFromOrg = false);
-                }
-              },
-            ),
+            _SenderChip(organization: org, isSwahili: isSw),
           const SizedBox(height: 12),
 
+          if (_step == 0) ...[
           // 2. Document Type & Tracking Metadata Card
           Card(
             child: Padding(
@@ -543,9 +555,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
               ),
             ),
           ),
+          ],
 
-          const SizedBox(height: 12),
-
+          if (_step == 1) ...[
           // 4. Itemised Line Items Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -589,8 +601,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
             ),
           ),
 
-          const SizedBox(height: 12),
+          ],
 
+          if (_step == 2) ...[
           // 5. Financial Summary & Initial Deposit Card
           Card(
             child: Padding(
@@ -753,106 +766,105 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
 
           const SizedBox(height: 12),
 
-          // 6. Payment Instructions, Terms & Signatory Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionHeader(
-                    icon: Icons.account_balance_outlined,
-                    title: isSw
-                        ? '5. Maelekezo ya Malipo, Masharti & Sahihi'
-                        : '5. Payment Instructions, Terms & Signatory',
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _paymentInstructionsController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: isSw
-                          ? 'Maelekezo ya Malipo (Benki / Lipa Namba)'
-                          : 'Payment Instructions (Bank / Mobile Money)',
-                      hintText: isSw
-                          ? 'Mfano: CRDB Bank • Jina: Kampuni Ltd • A/C: 0150...\nM-Pesa Lipa Namba: 556677'
-                          : 'e.g. CRDB Bank • Acc Name: Company Ltd • A/C: 0150...\nM-Pesa Till: 556677',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _notesController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: loc.invoiceNotes,
-                      hintText: isSw
-                          ? 'Masharti ya malipo au maelezo ya ziada...'
-                          : 'Payment terms, warranty, or delivery notes...',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _signatoryNameController,
-                          decoration: InputDecoration(
-                            labelText: isSw
-                                ? 'Jina la Mwidhinishaji'
-                                : 'Authorized Signatory Name',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _signatoryTitleController,
-                          decoration: InputDecoration(
-                            labelText: isSw
-                                ? 'Cheo (Title)'
-                                : 'Signatory Title / Role',
-                            hintText: isSw
-                                ? 'Mkurugenzi / Mhasibu'
-                                : 'Managing Director / Finance',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          _SenderInfoCard(
+            isSwahili: isSw,
+            organization: org,
+            onOpenProfile: () async {
+              await showInvoiceBrandingSheet(context);
+              if (mounted) {
+                setState(() => _prefilledFromOrg = false);
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notesController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: loc.invoiceNotes,
+              hintText: isSw
+                  ? 'Maelezo ya ziada kwa ankara hii (hiari)...'
+                  : 'Optional note for this invoice...',
             ),
           ),
+          ],
+
+          if (_step == 3) ...[
+            _ReviewCard(
+              isSwahili: isSw,
+              organization: org,
+              customerName: _customerNameController.text.trim(),
+              documentTitle: _documentTitle,
+              lineCount: _lines
+                  .where((l) => l.description.text.trim().isNotEmpty)
+                  .length,
+              subtotal: _subtotal,
+              discount: _invoiceDiscount,
+              total: _totalAmount,
+              paid: _initialPaid,
+              balance: _balanceDue,
+              paymentInstructions: _paymentInstructionsController.text.trim(),
+              notes: _notesController.text.trim(),
+              onEditCustomer: () => setState(() => _step = 0),
+              onEditItems: () => setState(() => _step = 1),
+            ),
+          ],
 
           if (_error != null) ...[
             const SizedBox(height: 12),
             Text(_error!, style: const TextStyle(color: AppColors.error)),
           ],
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 50,
-            child: FilledButton.icon(
-              onPressed: _canSave ? _save : null,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(
+            children: [
+              if (_step > 0)
+                OutlinedButton(
+                  onPressed: _saving ? null : () => setState(() => _step--),
+                  child: Text(isSw ? 'Rudi' : 'Back'),
+                ),
+              if (_step > 0) const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 50,
+                  child: FilledButton.icon(
+                    onPressed: _step < 3
+                        ? (_canContinue ? () => setState(() => _step++) : null)
+                        : (_canSave ? _save : null),
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Icon(
+                            _step < 3
+                                ? Icons.arrow_forward
+                                : Icons.check_circle_outline,
+                          ),
+                    label: Text(
+                      _step < 2
+                          ? (isSw ? 'Endelea' : 'Continue')
+                          : _step == 2
+                              ? (isSw ? 'Kagua Ankara' : 'Review invoice')
+                              : loc.invoiceSave,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                       ),
-                    )
-                  : const Icon(Icons.check_circle_outline),
-              label: Text(
-                loc.invoiceSave,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1011,81 +1023,6 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   static String _isoDate(DateTime value) =>
       '${value.year}-${value.month.toString().padLeft(2, '0')}-'
       '${value.day.toString().padLeft(2, '0')}';
-}
-
-class _SellerBrandingBanner extends StatelessWidget {
-  const _SellerBrandingBanner({
-    required this.organization,
-    required this.isSwahili,
-    required this.onTap,
-  });
-
-  final Organization organization;
-  final bool isSwahili;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasLogo =
-        organization.logoBase64 != null && organization.logoBase64!.isNotEmpty;
-    final hasBank = (organization.bankName?.isNotEmpty ?? false) ||
-        (organization.mobileMoneyDetails?.isNotEmpty ?? false);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              hasLogo ? Icons.verified_outlined : Icons.add_photo_alternate,
-              color: const Color(0xFF2DD4BF),
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    (organization.name != null && organization.name!.isNotEmpty)
-                        ? organization.name!
-                        : (isSwahili ? 'Biashara Yako' : 'Your Business'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                  Text(
-                    isSwahili
-                        ? '${hasLogo ? "✓ Nembo imewekwa" : "+ Weka Nembo (Logo)"}  •  '
-                            '${hasBank ? "✓ Maelezo ya Benki/M-Pesa tayari" : "+ Weka Benki / Lipa Namba"}'
-                        : '${hasLogo ? "✓ Logo configured" : "+ Add Business Logo"}  •  '
-                            '${hasBank ? "✓ Bank/Mobile Money ready" : "+ Add Bank / Mobile Money"}',
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.white70,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -1385,6 +1322,282 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
           ),
         );
       },
+    );
+  }
+}
+
+class _WizardStepper extends StatelessWidget {
+  const _WizardStepper({
+    required this.step,
+    required this.isSwahili,
+    required this.onTap,
+  });
+
+  final int step;
+  final bool isSwahili;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = isSwahili
+        ? const ['Mteja', 'Bidhaa', 'Malipo', 'Kagua']
+        : const ['Customer', 'Items', 'Payment', 'Review'];
+    final primary = Theme.of(context).colorScheme.primary;
+    return Row(
+      children: [
+        for (var i = 0; i < labels.length; i++) ...[
+          Expanded(
+            child: InkWell(
+              onTap: () => onTap(i),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 13,
+                    backgroundColor: i <= step
+                        ? primary
+                        : AppColors.resolveBorder(context),
+                    child: i < step
+                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        : Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: i <= step
+                                  ? Colors.white
+                                  : AppColors.resolveTextSecondary(context),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    labels[i],
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: i == step ? FontWeight.w700 : FontWeight.w500,
+                      color: i == step
+                          ? primary
+                          : AppColors.resolveTextSecondary(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SenderChip extends StatelessWidget {
+  const _SenderChip({required this.organization, required this.isSwahili});
+
+  final Organization organization;
+  final bool isSwahili;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (organization.name != null && organization.name!.isNotEmpty)
+        ? organization.name!
+        : (isSwahili ? 'Biashara Yako' : 'Your Business');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.resolveBorder(context)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.storefront_outlined, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${isSwahili ? 'Kutoka' : 'From'}: $name',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const Icon(Icons.lock_outline, size: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _SenderInfoCard extends StatelessWidget {
+  const _SenderInfoCard({
+    required this.isSwahili,
+    required this.organization,
+    required this.onOpenProfile,
+  });
+
+  final bool isSwahili;
+  final Organization? organization;
+  final VoidCallback onOpenProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final org = organization;
+    final hasBank = org != null &&
+        ((org.bankName?.trim().isNotEmpty ?? false) ||
+            (org.mobileMoneyDetails?.trim().isNotEmpty ?? false));
+    final hasName = org != null && (org.name?.trim().isNotEmpty ?? false);
+    final complete = hasBank && hasName;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Icon(
+              complete ? Icons.verified_outlined : Icons.info_outline,
+              color: complete ? AppColors.success : AppColors.error,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                complete
+                    ? (isSwahili
+                        ? 'Benki, masharti na sahihi vinatoka kwenye Wasifu wa Kampuni.'
+                        : 'Bank, terms and signatory come from your Company Profile.')
+                    : (isSwahili
+                        ? 'Wasifu wa kampuni haujakamilika. Ongeza benki / Lipa Namba ili ionekane kwenye ankara.'
+                        : 'Company Profile is incomplete. Add bank / mobile money so it shows on invoices.'),
+                style: const TextStyle(fontSize: 12.5),
+              ),
+            ),
+            TextButton(
+              onPressed: onOpenProfile,
+              child: Text(isSwahili ? 'Hariri' : 'Edit'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({
+    required this.isSwahili,
+    required this.organization,
+    required this.customerName,
+    required this.documentTitle,
+    required this.lineCount,
+    required this.subtotal,
+    required this.discount,
+    required this.total,
+    required this.paid,
+    required this.balance,
+    required this.paymentInstructions,
+    required this.notes,
+    required this.onEditCustomer,
+    required this.onEditItems,
+  });
+
+  final bool isSwahili;
+  final Organization? organization;
+  final String customerName;
+  final String documentTitle;
+  final int lineCount;
+  final double subtotal;
+  final double discount;
+  final double total;
+  final double paid;
+  final double balance;
+  final String paymentInstructions;
+  final String notes;
+  final VoidCallback onEditCustomer;
+  final VoidCallback onEditItems;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row(String label, String value, {bool bold = false}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label),
+              Text(
+                value,
+                style: TextStyle(
+                  fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              documentTitle,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${isSwahili ? 'Kutoka' : 'From'}: ${organization?.name ?? '-'}',
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${isSwahili ? 'Kwa' : 'To'}: '
+                    '${customerName.isEmpty ? (isSwahili ? 'Mteja wa kawaida' : 'Walk-in customer') : customerName}',
+                  ),
+                ),
+                IconButton(
+                  onPressed: onEditCustomer,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$lineCount ${isSwahili ? 'bidhaa / huduma' : 'item(s)'}',
+                  ),
+                ),
+                IconButton(
+                  onPressed: onEditItems,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                ),
+              ],
+            ),
+            const Divider(),
+            row(isSwahili ? 'Jumla Ndogo' : 'Subtotal', formatMoney(subtotal)),
+            if (discount > 0)
+              row(isSwahili ? 'Punguzo' : 'Discount', formatMoney(discount)),
+            row(isSwahili ? 'Jumla' : 'Total', formatMoney(total), bold: true),
+            if (paid > 0)
+              row(isSwahili ? 'Imelipwa' : 'Paid', formatMoney(paid)),
+            row(
+              isSwahili ? 'Salio' : 'Balance due',
+              formatMoney(balance),
+              bold: true,
+            ),
+            if (paymentInstructions.isNotEmpty) ...[
+              const Divider(),
+              Text(
+                paymentInstructions,
+                style: const TextStyle(fontSize: 12.5),
+              ),
+            ],
+            if (notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(notes, style: const TextStyle(fontSize: 12.5)),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

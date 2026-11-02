@@ -198,3 +198,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Bump client version to `1.0.0+74` in `pubspec.yaml` and `app_update_service.dart`.
 - [ ] Task 6: Commit and push changes to branch `feature/invoice-delivery`.
 - [ ] Task 7: Trigger remote GitHub Actions workflow `build-clients.yml` with `deploy_target: production` and monitor until release APK is published.
+
+## Implementation Plan — Offline Pricing & Seamless Sync Recovery (Build 76)
+- [x] Task 1: Drift SQLite Catalog Immediate Persistence — `ProductRepository.create()` immediately caches `retailPrice` to `cached_products` upon creation (online and offline).
+- [x] Task 2: Open Price POS Prompt & Local Sync — `_promptOpenPrice` persists entered price to `localSalesServiceProvider.catalog.updateRetailPrice` and refreshes POS catalog.
+- [x] Task 3: Client Sale Payload Unit Price Guarantee — `buildSalePayload` in `local_sales_dao.dart` and `buildCreateSaleBody` in `sale.dart` always include `unitPrice` for every line.
+- [x] Task 4: Backend Resilient Price Fallback — `CreateSaleCommandHandler.ResolvePriceAsync` falls back to `input.UnitPrice` or `product.CostPrice` when candidate price resolution returns empty, preventing validation failure.
+- [x] Task 5: Zero-Resource Local Policy — Avoid local heavy builds (`dotnet build` / `flutter build`) on user PC; leverage GitHub Actions cloud runners for testing and compilation.
+- [x] Task 6: Invoicing TemplateQueries Fix — Replaced `IOrganizationRepository` with `ITenantRepository` in `TemplateQueries.cs` and added `TenantOrganizationDto.From(Tenant)`.
+- [ ] Task 7: Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflows (`deploy-azure.yml` and `build-clients.yml`).
