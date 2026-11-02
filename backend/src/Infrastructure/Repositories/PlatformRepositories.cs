@@ -2921,7 +2921,7 @@ public sealed class DeliveryNoteRepository : IDeliveryNoteRepository
                 EF.Functions.ILike(d.Number, $"%{search}%") ||
                 EF.Functions.ILike(d.CustomerName!, $"%{search}%") ||
                 (d.InvoiceNumber != null && EF.Functions.ILike(d.InvoiceNumber, $"%{search}%")) ||
-                (d.VehicleRegistration != null && EF.Functions.ILike(d.VehicleRegistration, $"%{search}%")) ||
+                (d.VehicleNumber != null && EF.Functions.ILike(d.VehicleNumber, $"%{search}%")) ||
                 (d.DriverName != null && EF.Functions.ILike(d.DriverName, $"%{search}%")));
         }
 
@@ -2954,7 +2954,7 @@ public sealed class DeliveryNoteRepository : IDeliveryNoteRepository
                 EF.Functions.ILike(d.Number, $"%{search}%") ||
                 EF.Functions.ILike(d.CustomerName!, $"%{search}%") ||
                 (d.InvoiceNumber != null && EF.Functions.ILike(d.InvoiceNumber, $"%{search}%")) ||
-                (d.VehicleRegistration != null && EF.Functions.ILike(d.VehicleRegistration, $"%{search}%")) ||
+                (d.VehicleNumber != null && EF.Functions.ILike(d.VehicleNumber, $"%{search}%")) ||
                 (d.DriverName != null && EF.Functions.ILike(d.DriverName, $"%{search}%")));
         }
 
