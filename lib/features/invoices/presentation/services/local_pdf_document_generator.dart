@@ -198,7 +198,7 @@ class LocalPdfDocumentGenerator {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text(
-                '$orgName  •  ${invoice.documentTitle} #${invoice.number}',
+                '$orgName  |  ${invoice.documentTitle} #${invoice.number}',
                 style: const pw.TextStyle(color: _slate500, fontSize: 8),
               ),
               pw.Text(
@@ -384,12 +384,7 @@ class LocalPdfDocumentGenerator {
             decoration: pw.BoxDecoration(
               color: _slate50,
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              border: pw.Border(
-                left: pw.BorderSide(color: primaryColor, width: 3.5),
-                top: const pw.BorderSide(color: _slate200, width: 0.6),
-                right: const pw.BorderSide(color: _slate200, width: 0.6),
-                bottom: const pw.BorderSide(color: _slate200, width: 0.6),
-              ),
+              border: pw.Border.all(color: _slate200, width: 0.6),
             ),
             child: pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -571,7 +566,7 @@ class LocalPdfDocumentGenerator {
                   numFmt.format(invoice.lines[i].unitPrice),
                   invoice.lines[i].discountAmount > 0
                       ? '-${numFmt.format(invoice.lines[i].discountAmount)}'
-                      : '—',
+                      : '-',
                   numFmt.format(invoice.lines[i].lineTotal),
                 ],
             ],
@@ -810,7 +805,7 @@ class LocalPdfDocumentGenerator {
                           ),
                         ),
                       pw.Text(
-                        '$signatoryTitle  •  ${isSwahili ? "Sahihi & Muhuri" : "Signature & Official Stamp"}',
+                        '$signatoryTitle  |  ${isSwahili ? "Sahihi & Muhuri" : "Signature & Official Stamp"}',
                         style: const pw.TextStyle(
                           color: _slate500,
                           fontSize: 8,

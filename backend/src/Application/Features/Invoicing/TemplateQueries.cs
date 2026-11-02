@@ -51,7 +51,7 @@ public sealed class GetDocumentTemplateQueryHandler
         if (template is null)
         {
             return Result<DocumentTemplateDto>.Failure(
-                Error.NotFound("TEMPLATE_NOT_FOUND", $"Document template '{request.Id}' was not found."));
+                Error.NotFound($"Document template '{request.Id}' was not found."));
         }
 
         return Result<DocumentTemplateDto>.Success(TemplateMappers.ToDto(template));
@@ -128,7 +128,7 @@ public sealed class RenderInvoiceHtmlQueryHandler
         if (invoice is null)
         {
             return Result<string>.Failure(
-                Error.NotFound("INVOICE_NOT_FOUND", $"Customer invoice '{request.InvoiceId}' was not found."));
+                Error.NotFound($"Customer invoice '{request.InvoiceId}' was not found."));
         }
 
         var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
@@ -181,7 +181,7 @@ public sealed class RenderDeliveryNoteHtmlQueryHandler
         if (note is null)
         {
             return Result<string>.Failure(
-                Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{request.DeliveryNoteId}' was not found."));
+                Error.NotFound($"Delivery note '{request.DeliveryNoteId}' was not found."));
         }
 
         var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
@@ -268,7 +268,7 @@ public sealed class RenderInvoicePdfQueryHandler
         if (invoice is null)
         {
             return Result<byte[]>.Failure(
-                Error.NotFound("INVOICE_NOT_FOUND", $"Customer invoice '{request.InvoiceId}' was not found."));
+                Error.NotFound($"Customer invoice '{request.InvoiceId}' was not found."));
         }
 
         var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
@@ -282,7 +282,7 @@ public sealed class RenderInvoicePdfQueryHandler
 
         var totalFormatted = $"{invoice.Currency} {invoice.TotalAmount:N2}";
 
-        var pdfBytes = BusinessOS.Infrastructure.Services.MinimalPdfGenerator.CreateDocument(
+        var pdfBytes = MinimalPdfGenerator.CreateDocument(
             title: invoice.DocumentTitle ?? "INVOICE",
             documentNumber: invoice.Number,
             organizationName: orgName,
@@ -325,7 +325,7 @@ public sealed class RenderDeliveryNotePdfQueryHandler
         if (note is null)
         {
             return Result<byte[]>.Failure(
-                Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{request.DeliveryNoteId}' was not found."));
+                Error.NotFound($"Delivery note '{request.DeliveryNoteId}' was not found."));
         }
 
         var org = await _tenants.GetByIdAsync(tenantId, cancellationToken);
@@ -337,7 +337,7 @@ public sealed class RenderDeliveryNotePdfQueryHandler
             Total: $"{i.QuantityDelivered:G29} Delivered"
         )).ToList();
 
-        var pdfBytes = BusinessOS.Infrastructure.Services.MinimalPdfGenerator.CreateDocument(
+        var pdfBytes = MinimalPdfGenerator.CreateDocument(
             title: "DELIVERY NOTE",
             documentNumber: note.Number,
             organizationName: orgName,

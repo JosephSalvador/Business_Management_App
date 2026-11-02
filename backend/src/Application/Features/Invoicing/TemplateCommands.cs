@@ -82,20 +82,20 @@ public sealed class UpdateTenantDocumentConfigurationCommandHandler
         if (tenantId == Guid.Empty)
         {
             return Result<TenantDocumentConfigurationDto>.Failure(
-                Error.Unauthorized("AUTH_TENANT_MISSING", "Tenant context is required."));
+                Error.Unauthorized("Tenant context is required."));
         }
 
         var template = await _templates.GetByIdAsync(request.ActiveTemplateId, cancellationToken);
         if (template is null)
         {
             return Result<TenantDocumentConfigurationDto>.Failure(
-                Error.NotFound("TEMPLATE_NOT_FOUND", $"Marketplace template '{request.ActiveTemplateId}' was not found."));
+                Error.NotFound($"Marketplace template '{request.ActiveTemplateId}' was not found."));
         }
 
         if (template.DocumentType != request.DocumentType)
         {
             return Result<TenantDocumentConfigurationDto>.Failure(
-                Error.Validation("TEMPLATE_TYPE_MISMATCH", $"Selected template is for {template.DocumentType}, not {request.DocumentType}."));
+                Error.Validation($"Selected template is for {template.DocumentType}, not {request.DocumentType}."));
         }
 
         // Force custom HTML / Liquid layout through the safety sanitizer pipeline

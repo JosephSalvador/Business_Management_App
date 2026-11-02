@@ -74,7 +74,7 @@ public sealed class GetDeliveryNoteQueryHandler
         if (note is null)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{query.Id}' was not found."));
+                Error.NotFound($"Delivery note '{query.Id}' was not found."));
         }
 
         return Result<DeliveryNoteDto>.Success(DeliveryNoteMappers.ToDto(note));
@@ -106,7 +106,7 @@ public sealed class GetDeliveryNoteByNumberQueryHandler
         if (note is null)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{query.Number}' was not found."));
+                Error.NotFound($"Delivery note '{query.Number}' was not found."));
         }
 
         return Result<DeliveryNoteDto>.Success(DeliveryNoteMappers.ToDto(note));

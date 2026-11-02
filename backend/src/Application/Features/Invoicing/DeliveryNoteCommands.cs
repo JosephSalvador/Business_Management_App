@@ -28,7 +28,7 @@ public static class DeliveryNoteMappers
         note.DeliveredAtUtc,
         note.CancelledAtUtc,
         note.Items
-            .OrderBy(i => i.LineIndex)
+            .OrderBy(i => i.OrderIndex)
             .Select(i => new DeliveryNoteItemDto(
                 i.Id,
                 i.ProductId,
@@ -36,7 +36,7 @@ public static class DeliveryNoteMappers
                 i.UnitOfMeasure,
                 i.QuantityOrdered,
                 i.QuantityDelivered,
-                i.LineIndex))
+                i.OrderIndex))
             .ToList(),
         note.CreatedAt);
 
@@ -108,7 +108,7 @@ public sealed class CreateDeliveryNoteCommandHandler
         if (tenantId == Guid.Empty)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.Unauthorized("AUTH_TENANT_MISSING", "Tenant context is required."));
+                Error.Unauthorized("Tenant context is required."));
         }
 
         string? invoiceNumber = null;
@@ -126,7 +126,7 @@ public sealed class CreateDeliveryNoteCommandHandler
             if (invoice is null)
             {
                 return Result<DeliveryNoteDto>.Failure(
-                    Error.NotFound("INVOICE_NOT_FOUND", $"Customer invoice '{request.InvoiceId.Value}' was not found."));
+                    Error.NotFound($"Customer invoice '{request.InvoiceId.Value}' was not found."));
             }
 
             invoiceNumber = invoice.Number;
@@ -141,11 +141,10 @@ public sealed class CreateDeliveryNoteCommandHandler
                 foreach (var line in invoice.Lines.OrderBy(l => l.OrderIndex))
                 {
                     itemSpecs.Add(new DeliveryNoteItemSpec(
-                        ProductId: null,
                         Description: line.Description,
-                        UnitOfMeasure: line.UnitOfMeasure,
                         QuantityOrdered: line.Quantity,
-                        QuantityDelivered: line.Quantity));
+                        UnitOfMeasure: line.UnitOfMeasure,
+                        ProductId: null));
                 }
             }
         }
@@ -155,18 +154,17 @@ public sealed class CreateDeliveryNoteCommandHandler
             foreach (var item in request.Items)
             {
                 itemSpecs.Add(new DeliveryNoteItemSpec(
-                    ProductId: item.ProductId,
                     Description: item.Description,
-                    UnitOfMeasure: string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? "Pcs" : item.UnitOfMeasure,
                     QuantityOrdered: item.QuantityOrdered,
-                    QuantityDelivered: item.QuantityDelivered));
+                    UnitOfMeasure: string.IsNullOrWhiteSpace(item.UnitOfMeasure) ? "Pcs" : item.UnitOfMeasure,
+                    ProductId: item.ProductId));
             }
         }
 
         if (itemSpecs.Count == 0)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.Validation("ITEMS_REQUIRED", "A delivery note must contain at least one line item."));
+                Error.Validation("A delivery note must contain at least one line item."));
         }
 
         if (customerId.HasValue && string.IsNullOrWhiteSpace(customerName))
@@ -237,7 +235,7 @@ public sealed class MarkDeliveryNoteDispatchedCommandHandler
         if (note is null)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{request.Id}' was not found."));
+                Error.NotFound($"Delivery note '{request.Id}' was not found."));
         }
 
         try
@@ -249,7 +247,7 @@ public sealed class MarkDeliveryNoteDispatchedCommandHandler
         catch (InvalidOperationException ex)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.Validation("INVALID_DELIVERY_NOTE_STATE", ex.Message));
+                Error.Validation(ex.Message));
         }
     }
 }
@@ -281,19 +279,19 @@ public sealed class MarkDeliveryNoteDeliveredCommandHandler
         if (note is null)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{request.Id}' was not found."));
+                Error.NotFound($"Delivery note '{request.Id}' was not found."));
         }
 
         try
         {
-            note.MarkDelivered(request.ReceivedByName);
+            note.MarkDelivered(string.IsNullOrWhiteSpace(request.ReceivedByName) ? "Receiver" : request.ReceivedByName);
             await _deliveryNotes.UpdateAsync(note, cancellationToken);
             return Result<DeliveryNoteDto>.Success(DeliveryNoteMappers.ToDto(note));
         }
         catch (InvalidOperationException ex)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.Validation("INVALID_DELIVERY_NOTE_STATE", ex.Message));
+                Error.Validation(ex.Message));
         }
     }
 }
@@ -325,19 +323,19 @@ public sealed class CancelDeliveryNoteCommandHandler
         if (note is null)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.NotFound("DELIVERY_NOTE_NOT_FOUND", $"Delivery note '{request.Id}' was not found."));
+                Error.NotFound($"Delivery note '{request.Id}' was not found."));
         }
 
         try
         {
-            note.Cancel(request.Reason);
+            note.Cancel(DateTime.UtcNow);
             await _deliveryNotes.UpdateAsync(note, cancellationToken);
             return Result<DeliveryNoteDto>.Success(DeliveryNoteMappers.ToDto(note));
         }
         catch (InvalidOperationException ex)
         {
             return Result<DeliveryNoteDto>.Failure(
-                Error.Validation("INVALID_DELIVERY_NOTE_STATE", ex.Message));
+                Error.Validation(ex.Message));
         }
     }
 }
