@@ -188,4 +188,4 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Bump client version to `1.0.0+73` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 6: Commit and push changes to branch `feature/invoice-delivery`.
 - [x] Task 7: Trigger GitHub Actions `build-clients.yml` with `deploy_target: production` (Run 41413569037).
-- [ ] Task 8: Monitor remote workflow execution until release APK is published to `releases/tag/latest`.
+- [x] Task 8: Monitor remote workflow execution until release APK is published to `releases/tag/latest`.
