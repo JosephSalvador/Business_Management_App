@@ -19,9 +19,7 @@ Future<void> showInvoiceBrandingSheet(
   if (organization == null) {
     try {
       final container = ProviderScope.containerOf(context, listen: false);
-      final loaded =
-          await container.read(organizationRepositoryProvider).getOrganization();
-      if (loaded != null) org = loaded;
+      org = await container.read(organizationRepositoryProvider).get();
     } catch (_) {}
   }
   if (!context.mounted) return;

@@ -157,7 +157,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
       Organization? org;
       try {
-        org = await ref.read(organizationRepositoryProvider).getOrganization();
+        org = await ref.read(organizationRepositoryProvider).get();
       } catch (_) {}
 
       final Uint8List pdfBytes;

@@ -114,8 +114,6 @@ class OrganizationRepository {
 
   static const _cacheKey = 'organization_profile';
 
-  Future<Organization> getOrganization() => get();
-
   Future<Organization> get() async {
     Organization? cachedOrg;
     if (_cache != null) {
