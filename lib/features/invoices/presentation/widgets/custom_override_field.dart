@@ -46,13 +46,14 @@ class _CustomOverrideFieldState extends State<CustomOverrideField> {
   @override
   Widget build(BuildContext context) {
     final hasCustomText = _controller.text.trim().isNotEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.resolveCardBackground(context),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasCustomText ? AppColors.primary : AppColors.outlineVariant,
+          color: hasCustomText ? AppColors.primary : AppColors.resolveBorder(context),
         ),
       ),
       child: Column(
@@ -69,8 +70,10 @@ class _CustomOverrideFieldState extends State<CustomOverrideField> {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: hasCustomText
-                          ? AppColors.primaryContainer
-                          : AppColors.surfaceContainer,
+                          ? (isDark
+                              ? AppColors.primary.withValues(alpha: 0.2)
+                              : AppColors.primaryContainer)
+                          : AppColors.resolveSurfaceSecondary(context),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
@@ -78,7 +81,7 @@ class _CustomOverrideFieldState extends State<CustomOverrideField> {
                       size: 16,
                       color: hasCustomText
                           ? AppColors.primary
-                          : AppColors.onSurfaceVariant,
+                          : AppColors.resolveTextSecondary(context),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -90,11 +93,11 @@ class _CustomOverrideFieldState extends State<CustomOverrideField> {
                           widget.isSwahili
                               ? 'Muundo Maalum wa Liquid / HTML'
                               : 'Custom Liquid / HTML Override',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
+                            color: AppColors.resolveTextPrimary(context),
                           ),
                         ),
                         Text(
@@ -129,7 +132,7 @@ class _CustomOverrideFieldState extends State<CustomOverrideField> {
           if (_isExpanded) ...[
             const Divider(height: 1),
             Container(
-              color: const Color(0xFF0F172A),
+              color: isDark ? const Color(0xFF0B132B) : const Color(0xFF0F172A),
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -195,9 +198,9 @@ class _CustomOverrideFieldState extends State<CustomOverrideField> {
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: const BoxDecoration(
-                color: AppColors.surfaceContainer,
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+              decoration: BoxDecoration(
+                color: AppColors.resolveSurfaceSecondary(context),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
               ),
               child: Row(
                 children: [
@@ -209,10 +212,10 @@ class _CustomOverrideFieldState extends State<CustomOverrideField> {
                       widget.isSwahili
                           ? 'Kodi husafishwa kiotomatiki kuzuia script zenye madhara (XSS protection).'
                           : 'Sanitized on server to strip scripts and dangerous iframes automatically.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 10,
-                        color: AppColors.onSurfaceVariant,
+                        color: AppColors.resolveTextSecondary(context),
                       ),
                     ),
                   ),

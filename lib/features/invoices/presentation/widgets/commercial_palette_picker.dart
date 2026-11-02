@@ -77,16 +77,17 @@ class CommercialPalettePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           isSwahili ? 'Paleti za Biashara' : 'Commercial Theme Palettes',
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: AppColors.onSurface,
+            color: AppColors.resolveTextPrimary(context),
           ),
         ),
         const SizedBox(height: 8),
@@ -113,10 +114,16 @@ class CommercialPalettePicker extends StatelessWidget {
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isMatch ? AppColors.surface : AppColors.surfaceDim,
+                  color: isMatch
+                      ? (isDark
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.resolveCardBackground(context))
+                      : AppColors.resolveSurfaceSecondary(context),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isMatch ? AppColors.primary : AppColors.outlineVariant,
+                    color: isMatch
+                        ? AppColors.primary
+                        : AppColors.resolveBorder(context),
                     width: isMatch ? 2 : 1,
                   ),
                 ),
@@ -149,7 +156,9 @@ class CommercialPalettePicker extends StatelessWidget {
                         fontFamily: 'Inter',
                         fontSize: 11,
                         fontWeight: isMatch ? FontWeight.w700 : FontWeight.w500,
-                        color: isMatch ? AppColors.primary : AppColors.onSurface,
+                        color: isMatch
+                            ? AppColors.primary
+                            : AppColors.resolveTextPrimary(context),
                       ),
                     ),
                   ],

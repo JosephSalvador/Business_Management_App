@@ -197,38 +197,55 @@ class _InvoicesSummaryStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final collected =
         (totalBilled - totalOutstanding).clamp(0.0, double.infinity);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dividerColor =
+        isDark ? const Color(0xFF334155) : AppColors.resolveBorder(context);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: isDark
+            ? const Color(0xFF1E293B)
+            : AppColors.resolveCardBackground(context),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.resolveBorder(context)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Expanded(
             child: _metric(
+              context,
               isSwahili ? 'Jumla ya Ankara' : 'Total Billed',
               formatMoney(totalBilled),
-              Colors.white,
+              AppColors.resolveTextPrimary(context),
             ),
           ),
-          Container(width: 1, height: 28, color: const Color(0xFF334155)),
+          Container(width: 1, height: 28, color: dividerColor),
           const SizedBox(width: 12),
           Expanded(
             child: _metric(
+              context,
               isSwahili ? 'Kilicholipwa' : 'Collected',
               formatMoney(collected),
-              const Color(0xFF4ADE80),
+              isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A),
             ),
           ),
-          Container(width: 1, height: 28, color: const Color(0xFF334155)),
+          Container(width: 1, height: 28, color: dividerColor),
           const SizedBox(width: 12),
           Expanded(
             child: _metric(
+              context,
               isSwahili ? 'Salio (Deni)' : 'Outstanding',
               formatMoney(totalOutstanding),
-              const Color(0xFFFBBF24),
+              isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
             ),
           ),
         ],
@@ -236,13 +253,21 @@ class _InvoicesSummaryStrip extends StatelessWidget {
     );
   }
 
-  Widget _metric(String label, String value, Color valueColor) {
+  Widget _metric(
+    BuildContext context,
+    String label,
+    String value,
+    Color valueColor,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+          style: TextStyle(
+            fontSize: 10.5,
+            color: AppColors.resolveTextSecondary(context),
+          ),
         ),
         const SizedBox(height: 2),
         Text(
@@ -331,13 +356,20 @@ class _InvoiceTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF334155)
+                    : Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 invoice.documentTitle.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFE2E8F0)
+                      : Theme.of(context).colorScheme.primary,
                   fontSize: 9.5,
                   fontWeight: FontWeight.w800,
                 ),

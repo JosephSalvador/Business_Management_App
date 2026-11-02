@@ -146,11 +146,11 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
     return Column(
       children: [
         Container(
-          color: AppColors.surface,
+          color: AppColors.resolveCardBackground(context),
           child: TabBar(
             controller: _phoneTabController,
             labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.onSurfaceVariant,
+            unselectedLabelColor: AppColors.resolveTextSecondary(context),
             indicatorColor: AppColors.primary,
             indicatorWeight: 3,
             labelStyle: const TextStyle(
@@ -221,10 +221,10 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
             // Top Section: Compact Configuration Controls
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
+              decoration: BoxDecoration(
+                color: AppColors.resolveCardBackground(context),
                 border: Border(
-                  bottom: BorderSide(color: AppColors.outlineVariant),
+                  bottom: BorderSide(color: AppColors.resolveBorder(context)),
                 ),
               ),
               child: Row(
@@ -276,16 +276,20 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                   padding: const EdgeInsets.all(16),
                   constraints: const BoxConstraints(maxHeight: 280),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.resolveCardBackground(context),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
+                        color: Colors.black.withValues(
+                          alpha: Theme.of(context).brightness == Brightness.dark
+                              ? 0.35
+                              : 0.12,
+                        ),
                         blurRadius: 16,
                         offset: const Offset(0, -4),
                       ),
                     ],
-                    border: Border.all(color: AppColors.outlineVariant),
+                    border: Border.all(color: AppColors.resolveBorder(context)),
                   ),
                   child: SingleChildScrollView(
                     child: Column(
@@ -296,10 +300,11 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                           children: [
                             Text(
                               isSw ? 'Mipangilio ya Hati' : 'Page Parameters',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'Inter',
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
+                                color: AppColors.resolveTextPrimary(context),
                               ),
                             ),
                             IconButton(
@@ -334,8 +339,8 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                   FloatingActionButton.small(
                     onPressed: () => setState(
                         () => _tabletSheetCollapsed = !_tabletSheetCollapsed),
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.onSurface,
+                    backgroundColor: AppColors.resolveCardBackground(context),
+                    foregroundColor: AppColors.resolveTextPrimary(context),
                     elevation: 2,
                     child: Icon(
                       _tabletSheetCollapsed
@@ -387,10 +392,10 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
             SizedBox(
               width: leftWidth,
               child: Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
+                decoration: BoxDecoration(
+                  color: AppColors.resolveCardBackground(context),
                   border: Border(
-                    right: BorderSide(color: AppColors.outlineVariant, width: 1),
+                    right: BorderSide(color: AppColors.resolveBorder(context), width: 1),
                   ),
                 ),
                 child: SingleChildScrollView(
@@ -404,7 +409,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
             SizedBox(
               width: rightWidth,
               child: Container(
-                color: AppColors.surfaceDim,
+                color: AppColors.resolveSurfaceSecondary(context),
                 padding: const EdgeInsets.fromLTRB(28, 24, 28, 100),
                 child: _buildPreviewCanvas(context, state, isSw),
               ),
@@ -512,11 +517,11 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                 onChanged: notifier.updateShowLogo,
                 title: Text(
                   isSw ? 'Onyesha Nembo ya Biashara' : 'Display Organization Logo',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface,
+                    color: AppColors.resolveTextPrimary(context),
                   ),
                 ),
                 activeThumbColor: AppColors.primary,
@@ -525,18 +530,29 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
               TextField(
                 controller: _footerNotesController,
                 maxLines: 2,
-                style: const TextStyle(fontFamily: 'Inter', fontSize: 12),
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  color: AppColors.resolveTextPrimary(context),
+                ),
                 decoration: InputDecoration(
                   labelText: isSw ? 'Masharti / Footer Notes' : 'Footer Terms & Notes',
-                  labelStyle: const TextStyle(fontSize: 12),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.resolveTextSecondary(context),
+                  ),
                   hintText: isSw
                       ? 'Mfano: Malipo yawe ndani ya siku 14'
                       : 'E.g. Payment due within 14 days',
+                  hintStyle: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.resolveTextTertiary(context),
+                  ),
                   filled: true,
-                  fillColor: AppColors.surfaceContainer,
+                  fillColor: AppColors.resolveSurfaceSecondary(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.outlineVariant),
+                    borderSide: BorderSide(color: AppColors.resolveBorder(context)),
                   ),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -567,6 +583,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
     DocumentTemplateState state,
     bool isSw,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -581,7 +598,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: state.isThermal
-                        ? const Color(0xFF0F172A)
+                        ? (isDark ? const Color(0xFF334155) : const Color(0xFF0F172A))
                         : AppColors.primary,
                     borderRadius: BorderRadius.circular(6),
                   ),
@@ -631,16 +648,16 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainer,
+                color: AppColors.resolveSurfaceSecondary(context),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Text(
+              child: Text(
                 'LIVE PREVIEW STREAM',
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.onSurfaceVariant,
+                  color: AppColors.resolveTextSecondary(context),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -681,9 +698,9 @@ class _FormSectionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.resolveCardBackground(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outlineVariant),
+        border: Border.all(color: AppColors.resolveBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -704,11 +721,11 @@ class _FormSectionCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
+                      color: AppColors.resolveTextPrimary(context),
                     ),
                   ),
                 ],
@@ -718,16 +735,16 @@ class _FormSectionCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceContainer,
+                    color: AppColors.resolveSurfaceSecondary(context),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     badge!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.onSurfaceVariant,
+                      color: AppColors.resolveTextSecondary(context),
                     ),
                   ),
                 ),
@@ -752,6 +769,7 @@ class _PrintProfileButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -759,8 +777,10 @@ class _PrintProfileButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: isThermal
-              ? const Color(0xFF0F172A)
-              : AppColors.primaryContainer,
+              ? (isDark ? const Color(0xFF334155) : const Color(0xFF0F172A))
+              : (isDark
+                  ? AppColors.primary.withValues(alpha: 0.18)
+                  : AppColors.primaryContainer),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

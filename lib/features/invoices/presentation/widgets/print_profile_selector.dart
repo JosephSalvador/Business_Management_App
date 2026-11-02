@@ -31,26 +31,26 @@ class PrintProfileSelector extends StatelessWidget {
           children: [
             Text(
               isSwahili ? 'Umbizo la Printa' : 'Print Size Profile Matrix',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: AppColors.onSurface,
+                color: AppColors.resolveTextPrimary(context),
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainer,
+                color: AppColors.resolveSurfaceSecondary(context),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 selectedProfile.isThermal ? '80MM ESC/POS' : 'ISO 216 A4',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.onSurfaceVariant,
+                  color: AppColors.resolveTextSecondary(context),
                 ),
               ),
             ),
@@ -112,6 +112,7 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -121,16 +122,22 @@ class _ProfileCard extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.surface : AppColors.surfaceDim,
+            color: isSelected
+                ? (isDark
+                    ? AppColors.primary.withValues(alpha: 0.18)
+                    : AppColors.resolveCardBackground(context))
+                : AppColors.resolveSurfaceSecondary(context),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+              color: isSelected
+                  ? AppColors.primary
+                  : AppColors.resolveBorder(context),
               width: isSelected ? 2 : 1,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.08),
+                      color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -147,8 +154,12 @@ class _ProfileCard extends StatelessWidget {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.primaryContainer
-                          : AppColors.surfaceContainer,
+                          ? (isDark
+                              ? AppColors.primary.withValues(alpha: 0.25)
+                              : AppColors.primaryContainer)
+                          : (isDark
+                              ? const Color(0xFF334155)
+                              : AppColors.surfaceContainer),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
@@ -156,7 +167,7 @@ class _ProfileCard extends StatelessWidget {
                       size: 18,
                       color: isSelected
                           ? AppColors.primary
-                          : AppColors.onSurfaceVariant,
+                          : AppColors.resolveTextSecondary(context),
                     ),
                   ),
                   Container(
@@ -164,8 +175,8 @@ class _ProfileCard extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.1)
-                          : AppColors.surfaceContainerHigh,
+                          ? AppColors.primary.withValues(alpha: 0.15)
+                          : AppColors.resolveSurfaceSecondary(context),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -176,7 +187,7 @@ class _ProfileCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: isSelected
                             ? AppColors.primary
-                            : AppColors.onSurfaceVariant,
+                            : AppColors.resolveTextSecondary(context),
                       ),
                     ),
                   ),
@@ -189,7 +200,9 @@ class _ProfileCard extends StatelessWidget {
                   fontFamily: 'Inter',
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: isSelected ? AppColors.primary : AppColors.onSurface,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.resolveTextPrimary(context),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

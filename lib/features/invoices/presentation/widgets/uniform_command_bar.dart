@@ -26,19 +26,20 @@ class UniformCommandBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.resolveCardBackground(context),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
             blurRadius: 16,
             offset: const Offset(0, -2),
           ),
         ],
-        border: Border.all(color: AppColors.outlineVariant),
+        border: Border.all(color: AppColors.resolveBorder(context)),
       ),
       child: SafeArea(
         top: false,
@@ -49,8 +50,10 @@ class UniformCommandBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: isThermal
-                    ? const Color(0xFF0F172A)
-                    : AppColors.primaryContainer,
+                    ? (isDark ? const Color(0xFF334155) : const Color(0xFF0F172A))
+                    : (isDark
+                        ? AppColors.primary.withValues(alpha: 0.18)
+                        : AppColors.primaryContainer),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -168,8 +171,8 @@ class UniformCommandBar extends StatelessWidget {
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.onSurface,
-                side: const BorderSide(color: AppColors.outline),
+                foregroundColor: AppColors.resolveTextPrimary(context),
+                side: BorderSide(color: AppColors.resolveBorder(context)),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 shape: RoundedRectangleBorder(

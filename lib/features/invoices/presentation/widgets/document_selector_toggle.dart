@@ -20,9 +20,9 @@ class DocumentSelectorToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHigh,
+        color: AppColors.resolveSurfaceSecondary(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outlineVariant),
+        border: Border.all(color: AppColors.resolveBorder(context)),
       ),
       child: Row(
         children: [
@@ -68,6 +68,7 @@ class _ToggleItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -77,12 +78,14 @@ class _ToggleItem extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.surface : Colors.transparent,
+            color: isSelected
+                ? AppColors.resolveCardBackground(context)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -99,8 +102,12 @@ class _ToggleItem extends StatelessWidget {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? AppColors.primaryContainer
-                      : AppColors.surfaceContainer,
+                      ? (isDark
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.primaryContainer)
+                      : (isDark
+                          ? const Color(0xFF334155)
+                          : AppColors.surfaceContainer),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -108,7 +115,7 @@ class _ToggleItem extends StatelessWidget {
                   size: 18,
                   color: isSelected
                       ? AppColors.primary
-                      : AppColors.onSurfaceVariant,
+                      : AppColors.resolveTextSecondary(context),
                 ),
               ),
               const SizedBox(width: 10),
@@ -124,8 +131,8 @@ class _ToggleItem extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                         color: isSelected
-                            ? AppColors.onSurface
-                            : AppColors.onSurfaceVariant,
+                            ? AppColors.resolveTextPrimary(context)
+                            : AppColors.resolveTextSecondary(context),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

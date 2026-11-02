@@ -734,24 +734,41 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF1E293B)
+                          : Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF334155)
+                            : Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.25),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           isSw ? 'SALIO LA KULIPWA' : 'BALANCE DUE',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFF93C5FD)
+                                : Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
                           ),
                         ),
                         Text(
                           formatMoney(_balanceDue),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w900,
                             fontSize: 15,
                           ),
@@ -816,53 +833,74 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
           ],
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(
-            children: [
-              if (_step > 0)
-                OutlinedButton(
-                  onPressed: _saving ? null : () => setState(() => _step--),
-                  child: Text(isSw ? 'Rudi' : 'Back'),
-                ),
-              if (_step > 0) const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 50,
-                  child: FilledButton.icon(
-                    onPressed: _step < 3
-                        ? (_canContinue ? () => setState(() => _step++) : null)
-                        : (_canSave ? _save : null),
-                    icon: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.resolveCardBackground(context),
+          border: Border(
+            top: BorderSide(
+              color: AppColors.resolveBorder(context),
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(
+                alpha: Theme.of(context).brightness == Brightness.dark
+                    ? 0.25
+                    : 0.05,
+              ),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              children: [
+                if (_step > 0)
+                  OutlinedButton(
+                    onPressed: _saving ? null : () => setState(() => _step--),
+                    child: Text(isSw ? 'Rudi' : 'Back'),
+                  ),
+                if (_step > 0) const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: FilledButton.icon(
+                      onPressed: _step < 3
+                          ? (_canContinue ? () => setState(() => _step++) : null)
+                          : (_canSave ? _save : null),
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(
+                              _step < 3
+                                  ? Icons.arrow_forward
+                                  : Icons.check_circle_outline,
                             ),
-                          )
-                        : Icon(
-                            _step < 3
-                                ? Icons.arrow_forward
-                                : Icons.check_circle_outline,
-                          ),
-                    label: Text(
-                      _step < 2
-                          ? (isSw ? 'Endelea' : 'Continue')
-                          : _step == 2
-                              ? (isSw ? 'Kagua Ankara' : 'Review invoice')
-                              : loc.invoiceSave,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                      label: Text(
+                        _step < 2
+                            ? (isSw ? 'Endelea' : 'Continue')
+                            : _step == 2
+                                ? (isSw ? 'Kagua Ankara' : 'Review invoice')
+                                : loc.invoiceSave,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1115,13 +1153,20 @@ class _LineCard extends StatelessWidget {
                   height: 24,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF334155)
+                        : Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     '${index + 1}',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFFE2E8F0)
+                          : Theme.of(context).colorScheme.primary,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1401,26 +1446,41 @@ class _SenderChip extends StatelessWidget {
     final name = (organization.name != null && organization.name!.isNotEmpty)
         ? organization.name!
         : (isSwahili ? 'Biashara Yako' : 'Your Business');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1E293B)
+            : AppColors.primaryContainer.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.resolveBorder(context)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.storefront_outlined, size: 18),
+          Icon(
+            Icons.storefront_outlined,
+            size: 18,
+            color: isDark ? const Color(0xFF93C5FD) : AppColors.primary,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '${isSwahili ? 'Kutoka' : 'From'}: $name',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.resolveTextPrimary(context),
+              ),
             ),
           ),
-          const Icon(Icons.lock_outline, size: 16),
+          Icon(
+            Icons.lock_outline,
+            size: 16,
+            color: AppColors.resolveTextTertiary(context),
+          ),
         ],
       ),
     );

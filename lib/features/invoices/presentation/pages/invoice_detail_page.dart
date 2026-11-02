@@ -219,14 +219,26 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF1E293B)
+                : AppColors.primaryContainer.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF334155)
+                  : Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.25),
+            ),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.print_outlined,
-                color: Color(0xFF2DD4BF),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF2DD4BF)
+                    : Theme.of(context).colorScheme.primary,
                 size: 22,
               ),
               const SizedBox(width: 10),
@@ -238,8 +250,8 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                       isSwahili
                           ? 'Muundo wa A4 Tayari Kuchapishwa'
                           : 'Print-Ready A4 Invoice Format',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppColors.resolveTextPrimary(context),
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
@@ -248,8 +260,8 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                       isSwahili
                           ? 'Tuma WhatsApp/Email au chapisha kwenye karatasi ya A4'
                           : 'Share via WhatsApp/Email or print directly on A4 paper',
-                      style: const TextStyle(
-                        color: Color(0xFF94A3B8),
+                      style: TextStyle(
+                        color: AppColors.resolveTextSecondary(context),
                         fontSize: 11,
                       ),
                     ),
@@ -259,7 +271,10 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
               const SizedBox(width: 8),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
+                  backgroundColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF0D9488)
+                          : Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                 ),
                 onPressed: _sharingPdf
@@ -271,7 +286,18 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF0F172A),
+                  foregroundColor:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.primary,
+                  side: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF64748B)
+                        : Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.5),
+                  ),
                 ),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(

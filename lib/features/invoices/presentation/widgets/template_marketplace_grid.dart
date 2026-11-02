@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../../../shared/design_system/app_colors.dart';
 import '../../domain/document_template.dart';
 
 class TemplateMarketplaceGrid extends StatelessWidget {
@@ -22,12 +23,15 @@ class TemplateMarketplaceGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (templates.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
         child: Center(
           child: Text(
             'Hakuna violezo vilivyopatikana.',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+            style: TextStyle(
+              color: AppColors.resolveTextSecondary(context),
+              fontSize: 13,
+            ),
           ),
         ),
       );
@@ -94,6 +98,7 @@ class _TemplateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageBytes = _decodeBase64(template.thumbnailBase64);
     final isThermal = template.isThermal;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Material(
       color: Colors.transparent,
@@ -103,19 +108,19 @@ class _TemplateCard extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.resolveCardBackground(context),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected
-                  ? const Color(0xFF0D9488)
-                  : const Color(0xFFE2E8F0),
+                  ? AppColors.primary
+                  : AppColors.resolveBorder(context),
               width: isSelected ? 2.5 : 1.0,
             ),
             boxShadow: [
               BoxShadow(
                 color: isSelected
-                    ? const Color(0xFF0D9488).withValues(alpha: 0.15)
-                    : Colors.black.withValues(alpha: 0.04),
+                    ? AppColors.primary.withValues(alpha: isDark ? 0.3 : 0.15)
+                    : Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                 blurRadius: isSelected ? 12 : 6,
                 offset: const Offset(0, 3),
               ),
@@ -128,9 +133,11 @@ class _TemplateCard extends StatelessWidget {
               // Preview Visual Thumbnail
               Expanded(
                 child: Container(
-                  color: isThermal
-                      ? const Color(0xFFF1F5F9)
-                      : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF1E293B)
+                      : (isThermal
+                          ? const Color(0xFFF1F5F9)
+                          : const Color(0xFFF8FAFC)),
                   child: Stack(
                     children: [
                       if (imageBytes != null)
@@ -161,7 +168,9 @@ class _TemplateCard extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
+                                  color: isDark
+                                      ? const Color(0xFF334155)
+                                      : const Color(0xFF0F172A),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: const Row(
@@ -185,15 +194,19 @@ class _TemplateCard extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE0F2FE),
+                                  color: isDark
+                                      ? AppColors.primary.withValues(alpha: 0.25)
+                                      : const Color(0xFFE0F2FE),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'A4 Standard',
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0369A1),
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF0369A1),
                                   ),
                                 ),
                               ),
@@ -203,15 +216,19 @@ class _TemplateCard extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 5, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF3C7),
+                                  color: isDark
+                                      ? const Color(0xFF78350F)
+                                      : const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'DEFAULT',
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFF92400E),
+                                    color: isDark
+                                        ? const Color(0xFFFDE68A)
+                                        : const Color(0xFF92400E),
                                   ),
                                 ),
                               ),
@@ -228,7 +245,7 @@ class _TemplateCard extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(3),
                             decoration: const BoxDecoration(
-                              color: Color(0xFF0D9488),
+                              color: AppColors.primary,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -255,8 +272,8 @@ class _TemplateCard extends StatelessWidget {
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: isSelected
-                            ? const Color(0xFF0D9488)
-                            : const Color(0xFF0F172A),
+                            ? AppColors.primary
+                            : AppColors.resolveTextPrimary(context),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -265,9 +282,9 @@ class _TemplateCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         template.description!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF64748B),
+                          color: AppColors.resolveTextSecondary(context),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

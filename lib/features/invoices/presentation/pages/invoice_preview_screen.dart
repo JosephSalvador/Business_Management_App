@@ -327,11 +327,11 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     return Column(
       children: [
         Container(
-          color: AppColors.surface,
+          color: AppColors.resolveCardBackground(context),
           child: TabBar(
             controller: _phoneTabController,
             labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.onSurfaceVariant,
+            unselectedLabelColor: AppColors.resolveTextSecondary(context),
             indicatorColor: AppColors.primary,
             indicatorWeight: 3,
             labelStyle: const TextStyle(
@@ -357,11 +357,11 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
             children: [
               SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                child: _buildControls(isSw),
+                child: _buildControls(context, isSw),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                child: _buildNativeCanvasPreview(isSw),
+                child: _buildNativeCanvasPreview(context, isSw),
               ),
             ],
           ),
@@ -394,10 +394,10 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
+              decoration: BoxDecoration(
+                color: AppColors.resolveCardBackground(context),
                 border: Border(
-                  bottom: BorderSide(color: AppColors.outlineVariant),
+                  bottom: BorderSide(color: AppColors.resolveBorder(context)),
                 ),
               ),
               child: Row(
@@ -437,19 +437,23 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                   padding: const EdgeInsets.all(16),
                   constraints: const BoxConstraints(maxHeight: 280),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.resolveCardBackground(context),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
+                        color: Colors.black.withValues(
+                          alpha: Theme.of(context).brightness == Brightness.dark
+                              ? 0.35
+                              : 0.12,
+                        ),
                         blurRadius: 16,
                         offset: const Offset(0, -4),
                       ),
                     ],
-                    border: Border.all(color: AppColors.outlineVariant),
+                    border: Border.all(color: AppColors.resolveBorder(context)),
                   ),
                   child: SingleChildScrollView(
-                    child: _buildControls(isSw),
+                    child: _buildControls(context, isSw),
                   ),
                 ),
               Row(
@@ -457,8 +461,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                   FloatingActionButton.small(
                     onPressed: () => setState(
                         () => _tabletSheetCollapsed = !_tabletSheetCollapsed),
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.onSurface,
+                    backgroundColor: AppColors.resolveCardBackground(context),
+                    foregroundColor: AppColors.resolveTextPrimary(context),
                     elevation: 2,
                     child: Icon(
                       _tabletSheetCollapsed
@@ -504,24 +508,24 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
             SizedBox(
               width: leftWidth,
               child: Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
+                decoration: BoxDecoration(
+                  color: AppColors.resolveCardBackground(context),
                   border: Border(
-                    right: BorderSide(color: AppColors.outlineVariant, width: 1),
+                    right: BorderSide(color: AppColors.resolveBorder(context), width: 1),
                   ),
                 ),
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
-                  child: _buildControls(isSw),
+                  child: _buildControls(context, isSw),
                 ),
               ),
             ),
             SizedBox(
               width: rightWidth,
               child: Container(
-                color: AppColors.surfaceDim,
+                color: AppColors.resolveSurfaceSecondary(context),
                 padding: const EdgeInsets.fromLTRB(28, 24, 28, 100),
-                child: _buildNativeCanvasPreview(isSw),
+                child: _buildNativeCanvasPreview(context, isSw),
               ),
             ),
           ],
@@ -545,7 +549,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     );
   }
 
-  Widget _buildControls(bool isSw) {
+  Widget _buildControls(BuildContext context, bool isSw) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -568,9 +573,15 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.primaryContainer,
+            color: isDark
+                ? AppColors.primary.withValues(alpha: 0.15)
+                : AppColors.primaryContainer,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+            border: Border.all(
+              color: isDark
+                  ? AppColors.primary.withValues(alpha: 0.3)
+                  : AppColors.primary.withValues(alpha: 0.2),
+            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -582,10 +593,12 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                   isSw
                       ? 'Hakiki hii inatumia GPU Canvas natively bila WebViews, inatuma binary data moja kwa moja kwenye spooler.'
                       : 'Native GPU canvas binary PDF preview. Spools directly to POS terminal hardware without WebViews.',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 11,
-                    color: AppColors.onPrimaryContainer,
+                    color: isDark
+                        ? AppColors.resolveTextPrimary(context)
+                        : AppColors.onPrimaryContainer,
                   ),
                 ),
               ),
@@ -596,7 +609,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     );
   }
 
-  Widget _buildNativeCanvasPreview(bool isSw) {
+  Widget _buildNativeCanvasPreview(BuildContext context, bool isSw) {
     if (_isLoading) {
       return Center(
         child: Column(
@@ -608,10 +621,10 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
               isSw
                   ? 'Inazalisha PDF binary...'
                   : 'Compiling native PDF binary stream...',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 13,
-                color: AppColors.tertiary,
+                color: AppColors.resolveTextSecondary(context),
               ),
             ),
           ],
@@ -650,12 +663,16 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       return Center(
         child: Text(
           isSw ? 'Hakuna hati iliyopatikana.' : 'No document available.',
-          style: const TextStyle(fontFamily: 'Inter', color: AppColors.tertiary),
+          style: TextStyle(
+            fontFamily: 'Inter',
+            color: AppColors.resolveTextSecondary(context),
+          ),
         ),
       );
     }
 
     final double targetWidth = _isThermal ? 320 : 640;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Center(
       child: AnimatedContainer(
@@ -667,14 +684,15 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           borderRadius: BorderRadius.circular(_isThermal ? 4 : 8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
           ],
           border: Border.all(
-            color:
-                _isThermal ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
+            color: isDark
+                ? const Color(0xFF475569)
+                : (_isThermal ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
             width: _isThermal ? 2.0 : 1.0,
           ),
         ),
@@ -692,7 +710,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.8),
+                  color: (isDark ? const Color(0xFF334155) : const Color(0xFF0F172A))
+                      .withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(

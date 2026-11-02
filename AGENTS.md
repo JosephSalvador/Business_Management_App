@@ -216,3 +216,13 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Upgrade _LockedModulePlaceholder into an engaging value discovery card with 1-tap activation.
 - [x] Task 6: Add Workspace Mode selector in SettingsPage so existing merchants can switch between Retail, Invoicing, or All-in-One.
 - [x] Task 7: Verify zero disruption for existing users, bump version to 1.0.0+77, commit, push, and trigger GitHub Actions build (Run 41431357134 — APK published to releases/tag/latest).
+
+## Implementation Plan — Dark & Light Mode Color Awareness in Invoice Screens
+- [x] Task 1: Create Invoice Wizard (`create_invoice_page.dart`) — Make Stepper, balance banner, sender chip, and line index badges adaptively theme-aware in light and dark mode.
+- [x] Task 2: Invoice Detail Page (`invoice_detail_page.dart`) — Fix A4 PDF top banner contrast, OutlinedButton text color, and sync status container in both modes.
+- [x] Task 3: Invoices List Page (`invoices_page.dart`) — Transform `_InvoicesSummaryBar` and document title chip from hardcoded navy into theme-adaptive cards with proper text contrast.
+- [x] Task 4: Uniform Command Bar (`uniform_command_bar.dart`) — Fix floating bar background, print button text, and profile chip to resolve contrast in dark mode.
+- [x] Task 5: Document Templates & Preview Screens (`document_templates_page.dart`, `invoice_preview_screen.dart`) — Replace static surface and onSurface tokens with dynamic resolvers.
+- [x] Task 6: Invoice Configuration Widgets (`commercial_palette_picker.dart`, `color_hex_picker.dart`, `custom_override_field.dart`, `document_selector_toggle.dart`, `print_profile_selector.dart`, `template_marketplace_grid.dart`) — Replace hardcoded slate and surface colors with theme-aware tokens.
+- [x] Task 7: Bump version to 1.0.0+78, commit, push to `feature/invoice-delivery`, and trigger remote GitHub Actions build.
+

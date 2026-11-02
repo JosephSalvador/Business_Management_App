@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../shared/design_system/app_colors.dart';
+
 class ColorHexPicker extends StatefulWidget {
   const ColorHexPicker({
     super.key,
@@ -80,6 +82,7 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
   @override
   Widget build(BuildContext context) {
     final currentColor = _parseColor(widget.selectedHex);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,19 +95,19 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
               children: [
                 Text(
                   widget.label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155),
+                    color: AppColors.resolveTextPrimary(context),
                   ),
                 ),
                 if (widget.subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     widget.subtitle!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF64748B),
+                      color: AppColors.resolveTextSecondary(context),
                     ),
                   ),
                 ],
@@ -117,7 +120,10 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
               decoration: BoxDecoration(
                 color: currentColor,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
+                  width: 2,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: currentColor.withValues(alpha: 0.3),
@@ -151,7 +157,7 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isSelected
-                        ? const Color(0xFF0F172A)
+                        ? (isDark ? Colors.white : const Color(0xFF0F172A))
                         : Colors.transparent,
                     width: isSelected ? 2.5 : 1,
                   ),
@@ -179,40 +185,43 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
           child: TextField(
             controller: _textController,
             onChanged: _onTextChange,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontFamily: 'monospace',
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1E293B),
+              color: AppColors.resolveTextPrimary(context),
             ),
             decoration: InputDecoration(
               isDense: true,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              prefixIcon: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
                   'HEX',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF64748B),
+                    color: AppColors.resolveTextSecondary(context),
                   ),
                 ),
               ),
               prefixIconConstraints:
                   const BoxConstraints(minWidth: 0, minHeight: 0),
               hintText: '#0F172A',
-              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              hintStyle: TextStyle(
+                fontSize: 12,
+                color: AppColors.resolveTextTertiary(context),
+              ),
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: AppColors.resolveSurfaceSecondary(context),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const ColorBorder(Color(0xFFE2E8F0)),
+                borderSide: BorderSide(color: AppColors.resolveBorder(context)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                borderSide: BorderSide(color: AppColors.resolveBorder(context)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -224,8 +233,4 @@ class _ColorHexPickerState extends State<ColorHexPicker> {
       ],
     );
   }
-}
-
-class ColorBorder extends BorderSide {
-  const ColorBorder(Color color) : super(color: color);
 }
