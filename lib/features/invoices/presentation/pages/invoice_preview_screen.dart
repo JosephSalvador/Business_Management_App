@@ -8,7 +8,6 @@ import 'package:pdfx/pdfx.dart';
 import 'package:printing/printing.dart';
 
 import '../../../../core/network/connectivity_monitor.dart';
-import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
