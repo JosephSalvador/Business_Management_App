@@ -106,8 +106,10 @@ Map<String, dynamic> buildCreateSaleBody({
         {
           'productId': line.productId,
           'quantity': line.quantity,
-          'unitPrice': line.unitPriceOverride ?? line.unitPrice,
-          if (line.unitPriceOverride != null) 'productName': line.name,
+          if (line.unitPriceOverride != null) ...{
+            'unitPrice': line.unitPriceOverride,
+            'productName': line.name,
+          },
         },
     ],
     'payments': [
