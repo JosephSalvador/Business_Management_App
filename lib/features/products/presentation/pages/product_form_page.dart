@@ -181,7 +181,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               if (!canSetPrice) ...[
                 const SizedBox(height: 8),
                 Text(
-                  context.loc.billingPriceLockedMessage,
+                  context.loc.billingPriceLocked,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ],
@@ -211,7 +211,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _unitId,
+                initialValue: _unitId,
                 decoration: InputDecoration(
                   labelText: context.loc.productFormUnit,
                 ),
@@ -525,7 +525,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     } on PaymentRequiredException {
       setState(() {
         _saving = false;
-        _error = context.loc.billingPriceLockedMessage;
+        _error = context.loc.billingPriceLocked;
       });
       unawaited(
         ref.read(subscriptionEntitlementControllerProvider.notifier).refresh(),

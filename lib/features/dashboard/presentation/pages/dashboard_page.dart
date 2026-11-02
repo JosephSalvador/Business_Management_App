@@ -14,9 +14,6 @@ import '../../../../shared/format/money.dart';
 import '../../application/dashboard_controller.dart';
 import '../widgets/revenue_line_chart.dart';
 import '../../../../app/router.dart';
-import '../../../billing/application/billing_providers.dart';
-import '../../../billing/presentation/pages/billing_page.dart';
-import '../../../capabilities/application/capabilities_controller.dart';
 import '../../../capabilities/domain/capabilities.dart';
 import '../../../notifications/presentation/widgets/notification_bell_button.dart';
 

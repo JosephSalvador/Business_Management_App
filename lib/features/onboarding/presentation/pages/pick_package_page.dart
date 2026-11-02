@@ -123,13 +123,6 @@ class _PickPackagePageState extends ConsumerState<PickPackagePage> {
 
   @override
   Widget build(BuildContext context) {
-    final basePlans = _plans
-        .where((p) => !p.isPackage && p.code.toLowerCase() != 'free')
-        .toList();
-    final packages = _plans
-        .where((p) => p.isPackage && p.code.toLowerCase() != 'free')
-        .toList();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chagua Kifurushi'),

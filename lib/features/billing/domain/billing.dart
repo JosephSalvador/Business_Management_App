@@ -103,6 +103,10 @@ class SubscriptionEntitlement {
 
   bool get hasFullAccess => accessLevel == BillingAccessLevel.full;
   bool get isInDebt => status == SubscriptionStatus.debt;
+  bool get isTrial => status == SubscriptionStatus.trial;
+  bool get isActive => status == SubscriptionStatus.active;
+  DateTime get trialEndsAt =>
+      nextDueUtc ?? DateTime.now().add(const Duration(days: 14));
 
   bool hasFeature(String key) => effectiveFeatureKeys.contains(key);
 

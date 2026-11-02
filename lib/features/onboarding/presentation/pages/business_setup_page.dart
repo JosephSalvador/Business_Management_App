@@ -6,7 +6,7 @@ import '../../../../app/providers.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../app/router.dart';
-import '../../../capabilities/application/capabilities_controller.dart';
+import '../../../products/application/catalog_controller.dart';
 import '../../../capabilities/domain/capabilities.dart';
 import '../../application/workspace_controller.dart';
 
