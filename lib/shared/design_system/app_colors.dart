@@ -45,6 +45,7 @@ class AppColors {
   // ── Outline ─────────────────────────────────────────────────────
   static const Color outline = Color(0xFFD1D5DB);
   static const Color outlineVariant = Color(0xFFE5E7EB);
+  static const Color neutralContainer = Color(0xFFF1F5F9);
 
   // ── Semantic ────────────────────────────────────────────────────
   static const Color error = Color(0xFFEF4444);
@@ -99,6 +100,8 @@ class AppColors {
       Theme.of(context).brightness == Brightness.dark
           ? const Color(0xFF334155)
           : outline;
+
+  static Color resolveBorder(BuildContext context) => resolveOutline(context);
 
   // ── Legacy aliases (backward compat) ────────────────────────────
   static const Color primaryColor = primary;

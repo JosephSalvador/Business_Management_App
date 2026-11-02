@@ -111,7 +111,6 @@ void main() {
     setUp(() {
       generator = LocalPdfDocumentGenerator();
       sampleOrg = const Organization(
-        id: 'org-1',
         name: 'Dar es Salaam Enterprises',
         address: 'Kariakoo, Livingstone St, Plot 42',
         phone: '+255 754 112 233',

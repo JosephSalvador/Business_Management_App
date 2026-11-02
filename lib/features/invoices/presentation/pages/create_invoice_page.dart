@@ -1049,8 +1049,8 @@ class _SellerBrandingBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    organization.name.isNotEmpty
-                        ? organization.name
+                    (organization.name != null && organization.name!.isNotEmpty)
+                        ? organization.name!
                         : (isSwahili ? 'Biashara Yako' : 'Your Business'),
                     style: const TextStyle(
                       color: Colors.white,
@@ -1095,7 +1095,7 @@ class _SectionHeader extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: AppColors.brandPrimary),
+        Icon(icon, size: 18, color: AppColors.primary),
         const SizedBox(width: 8),
         Text(
           title,

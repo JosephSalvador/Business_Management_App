@@ -103,19 +103,17 @@ class DocumentTemplateState {
   }
 }
 
-class DocumentTemplateController extends StateNotifier<DocumentTemplateState> {
-  DocumentTemplateController({
-    required DocumentTemplateRepository repository,
-  })  : _repository = repository,
-        super(const DocumentTemplateState());
-
-  final DocumentTemplateRepository _repository;
+class DocumentTemplateController extends Notifier<DocumentTemplateState> {
+  DocumentTemplateRepository get _repository =>
+      ref.read(documentTemplateRepositoryProvider);
   Timer? _debounceTimer;
 
   @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    super.dispose();
+  DocumentTemplateState build() {
+    ref.onDispose(() {
+      _debounceTimer?.cancel();
+    });
+    return const DocumentTemplateState();
   }
 
   Future<void> load() async {
@@ -344,9 +342,6 @@ class DocumentTemplateController extends StateNotifier<DocumentTemplateState> {
 }
 
 final documentTemplateControllerProvider =
-    StateNotifierProvider<DocumentTemplateController, DocumentTemplateState>(
-  (ref) {
-    final repository = ref.watch(documentTemplateRepositoryProvider);
-    return DocumentTemplateController(repository: repository);
-  },
+    NotifierProvider<DocumentTemplateController, DocumentTemplateState>(
+  DocumentTemplateController.new,
 );

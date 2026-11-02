@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,9 +50,9 @@ class LocalPdfDocumentGenerator {
     bool isSwahili = false,
   }) async {
     final primaryColor = _parseHex(primaryHex, _defaultPrimary);
-    final secondaryColor = _parseHex(secondaryHex, _defaultSecondary);
-    final orgName = organization?.name.isNotEmpty == true
-        ? organization!.name
+    final String orgName = (organization?.name != null &&
+            organization!.name!.isNotEmpty)
+        ? organization.name!
         : 'Biashara Yetu';
     final currency = invoice.currency.isNotEmpty ? invoice.currency : 'TZS';
 
@@ -482,8 +481,9 @@ class LocalPdfDocumentGenerator {
     Organization? organization,
     bool isSwahili = false,
   }) async {
-    final orgName = organization?.name.isNotEmpty == true
-        ? organization!.name
+    final String orgName = (organization?.name != null &&
+            organization!.name!.isNotEmpty)
+        ? organization.name!
         : 'Biashara Yetu';
     final currency = invoice.currency.isNotEmpty ? invoice.currency : 'TZS';
 
@@ -649,8 +649,9 @@ class LocalPdfDocumentGenerator {
     bool isSwahili = false,
   }) async {
     final primaryColor = _parseHex(primaryHex, _defaultPrimary);
-    final orgName = organization?.name.isNotEmpty == true
-        ? organization!.name
+    final String orgName = (organization?.name != null &&
+            organization!.name!.isNotEmpty)
+        ? organization.name!
         : 'Biashara Yetu';
 
     final document = pw.Document(
@@ -933,8 +934,9 @@ class LocalPdfDocumentGenerator {
     Organization? organization,
     bool isSwahili = false,
   }) async {
-    final orgName = organization?.name.isNotEmpty == true
-        ? organization!.name
+    final String orgName = (organization?.name != null &&
+            organization!.name!.isNotEmpty)
+        ? organization.name!
         : 'Biashara Yetu';
 
     final document = pw.Document(

@@ -40,8 +40,10 @@ class CustomerInvoicePdfService {
 
     final dateFormat = DateFormat('dd MMM yyyy');
     final numberFormat = NumberFormat('#,##0.##');
-    final currency =
-        organization.currency.isNotEmpty ? organization.currency : 'TZS';
+    final currency = organization.currency != null &&
+            organization.currency!.isNotEmpty
+        ? organization.currency!
+        : 'TZS';
 
     String fmtMoney(double amount) => '$currency ${numberFormat.format(amount)}';
 
@@ -182,7 +184,7 @@ class CustomerInvoicePdfService {
             qrData: qrData,
             signatoryName: signatoryName,
             signatoryTitle: signatoryTitle,
-            organizationName: organization.name,
+            organizationName: organization.name ?? 'Biashara Yetu',
             isSwahili: isSwahili,
           ),
         ],
@@ -243,7 +245,7 @@ class CustomerInvoicePdfService {
     required Organization organization,
     required pw.MemoryImage? logoImage,
   }) {
-    final initials = _extractInitials(organization.name);
+    final initials = _extractInitials(organization.name ?? 'BY');
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -286,8 +288,8 @@ class CustomerInvoicePdfService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                organization.name.isNotEmpty
-                    ? organization.name.toUpperCase()
+                (organization.name != null && organization.name!.isNotEmpty)
+                    ? organization.name!.toUpperCase()
                     : 'BUSINESS NAME',
                 style: pw.TextStyle(
                   fontSize: 15,
@@ -404,11 +406,13 @@ class CustomerInvoicePdfService {
                 isSwahili ? 'Tarehe ya Kutolewa:' : 'Issue Date:',
                 dateFormat.format(invoice.issueDate.toLocal()),
               ),
-              pw.SizedBox(height: 3),
-              _metaRow(
-                isSwahili ? 'Tarehe ya Mwisho:' : 'Due Date:',
-                dateFormat.format(invoice.dueDate.toLocal()),
-              ),
+              if (invoice.dueDate != null) ...[
+                pw.SizedBox(height: 3),
+                _metaRow(
+                  isSwahili ? 'Tarehe ya Mwisho:' : 'Due Date:',
+                  dateFormat.format(invoice.dueDate!.toLocal()),
+                ),
+              ],
               if (invoice.paymentTerms != null &&
                   invoice.paymentTerms!.trim().isNotEmpty) ...[
                 pw.SizedBox(height: 3),
@@ -491,7 +495,7 @@ class CustomerInvoicePdfService {
           ),
           pw.SizedBox(height: 4),
           pw.Text(
-            invoice.customerName,
+            invoice.customerName ?? '—',
             style: pw.TextStyle(
               fontSize: 12,
               fontWeight: pw.FontWeight.bold,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/providers.dart';
 import '../../../../core/platform/logo_picker_service.dart';
 import '../../../../shared/design_system/app_colors.dart';
+import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
 
 /// Opens a comprehensive bottom sheet where any business user can:
@@ -12,13 +13,23 @@ import '../../../settings/data/organization_repository.dart';
 /// 3. Configure Bank Details, Mobile Money (Lipa Namba), Default Terms, and Authorized Signatory
 Future<void> showInvoiceBrandingSheet(
   BuildContext context, {
-  required Organization organization,
-}) {
+  Organization? organization,
+}) async {
+  var org = organization ?? const Organization();
+  if (organization == null) {
+    try {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final loaded =
+          await container.read(organizationRepositoryProvider).getOrganization();
+      if (loaded != null) org = loaded;
+    } catch (_) {}
+  }
+  if (!context.mounted) return;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => InvoiceBrandingSheet(organization: organization),
+    builder: (_) => InvoiceBrandingSheet(organization: org),
   );
 }
 

@@ -86,7 +86,6 @@ void main() {
         () async {
       final service = CustomerInvoicePdfService();
       const org = Organization(
-        id: 'org-1',
         name: 'Jolinx Hardware & Supplies Ltd',
         taxId: '109-887-221',
         address: 'Kariakoo, Msimbazi Street, Dar es Salaam',

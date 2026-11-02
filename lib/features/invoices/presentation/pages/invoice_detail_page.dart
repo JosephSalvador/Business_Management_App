@@ -77,7 +77,6 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
       return settingsState.organization;
     }
     return const Organization(
-      id: 'local',
       name: 'Your Business',
       currency: 'TZS',
     );

@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pdf/pdf.dart';
+import 'package:pdf/pdf.dart' hide PdfDocument;
 import 'package:pdfx/pdfx.dart';
 import 'package:printing/printing.dart';
 
@@ -14,6 +14,7 @@ import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../sales/data/sales_providers.dart'
     show connectionQualityProvider;
+import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../data/invoice_providers.dart';
 import '../../domain/document_template.dart';
@@ -48,8 +49,7 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
 class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     with SingleTickerProviderStateMixin {
   late TabController _phoneTabController;
-  PdfDocument? _pdfDocument;
-  PdfPageController? _pdfController;
+  PdfController? _pdfController;
   Uint8List? _rawPdfBytes;
 
   bool _isLoading = false;
@@ -133,17 +133,15 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
 
         final pdfBytes = Uint8List.fromList(bytesList);
 
-        // Open thread-safe native PdfDocument structure from raw binary
-        final document = await PdfDocument.openData(pdfBytes);
-
         _pdfController?.dispose();
-        final controller = PdfPageController(page: 1);
+        final controller = PdfController(
+          document: PdfDocument.openData(pdfBytes),
+        );
 
         if (!mounted) return;
 
         setState(() {
           _rawPdfBytes = pdfBytes;
-          _pdfDocument = document;
           _pdfController = controller;
           _isLoading = false;
           _isSynced = true;
@@ -202,16 +200,15 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
               );
       }
 
-      final document = await PdfDocument.openData(pdfBytes);
-
       _pdfController?.dispose();
-      final controller = PdfPageController(page: 1);
+      final controller = PdfController(
+        document: PdfDocument.openData(pdfBytes),
+      );
 
       if (!mounted) return;
 
       setState(() {
         _rawPdfBytes = pdfBytes;
-        _pdfDocument = document;
         _pdfController = controller;
         _isLoading = false;
         _isSynced = isDocSynced;
@@ -686,7 +683,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            PdfPageView(
+            PdfView(
               controller: _pdfController!,
               pageSnapping: false,
             ),

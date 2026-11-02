@@ -36,8 +36,10 @@ class InvoiceA4PreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM yyyy');
     final numberFormat = NumberFormat('#,##0.##');
-    final currency =
-        organization.currency.isNotEmpty ? organization.currency : 'TZS';
+    final currency = organization.currency != null &&
+            organization.currency!.isNotEmpty
+        ? organization.currency!
+        : 'TZS';
 
     String fmtMoney(double amount) => '$currency ${numberFormat.format(amount)}';
 
@@ -63,8 +65,8 @@ class InvoiceA4PreviewCard extends StatelessWidget {
     final qrData = [
       invoice.documentTitle,
       'No: ${invoice.invoiceNumber}',
-      'Seller: ${organization.name}',
-      'Client: ${invoice.customerName}',
+      'Seller: ${organization.name ?? ""}',
+      'Client: ${invoice.customerLabel}',
       'Total: ${fmtMoney(invoice.totalAmount)}',
       'Balance: ${fmtMoney(invoice.balanceDue)}',
     ].join(' | ');
@@ -112,8 +114,9 @@ class InvoiceA4PreviewCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            organization.name.isNotEmpty
-                                ? organization.name.toUpperCase()
+                            (organization.name != null &&
+                                    organization.name!.isNotEmpty)
+                                ? organization.name!.toUpperCase()
                                 : 'YOUR BUSINESS NAME',
                             style: const TextStyle(
                               fontSize: 15,
@@ -223,10 +226,11 @@ class InvoiceA4PreviewCard extends StatelessWidget {
                         isSwahili ? 'Tarehe ya Kutolewa' : 'Issue Date',
                         dateFormat.format(invoice.issueDate.toLocal()),
                       ),
-                      _metaItem(
-                        isSwahili ? 'Tarehe ya Mwisho' : 'Due Date',
-                        dateFormat.format(invoice.dueDate.toLocal()),
-                      ),
+                      if (invoice.dueDate != null)
+                        _metaItem(
+                          isSwahili ? 'Tarehe ya Mwisho' : 'Due Date',
+                          dateFormat.format(invoice.dueDate!.toLocal()),
+                        ),
                       if (invoice.paymentTerms != null &&
                           invoice.paymentTerms!.trim().isNotEmpty)
                         _metaItem(
@@ -272,7 +276,7 @@ class InvoiceA4PreviewCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        invoice.customerName,
+                        invoice.customerLabel,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -691,7 +695,7 @@ class InvoiceA4PreviewCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'FOR: ${organization.name.toUpperCase()}',
+                              'FOR: ${(organization.name ?? "BUSINESS").toUpperCase()}',
                               style: const TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w700,
@@ -744,7 +748,7 @@ class InvoiceA4PreviewCard extends StatelessWidget {
         child: Image.memory(logoBytes, fit: BoxFit.contain),
       );
     }
-    final words = organization.name
+    final words = (organization.name ?? 'JB')
         .trim()
         .split(RegExp(r'\s+'))
         .where((w) => w.isNotEmpty)

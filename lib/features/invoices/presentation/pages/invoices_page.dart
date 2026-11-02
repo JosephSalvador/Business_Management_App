@@ -118,7 +118,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               ? items
               : items.where((inv) {
                   final num = inv.number.toLowerCase();
-                  final name = inv.customerName.toLowerCase();
+                  final name = (inv.customerName ?? '').toLowerCase();
                   final refNo = (inv.referenceNumber ?? '').toLowerCase();
                   final amount = inv.totalAmount.toString();
                   return num.contains(_filter) ||
@@ -384,9 +384,7 @@ class _InvoiceTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                invoice.customerName.isEmpty
-                    ? loc.invoiceWalkIn
-                    : invoice.customerName,
+                invoice.customerLabel,
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: AppColors.resolveTextPrimary(context),
@@ -396,7 +394,8 @@ class _InvoiceTile extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 [
-                  '${isSwahili ? "Mwisho" : "Due"}: ${dateFmt.format(invoice.dueDate.toLocal())}',
+                  if (invoice.dueDate != null)
+                    '${isSwahili ? "Mwisho" : "Due"}: ${dateFmt.format(invoice.dueDate!.toLocal())}',
                   if (invoice.referenceNumber != null &&
                       invoice.referenceNumber!.trim().isNotEmpty)
                     'Ref: ${invoice.referenceNumber!.trim()}',

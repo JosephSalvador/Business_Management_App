@@ -160,3 +160,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Fallback Preview Integration — Updated `InvoicePreviewScreen` to automatically compile and render local PDF bytes when offline or if server endpoint fails.
 - [x] Task 6: Unit Tests & Verification — Created `offline_invoicing_test.dart` verifying domain model serialization, sync status tracking, and on-device PDF compilation.
 - [x] Task 7: Version Code Bump — Incremented version code to `1.0.0+70` in `pubspec.yaml` and `app_update_service.dart`.
+
+## Implementation Plan — CI Analyzer Resolution & Release APK Build v1.0.0+71
+- [x] Task 1: Resolve Riverpod 3 Notifier migration in `DocumentTemplateController` and `documentTemplateControllerProvider`.
+- [x] Task 2: Fix `AppColors.resolveBorder` and `neutralContainer` definitions.
+- [x] Task 3: Fix `InvoiceDraftLine.productId`, `InvoiceLine.taxRate` / `productId`, and `CustomerInvoice` optional parameters and backward-compatible getters.
+- [x] Task 4: Fix null checks across `customer_invoice_pdf_service.dart`, `local_pdf_document_generator.dart`, `invoice_a4_preview_card.dart`, `invoices_page.dart`, and `invoice_preview_screen.dart` (using `PdfView` & `PdfController`).
+- [x] Task 5: Bump version code to `1.0.0+71` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 6: Commit and push fixes on branch `feature/invoice-delivery`.
+- [ ] Task 7: Trigger remote GitHub Actions workflow `build-clients.yml` with `deploy_target: production` to compile and release the latest signed APK.

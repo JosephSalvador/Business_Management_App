@@ -26,14 +26,17 @@ class InvoiceLine {
     required this.description,
     required this.quantity,
     required this.unitPrice,
-    required this.taxRatePercent,
+    double taxRatePercent = 0,
+    double? taxRate,
     required this.lineTotal,
     required this.taxAmount,
     this.unitOfMeasure = 'Pcs',
     this.discountAmount = 0,
-  });
+    this.productId,
+  }) : taxRatePercent = taxRate ?? taxRatePercent;
 
   final String id;
+  final String? productId;
   final String description;
   final String unitOfMeasure;
   final double quantity;
@@ -70,26 +73,46 @@ class InvoiceLine {
       };
 }
 
+typedef CustomerInvoiceLine = InvoiceLine;
+
+class CustomerInvoicePayment {
+  const CustomerInvoicePayment({
+    required this.id,
+    required this.amount,
+    required this.paymentMethod,
+    this.reference,
+    required this.paidAt,
+  });
+
+  final String id;
+  final double amount;
+  final String paymentMethod;
+  final String? reference;
+  final DateTime paidAt;
+}
+
 class CustomerInvoice {
   const CustomerInvoice({
     required this.id,
-    required this.number,
-    required this.customerId,
-    required this.customerName,
-    required this.currency,
+    String? number,
+    String? invoiceNumber,
+    this.customerId,
+    this.customerName,
+    this.currency = 'TZS',
     required this.issueDate,
-    required this.dueDate,
-    required this.notes,
+    this.dueDate,
+    this.notes,
     required this.status,
     required this.subtotal,
-    required this.taxAmount,
+    this.taxAmount = 0,
     required this.totalAmount,
-    required this.amountPaid,
-    required this.balanceDue,
-    required this.paymentMethod,
-    required this.paymentReference,
-    required this.paidAtUtc,
-    required this.lines,
+    this.amountPaid = 0,
+    this.balanceDue = 0,
+    this.paymentMethod,
+    this.paymentReference,
+    this.paidAtUtc,
+    this.lines = const [],
+    this.payments = const [],
     this.documentTitle = 'INVOICE',
     this.referenceNumber,
     this.paymentTerms,
@@ -103,7 +126,7 @@ class CustomerInvoice {
     this.authorizedSignatoryName,
     this.authorizedSignatoryTitle,
     this.isSynced = true,
-  });
+  }) : number = number ?? invoiceNumber ?? '';
 
   final String id;
   final String number;
@@ -135,7 +158,10 @@ class CustomerInvoice {
   final String? paymentReference;
   final DateTime? paidAtUtc;
   final List<InvoiceLine> lines;
+  final List<CustomerInvoicePayment> payments;
   final bool isSynced;
+
+  String get invoiceNumber => number;
 
   String get customerLabel =>
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
@@ -326,6 +352,8 @@ class CustomerInvoiceSummary {
   String get customerLabel =>
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
 
+  String get invoiceNumber => number;
+
   bool get isOverdue {
     final due = dueDate;
     if (due == null || !status.isOpen) return false;
@@ -382,6 +410,7 @@ class InvoicePage {
 
 class InvoiceDraftLine {
   InvoiceDraftLine({
+    this.productId,
     this.description = '',
     this.unitOfMeasure = 'Pcs',
     this.quantity = 1,
@@ -390,6 +419,7 @@ class InvoiceDraftLine {
     this.taxRatePercent = 0,
   });
 
+  String? productId;
   String description;
   String unitOfMeasure;
   double quantity;
@@ -407,6 +437,7 @@ class InvoiceDraftLine {
   double get lineTax => lineTotal * taxRatePercent / 100;
 
   Map<String, dynamic> toJson() => {
+        if (productId != null) 'productId': productId,
         'description': description.trim(),
         'unitOfMeasure':
             unitOfMeasure.trim().isEmpty ? 'Pcs' : unitOfMeasure.trim(),
