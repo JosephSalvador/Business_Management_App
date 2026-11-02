@@ -215,4 +215,4 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Make bottom navigation in HomePage adaptive (replace locked POS tab with Invoices for invoice-only users).
 - [x] Task 5: Upgrade _LockedModulePlaceholder into an engaging value discovery card with 1-tap activation.
 - [x] Task 6: Add Workspace Mode selector in SettingsPage so existing merchants can switch between Retail, Invoicing, or All-in-One.
-- [x] Task 7: Verify zero disruption for existing users, bump version to 1.0.0+77, commit, push, and trigger GitHub Actions build.
+- [x] Task 7: Verify zero disruption for existing users, bump version to 1.0.0+77, commit, push, and trigger GitHub Actions build (Run 41431357134 — APK published to releases/tag/latest).
