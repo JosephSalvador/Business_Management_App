@@ -3040,4 +3040,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get billingPriceLockedMessage =>
       'Renew your subscription to set selling and wholesale prices.';
+
+  @override
+  String get dismiss => 'Dismiss';
 }

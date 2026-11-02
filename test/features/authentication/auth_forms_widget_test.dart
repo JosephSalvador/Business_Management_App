@@ -169,6 +169,30 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('dismissible alert card disappears when dismiss button is tapped',
+        (tester) async {
+      await pumpRegister(tester);
+
+      await continueToStep2(tester);
+      final passwordFields = find.byType(PasswordField);
+      await tester.enterText(passwordFields.first, 'Passw0rd!');
+      await tester.enterText(passwordFields.last, 'Passw0rd!');
+      await tester.pump();
+
+      // Submit without checking terms -> triggers banner error card
+      await tester.ensureVisible(find.text('Fungua akaunti'));
+      await tester.tap(find.text('Fungua akaunti'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('dismissible_alert_card')), findsOneWidget);
+
+      // Tap the dismiss button on the card
+      await tester.tap(find.byKey(const Key('dismiss_alert_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('dismissible_alert_card')), findsNothing);
+    });
   });
 }
 

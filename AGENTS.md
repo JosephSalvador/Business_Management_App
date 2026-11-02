@@ -179,3 +179,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Bump version code to `1.0.0+72` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 7: Commit and push changes to branch `feature/invoice-delivery`.
 - [x] Task 8: Trigger GitHub Actions `build-clients.yml` with `deploy_target: production` and monitor until the release APK is published (Run 41408849718).
+
+## Implementation Plan — Registration Alert Dismissibility & Production APK Release v1.0.0+73
+- [x] Task 1: Add `dismiss` localization strings to ARB and generated localizations (`app_en.arb`, `app_sw.arb`, `app_localizations.dart`, etc.).
+- [x] Task 2: Build `_DismissibleAlertCard` widget with error styling, warning icon, optional login action link, and explicit close button ('X' icon and tooltip).
+- [x] Task 3: Enhance `register_page.dart` with `_dismissError`, `_showErrorCard` (`showCloseIcon: true`, floating card behavior), and in-field `onChanged` error clearing.
+- [x] Task 4: Add widget test in `auth_forms_widget_test.dart` verifying `_DismissibleAlertCard` dismissal.
+- [x] Task 5: Bump client version to `1.0.0+73` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 6: Commit and push changes to branch `feature/invoice-delivery`.
+- [ ] Task 7: Trigger GitHub Actions `build-clients.yml` with `deploy_target: production` and monitor until the release APK is published.

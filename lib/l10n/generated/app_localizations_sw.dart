@@ -3049,4 +3049,7 @@ class AppLocalizationsSw extends AppLocalizations {
   @override
   String get billingPriceLockedMessage =>
       'Endelea mpango wako ili kuweka bei za uuzaji na rejareja.';
+
+  @override
+  String get dismiss => 'Funga';
 }

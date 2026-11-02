@@ -5875,6 +5875,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Renew your subscription to set selling and wholesale prices.'**
   String get billingPriceLockedMessage;
+
+  /// No description provided for @dismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get dismiss;
 }
 
 class _AppLocalizationsDelegate

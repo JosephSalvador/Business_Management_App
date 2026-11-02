@@ -1156,5 +1156,6 @@
   "billingInvoiceReference": "Payment reference",
   "billingInvoicePaidAt": "Paid on",
   "billingPriceLocked": "Selling price (renewal required)",
-  "billingPriceLockedMessage": "Renew your subscription to set selling and wholesale prices."
+  "billingPriceLockedMessage": "Renew your subscription to set selling and wholesale prices.",
+  "dismiss": "Dismiss"
 }

@@ -1156,5 +1156,6 @@
   "billingInvoiceReference": "Kumbukumbu ya malipo",
   "billingInvoicePaidAt": "Imelipwa tarehe",
   "billingPriceLocked": "Bei ya uuzaji (inahitaji kuendeshwa)",
-  "billingPriceLockedMessage": "Endelea mpango wako ili kuweka bei za uuzaji na rejareja."
+  "billingPriceLockedMessage": "Endelea mpango wako ili kuweka bei za uuzaji na rejareja.",
+  "dismiss": "Funga"
 }

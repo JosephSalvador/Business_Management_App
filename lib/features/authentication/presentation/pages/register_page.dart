@@ -53,6 +53,38 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     super.dispose();
   }
 
+  void _dismissError() {
+    setState(() => _errors = null);
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    }
+  }
+
+  void _showErrorCard({
+    required String message,
+    bool isConflict = false,
+  }) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        showCloseIcon: true,
+        closeIconColor: Colors.white,
+        duration: const Duration(seconds: 8),
+        action: isConflict
+            ? SnackBarAction(
+                label: context.loc.haveAccount,
+                textColor: Colors.white,
+                onPressed: () => context.go(Routes.login),
+              )
+            : null,
+      ),
+    );
+  }
+
   Future<void> _nextStep() async {
     if (!_formKey.currentState!.validate() || _busy) return;
     setState(() {
@@ -71,19 +103,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         setState(() {
           _errors = AuthFieldErrors(
             fieldErrors: {'Email': context.loc.emailAlreadyTaken},
+            banner: context.loc.emailAlreadyTaken,
           );
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.loc.emailAlreadyTaken),
-              backgroundColor: AppColors.error,
-              action: SnackBarAction(
-                label: context.loc.haveAccount,
-                textColor: Colors.white,
-                onPressed: () => context.go(Routes.login),
-              ),
-            ),
+          _showErrorCard(
+            message: context.loc.emailAlreadyTaken,
+            isConflict: true,
           );
         }
         return;
@@ -92,19 +118,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         setState(() {
           _errors = AuthFieldErrors(
             fieldErrors: {'Phone': context.loc.phoneAlreadyTaken},
+            banner: context.loc.phoneAlreadyTaken,
           );
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.loc.phoneAlreadyTaken),
-              backgroundColor: AppColors.error,
-              action: SnackBarAction(
-                label: context.loc.haveAccount,
-                textColor: Colors.white,
-                onPressed: () => context.go(Routes.login),
-              ),
-            ),
+          _showErrorCard(
+            message: context.loc.phoneAlreadyTaken,
+            isConflict: true,
           );
         }
         return;
@@ -157,6 +177,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       }
     } on AppException catch (error) {
       final mapped = mapAuthError(error);
+      final isConflict = error is ConflictException ||
+          mapped.fieldErrors.containsKey('Email') ||
+          mapped.fieldErrors.containsKey('Phone');
       setState(() {
         _errors = mapped;
         // If the conflict was on an identity field, route back to Step 0 immediately
@@ -164,7 +187,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             mapped.fieldErrors.containsKey('Phone') ||
             mapped.fieldErrors.containsKey('FullName') ||
             mapped.fieldErrors.containsKey('InvitationCode') ||
-            error is ConflictException) {
+            isConflict) {
           _currentStep = 0;
         }
       });
@@ -172,30 +195,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         final message = mapped.fieldErrors.isNotEmpty
             ? mapped.fieldErrors.values.first
             : (mapped.banner ?? error.message);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.error,
-            action: error is ConflictException
-                ? SnackBarAction(
-                    label: context.loc.haveAccount,
-                    textColor: Colors.white,
-                    onPressed: () => context.go(Routes.login),
-                  )
-                : null,
-          ),
+        _showErrorCard(
+          message: message,
+          isConflict: isConflict,
         );
       }
     } catch (error) {
       final message = error.toString();
       setState(() => _errors = AuthFieldErrors(banner: message));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        _showErrorCard(message: message);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -312,6 +321,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   Widget _buildIdentityStep(AppLocalizations loc, AuthFieldErrors errors) {
+    final conflictMsg = errors.banner ??
+        errors.fieldErrors['Email'] ??
+        errors.fieldErrors['Phone'];
+    final isConflict = errors.fieldErrors.containsKey('Email') ||
+        errors.fieldErrors.containsKey('Phone') ||
+        (errors.banner?.toLowerCase().contains('tayari') ?? false) ||
+        (errors.banner?.toLowerCase().contains('registered') ?? false) ||
+        (errors.banner?.toLowerCase().contains('already') ?? false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -356,6 +374,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         const SizedBox(height: 14),
         TextFormField(
           controller: _emailController,
+          onChanged: (_) {
+            if (_errors != null) _dismissError();
+          },
           decoration: InputDecoration(
             labelText: loc.emailLabel,
             prefixIcon: const Icon(Icons.email_outlined, size: 20),
@@ -374,6 +395,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         const SizedBox(height: 14),
         TextFormField(
           controller: _phoneController,
+          onChanged: (_) {
+            if (_errors != null) _dismissError();
+          },
           decoration: InputDecoration(
             labelText: loc.phoneLabel,
             helperText: loc.phoneHelper,
@@ -413,14 +437,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             },
           ),
         ],
-        if (errors.banner != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 4),
-            child: Text(
-              errors.banner!,
-              style: const TextStyle(color: AppColors.error, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
+        if (conflictMsg != null)
+          _DismissibleAlertCard(
+            message: conflictMsg,
+            actionLabel: isConflict ? loc.haveAccount : null,
+            onAction: () => context.go(Routes.login),
+            onDismiss: _dismissError,
           ),
         const SizedBox(height: 20),
         FilledButton(
@@ -580,16 +602,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ],
         ),
         if (errors.banner != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 4),
-            child: Text(
-              errors.banner!,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 13,
-              ),
-              textAlign: TextAlign.center,
-            ),
+          _DismissibleAlertCard(
+            message: errors.banner!,
+            onDismiss: _dismissError,
           ),
         const SizedBox(height: 20),
         Row(
@@ -773,3 +788,99 @@ class _TabButton extends StatelessWidget {
     );
   }
 }
+
+class _DismissibleAlertCard extends StatelessWidget {
+  const _DismissibleAlertCard({
+    required this.message,
+    required this.onDismiss,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String message;
+  final VoidCallback onDismiss;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final loc = context.loc;
+
+    return Container(
+      key: const Key('dismissible_alert_card'),
+      margin: const EdgeInsets.only(top: 14, bottom: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.error.withValues(alpha: 0.18)
+            : AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.error.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.error,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.red.shade200 : AppColors.error,
+                  ),
+                ),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: onAction,
+                    child: Text(
+                      actionLabel!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            key: const Key('dismiss_alert_button'),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            icon: Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: AppColors.resolveTextSecondary(context),
+            ),
+            tooltip: loc.dismiss,
+            onPressed: onDismiss,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
