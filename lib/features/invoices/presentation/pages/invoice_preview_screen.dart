@@ -417,7 +417,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-                child: _buildNativeCanvasPreview(isSw),
+                child: _buildNativeCanvasPreview(context, isSw),
               ),
             ),
           ],
