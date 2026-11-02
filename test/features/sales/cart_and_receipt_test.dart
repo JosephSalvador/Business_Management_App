@@ -104,6 +104,26 @@ void main() {
       controller.decrement(key);
       expect(controller.state.lines.single.quantity, 2);
     });
+
+    test('add supports open-price items with unitPriceOverride and quantity', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(cartControllerProvider.notifier);
+
+      controller.add(
+        'p-service',
+        'Ushonaji',
+        0,
+        unitPriceOverride: 7500,
+        quantity: 2,
+      );
+
+      expect(controller.state.lines.length, 1);
+      expect(controller.state.lines.single.unitPrice, 7500);
+      expect(controller.state.lines.single.unitPriceOverride, 7500);
+      expect(controller.state.lines.single.quantity, 2);
+      expect(controller.state.total, 15000);
+    });
   });
 
   group('buildCreateSaleBody', () {

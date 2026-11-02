@@ -5881,6 +5881,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get dismiss;
+
+  /// No description provided for @productFormPriceOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Selling price (Optional)'**
+  String get productFormPriceOptional;
+
+  /// No description provided for @productFormPriceOptionalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty or 0 to set price at POS checkout'**
+  String get productFormPriceOptionalHint;
+
+  /// No description provided for @posOpenPriceBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Price'**
+  String get posOpenPriceBadge;
+
+  /// No description provided for @posEnterPriceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Price for {name}'**
+  String posEnterPriceTitle(String name);
+
+  /// No description provided for @posEnterPriceSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Cart'**
+  String get posEnterPriceSubmit;
 }
 
 class _AppLocalizationsDelegate

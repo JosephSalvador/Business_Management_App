@@ -196,8 +196,78 @@ class _PosPageState extends ConsumerState<PosPage> {
     );
   }
 
+  Future<void> _promptOpenPrice(PosProduct product, {double quantity = 1}) async {
+    final loc = context.loc;
+    final controller = TextEditingController();
+    final enteredPrice = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(loc.posEnterPriceTitle(product.name)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: const InputDecoration(
+            hintText: '0',
+            prefixText: 'TSh ',
+          ),
+          onSubmitted: (text) {
+            final val = double.tryParse(text.trim().replaceAll(',', '.'));
+            if (val != null && val > 0) {
+              Navigator.of(dialogContext).pop(val);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(loc.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val =
+                  double.tryParse(controller.text.trim().replaceAll(',', '.'));
+              if (val != null && val > 0) {
+                Navigator.of(dialogContext).pop(val);
+              }
+            },
+            child: Text(loc.posEnterPriceSubmit),
+          ),
+        ],
+      ),
+    );
+
+    if (enteredPrice != null && enteredPrice > 0) {
+      if (product.outOfStock) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${product.name}: ${loc.posOutOfStock}'),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+      ref.read(cartControllerProvider.notifier).add(
+            product.productId,
+            product.name,
+            enteredPrice,
+            unitPriceOverride: enteredPrice,
+            quantity: quantity,
+          );
+    }
+  }
+
   void _addToCart(PosProduct product) {
     HapticFeedback.selectionClick();
+    if (product.price <= 0) {
+      _promptOpenPrice(product);
+      return;
+    }
     if (product.outOfStock) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -413,12 +483,16 @@ class _PosPageState extends ConsumerState<PosPage> {
       ),
     );
     if (quantity != null && quantity > 0) {
-      ref
-          .read(cartControllerProvider.notifier)
-          .add(product.productId, product.name, product.price);
-      ref
-          .read(cartControllerProvider.notifier)
-          .setQuantity(product.productId, quantity);
+      if (product.price <= 0) {
+        _promptOpenPrice(product, quantity: quantity);
+        return;
+      }
+      ref.read(cartControllerProvider.notifier).add(
+            product.productId,
+            product.name,
+            product.price,
+            quantity: quantity,
+          );
     }
   }
 
@@ -907,18 +981,47 @@ class _ProductCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      price == null || price == 0
-                          ? 'Hakuna bei'
-                          : formatMoney(price!),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: price == null || price == 0
-                            ? AppColors.error
-                            : AppColors.primary,
-                      ),
-                    ),
+                    child: (price == null || price == 0)
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.edit_note,
+                                  size: 13,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 3),
+                                Flexible(
+                                  child: Text(
+                                    context.loc.posOpenPriceBadge,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Text(
+                            formatMoney(price!),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
                   ),
                   if (outOfStock)
                     const Icon(

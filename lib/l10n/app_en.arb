@@ -1156,6 +1156,17 @@
   "billingInvoiceReference": "Payment reference",
   "billingInvoicePaidAt": "Paid on",
   "billingPriceLocked": "Selling price (renewal required)",
-  "billingPriceLockedMessage": "Renew your subscription to set selling and wholesale prices.",
-  "dismiss": "Dismiss"
+  "dismiss": "Dismiss",
+  "productFormPriceOptional": "Selling price (Optional)",
+  "productFormPriceOptionalHint": "Leave empty or 0 to set price at POS checkout",
+  "posOpenPriceBadge": "Open Price",
+  "posEnterPriceTitle": "Enter Price for {name}",
+  "@posEnterPriceTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "posEnterPriceSubmit": "Add to Cart"
 }

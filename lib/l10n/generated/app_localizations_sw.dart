@@ -3052,4 +3052,20 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get dismiss => 'Funga';
+
+  @override
+  String get productFormPriceOptional => 'Bei ya kuuza (Si lazima)';
+
+  @override
+  String get productFormPriceOptionalHint =>
+      'Acha wazi au 0 kuweka bei wakati wa kuuza POS';
+
+  @override
+  String get posOpenPriceBadge => 'Weka Bei';
+
+  @override
+  String posEnterPriceTitle(String name) => 'Weka Bei ya $name';
+
+  @override
+  String get posEnterPriceSubmit => 'Weka Kwenye Kikapu';
 }

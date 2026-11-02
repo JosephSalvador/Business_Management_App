@@ -1156,6 +1156,17 @@
   "billingInvoiceReference": "Kumbukumbu ya malipo",
   "billingInvoicePaidAt": "Imelipwa tarehe",
   "billingPriceLocked": "Bei ya uuzaji (inahitaji kuendeshwa)",
-  "billingPriceLockedMessage": "Endelea mpango wako ili kuweka bei za uuzaji na rejareja.",
-  "dismiss": "Funga"
+  "dismiss": "Funga",
+  "productFormPriceOptional": "Bei ya kuuza (Si lazima)",
+  "productFormPriceOptionalHint": "Acha wazi au 0 kuweka bei wakati wa kuuza POS",
+  "posOpenPriceBadge": "Weka Bei",
+  "posEnterPriceTitle": "Weka Bei ya {name}",
+  "@posEnterPriceTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "posEnterPriceSubmit": "Weka Kwenye Kikapu"
 }

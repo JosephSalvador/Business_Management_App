@@ -189,3 +189,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Commit and push changes to branch `feature/invoice-delivery`.
 - [x] Task 7: Trigger GitHub Actions `build-clients.yml` with `deploy_target: production` (Run 41413569037).
 - [x] Task 8: Monitor remote workflow execution until release APK is published to `releases/tag/latest`.
+
+## Implementation Plan — Variable / Open Pricing & Frictionless Units for Products & Services
+- [x] Task 1: Add localization strings for optional price and open price badge / dialog (`lib/l10n/app_en.arb`, `lib/l10n/app_sw.arb`, and generated l10n).
+- [x] Task 2: Update `ProductFormPage` (`product_form_page.dart`): auto-default unit of measure and make selling price optional with informative helper text.
+- [x] Task 3: Update `CartController` (`cart_controller.dart`) to support optional `unitPriceOverride` in `add()`.
+- [x] Task 4: Update `pos_page.dart`: display `Weka Bei` badge for open-price items and trigger `_promptOpenPrice` dialog when tapped.
+- [x] Task 5: Bump client version to `1.0.0+74` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 6: Commit and push changes to branch `feature/invoice-delivery`.
+- [ ] Task 7: Trigger remote GitHub Actions workflow `build-clients.yml` with `deploy_target: production` and monitor until release APK is published.

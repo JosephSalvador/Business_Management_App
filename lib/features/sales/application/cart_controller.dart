@@ -19,16 +19,30 @@ class CartController extends Notifier<CartState> {
   @override
   CartState build() => const CartState();
 
-  void add(String productId, String name, double unitPrice) {
+  void add(
+    String productId,
+    String name,
+    double unitPrice, {
+    double? unitPriceOverride,
+    double quantity = 1,
+  }) {
     final lines = [...state.lines];
-    final index = lines.indexWhere((line) => line.productId == productId);
+    final index = lines.indexWhere((line) =>
+        line.productId == productId &&
+        (unitPriceOverride == null ||
+            line.unitPriceOverride == unitPriceOverride));
     if (index >= 0) {
-      lines[index].quantity += 1;
+      lines[index].quantity += quantity;
     } else {
       lines.add(CartLine(
         productId: productId,
         name: name,
-        unitPrice: unitPrice,
+        unitPrice: unitPriceOverride ?? unitPrice,
+        unitPriceOverride: unitPriceOverride,
+        quantity: quantity,
+        key: unitPriceOverride != null
+            ? '$productId-${DateTime.now().microsecondsSinceEpoch}'
+            : productId,
       ));
     }
     state = CartState(lines: lines);

@@ -102,6 +102,16 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     }
 
     final ready = catalog as CatalogReady;
+    if (!widget.isEdit && _unitId == null && ready.units.isNotEmpty) {
+      _unitId = ready.units.firstWhere(
+        (u) =>
+            u.abbreviation.toLowerCase() == 'pcs' ||
+            u.abbreviation.toLowerCase() == 'pc' ||
+            u.name.toLowerCase().contains('kipande') ||
+            u.name.toLowerCase().contains('item'),
+        orElse: () => ready.units.first,
+      ).id;
+    }
     if (widget.isEdit && !_loadedExisting && !_loadingExisting) {
       _loadingExisting = true;
       _loadExisting(ready);
@@ -148,17 +158,22 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: canSetPrice
-                      ? context.loc.productFormPrice
+                      ? context.loc.productFormPriceOptional
                       : context.loc.billingPriceLocked,
                   prefixText: currency.isEmpty ? null : '$currency ',
+                  hintText: context.loc.productFormPriceOptionalHint,
+                  helperText: context.loc.productFormPriceOptionalHint,
+                  helperMaxLines: 2,
                 ),
                 validator: (value) {
-                  if (!canSetPrice) return null;
+                  if (!canSetPrice || value == null || value.trim().isEmpty) {
+                    return null;
+                  }
                   final parsed = double.tryParse(
-                    value?.trim().replaceAll(',', '.') ?? '',
+                    value.trim().replaceAll(',', '.'),
                   );
-                  if (parsed == null || parsed <= 0) {
-                    return context.loc.productFormPriceRequired;
+                  if (parsed == null || parsed < 0) {
+                    return context.loc.productFormCostPriceInvalid;
                   }
                   return null;
                 },
@@ -196,7 +211,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                initialValue: _unitId,
+                value: _unitId,
                 decoration: InputDecoration(
                   labelText: context.loc.productFormUnit,
                 ),
@@ -454,8 +469,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       taxCategoryId: _taxCategoryId,
       costPrice: double.tryParse(_costPrice.text.trim().replaceAll(',', '.')),
     );
-    final sellingPrice = ref.read(fullBillingAccessProvider)
-        ? double.tryParse(_price.text.trim().replaceAll(',', '.'))
+    final rawSellingPrice =
+        double.tryParse(_price.text.trim().replaceAll(',', '.'));
+    final sellingPrice = ref.read(fullBillingAccessProvider) &&
+            rawSellingPrice != null &&
+            rawSellingPrice > 0
+        ? rawSellingPrice
         : null;
     final wholesalePriceText = _wholesalePrice.text.trim().replaceAll(',', '.');
     final wholesalePrice =

@@ -3043,4 +3043,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dismiss => 'Dismiss';
+
+  @override
+  String get productFormPriceOptional => 'Selling price (Optional)';
+
+  @override
+  String get productFormPriceOptionalHint =>
+      'Leave empty or 0 to set price at POS checkout';
+
+  @override
+  String get posOpenPriceBadge => 'Open Price';
+
+  @override
+  String posEnterPriceTitle(String name) => 'Enter Price for $name';
+
+  @override
+  String get posEnterPriceSubmit => 'Add to Cart';
 }
