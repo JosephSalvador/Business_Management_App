@@ -207,107 +207,85 @@ class _PickPackagePageState extends ConsumerState<PickPackagePage> {
                     const SizedBox(height: 12),
                   ],
 
-                  // Plans selection
-                  if (basePlans.isNotEmpty) ...[
-                    Text(
-                      'Mpango wa Msingi (Base Plan)',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                  // Business Persona Selection
+                  Text(
+                    'Biashara yako inafanya nini zaidi?',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Chagua ili mfumo ujipange kiotomatiki kwa mahitaji yako:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.resolveTextSecondary(context),
                     ),
-                    const SizedBox(height: 8),
-                    ...basePlans.map((plan) {
-                      final isSelected = _selectedPlanCode == plan.code;
-                      return Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(
-                            color: isSelected
-                                ? AppColors.primary
-                                : Colors.transparent,
-                            width: 2,
-                          ),
-                        ),
-                        child: ListTile(
-                          title: Text(
-                            plan.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            'Matawi: ${plan.maxBranches ?? "Bila kikomo"} • Watumiaji: ${plan.maxUsers ?? "Bila kikomo"}',
-                          ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '${plan.currency} ${plan.monthlyPrice.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const Text(
-                                '/mwezi',
-                                style: TextStyle(fontSize: 11),
-                              ),
-                            ],
-                          ),
-                          leading: Icon(
-                            isSelected
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_off,
-                            color: isSelected
-                                ? AppColors.primary
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          onTap: () {
-                            setState(() => _selectedPlanCode = plan.code);
-                          },
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 16),
-                  ],
+                  ),
+                  const SizedBox(height: 14),
 
-                  // Packages selection
-                  if (packages.isNotEmpty) ...[
-                    Text(
-                      'Vifurushi vya Ziada (Add-on Modules)',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...packages.map((pkg) {
-                      final isChecked =
-                          _selectedPackages.contains(pkg.code.toLowerCase());
-                      return Card(
-                        child: CheckboxListTile(
-                          value: isChecked,
-                          title: Text(
-                            pkg.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            '+${pkg.currency} ${pkg.monthlyPrice.toStringAsFixed(0)} /mwezi',
-                          ),
-                          secondary: const Icon(Icons.extension_outlined),
-                          onChanged: (val) {
-                            setState(() {
-                              if (val == true) {
-                                _selectedPackages.add(pkg.code.toLowerCase());
-                              } else {
-                                _selectedPackages
-                                    .remove(pkg.code.toLowerCase());
-                              }
-                            });
-                          },
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 16),
-                  ],
+                  // Persona 1: Invoicing & Services
+                  _PersonaCard(
+                    title: '1. Huduma & Ankara (Invoicing)',
+                    tag: 'Inashauriwa kwa Mafundi, Washauri & Wasambazaji',
+                    description:
+                        'Utoaji wa Ankara za PDF & Mashine ya POS, Nukuu (Quotes), Proforma, na usimamizi wa wateja.',
+                    icon: Icons.receipt_long_rounded,
+                    accentColor: const Color(0xFF0D9488),
+                    isSelected: _selectedPackages.contains('invoice-manager') &&
+                        _selectedPlanCode != 'Pro',
+                    priceText: 'TZS 15,000 / mwezi',
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanCode = 'Free';
+                        _selectedPackages.clear();
+                        _selectedPackages.add('invoice-manager');
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Persona 2: Retail Shop & POS
+                  _PersonaCard(
+                    title: '2. Duka & Mauzo ya Rejareja (Retail Shop)',
+                    tag: 'Inashauriwa kwa Maduka ya Mtaani, Vyakula & Bidhaa',
+                    description:
+                        'Mauzo ya haraka ya POS, kukata risiti za wateja, kuhesabu stoo (stokisi) na kurekodi faida.',
+                    icon: Icons.point_of_sale_rounded,
+                    accentColor: const Color(0xFF1565C0),
+                    isSelected: _selectedPlanCode == 'Pro' &&
+                        !_selectedPackages.contains('invoice-manager'),
+                    priceText: 'Siku 14 Bure (Kisha TZS 25,000/mwezi)',
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanCode = 'Pro';
+                        _selectedPackages.clear();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Persona 3: All-In-One Enterprise
+                  _PersonaCard(
+                    title: '3. Mfumo Kamili (Duka + Ankara Kubwa)',
+                    tag: 'Maduka Makubwa, Ya Jumla & Kampuni',
+                    description:
+                        'Kila kitu kimefunguliwa: Mauzo ya POS, Stoo ya bidhaa, Ankara za kampuni, Matawi 3 na Ripoti kamili.',
+                    icon: Icons.business_center_rounded,
+                    accentColor: const Color(0xFF6366F1),
+                    isSelected: _selectedPlanCode == 'Pro' &&
+                        _selectedPackages.contains('invoice-manager'),
+                    priceText: 'Siku 14 Bure kwa Vyote',
+                    onTap: () {
+                      setState(() {
+                        _selectedPlanCode = 'Pro';
+                        _selectedPackages.clear();
+                        _selectedPackages.add('invoice-manager');
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
 
                   // Voucher input
                   Card(
@@ -394,6 +372,154 @@ class _PickPackagePageState extends ConsumerState<PickPackagePage> {
                   const SizedBox(height: 32),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+class _PersonaCard extends StatelessWidget {
+  const _PersonaCard({
+    required this.title,
+    required this.tag,
+    required this.description,
+    required this.icon,
+    required this.accentColor,
+    required this.isSelected,
+    required this.priceText,
+    required this.onTap,
+  });
+
+  final String title;
+  final String tag;
+  final String description;
+  final IconData icon;
+  final Color accentColor;
+  final bool isSelected;
+  final String priceText;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppColors.resolveCardBackground(context)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? accentColor : AppColors.resolveBorder(context),
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: [
+              if (isSelected)
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(icon, color: accentColor, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: accentColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: accentColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_off,
+                    color: isSelected
+                        ? accentColor
+                        : AppColors.resolveTextTertiary(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.resolveTextSecondary(context),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.resolveSurfaceSecondary(context),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.flash_on_rounded,
+                        size: 14, color: AppColors.warning),
+                    const SizedBox(width: 4),
+                    Text(
+                      priceText,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -14,6 +14,8 @@ import '../../../../shared/format/money.dart';
 import '../../application/dashboard_controller.dart';
 import '../widgets/revenue_line_chart.dart';
 import '../../../../app/router.dart';
+import '../../../billing/application/billing_providers.dart';
+import '../../../billing/presentation/pages/billing_page.dart';
 import '../../../capabilities/application/capabilities_controller.dart';
 import '../../../capabilities/domain/capabilities.dart';
 import '../../../notifications/presentation/widgets/notification_bell_button.dart';
@@ -338,7 +340,7 @@ class _DashboardBody extends StatelessWidget {
 
 // ── Branded Curved Canopy Header ─────────────────────────────────
 
-class _GreetingHeader extends StatelessWidget {
+class _GreetingHeader extends ConsumerWidget {
   const _GreetingHeader({
     required this.userName,
     required this.connectionQuality,
@@ -347,7 +349,7 @@ class _GreetingHeader extends StatelessWidget {
   final ConnectionQuality connectionQuality;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final loc = context.loc;
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -381,7 +383,7 @@ class _GreetingHeader extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -436,6 +438,9 @@ class _GreetingHeader extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              // Subscription Tier Pill
+              const _SubscriptionStatusPill(),
+              const SizedBox(width: 8),
               // Top Right Actions
               Container(
                 decoration: BoxDecoration(
@@ -446,7 +451,7 @@ class _GreetingHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 18),
           // Greeting & User Name
           Text(
             '$greeting$name',
@@ -470,6 +475,86 @@ class _GreetingHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Subscription Tier Status Pill ─────────────────────────────────
+
+class _SubscriptionStatusPill extends ConsumerWidget {
+  const _SubscriptionStatusPill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entitlement = ref.watch(subscriptionEntitlementControllerProvider);
+    final enabledModules = ref.watch(enabledModulesProvider);
+    final hasPos = enabledModules.contains(WorkspaceModule.pos);
+    final hasInvoicing = enabledModules.contains(WorkspaceModule.invoicing);
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
+
+    String label;
+    IconData icon;
+    Color bg;
+    Color fg;
+
+    if (entitlement == null || entitlement.isTrial) {
+      final days = entitlement != null
+          ? entitlement.trialEndsAt.difference(DateTime.now()).inDays
+          : 14;
+      final effectiveDays = days < 0 ? 0 : days;
+      label = isSw ? 'Trial ($effectiveDays siku)' : 'Trial ($effectiveDays d)';
+      icon = Icons.stars_rounded;
+      bg = const Color(0xFFF59E0B).withValues(alpha: 0.25);
+      fg = const Color(0xFFFDE68A);
+    } else if (entitlement.isActive) {
+      if (hasInvoicing && !hasPos) {
+        label = isSw ? 'Ankara Pekee' : 'Invoice Pro';
+        icon = Icons.receipt_long_rounded;
+        bg = const Color(0xFF0D9488).withValues(alpha: 0.35);
+        fg = const Color(0xFF99F6E4);
+      } else {
+        label = isSw ? 'Pro Imelipiwa' : 'Pro Active';
+        icon = Icons.verified_rounded;
+        bg = const Color(0xFF10B981).withValues(alpha: 0.25);
+        fg = const Color(0xFFA7F3D0);
+      }
+    } else {
+      label = isSw ? 'Kifurushi cha Bure' : 'Free Backstop';
+      icon = Icons.shield_outlined;
+      bg = Colors.white.withValues(alpha: 0.15);
+      fg = Colors.white;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push(Routes.billing),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: fg.withValues(alpha: 0.4), width: 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

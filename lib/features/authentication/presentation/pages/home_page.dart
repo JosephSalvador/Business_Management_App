@@ -14,6 +14,7 @@ import '../../../capabilities/domain/capabilities.dart';
 import '../../../products/presentation/pages/products_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../sales/presentation/pages/pos_page.dart';
+import '../../../invoices/presentation/pages/invoices_page.dart';
 import '../../../onboarding/application/workspace_controller.dart';
 import '../../application/auth_controller.dart';
 import '../../../../core/platform/ios_install_prompt_banner.dart';
@@ -127,6 +128,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     labelKey: 'navPOS',
     module: WorkspaceModule.pos,
   );
+  static const _invoicesDest = _NavDest(
+    icon: Icons.receipt_long_outlined,
+    selectedIcon: Icons.receipt_long,
+    labelKey: 'navInvoices',
+    module: WorkspaceModule.invoicing,
+  );
   static const _reportsDest = _NavDest(
     icon: Icons.bar_chart_outlined,
     selectedIcon: Icons.bar_chart,
@@ -138,14 +145,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     selectedIcon: Icons.more_horiz,
     labelKey: 'navMore',
   );
-
-  static const _destinations = [
-    _dashboardDest,
-    _productsDest,
-    _posDest,
-    _reportsDest,
-    _moreDest,
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -161,22 +160,35 @@ class _HomePageState extends ConsumerState<HomePage> {
     final canManageBilling =
         session?.user.hasPermission('Billing.Manage') ?? false;
 
+    final isInvoiceOnly = enabledModules.contains(WorkspaceModule.invoicing) &&
+        !enabledModules.contains(WorkspaceModule.pos);
+
+    final destinations = [
+      _dashboardDest,
+      _productsDest,
+      isInvoiceOnly ? _invoicesDest : _posDest,
+      _reportsDest,
+      _moreDest,
+    ];
+
     final pages = [
       _visitedTabs.contains(0) ? const DashboardPage() : const SizedBox.shrink(),
       _visitedTabs.contains(1)
           ? (_isDestEnabled(_productsDest, enabledModules)
               ? const ProductsPage()
-              : const _LockedModulePlaceholder())
+              : const _LockedModulePlaceholder(module: WorkspaceModule.inventory))
           : const SizedBox.shrink(),
       _visitedTabs.contains(2)
-          ? (_isDestEnabled(_posDest, enabledModules)
-              ? const PosPage()
-              : const _LockedModulePlaceholder())
+          ? (isInvoiceOnly
+              ? const InvoicesPage()
+              : (_isDestEnabled(_posDest, enabledModules)
+                  ? const PosPage()
+                  : const _LockedModulePlaceholder(module: WorkspaceModule.pos)))
           : const SizedBox.shrink(),
       _visitedTabs.contains(3)
           ? (_isDestEnabled(_reportsDest, enabledModules)
               ? const ReportsPage()
-              : const _LockedModulePlaceholder())
+              : const _LockedModulePlaceholder(module: WorkspaceModule.reports))
           : const SizedBox.shrink(),
       _visitedTabs.contains(4)
           ? _MoreTab(
@@ -200,7 +212,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           onTabChanged: _onTabChanged,
           onLockedDest: (d) => _onLockedModule(context, d, canManageBilling),
           isEnabled: (d) => _isDestEnabled(d, enabledModules),
-          destinations: _destinations,
+          destinations: destinations,
           pages: pages,
         ),
       );
@@ -212,7 +224,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         onTabChanged: _onTabChanged,
         onLockedDest: (d) => _onLockedModule(context, d, canManageBilling),
         isEnabled: (d) => _isDestEnabled(d, enabledModules),
-        destinations: _destinations,
+        destinations: destinations,
         pages: pages,
       ),
     );
@@ -483,6 +495,7 @@ String _label(AppLocalizations loc, String key) {
     'navDashboard' => loc.navDashboard,
     'navProducts' => loc.navProducts,
     'navPOS' => loc.navPOS,
+    'navInvoices' => loc.invoicesTitle,
     'navReports' => loc.navReports,
     'navMore' => loc.navMore,
     _ => key,
@@ -547,23 +560,35 @@ class _NavIcon extends StatelessWidget {
 }
 
 class _LockedModulePlaceholder extends StatelessWidget {
-  const _LockedModulePlaceholder();
+  const _LockedModulePlaceholder({this.module});
+
+  final WorkspaceModule? module;
 
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_outline, size: 40, color: AppColors.warning),
-            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_outline, size: 44, color: AppColors.warning),
+            ),
+            const SizedBox(height: 20),
             Text(
               loc.moduleLockedTitle,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -572,6 +597,21 @@ class _LockedModulePlaceholder extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.resolveTextSecondary(context),
                   ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              icon: const Icon(Icons.stars_rounded, size: 20),
+              label: Text(isSw ? 'Fungua Huduma Hii' : 'Unlock This Feature'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              onPressed: () {
+                if (module != null) {
+                  ModuleUpgradeSheet.show(context, module: module!);
+                } else {
+                  context.push(Routes.billing);
+                }
+              },
             ),
           ],
         ),

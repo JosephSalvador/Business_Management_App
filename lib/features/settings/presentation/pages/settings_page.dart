@@ -214,6 +214,16 @@ class SettingsPage extends ConsumerWidget {
               onTap: () {},
             ),
             _SettingsTile(
+              icon: Icons.dashboard_customize_outlined,
+              title: Localizations.localeOf(context).languageCode == 'sw'
+                  ? 'Kifurushi & Usanidi wa Moduli'
+                  : 'Subscription & Modules',
+              subtitle: Localizations.localeOf(context).languageCode == 'sw'
+                  ? 'Tazama au badilisha mfumo unaoutumia (Duka, Ankara, au Mfumo Mzima)'
+                  : 'View or switch business modes (Retail, Invoicing, or All-in-One)',
+              onTap: () => context.push(Routes.billing),
+            ),
+            _SettingsTile(
               icon: Icons.notifications_outlined,
               title: loc.settingsNotifications,
               subtitle: loc.settingsPhoneEmail,

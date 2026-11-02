@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/providers.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../../l10n/loc.dart';
-import '../../../products/application/catalog_controller.dart';
+import '../../../../app/router.dart';
+import '../../../capabilities/application/capabilities_controller.dart';
+import '../../../capabilities/domain/capabilities.dart';
 import '../../application/workspace_controller.dart';
 
 /// First-run business setup, shown once after creating the business and
@@ -42,6 +44,10 @@ class _BusinessSetupPageState extends ConsumerState<BusinessSetupPage> {
 
     final unitsReady = catalog is CatalogReady;
     final catalogFailed = catalog is CatalogFailure;
+    final enabledModules = ref.watch(enabledModulesProvider);
+    final hasPos = enabledModules.contains(WorkspaceModule.pos);
+    final hasInvoicing = enabledModules.contains(WorkspaceModule.invoicing);
+    final isInvoiceOnly = hasInvoicing && !hasPos;
 
     return Scaffold(
       appBar: AppBar(title: Text(context.loc.businessSetupTitle)),
@@ -88,11 +94,19 @@ class _BusinessSetupPageState extends ConsumerState<BusinessSetupPage> {
             ),
             const SizedBox(height: 40),
             FilledButton(
-              onPressed: unitsReady ? () => context.go('/home?tab=1') : null,
+              onPressed: isInvoiceOnly
+                  ? () => context.go(Routes.invoiceNew)
+                  : (unitsReady ? () => context.go('/home?tab=1') : null),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
               ),
-              child: Text(context.loc.businessSetupAddProducts),
+              child: Text(
+                isInvoiceOnly
+                    ? (Localizations.localeOf(context).languageCode == 'sw'
+                        ? 'Tengeneza Ankara ya Kwanza'
+                        : 'Create First Invoice')
+                    : context.loc.businessSetupAddProducts,
+              ),
             ),
             TextButton(
               onPressed: () => context.go('/home'),

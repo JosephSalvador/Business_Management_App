@@ -207,3 +207,12 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Zero-Resource Local Policy — Avoid local heavy builds (`dotnet build` / `flutter build`) on user PC; leverage GitHub Actions cloud runners for testing and compilation.
 - [x] Task 6: Invoicing TemplateQueries Fix — Replaced `IOrganizationRepository` with `ITenantRepository` in `TemplateQueries.cs` and added `TenantOrganizationDto.From(Tenant)`.
 - [ ] Task 7: Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflows (`deploy-azure.yml` and `build-clients.yml`).
+
+## Implementation Plan — SME Tier Architecture, Onboarding Awareness & Functionality Discovery
+- [x] Task 1: Add _SubscriptionStatusPill to DashboardPage greeting header with ambient status, days left, and one-tap upgrade/renewal sheet.
+- [x] Task 2: Redesign PickPackagePage into 3 friendly SME Persona Cards (Ankara & Huduma, Duka & POS, Mfumo Kamili) auto-configuring tier without jargon.
+- [x] Task 3: Adapt BusinessSetupPage to route Invoice personas directly to invoice wizard and Retail personas to POS/Products.
+- [x] Task 4: Make bottom navigation in HomePage adaptive (replace locked POS tab with Invoices for invoice-only users).
+- [x] Task 5: Upgrade _LockedModulePlaceholder into an engaging value discovery card with 1-tap activation.
+- [x] Task 6: Add Workspace Mode selector in SettingsPage so existing merchants can switch between Retail, Invoicing, or All-in-One.
+- [x] Task 7: Verify zero disruption for existing users, bump version to 1.0.0+77, commit, push, and trigger GitHub Actions build.
