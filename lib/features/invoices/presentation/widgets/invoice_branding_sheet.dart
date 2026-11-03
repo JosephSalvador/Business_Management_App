@@ -96,7 +96,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
     _signatureBase64 = org.signatureBase64;
     _letterheadHeaderBase64 = org.letterheadHeaderBase64;
     _hideHeaderForPrePrinted = org.hideHeaderForPrePrinted;
-    _prePrintedTopMarginMm = org.prePrintedTopMarginMm;
+    _prePrintedTopMarginMm = org.prePrintedTopMarginMm ?? 45.0;
 
     _nameController = TextEditingController(text: org.name ?? '');
     _tinController = TextEditingController(text: org.taxId ?? '');

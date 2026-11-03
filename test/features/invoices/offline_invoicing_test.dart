@@ -273,7 +273,12 @@ void main() {
           showLogo: true,
           footerNotes: 'Custom template footer note for ${style.name}',
         );
-        final orgWithBranding = sampleOrg.copyWith(
+        final orgWithBranding = Organization(
+          name: sampleOrg.name,
+          address: sampleOrg.address,
+          phone: sampleOrg.phone,
+          currency: sampleOrg.currency,
+          taxId: sampleOrg.taxId,
           website: 'www.darent.co.tz',
           hideHeaderForPrePrinted: style == InvoiceLayoutStyle.customLetterhead,
           prePrintedTopMarginMm: 50.0,
