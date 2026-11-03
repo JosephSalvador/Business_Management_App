@@ -276,200 +276,228 @@ app.MapNotificationEndpoints();
 app.MapTenantProvisioningEndpoints();
 app.MapAppVersionEndpoints();
 
-if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
+var schemaSelfHealingStatements = new (string sql, string description)[]
 {
-    using var scope = app.Services.CreateScope();
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""LogoBase64"" text;", "Tenants.LogoBase64"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""BankName"" character varying(150);", "Tenants.BankName"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""BankAccountName"" character varying(200);", "Tenants.BankAccountName"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""BankAccountNumber"" character varying(100);", "Tenants.BankAccountNumber"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""BankBranchOrSwift"" character varying(150);", "Tenants.BankBranchOrSwift"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""MobileMoneyDetails"" character varying(300);", "Tenants.MobileMoneyDetails"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""InvoiceTerms"" text;", "Tenants.InvoiceTerms"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150);", "Tenants.AuthorizedSignatoryName"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150);", "Tenants.AuthorizedSignatoryTitle"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""PaymentAccountsJson"" text;", "Tenants.PaymentAccountsJson"),
+
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""DocumentTitle"" character varying(50) DEFAULT 'INVOICE';", "CustomerInvoices.DocumentTitle"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""ReferenceNumber"" character varying(100);", "CustomerInvoices.ReferenceNumber"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""PaymentTerms"" character varying(100);", "CustomerInvoices.PaymentTerms"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""CustomerAttention"" character varying(200);", "CustomerInvoices.CustomerAttention"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""CustomerPhone"" character varying(50);", "CustomerInvoices.CustomerPhone"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""CustomerEmail"" character varying(320);", "CustomerInvoices.CustomerEmail"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""CustomerAddress"" text;", "CustomerInvoices.CustomerAddress"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""CustomerTin"" character varying(64);", "CustomerInvoices.CustomerTin"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0;", "CustomerInvoices.DiscountAmount"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""PaymentInstructions"" text;", "CustomerInvoices.PaymentInstructions"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150);", "CustomerInvoices.AuthorizedSignatoryName"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150);", "CustomerInvoices.AuthorizedSignatoryTitle"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""PaymentsJson"" text;", "CustomerInvoices.PaymentsJson"),
+
+    (@"ALTER TABLE public.""CustomerInvoiceLines"" ADD COLUMN IF NOT EXISTS ""UnitOfMeasure"" character varying(50) DEFAULT 'Pcs';", "CustomerInvoiceLines.UnitOfMeasure"),
+    (@"ALTER TABLE public.""CustomerInvoiceLines"" ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0;", "CustomerInvoiceLines.DiscountAmount"),
+
+    (@"CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoices_TenantId_CreatedAt"" ON public.""CustomerInvoices"" (""TenantId"", ""CreatedAt"");", "Index IX_CustomerInvoices_TenantId_CreatedAt"),
+    (@"CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoiceLines_TenantId_CreatedAt"" ON public.""CustomerInvoiceLines"" (""TenantId"", ""CreatedAt"");", "Index IX_CustomerInvoiceLines_TenantId_CreatedAt"),
+
+    (@"CREATE TABLE IF NOT EXISTS public.""DocumentTemplates"" (
+        ""Id"" uuid NOT NULL PRIMARY KEY,
+        ""Name"" character varying(100) NOT NULL,
+        ""Description"" character varying(500),
+        ""DocumentType"" integer NOT NULL,
+        ""LiquidLayout"" text NOT NULL,
+        ""ThumbnailBase64"" text,
+        ""EngineVersion"" character varying(50) NOT NULL,
+        ""IsActive"" boolean NOT NULL,
+        ""IsDefault"" boolean NOT NULL,
+        ""DisplayOrder"" integer NOT NULL,
+        ""CreatedAt"" timestamp with time zone NOT NULL,
+        ""CreatedBy"" uuid,
+        ""UpdatedAt"" timestamp with time zone,
+        ""UpdatedBy"" uuid
+    );", "Table DocumentTemplates"),
+
+    (@"CREATE TABLE IF NOT EXISTS public.""TenantDocumentConfigurations"" (
+        ""Id"" uuid NOT NULL PRIMARY KEY,
+        ""TenantId"" uuid NOT NULL,
+        ""DocumentType"" integer NOT NULL,
+        ""ActiveTemplateId"" uuid NOT NULL,
+        ""CustomLiquidOverride"" text,
+        ""ThemePrimaryHex"" character varying(20),
+        ""ThemeSecondaryHex"" character varying(20),
+        ""LogoUrl"" character varying(500),
+        ""ShowLogo"" boolean NOT NULL,
+        ""FooterNotes"" text,
+        ""CreatedAt"" timestamp with time zone NOT NULL,
+        ""CreatedBy"" uuid,
+        ""UpdatedAt"" timestamp with time zone,
+        ""UpdatedBy"" uuid
+    );", "Table TenantDocumentConfigurations"),
+
+    (@"CREATE INDEX IF NOT EXISTS ""IX_DocumentTemplates_DocumentType_IsActive_DisplayOrder""
+        ON public.""DocumentTemplates"" (""DocumentType"", ""IsActive"", ""DisplayOrder"");", "Index IX_DocumentTemplates_DocumentType"),
+
+    (@"CREATE INDEX IF NOT EXISTS ""IX_TenantDocumentConfigurations_ActiveTemplateId""
+        ON public.""TenantDocumentConfigurations"" (""ActiveTemplateId"");", "Index IX_TenantDocumentConfigurations_ActiveTemplateId"),
+
+    (@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_TenantDocumentConfigurations_TenantId_DocumentType""
+        ON public.""TenantDocumentConfigurations"" (""TenantId"", ""DocumentType"");", "Index IX_TenantDocumentConfigurations_TenantId_DocumentType"),
+
+    (@"CREATE TABLE IF NOT EXISTS public.""DeliveryNotes"" (
+        ""Id"" uuid NOT NULL PRIMARY KEY,
+        ""TenantId"" uuid NOT NULL,
+        ""Number"" character varying(50) NOT NULL,
+        ""InvoiceId"" uuid,
+        ""InvoiceNumber"" character varying(50),
+        ""CustomerId"" uuid,
+        ""CustomerName"" character varying(200),
+        ""CustomerAttention"" character varying(200),
+        ""CustomerPhone"" character varying(50),
+        ""DeliveryAddress"" text,
+        ""IssueDate"" timestamp with time zone NOT NULL,
+        ""Status"" integer NOT NULL,
+        ""VehicleNumber"" character varying(50),
+        ""DriverName"" character varying(150),
+        ""DriverPhone"" character varying(50),
+        ""ReceivedByName"" character varying(150),
+        ""Notes"" text,
+        ""DispatchedAtUtc"" timestamp with time zone,
+        ""DeliveredAtUtc"" timestamp with time zone,
+        ""CancelledAtUtc"" timestamp with time zone,
+        ""CreatedAt"" timestamp with time zone NOT NULL,
+        ""CreatedBy"" uuid,
+        ""UpdatedAt"" timestamp with time zone,
+        ""UpdatedBy"" uuid
+    );", "Table DeliveryNotes"),
+
+    (@"CREATE TABLE IF NOT EXISTS public.""DeliveryNoteItems"" (
+        ""Id"" uuid NOT NULL PRIMARY KEY,
+        ""TenantId"" uuid NOT NULL,
+        ""DeliveryNoteId"" uuid NOT NULL,
+        ""ProductId"" uuid,
+        ""Description"" character varying(500) NOT NULL,
+        ""UnitOfMeasure"" character varying(50) NOT NULL,
+        ""QuantityOrdered"" numeric(18,4) NOT NULL,
+        ""QuantityDelivered"" numeric(18,4) NOT NULL,
+        ""LineIndex"" integer NOT NULL,
+        ""CreatedAt"" timestamp with time zone NOT NULL,
+        ""CreatedBy"" uuid,
+        ""UpdatedAt"" timestamp with time zone,
+        ""UpdatedBy"" uuid
+    );", "Table DeliveryNoteItems"),
+
+    (@"CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_CreatedAt"" ON public.""DeliveryNotes"" (""TenantId"", ""CreatedAt"");", "Index IX_DeliveryNotes_TenantId_CreatedAt"),
+    (@"CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Status"" ON public.""DeliveryNotes"" (""TenantId"", ""Status"");", "Index IX_DeliveryNotes_TenantId_Status"),
+    (@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Number"" ON public.""DeliveryNotes"" (""TenantId"", ""Number"");", "Index IX_DeliveryNotes_TenantId_Number"),
+    (@"CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_InvoiceId"" ON public.""DeliveryNotes"" (""TenantId"", ""InvoiceId"");", "Index IX_DeliveryNotes_TenantId_InvoiceId"),
+    (@"CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_DeliveryNoteId"" ON public.""DeliveryNoteItems"" (""DeliveryNoteId"");", "Index IX_DeliveryNoteItems_DeliveryNoteId"),
+    (@"CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_TenantId_CreatedAt"" ON public.""DeliveryNoteItems"" (""TenantId"", ""CreatedAt"");", "Index IX_DeliveryNoteItems_TenantId_CreatedAt"),
+
+    (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261029100000_AddCompleteInvoiceAndBrandingElements', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261029100000"),
+    (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261031180000_AddDeliveryNotesAndDocumentIndexes', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261031180000"),
+    (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261031190000_AddDocumentTemplatesAndTenantConfigurations', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261031190000"),
+    (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261103130000_AddMultiplePaymentMethodsAndInvoicePayments', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261103130000")
+};
+
+app.MapGet("/health/schema-check", async (BusinessDbContext db) =>
+{
+    var signatoryExists = await db.Database.SqlQueryRaw<int>(
+        @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Tenants' AND column_name = 'AuthorizedSignatoryName'").FirstOrDefaultAsync();
+
+    var deliveryNotesExists = await db.Database.SqlQueryRaw<int>(
+        @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'DeliveryNotes'").FirstOrDefaultAsync();
+
+    return Results.Ok(new
+    {
+        environment = app.Environment.EnvironmentName,
+        authorizedSignatoryColumn = signatoryExists > 0 ? "Present" : "Missing",
+        deliveryNotesTable = deliveryNotesExists > 0 ? "Present" : "Missing"
+    });
+}).AllowAnonymous();
+
+app.MapPost("/health/schema-heal", async (BusinessDbContext db) =>
+{
+    var results = new List<string>();
+    foreach (var (sql, desc) in schemaSelfHealingStatements)
+    {
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(sql);
+            results.Add($"{desc}: OK");
+        }
+        catch (Exception ex)
+        {
+            results.Add($"{desc}: ERROR - {ex.Message}");
+        }
+    }
+    return Results.Ok(results);
+}).AllowAnonymous();
+
+using (var scope = app.Services.CreateScope())
+{
     var db = scope.ServiceProvider.GetRequiredService<BusinessDbContext>();
     if (await db.Database.CanConnectAsync())
     {
-        await db.Database.MigrateAsync();
-        await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>().SeedAsync();
-    }
-}
-else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.IsProduction())
-{
-    // Pending migrations are applied here so preprod/production stays operable on managed DB hosts.
-    // Only platform-level bootstrap data is seeded: the demo tenant and its known
-    // dev credentials are never created outside Development/Testing.
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<BusinessDbContext>();
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                @"CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
+                    ""MigrationId"" character varying(150) NOT NULL,
+                    ""ProductVersion"" character varying(32) NOT NULL,
+                    CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+                  );");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Startup Migration History Notice] {ex.Message}");
+        }
 
-    try
-    {
-        // 1. Ensure __EFMigrationsHistory table exists
-        await db.Database.ExecuteSqlRawAsync(
-            @"CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
-                ""MigrationId"" character varying(150) NOT NULL,
-                ""ProductVersion"" character varying(32) NOT NULL,
-                CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
-              );");
+        foreach (var (sql, desc) in schemaSelfHealingStatements)
+        {
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync(sql);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Startup Schema Self-Healing Notice] {desc}: {ex.Message}");
+            }
+        }
 
-        // 2. Self-Healing & Fallback Idempotent DDL:
-        // Guarantee DocumentTemplates, TenantDocumentConfigurations, DeliveryNotes, DeliveryNoteItems,
-        // and all required branding, invoice, and payment columns exist idempotently.
-        await db.Database.ExecuteSqlRawAsync(@"
-            CREATE TABLE IF NOT EXISTS public.""DocumentTemplates"" (
-                ""Id"" uuid NOT NULL,
-                ""Name"" character varying(100) NOT NULL,
-                ""Description"" character varying(500),
-                ""DocumentType"" integer NOT NULL,
-                ""LiquidLayout"" text NOT NULL,
-                ""ThumbnailBase64"" text,
-                ""EngineVersion"" character varying(50) NOT NULL,
-                ""IsActive"" boolean NOT NULL,
-                ""IsDefault"" boolean NOT NULL,
-                ""DisplayOrder"" integer NOT NULL,
-                ""CreatedAt"" timestamp with time zone NOT NULL,
-                ""CreatedBy"" uuid,
-                ""UpdatedAt"" timestamp with time zone,
-                ""UpdatedBy"" uuid,
-                CONSTRAINT ""PK_DocumentTemplates"" PRIMARY KEY (""Id"")
-            );
+        try
+        {
+            await db.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Startup MigrateAsync Warning] {ex.Message}");
+        }
 
-            CREATE TABLE IF NOT EXISTS public.""TenantDocumentConfigurations"" (
-                ""Id"" uuid NOT NULL,
-                ""TenantId"" uuid NOT NULL,
-                ""DocumentType"" integer NOT NULL,
-                ""ActiveTemplateId"" uuid NOT NULL,
-                ""CustomLiquidOverride"" text,
-                ""ThemePrimaryHex"" character varying(20),
-                ""ThemeSecondaryHex"" character varying(20),
-                ""LogoUrl"" character varying(500),
-                ""ShowLogo"" boolean NOT NULL,
-                ""FooterNotes"" text,
-                ""CreatedAt"" timestamp with time zone NOT NULL,
-                ""CreatedBy"" uuid,
-                ""UpdatedAt"" timestamp with time zone,
-                ""UpdatedBy"" uuid,
-                CONSTRAINT ""PK_TenantDocumentConfigurations"" PRIMARY KEY (""Id"")
-            );
-
-            CREATE INDEX IF NOT EXISTS ""IX_DocumentTemplates_DocumentType_IsActive_DisplayOrder""
-                ON public.""DocumentTemplates"" (""DocumentType"", ""IsActive"", ""DisplayOrder"");
-
-            CREATE INDEX IF NOT EXISTS ""IX_TenantDocumentConfigurations_ActiveTemplateId""
-                ON public.""TenantDocumentConfigurations"" (""ActiveTemplateId"");
-
-            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_TenantDocumentConfigurations_TenantId_DocumentType""
-                ON public.""TenantDocumentConfigurations"" (""TenantId"", ""DocumentType"");
-
-            CREATE TABLE IF NOT EXISTS public.""DeliveryNotes"" (
-                ""Id"" uuid NOT NULL,
-                ""TenantId"" uuid NOT NULL,
-                ""Number"" character varying(50) NOT NULL,
-                ""InvoiceId"" uuid,
-                ""InvoiceNumber"" character varying(50),
-                ""CustomerId"" uuid,
-                ""CustomerName"" character varying(200),
-                ""CustomerAttention"" character varying(200),
-                ""CustomerPhone"" character varying(50),
-                ""DeliveryAddress"" text,
-                ""IssueDate"" timestamp with time zone NOT NULL,
-                ""Status"" integer NOT NULL,
-                ""VehicleNumber"" character varying(50),
-                ""DriverName"" character varying(150),
-                ""DriverPhone"" character varying(50),
-                ""ReceivedByName"" character varying(150),
-                ""Notes"" text,
-                ""DispatchedAtUtc"" timestamp with time zone,
-                ""DeliveredAtUtc"" timestamp with time zone,
-                ""CancelledAtUtc"" timestamp with time zone,
-                ""CreatedAt"" timestamp with time zone NOT NULL,
-                ""CreatedBy"" uuid,
-                ""UpdatedAt"" timestamp with time zone,
-                ""UpdatedBy"" uuid,
-                CONSTRAINT ""PK_DeliveryNotes"" PRIMARY KEY (""Id"")
-            );
-
-            CREATE TABLE IF NOT EXISTS public.""DeliveryNoteItems"" (
-                ""Id"" uuid NOT NULL,
-                ""TenantId"" uuid NOT NULL,
-                ""DeliveryNoteId"" uuid NOT NULL,
-                ""ProductId"" uuid,
-                ""Description"" character varying(500) NOT NULL,
-                ""UnitOfMeasure"" character varying(50) NOT NULL,
-                ""QuantityOrdered"" numeric(18,4) NOT NULL,
-                ""QuantityDelivered"" numeric(18,4) NOT NULL,
-                ""LineIndex"" integer NOT NULL,
-                ""CreatedAt"" timestamp with time zone NOT NULL,
-                ""CreatedBy"" uuid,
-                ""UpdatedAt"" timestamp with time zone,
-                ""UpdatedBy"" uuid,
-                CONSTRAINT ""PK_DeliveryNoteItems"" PRIMARY KEY (""Id"")
-            );
-
-            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_CreatedAt"" ON public.""DeliveryNotes"" (""TenantId"", ""CreatedAt"");
-            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Status"" ON public.""DeliveryNotes"" (""TenantId"", ""Status"");
-            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Number"" ON public.""DeliveryNotes"" (""TenantId"", ""Number"");
-            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_InvoiceId"" ON public.""DeliveryNotes"" (""TenantId"", ""InvoiceId"");
-            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_DeliveryNoteId"" ON public.""DeliveryNoteItems"" (""DeliveryNoteId"");
-            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_TenantId_CreatedAt"" ON public.""DeliveryNoteItems"" (""TenantId"", ""CreatedAt"");
-
-            ALTER TABLE IF EXISTS public.""Tenants""
-                ADD COLUMN IF NOT EXISTS ""LogoBase64"" text,
-                ADD COLUMN IF NOT EXISTS ""BankName"" character varying(150),
-                ADD COLUMN IF NOT EXISTS ""BankAccountName"" character varying(200),
-                ADD COLUMN IF NOT EXISTS ""BankAccountNumber"" character varying(100),
-                ADD COLUMN IF NOT EXISTS ""BankBranchOrSwift"" character varying(150),
-                ADD COLUMN IF NOT EXISTS ""MobileMoneyDetails"" character varying(300),
-                ADD COLUMN IF NOT EXISTS ""InvoiceTerms"" text,
-                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150),
-                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150),
-                ADD COLUMN IF NOT EXISTS ""PaymentAccountsJson"" text;
-
-            ALTER TABLE IF EXISTS public.""CustomerInvoices""
-                ADD COLUMN IF NOT EXISTS ""DocumentTitle"" character varying(50) DEFAULT 'INVOICE',
-                ADD COLUMN IF NOT EXISTS ""ReferenceNumber"" character varying(100),
-                ADD COLUMN IF NOT EXISTS ""PaymentTerms"" character varying(100),
-                ADD COLUMN IF NOT EXISTS ""CustomerAttention"" character varying(200),
-                ADD COLUMN IF NOT EXISTS ""CustomerPhone"" character varying(50),
-                ADD COLUMN IF NOT EXISTS ""CustomerEmail"" character varying(320),
-                ADD COLUMN IF NOT EXISTS ""CustomerAddress"" text,
-                ADD COLUMN IF NOT EXISTS ""CustomerTin"" character varying(64),
-                ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS ""PaymentInstructions"" text,
-                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150),
-                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150),
-                ADD COLUMN IF NOT EXISTS ""PaymentsJson"" text;
-
-            ALTER TABLE IF EXISTS public.""CustomerInvoiceLines""
-                ADD COLUMN IF NOT EXISTS ""UnitOfMeasure"" character varying(50) DEFAULT 'Pcs',
-                ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0;
-
-            CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoices_TenantId_CreatedAt"" ON public.""CustomerInvoices"" (""TenantId"", ""CreatedAt"");
-            CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoiceLines_TenantId_CreatedAt"" ON public.""CustomerInvoiceLines"" (""TenantId"", ""CreatedAt"");
-
-            INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
-            VALUES
-                ('20261029100000_AddCompleteInvoiceAndBrandingElements', '9.0.0'),
-                ('20261031180000_AddDeliveryNotesAndDocumentIndexes', '9.0.0'),
-                ('20261031190000_AddDocumentTemplatesAndTenantConfigurations', '9.0.0'),
-                ('20261103130000_AddMultiplePaymentMethodsAndInvoicePayments', '9.0.0')
-            ON CONFLICT DO NOTHING;
-        ");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[Startup Migration Healing Warning] {ex.Message}");
-    }
-
-    try
-    {
-        await db.Database.MigrateAsync();
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[Startup MigrateAsync Warning] {ex.Message}");
-    }
-
-    try
-    {
-        await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>()
-            .SeedAsync(cancellationToken: default, createDemoTenant: true);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[Startup Seeding Warning] {ex.Message}");
+        try
+        {
+            var seeder = scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>();
+            if (app.Environment.IsEnvironment("Development") || app.Environment.IsEnvironment("Testing"))
+            {
+                await seeder.SeedAsync();
+            }
+            else
+            {
+                await seeder.SeedAsync(cancellationToken: default, createDemoTenant: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Startup Seeding Warning] {ex.Message}");
+        }
     }
 }
 
