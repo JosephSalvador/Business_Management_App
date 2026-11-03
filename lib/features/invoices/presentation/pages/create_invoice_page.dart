@@ -82,9 +82,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   final _invoiceDiscountController = TextEditingController();
 
   bool _hasInitialDeposit = false;
-  final _initialPaidController = TextEditingController();
-  String _initialPaymentMethod = 'Bank Transfer';
-  final _initialPaymentReferenceController = TextEditingController();
+  final List<_InitialPaymentEntry> _initialPaymentEntries = [];
 
   final _paymentInstructionsController = TextEditingController();
   final _notesController = TextEditingController();
@@ -99,6 +97,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   @override
   void initState() {
     super.initState();
+    if (_initialPaymentEntries.isEmpty) {
+      _initialPaymentEntries.add(_InitialPaymentEntry());
+    }
     _issueDateController.text = _isoDate(_issueDate);
     _dueDateController.text = _isoDate(_dueDate!);
     Future.microtask(() {
@@ -121,8 +122,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
     _customerEmailController.dispose();
     _customerAddressController.dispose();
     _invoiceDiscountController.dispose();
-    _initialPaidController.dispose();
-    _initialPaymentReferenceController.dispose();
+    for (final entry in _initialPaymentEntries) {
+      entry.dispose();
+    }
     _paymentInstructionsController.dispose();
     _notesController.dispose();
     _signatoryNameController.dispose();
@@ -187,7 +189,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   }
 
   double get _initialPaid => _hasInitialDeposit
-      ? (double.tryParse(_initialPaidController.text.trim()) ?? 0)
+      ? _initialPaymentEntries.fold<double>(0.0, (sum, e) => sum + e.amount)
       : 0;
 
   double get _balanceDue {
@@ -261,6 +263,26 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
         : (_initialPaid > 0
             ? InvoiceStatus.partiallyPaid
             : InvoiceStatus.unpaid);
+
+    final draftPayments = <CustomerInvoicePayment>[];
+    if (_hasInitialDeposit) {
+      var pIdx = 1;
+      for (final entry in _initialPaymentEntries) {
+        if (entry.amount > 0) {
+          draftPayments.add(
+            CustomerInvoicePayment(
+              id: 'draft-pmt-$pIdx',
+              amount: entry.amount,
+              method: entry.method,
+              reference: entry.reference,
+              paidAtUtc: DateTime.now().toUtc(),
+            ),
+          );
+          pIdx++;
+        }
+      }
+    }
+
     return CustomerInvoice(
       id: _invoiceId,
       number: 'PREVIEW',
@@ -308,11 +330,17 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       totalAmount: _totalAmount,
       amountPaid: _initialPaid,
       balanceDue: _balanceDue,
-      paymentMethod: _hasInitialDeposit ? _initialPaymentMethod : null,
-      paymentReference: _hasInitialDeposit &&
-              _initialPaymentReferenceController.text.trim().isNotEmpty
-          ? _initialPaymentReferenceController.text.trim()
+      paymentMethod: draftPayments.isNotEmpty
+          ? draftPayments.map((p) => p.method).join(', ')
           : null,
+      paymentReference: draftPayments.isNotEmpty
+          ? draftPayments
+              .map((p) => p.reference)
+              .whereType<String>()
+              .where((r) => r.isNotEmpty)
+              .join(', ')
+          : null,
+      payments: draftPayments,
       lines: invoiceLines,
       isSynced: false,
     );
@@ -920,71 +948,187 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                             setState(() => _hasInitialDeposit = val),
                       ),
                       if (_hasInitialDeposit) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _initialPaidController,
-                                style: TextStyle(
-                                  color: textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
-                                onChanged: (_) => setState(() {}),
-                                decoration: InputDecoration(
-                                  labelText: isSw
-                                      ? 'Kiasi Kilicholipwa'
-                                      : 'Amount Paid Now',
-                                ),
-                              ),
+                        const SizedBox(height: 8),
+                        for (var i = 0;
+                            i < _initialPaymentEntries.length;
+                            i++) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.resolveSurfaceSecondary(context),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: borderColor),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                initialValue: _initialPaymentMethod,
-                                isExpanded: true,
-                                dropdownColor: cardBg,
-                                style: TextStyle(
-                                  color: textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: loc.invoicePaymentMethod,
-                                ),
-                                items: [
-                                  for (final method in _paymentMethods)
-                                    DropdownMenuItem(
-                                      value: method,
-                                      child: Text(
-                                        method,
-                                        style: TextStyle(color: textPrimary),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      isSw
+                                          ? 'Njia ya Malipo #${i + 1}'
+                                          : 'Payment Entry #${i + 1}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
                                       ),
                                     ),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => _initialPaymentMethod = val);
-                                  }
-                                },
-                              ),
+                                    if (_initialPaymentEntries.length > 1)
+                                      InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            final removed =
+                                                _initialPaymentEntries
+                                                    .removeAt(i);
+                                            removed.dispose();
+                                          });
+                                        },
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4),
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 16,
+                                            color: AppColors.error,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: TextField(
+                                        controller: _initialPaymentEntries[i]
+                                            .amountController,
+                                        style: TextStyle(
+                                          color: textPrimary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(decimal: true),
+                                        onChanged: (_) => setState(() {}),
+                                        decoration: InputDecoration(
+                                          labelText: isSw
+                                              ? 'Kiasi Kilicholipwa'
+                                              : 'Amount Paid',
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      flex: 3,
+                                      child: DropdownButtonFormField<String>(
+                                        value:
+                                            _initialPaymentEntries[i].method,
+                                        isExpanded: true,
+                                        dropdownColor: cardBg,
+                                        style: TextStyle(
+                                          color: textPrimary,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        decoration: InputDecoration(
+                                          labelText: loc.invoicePaymentMethod,
+                                          isDense: true,
+                                        ),
+                                        items: [
+                                          for (final method in _paymentMethods)
+                                            DropdownMenuItem(
+                                              value: method,
+                                              child: Text(
+                                                method,
+                                                style: TextStyle(
+                                                    color: textPrimary),
+                                              ),
+                                            ),
+                                        ],
+                                        onChanged: (val) {
+                                          if (val != null) {
+                                            setState(() =>
+                                                _initialPaymentEntries[i]
+                                                    .method = val);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _initialPaymentEntries[i]
+                                      .referenceController,
+                                  style: TextStyle(
+                                    color: textPrimary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                  decoration: InputDecoration(
+                                    labelText: loc.invoicePaymentReference,
+                                    hintText: isSw
+                                        ? 'Namba ya Kumbukumbu / Muamala'
+                                        : 'Tx / Receipt / Ref No',
+                                    isDense: true,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _initialPaymentReferenceController,
-                          style: TextStyle(
-                            color: textPrimary,
-                            fontWeight: FontWeight.w500,
                           ),
-                          decoration: InputDecoration(
-                            labelText: loc.invoicePaymentReference,
+                        ],
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _initialPaymentEntries.add(
+                                  _InitialPaymentEntry(
+                                    method: _paymentMethods.first,
+                                  ),
+                                );
+                              });
+                            },
+                            icon: const Icon(Icons.add, size: 16),
+                            label: Text(
+                              isSw
+                                  ? 'Ongeza Njia Nyingine (Split Deposit)'
+                                  : 'Add Another Payment (Split Deposit)',
+                              style: const TextStyle(fontSize: 12),
+                            ),
                           ),
                         ),
+                        if (_initialPaymentEntries.length > 1) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isSw
+                                    ? 'Jumla ya Amana / Advance:'
+                                    : 'Total Deposit Paid:',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: textSecondary,
+                                ),
+                              ),
+                              Text(
+                                formatMoney(_initialPaid),
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                       const SizedBox(height: 10),
                       Container(
@@ -1278,6 +1422,23 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
         )
         .toList(growable: false);
 
+    final initialPaymentsList = <CustomerInvoicePayment>[];
+    if (_hasInitialDeposit) {
+      for (final entry in _initialPaymentEntries) {
+        if (entry.amount > 0) {
+          initialPaymentsList.add(
+            CustomerInvoicePayment(
+              id: const Uuid().v4(),
+              amount: entry.amount,
+              method: entry.method,
+              reference: entry.reference,
+              paidAtUtc: DateTime.now().toUtc(),
+            ),
+          );
+        }
+      }
+    }
+
     final invoice = await ref.read(invoicesControllerProvider.notifier).create(
           id: _invoiceId,
           lines: drafts,
@@ -1295,9 +1456,16 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
           dueDate: _dueDate,
           discountAmount: _invoiceDiscount,
           initialAmountPaid: _initialPaid,
-          paymentMethod: _hasInitialDeposit ? _initialPaymentMethod : null,
-          paymentReference: _hasInitialDeposit
-              ? _initialPaymentReferenceController.text
+          initialPayments: initialPaymentsList,
+          paymentMethod: initialPaymentsList.isNotEmpty
+              ? initialPaymentsList.map((p) => p.method).join(', ')
+              : null,
+          paymentReference: initialPaymentsList.isNotEmpty
+              ? initialPaymentsList
+                  .map((p) => p.reference)
+                  .whereType<String>()
+                  .where((r) => r.isNotEmpty)
+                  .join(', ')
               : null,
           notes: _notesController.text,
           paymentInstructions: _paymentInstructionsController.text,
@@ -1375,6 +1543,31 @@ class _LineInputs {
     quantity.dispose();
     unitPrice.dispose();
     discount.dispose();
+  }
+}
+
+class _InitialPaymentEntry {
+  _InitialPaymentEntry({
+    String method = 'Bank Transfer',
+    String? amountText,
+    String? referenceText,
+  })  : method = method,
+        amountController = TextEditingController(text: amountText ?? ''),
+        referenceController = TextEditingController(text: referenceText ?? '');
+
+  String method;
+  final TextEditingController amountController;
+  final TextEditingController referenceController;
+
+  double get amount => double.tryParse(amountController.text.trim()) ?? 0;
+  String? get reference {
+    final t = referenceController.text.trim();
+    return t.isEmpty ? null : t;
+  }
+
+  void dispose() {
+    amountController.dispose();
+    referenceController.dispose();
   }
 }
 
@@ -1815,7 +2008,8 @@ class _SenderInfoCard extends StatelessWidget {
     final org = organization;
     final hasBank = org != null &&
         ((org.bankName?.trim().isNotEmpty ?? false) ||
-            (org.mobileMoneyDetails?.trim().isNotEmpty ?? false));
+            (org.mobileMoneyDetails?.trim().isNotEmpty ?? false) ||
+            org.paymentAccounts.isNotEmpty);
     final hasName = org != null && (org.name?.trim().isNotEmpty ?? false);
     final complete = hasBank && hasName;
     final isDark = Theme.of(context).brightness == Brightness.dark;

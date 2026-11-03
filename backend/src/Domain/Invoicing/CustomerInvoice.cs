@@ -88,6 +88,7 @@ public sealed class CustomerInvoice : AggregateRoot
     public decimal BalanceDue => TotalAmount - AmountPaid;
     public string? PaymentMethod { get; private set; }
     public string? PaymentReference { get; private set; }
+    public string? PaymentsJson { get; private set; }
     public Guid? PaymentRecordedByUserId { get; private set; }
     public DateTime? PaidAtUtc { get; private set; }
     public DateTime? VoidedAtUtc { get; private set; }
@@ -201,12 +202,50 @@ public sealed class CustomerInvoice : AggregateRoot
         return invoice;
     }
 
+    public IReadOnlyList<CustomerInvoicePaymentRecord> GetPayments()
+    {
+        if (!string.IsNullOrWhiteSpace(PaymentsJson))
+        {
+            try
+            {
+                var deserialized = System.Text.Json.JsonSerializer.Deserialize<List<CustomerInvoicePaymentRecord>>(
+                    PaymentsJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (deserialized is not null && deserialized.Count > 0)
+                {
+                    return deserialized;
+                }
+            }
+            catch
+            {
+                // Fallback to legacy single payment if JSON parse fails
+            }
+        }
+
+        if (AmountPaid > 0)
+        {
+            return new List<CustomerInvoicePaymentRecord>
+            {
+                new(
+                    Guid.Empty,
+                    AmountPaid,
+                    PaymentMethod,
+                    PaymentReference,
+                    PaidAtUtc ?? CreatedAt,
+                    PaymentRecordedByUserId)
+            };
+        }
+
+        return Array.Empty<CustomerInvoicePaymentRecord>();
+    }
+
     public void RecordPayment(
         decimal amount,
         string? method,
         string? reference,
         Guid? recordedByUserId = null,
-        DateTime? nowUtc = null)
+        DateTime? nowUtc = null,
+        Guid? paymentId = null)
     {
         if (Status is CustomerInvoiceStatus.Paid or CustomerInvoiceStatus.Void)
         {
@@ -226,9 +265,25 @@ public sealed class CustomerInvoice : AggregateRoot
         }
 
         var now = nowUtc ?? DateTime.UtcNow;
+        var existingPayments = GetPayments().ToList();
+        var newPaymentId = paymentId.HasValue && paymentId.Value != Guid.Empty
+            ? paymentId.Value
+            : Guid.NewGuid();
+
+        var record = new CustomerInvoicePaymentRecord(
+            newPaymentId,
+            decimal.Round(amount, 2),
+            string.IsNullOrWhiteSpace(method) ? null : method.Trim(),
+            string.IsNullOrWhiteSpace(reference) ? null : reference.Trim(),
+            now,
+            recordedByUserId);
+
+        existingPayments.Add(record);
+        PaymentsJson = System.Text.Json.JsonSerializer.Serialize(existingPayments);
+
         AmountPaid += amount;
-        PaymentMethod = method?.Trim();
-        PaymentReference = reference?.Trim();
+        if (!string.IsNullOrWhiteSpace(method)) PaymentMethod = method.Trim();
+        if (!string.IsNullOrWhiteSpace(reference)) PaymentReference = reference.Trim();
         PaymentRecordedByUserId = recordedByUserId;
         Status = AmountPaid >= TotalAmount
             ? CustomerInvoiceStatus.Paid
@@ -292,3 +347,12 @@ public sealed class CustomerInvoice : AggregateRoot
         TotalAmount = (Subtotal - effectiveDiscount) + TaxAmount;
     }
 }
+
+public sealed record CustomerInvoicePaymentRecord(
+    Guid Id,
+    decimal Amount,
+    string? Method,
+    string? Reference,
+    DateTime PaidAtUtc,
+    Guid? RecordedByUserId = null);
+

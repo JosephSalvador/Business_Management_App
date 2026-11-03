@@ -135,6 +135,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(t => t.BankAccountNumber).HasMaxLength(100);
             entity.Property(t => t.BankBranchOrSwift).HasMaxLength(150);
             entity.Property(t => t.MobileMoneyDetails).HasMaxLength(300);
+            entity.Property(t => t.PaymentAccountsJson).HasColumnType("text");
             entity.Property(t => t.InvoiceTerms).HasColumnType("text");
             entity.Property(t => t.AuthorizedSignatoryName).HasMaxLength(150);
             entity.Property(t => t.AuthorizedSignatoryTitle).HasMaxLength(150);
@@ -1142,6 +1143,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.Property(i => i.AmountPaid).IsRequired().HasColumnType("decimal(18,2)");
                 entity.Property(i => i.PaymentMethod).HasMaxLength(50);
                 entity.Property(i => i.PaymentReference).HasMaxLength(100);
+                entity.Property(i => i.PaymentsJson).HasColumnType("text");
                 entity.Property(i => i.PaymentInstructions).HasColumnType("text");
                 entity.Property(i => i.Notes).HasColumnType("text");
                 entity.Property(i => i.AuthorizedSignatoryName).HasMaxLength(150);

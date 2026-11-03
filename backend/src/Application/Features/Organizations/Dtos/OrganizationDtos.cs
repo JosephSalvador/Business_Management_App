@@ -18,7 +18,8 @@ public sealed record OrganizationDto(
     string? MobileMoneyDetails = null,
     string? InvoiceTerms = null,
     string? AuthorizedSignatoryName = null,
-    string? AuthorizedSignatoryTitle = null)
+    string? AuthorizedSignatoryTitle = null,
+    string? PaymentAccountsJson = null)
 {
     public string? Email => ContactEmail;
     public string? Phone => ContactPhone;
@@ -41,7 +42,8 @@ public sealed record TenantOrganizationDto(
     string? MobileMoneyDetails = null,
     string? InvoiceTerms = null,
     string? AuthorizedSignatoryName = null,
-    string? AuthorizedSignatoryTitle = null)
+    string? AuthorizedSignatoryTitle = null,
+    string? PaymentAccountsJson = null)
 {
     public static TenantOrganizationDto From(OrganizationDto org) => new(
         org.Id,
@@ -60,7 +62,8 @@ public sealed record TenantOrganizationDto(
         org.MobileMoneyDetails,
         org.InvoiceTerms,
         org.AuthorizedSignatoryName,
-        org.AuthorizedSignatoryTitle);
+        org.AuthorizedSignatoryTitle,
+        org.PaymentAccountsJson);
 
     public static TenantOrganizationDto From(Domain.Tenants.Tenant tenant) => new(
         tenant.Id,
@@ -79,6 +82,7 @@ public sealed record TenantOrganizationDto(
         tenant.MobileMoneyDetails,
         tenant.InvoiceTerms,
         tenant.AuthorizedSignatoryName,
-        tenant.AuthorizedSignatoryTitle);
+        tenant.AuthorizedSignatoryTitle,
+        tenant.PaymentAccountsJson);
 }
 

@@ -247,6 +247,15 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 2: Add `InvoiceLayoutStyle` enum (`modernRibbon`, `executiveCorporate`, `classicGrid`, `customLetterhead`), built-in offline templates, and local persistence in `DocumentTemplateRepository` & `DocumentTemplateController`.
 - [x] Task 3: Upgrade `InvoiceA4PreviewCard` and `LocalPdfDocumentGenerator.generateInvoiceA4` (and `CustomerInvoicePdfService`) to render all 4 layout styles, including the exact `Modern Ribbon` sample match (4-cell highlight bar, borderless table, `"Issued by, signature:"` image, and bottom `Phone | Website | Email` bar), `Classic Wholesale Grid`, and `Custom Letterhead / Pre-Printed Paper`.
 - [x] Task 4: Upgrade `InvoiceBrandingSheet`, `DocumentTemplatesPage` (60fps live `InvoiceA4PreviewCard`), and `InvoicePreviewScreen` with layout style selectors and upload controls for Logo, Digital Signature/Stamp, Letterhead Banner, Pre-Printed Paper margin, and Website.
-- [x] Task 5: Add unit tests in `test/features/invoices/offline_invoicing_test.dart` for all 4 layout styles, bump version to `1.0.0+81`, push, and trigger `build-clients.yml`.
+## Implementation Plan — Multi-Payment Accounts & Split Payments Engine (Build 82)
+- [x] Task 1: Backend Domain & Persistence — Update `Tenant.cs` (`PaymentAccountsJson`), `CustomerInvoice.cs` (`PaymentsJson`, multi-payment list, `RecordPayment`), `BusinessDbContext.cs`, migration `20261103130000_AddMultiplePaymentMethodsAndInvoicePayments.cs`, and snapshot.
+- [x] Task 2: Backend Application CQRS & DTOs — Add `PaymentAccountDto`, `CustomerInvoicePaymentDto`, and `CustomerInvoicePaymentRequest`. Update `CreateCustomerInvoiceCommand`, `RecordInvoicePaymentCommand`, and `UpdateOrganizationCommand`.
+- [x] Task 3: Frontend Organization & Settings — Add `PaymentAccountType`, `PaymentAccount`, and `paymentAccounts` list to `Organization` in `organization_repository.dart`. Update `InvoiceBrandingSheet` (`invoice_branding_sheet.dart`) with multi-account editor (Bank, Lipa Namba, Mobile Money).
+- [x] Task 4: Frontend Invoice Domain & Repository — Update `CustomerInvoice` in `invoice.dart` to parse/serialize `payments` list. Update `InvoiceRepository` (`invoice_repository.dart`) to store and retrieve multiple payments locally and preserve them in `_mergePreservingLocalDetails`.
+- [x] Task 5: Frontend Step 3 Multi-Payment Wizard & Record Payment — In `create_invoice_page.dart` (Step 3), support split deposits with multiple payment entries and selectable payment accounts. In `invoice_detail_page.dart`, update payment recording dialog to append to payment history.
+- [x] Task 6: Frontend Preview & PDF Generator — In `invoice_a4_preview_card.dart` and `local_pdf_document_generator.dart`, render multiple payment accounts in payment instructions and render the Payment History table when payments exist.
+- [x] Task 7: Unit Tests & Verification — Add unit tests in `test/features/invoices/offline_invoicing_test.dart` for multiple payment accounts parsing, formatting, and split payment recording.
+- [x] Task 8: Bump version code to `1.0.0+82` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 9: Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflows (`deploy-azure.yml` and `build-clients.yml`).
 
 

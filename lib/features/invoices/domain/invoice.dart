@@ -89,6 +89,32 @@ class CustomerInvoicePayment {
   final String paymentMethod;
   final String? reference;
   final DateTime paidAt;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'amount': amount,
+        'paymentMethod': paymentMethod,
+        'method': paymentMethod,
+        'reference': reference,
+        'paidAt': paidAt.toIso8601String(),
+        'paidAtUtc': paidAt.toIso8601String(),
+      };
+
+  factory CustomerInvoicePayment.fromJson(Map<String, dynamic> json) =>
+      CustomerInvoicePayment(
+        id: (json['id'] as String?) ?? '',
+        amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+        paymentMethod: (json['paymentMethod'] as String?) ??
+            (json['method'] as String?) ??
+            'Malipo',
+        reference: json['reference'] as String?,
+        paidAt: json['paidAt'] != null
+            ? DateTime.tryParse(json['paidAt'].toString()) ?? DateTime.now()
+            : (json['paidAtUtc'] != null
+                ? DateTime.tryParse(json['paidAtUtc'].toString()) ??
+                    DateTime.now()
+                : DateTime.now()),
+      );
 }
 
 class CustomerInvoice {
@@ -201,6 +227,7 @@ class CustomerInvoice {
     String? paymentMethod,
     String? paymentReference,
     DateTime? paidAtUtc,
+    List<CustomerInvoicePayment>? payments,
     bool? isSynced,
   }) =>
       CustomerInvoice(
@@ -234,6 +261,7 @@ class CustomerInvoice {
         paymentReference: paymentReference ?? this.paymentReference,
         paidAtUtc: paidAtUtc ?? this.paidAtUtc,
         lines: lines,
+        payments: payments ?? this.payments,
         isSynced: isSynced ?? this.isSynced,
       );
 
@@ -268,11 +296,38 @@ class CustomerInvoice {
         'paymentReference': paymentReference,
         'paidAtUtc': paidAtUtc?.toIso8601String(),
         'lines': [for (final line in lines) line.toJson()],
+        'payments': [for (final p in payments) p.toJson()],
         'isSynced': isSynced,
       };
 
   factory CustomerInvoice.fromJson(Map<String, dynamic> json) {
     final rawLines = json['lines'];
+    final rawPayments = json['payments'];
+    var paymentsList = <CustomerInvoicePayment>[];
+    if (rawPayments is List) {
+      paymentsList = rawPayments
+          .whereType<Map<dynamic, dynamic>>()
+          .map((raw) =>
+              CustomerInvoicePayment.fromJson(Map<String, dynamic>.from(raw)))
+          .toList();
+    }
+
+    final amountPaid = _requiredDouble(json, 'amountPaid');
+    final paymentMethod = _optionalString(json, 'paymentMethod');
+    final paymentReference = _optionalString(json, 'paymentReference');
+    final paidAtUtc = _optionalDateTime(json, 'paidAtUtc');
+    final issueDate = _requiredDateTime(json, 'issueDate');
+
+    if (paymentsList.isEmpty && amountPaid > 0) {
+      paymentsList.add(CustomerInvoicePayment(
+        id: 'legacy_initial_payment',
+        amount: amountPaid,
+        paymentMethod: paymentMethod ?? 'Malipo ya Awali',
+        reference: paymentReference,
+        paidAt: paidAtUtc ?? issueDate,
+      ));
+    }
+
     return CustomerInvoice(
       id: _requiredString(json, 'id'),
       number: _requiredString(json, 'number'),
@@ -287,7 +342,7 @@ class CustomerInvoice {
       customerAddress: _optionalString(json, 'customerAddress'),
       customerTin: _optionalString(json, 'customerTin'),
       currency: _optionalString(json, 'currency') ?? 'TZS',
-      issueDate: _requiredDateTime(json, 'issueDate'),
+      issueDate: issueDate,
       dueDate: _optionalDateTime(json, 'dueDate'),
       notes: _optionalString(json, 'notes'),
       paymentInstructions: _optionalString(json, 'paymentInstructions'),
@@ -299,11 +354,11 @@ class CustomerInvoice {
       discountAmount: _optionalDouble(json, 'discountAmount') ?? 0,
       taxAmount: _optionalDouble(json, 'taxAmount') ?? 0,
       totalAmount: _requiredDouble(json, 'totalAmount'),
-      amountPaid: _requiredDouble(json, 'amountPaid'),
+      amountPaid: amountPaid,
       balanceDue: _requiredDouble(json, 'balanceDue'),
-      paymentMethod: _optionalString(json, 'paymentMethod'),
-      paymentReference: _optionalString(json, 'paymentReference'),
-      paidAtUtc: _optionalDateTime(json, 'paidAtUtc'),
+      paymentMethod: paymentMethod,
+      paymentReference: paymentReference,
+      paidAtUtc: paidAtUtc,
       isSynced: (json['isSynced'] as bool?) ?? true,
       lines: rawLines is List
           ? rawLines
@@ -312,6 +367,7 @@ class CustomerInvoice {
                   (raw) => InvoiceLine.fromJson(Map<String, dynamic>.from(raw)))
               .toList(growable: false)
           : const [],
+      payments: paymentsList,
     );
   }
 }

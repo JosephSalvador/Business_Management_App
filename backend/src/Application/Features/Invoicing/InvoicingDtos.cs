@@ -13,6 +13,13 @@ public sealed record CustomerInvoiceLineDto(
     string UnitOfMeasure = "Pcs",
     decimal DiscountAmount = 0m);
 
+public sealed record CustomerInvoicePaymentDto(
+    Guid Id,
+    decimal Amount,
+    string? Method,
+    string? Reference,
+    DateTime PaidAtUtc);
+
 public sealed record CustomerInvoiceDto(
     Guid Id,
     string Number,
@@ -45,7 +52,8 @@ public sealed record CustomerInvoiceDto(
     decimal DiscountAmount = 0m,
     string? PaymentInstructions = null,
     string? AuthorizedSignatoryName = null,
-    string? AuthorizedSignatoryTitle = null);
+    string? AuthorizedSignatoryTitle = null,
+    IReadOnlyList<CustomerInvoicePaymentDto>? Payments = null);
 
 public sealed record CustomerInvoiceSummaryDto(
     Guid Id,

@@ -66,6 +66,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
   String? _letterheadHeaderBase64;
   bool _hideHeaderForPrePrinted = false;
   double _prePrintedTopMarginMm = 45.0;
+  List<PaymentAccount> _paymentAccounts = [];
 
   InvoiceLayoutStyle _selectedLayoutStyle = InvoiceLayoutStyle.modernRibbon;
   String _primaryHex = '#D97706';
@@ -97,6 +98,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
     _letterheadHeaderBase64 = org.letterheadHeaderBase64;
     _hideHeaderForPrePrinted = org.hideHeaderForPrePrinted;
     _prePrintedTopMarginMm = org.prePrintedTopMarginMm ?? 45.0;
+    _paymentAccounts = List<PaymentAccount>.from(org.paymentAccounts);
 
     _nameController = TextEditingController(text: org.name ?? '');
     _tinController = TextEditingController(text: org.taxId ?? '');
@@ -221,6 +223,13 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
   Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
+    final firstBank = _paymentAccounts
+        .where((a) => a.type == PaymentAccountType.bank)
+        .firstOrNull;
+    final firstMobile = _paymentAccounts
+        .where((a) => a.type == PaymentAccountType.mobileMoney)
+        .firstOrNull;
+
     try {
       await ref.read(settingsControllerProvider.notifier).updateOrganization({
         'name': _nameController.text.trim().isEmpty
@@ -236,11 +245,17 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
         'letterheadHeaderBase64': _letterheadHeaderBase64 ?? '',
         'hideHeaderForPrePrinted': _hideHeaderForPrePrinted,
         'prePrintedTopMarginMm': _prePrintedTopMarginMm,
-        'bankName': _bankNameController.text.trim(),
-        'bankAccountName': _bankAccountNameController.text.trim(),
-        'bankAccountNumber': _bankAccountNumberController.text.trim(),
-        'bankBranchOrSwift': _bankSwiftController.text.trim(),
-        'mobileMoneyDetails': _mobileMoneyController.text.trim(),
+        'bankName': firstBank?.name ?? _bankNameController.text.trim(),
+        'bankAccountName':
+            firstBank?.accountName ?? _bankAccountNameController.text.trim(),
+        'bankAccountNumber': firstBank?.accountNumber ??
+            _bankAccountNumberController.text.trim(),
+        'bankBranchOrSwift':
+            firstBank?.branchOrSwift ?? _bankSwiftController.text.trim(),
+        'mobileMoneyDetails': firstMobile != null
+            ? '${firstMobile.name}: ${firstMobile.accountNumber}'
+            : _mobileMoneyController.text.trim(),
+        'paymentAccounts': _paymentAccounts.map((a) => a.toJson()).toList(),
         'invoiceTerms': _termsController.text.trim(),
         'authorizedSignatoryName': _signatoryNameController.text.trim(),
         'authorizedSignatoryTitle': _signatoryTitleController.text.trim(),
@@ -274,6 +289,353 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _showPaymentAccountDialog([PaymentAccount? accountToEdit]) async {
+    final isSw = Localizations.localeOf(context).languageCode == 'sw';
+    PaymentAccountType selectedType =
+        accountToEdit?.type ?? PaymentAccountType.bank;
+    final nameCtrl = TextEditingController(text: accountToEdit?.name ?? '');
+    final numberCtrl =
+        TextEditingController(text: accountToEdit?.accountNumber ?? '');
+    final holderCtrl =
+        TextEditingController(text: accountToEdit?.accountName ?? '');
+    final swiftCtrl =
+        TextEditingController(text: accountToEdit?.branchOrSwift ?? '');
+    final currencyCtrl = TextEditingController(
+      text: accountToEdit?.currency ?? widget.organization.currency ?? 'TZS',
+    );
+    bool isDefault = accountToEdit?.isDefault ?? (_paymentAccounts.isEmpty);
+
+    final bankPresets = [
+      'CRDB Bank',
+      'NMB Bank',
+      'NBC',
+      'Stanbic Bank',
+      'Absa Bank',
+      'KCB Bank',
+      'Exim Bank',
+      'Azania Bank',
+      'DTB Bank',
+    ];
+
+    final mobilePresets = [
+      'M-Pesa Lipa Namba',
+      'Airtel Money Till',
+      'Mixx by Yas (Tigo)',
+      'Halopesa',
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.resolveCardBackground(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(dialogCtx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          selectedType == PaymentAccountType.bank
+                              ? Icons.account_balance_outlined
+                              : Icons.phone_android_outlined,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            accountToEdit == null
+                                ? (isSw
+                                    ? 'Ongeza Njia ya Malipo'
+                                    : 'Add Payment Account')
+                                : (isSw
+                                    ? 'Hariri Njia ya Malipo'
+                                    : 'Edit Payment Account'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(sheetCtx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      isSw ? 'Aina ya Akaunti:' : 'Account Type:',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ChoiceChip(
+                            label: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.account_balance, size: 16),
+                                const SizedBox(width: 6),
+                                Text(isSw ? 'Benki' : 'Bank'),
+                              ],
+                            ),
+                            selected: selectedType == PaymentAccountType.bank,
+                            onSelected: (val) {
+                              if (val) {
+                                setDialogState(() {
+                                  selectedType = PaymentAccountType.bank;
+                                  if (mobilePresets.contains(nameCtrl.text)) {
+                                    nameCtrl.clear();
+                                  }
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ChoiceChip(
+                            label: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.phone_android, size: 16),
+                                const SizedBox(width: 6),
+                                Text(isSw ? 'Simu / Lipa' : 'Mobile Money'),
+                              ],
+                            ),
+                            selected:
+                                selectedType == PaymentAccountType.mobileMoney,
+                            onSelected: (val) {
+                              if (val) {
+                                setDialogState(() {
+                                  selectedType = PaymentAccountType.mobileMoney;
+                                  if (bankPresets.contains(nameCtrl.text)) {
+                                    nameCtrl.clear();
+                                  }
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: (selectedType == PaymentAccountType.bank
+                              ? bankPresets
+                              : mobilePresets)
+                          .map((preset) => ActionChip(
+                                label: Text(preset,
+                                    style: const TextStyle(fontSize: 11)),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setDialogState(() {
+                                    nameCtrl.text = preset;
+                                  });
+                                },
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: selectedType == PaymentAccountType.bank
+                            ? (isSw ? 'Jina la Benki' : 'Bank Name')
+                            : (isSw
+                                ? 'Mtandao / Jina la Huduma'
+                                : 'Provider / Service Name'),
+                        hintText: selectedType == PaymentAccountType.bank
+                            ? 'e.g. CRDB Bank, NMB Bank'
+                            : 'e.g. M-Pesa Lipa Namba, Airtel Till',
+                        prefixIcon: Icon(
+                          selectedType == PaymentAccountType.bank
+                              ? Icons.business
+                              : Icons.smartphone,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: numberCtrl,
+                      decoration: InputDecoration(
+                        labelText: selectedType == PaymentAccountType.bank
+                            ? (isSw ? 'Namba ya Akaunti' : 'Account Number')
+                            : (isSw
+                                ? 'Lipa Namba / Namba ya Simu'
+                                : 'Till / Phone Number'),
+                        hintText: selectedType == PaymentAccountType.bank
+                            ? '01528392019'
+                            : '55443322',
+                        prefixIcon: const Icon(Icons.numbers),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: holderCtrl,
+                      decoration: InputDecoration(
+                        labelText: isSw
+                            ? 'Jina la Mmiliki (Hiari)'
+                            : 'Account / Till Name (Optional)',
+                        hintText: widget.organization.name ?? 'Acme Ltd',
+                        prefixIcon: const Icon(Icons.person_outline),
+                      ),
+                    ),
+                    if (selectedType == PaymentAccountType.bank) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: swiftCtrl,
+                              decoration: InputDecoration(
+                                labelText: isSw
+                                    ? 'Tawi au SWIFT (Hiari)'
+                                    : 'Branch / SWIFT (Optional)',
+                                hintText: 'CORUTZTZ',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: currencyCtrl,
+                              decoration: InputDecoration(
+                                labelText: isSw ? 'Sarafu' : 'Currency',
+                                hintText: 'TZS / USD',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        isSw
+                            ? 'Weka kama akaunti kuu (Default)'
+                            : 'Set as primary / default',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      value: isDefault,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          isDefault = val ?? false;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.check),
+                        label: Text(isSw ? 'Hifadhi Njia Hii' : 'Save Account'),
+                        onPressed: () {
+                          if (nameCtrl.text.trim().isEmpty ||
+                              numberCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(isSw
+                                    ? 'Tafadhali jaza jina na namba ya akaunti'
+                                    : 'Please fill name and account number'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final accountId = accountToEdit?.id ??
+                              'acc_${DateTime.now().millisecondsSinceEpoch}';
+                          final newAccount = PaymentAccount(
+                            id: accountId,
+                            type: selectedType,
+                            name: nameCtrl.text.trim(),
+                            accountNumber: numberCtrl.text.trim(),
+                            accountName: holderCtrl.text.trim().isEmpty
+                                ? null
+                                : holderCtrl.text.trim(),
+                            branchOrSwift: swiftCtrl.text.trim().isEmpty
+                                ? null
+                                : swiftCtrl.text.trim(),
+                            currency: currencyCtrl.text.trim().isEmpty
+                                ? null
+                                : currencyCtrl.text.trim().toUpperCase(),
+                            isDefault: isDefault,
+                          );
+
+                          setState(() {
+                            if (isDefault) {
+                              _paymentAccounts = _paymentAccounts
+                                  .map((a) => a.copyWith(isDefault: false))
+                                  .toList();
+                            }
+                            final existingIdx = _paymentAccounts
+                                .indexWhere((a) => a.id == accountId);
+                            if (existingIdx >= 0) {
+                              _paymentAccounts[existingIdx] = newAccount;
+                            } else {
+                              _paymentAccounts.add(newAccount);
+                            }
+
+                            // Sync legacy controllers
+                            final firstB = _paymentAccounts
+                                .where((a) => a.type == PaymentAccountType.bank)
+                                .firstOrNull;
+                            final firstM = _paymentAccounts
+                                .where((a) =>
+                                    a.type == PaymentAccountType.mobileMoney)
+                                .firstOrNull;
+                            if (firstB != null) {
+                              _bankNameController.text = firstB.name;
+                              _bankAccountNumberController.text =
+                                  firstB.accountNumber;
+                              _bankAccountNameController.text =
+                                  firstB.accountName ?? '';
+                              _bankSwiftController.text =
+                                  firstB.branchOrSwift ?? '';
+                            }
+                            if (firstM != null) {
+                              _mobileMoneyController.text =
+                                  '${firstM.name}: ${firstM.accountNumber}';
+                            }
+                          });
+
+                          Navigator.of(sheetCtx).pop();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -706,77 +1068,270 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                     ),
                     const SizedBox(height: 24),
 
-                    // 3. PAYMENT INSTRUCTIONS (BANK & MOBILE MONEY)
+                    // 3. PAYMENT INSTRUCTIONS (MULTIPLE BANK & MOBILE MONEY ACCOUNTS)
                     _SectionHeader(
                       icon: Icons.account_balance_outlined,
                       title: isSw
-                          ? '3. Maelekezo ya Malipo (Bank & Lipa Namba)'
-                          : '3. Payment Instructions (Bank & Mobile Money)',
+                          ? '3. Njia na Akaunti za Malipo (Payment Channels)'
+                          : '3. Payment Accounts & Channels',
                       subtitle: isSw
-                          ? 'Mteja ataona akaunti hizi chini ya ankara ili alipe kwa urahisi'
-                          : 'Displayed on every invoice so clients know how to pay you',
+                          ? 'Weka akaunti za benki na lipa namba zitakazoonekana kwenye ankara ili wateja walipe kwa urahisi'
+                          : 'Add your bank accounts, tills, and mobile money numbers displayed on invoices',
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _bankNameController,
-                            decoration: InputDecoration(
-                              labelText: isSw ? 'Jina la Benki' : 'Bank Name',
-                              hintText: 'e.g. CRDB Bank / NMB / Stanbic',
-                            ),
+                    if (_paymentAccounts.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.resolveSurfaceSecondary(context),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.resolveBorder(context),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: _bankSwiftController,
-                            decoration: InputDecoration(
-                              labelText:
-                                  isSw ? 'Tawi au SWIFT' : 'Branch / SWIFT Code',
-                              hintText: 'e.g. CORUTZTZ',
-                            ),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.payment_outlined,
+                                size: 36,
+                                color: AppColors.resolveTextSecondary(context),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                isSw
+                                    ? 'Bado hujaongeza njia ya malipo (Benki au Lipa Namba)'
+                                    : 'No payment accounts added yet (Bank or Mobile Money)',
+                                style: TextStyle(
+                                  color:
+                                      AppColors.resolveTextSecondary(context),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.add),
+                                label: Text(isSw
+                                    ? 'Ongeza Akaunti ya Malipo'
+                                    : 'Add Payment Account'),
+                                onPressed: () => _showPaymentAccountDialog(),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _bankAccountNameController,
-                            decoration: InputDecoration(
-                              labelText:
-                                  isSw ? 'Jina la Akaunti' : 'Account Name',
+                      )
+                    else ...[
+                      Column(
+                        children: _paymentAccounts.map((account) {
+                          final isBank =
+                              account.type == PaymentAccountType.bank;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: _bankAccountNumberController,
-                            decoration: InputDecoration(
-                              labelText:
-                                  isSw ? 'Namba ya Akaunti' : 'Account Number',
+                            decoration: BoxDecoration(
+                              color: AppColors.resolveCardBackground(context),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: account.isDefault
+                                    ? AppColors.primary
+                                    : AppColors.resolveBorder(context),
+                                width: account.isDefault ? 1.5 : 1.0,
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _mobileMoneyController,
-                      decoration: InputDecoration(
-                        labelText: isSw
-                            ? 'Lipa Namba / Simu ya Malipo (M-Pesa / Airtel / Tigo)'
-                            : 'Mobile Money / Lipa Till Number',
-                        hintText:
-                            'e.g. M-Pesa Lipa Namba: 55443322 (Jina la Kampuni)',
-                        prefixIcon: const Icon(Icons.phone_android_outlined),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: isBank
+                                      ? AppColors.primary.withOpacity(0.12)
+                                      : Colors.green.withOpacity(0.12),
+                                  child: Icon(
+                                    isBank
+                                        ? Icons.account_balance
+                                        : Icons.phone_android,
+                                    size: 18,
+                                    color: isBank
+                                        ? AppColors.primary
+                                        : Colors.green.shade700,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              account.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (account.currency != null &&
+                                              account.currency!.isNotEmpty) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors
+                                                    .resolveSurfaceSecondary(
+                                                        context),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                account.currency!,
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                          if (account.isDefault) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary
+                                                    .withOpacity(0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                isSw ? 'KUU' : 'DEFAULT',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        account.accountNumber,
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                          color: AppColors.resolveTextPrimary(
+                                              context),
+                                        ),
+                                      ),
+                                      if (account.accountName != null &&
+                                          account.accountName!.isNotEmpty)
+                                        Text(
+                                          account.accountName!,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors
+                                                .resolveTextSecondary(context),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined,
+                                      size: 18),
+                                  tooltip: isSw ? 'Hariri' : 'Edit',
+                                  onPressed: () =>
+                                      _showPaymentAccountDialog(account),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.delete_outline,
+                                      size: 18, color: AppColors.error),
+                                  tooltip: isSw ? 'Futa' : 'Delete',
+                                  onPressed: () {
+                                    setState(() {
+                                      _paymentAccounts.removeWhere(
+                                          (a) => a.id == account.id);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.add, size: 18),
+                              label: Text(isSw
+                                  ? 'Ongeza Njia Nyingine ya Malipo'
+                                  : 'Add Another Payment Channel'),
+                              onPressed: () => _showPaymentAccountDialog(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.resolveSurfaceSecondary(context),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.resolveBorder(context),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.preview_outlined, size: 14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isSw
+                                      ? 'Muonekano kwenye Ankara (Preview):'
+                                      : 'Preview on Invoices:',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _paymentAccounts
+                                  .map((a) => a.formattedDisplay)
+                                  .join('\n'),
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.4,
+                                color: AppColors.resolveTextPrimary(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     // 4. TERMS, DIGITAL SIGNATURE & AUTHORIZED SIGNATORY

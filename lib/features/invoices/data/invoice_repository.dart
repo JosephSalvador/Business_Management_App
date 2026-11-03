@@ -265,6 +265,7 @@ class InvoiceRepository {
     DateTime? dueDate,
     double discountAmount = 0,
     double initialAmountPaid = 0,
+    List<CustomerInvoicePayment>? initialPayments,
     String? paymentMethod,
     String? paymentReference,
     String? paymentInstructions,
@@ -293,6 +294,7 @@ class InvoiceRepository {
       dueDate: dueDate,
       discountAmount: discountAmount,
       initialAmountPaid: initialAmountPaid,
+      initialPayments: initialPayments,
       paymentMethod: paymentMethod,
       paymentReference: paymentReference,
       paymentInstructions: paymentInstructions,
@@ -322,6 +324,7 @@ class InvoiceRepository {
     DateTime? dueDate,
     double discountAmount = 0,
     double initialAmountPaid = 0,
+    List<CustomerInvoicePayment>? initialPayments,
     String? paymentMethod,
     String? paymentReference,
     String? paymentInstructions,
@@ -352,7 +355,26 @@ class InvoiceRepository {
     final effectiveDiscount = discountAmount.clamp(0.0, subtotal);
     final taxAmount = builtLines.fold<double>(0, (sum, l) => sum + l.taxAmount);
     final totalAmount = (subtotal - effectiveDiscount) + taxAmount;
-    final paid = initialAmountPaid.clamp(0.0, totalAmount);
+
+    final paymentsList = <CustomerInvoicePayment>[];
+    double calculatedPaid = initialAmountPaid;
+    if (initialPayments != null && initialPayments.isNotEmpty) {
+      paymentsList.addAll(initialPayments);
+      calculatedPaid =
+          initialPayments.fold<double>(0, (sum, p) => sum + p.amount);
+    } else if (initialAmountPaid > 0) {
+      paymentsList.add(CustomerInvoicePayment(
+        id: _uuid.v4(),
+        amount: initialAmountPaid,
+        paymentMethod: (paymentMethod != null && paymentMethod.isNotEmpty)
+            ? paymentMethod
+            : 'Malipo ya Awali',
+        reference: paymentReference,
+        paidAt: now,
+      ));
+    }
+
+    final paid = calculatedPaid.clamp(0.0, totalAmount);
     final balance = totalAmount - paid;
     final status = paid >= totalAmount && totalAmount > 0
         ? InvoiceStatus.paid
@@ -389,10 +411,13 @@ class InvoiceRepository {
       totalAmount: totalAmount,
       amountPaid: paid,
       balanceDue: balance,
-      paymentMethod: paymentMethod?.trim(),
-      paymentReference: paymentReference?.trim(),
+      paymentMethod: paymentMethod?.trim() ??
+          (paymentsList.isNotEmpty ? paymentsList.first.paymentMethod : null),
+      paymentReference: paymentReference?.trim() ??
+          (paymentsList.isNotEmpty ? paymentsList.first.reference : null),
       paidAtUtc: status == InvoiceStatus.paid ? now : null,
       lines: builtLines,
+      payments: paymentsList,
       isSynced: false,
     );
 
@@ -425,11 +450,17 @@ class InvoiceRepository {
       'issueDate': issued.toUtc().toIso8601String(),
       if (dueDate != null) 'dueDate': dueDate.toUtc().toIso8601String(),
       'discountAmount': discountAmount,
-      'initialAmountPaid': initialAmountPaid,
+      'initialAmountPaid': paid,
+      if (paymentsList.isNotEmpty)
+        'initialPayments': [for (final p in paymentsList) p.toJson()],
       if (paymentMethod != null && paymentMethod.trim().isNotEmpty)
-        'paymentMethod': paymentMethod.trim(),
+        'paymentMethod': paymentMethod.trim()
+      else if (paymentsList.isNotEmpty)
+        'paymentMethod': paymentsList.first.paymentMethod,
       if (paymentReference != null && paymentReference.trim().isNotEmpty)
-        'paymentReference': paymentReference.trim(),
+        'paymentReference': paymentReference.trim()
+      else if (paymentsList.isNotEmpty && paymentsList.first.reference != null)
+        'paymentReference': paymentsList.first.reference,
       if (paymentInstructions != null && paymentInstructions.trim().isNotEmpty)
         'paymentInstructions': paymentInstructions.trim(),
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
@@ -508,12 +539,27 @@ class InvoiceRepository {
       }
     }
 
+    final paymentId = _uuid.v4();
+    final now = DateTime.now();
+
     if (localCurrent != null) {
       final newPaid = (localCurrent.amountPaid + amount)
           .clamp(0.0, localCurrent.totalAmount);
       final newBalance = localCurrent.totalAmount - newPaid;
       final newStatus =
           newBalance <= 0 ? InvoiceStatus.paid : InvoiceStatus.partiallyPaid;
+
+      final newPayment = CustomerInvoicePayment(
+        id: paymentId,
+        amount: amount,
+        paymentMethod:
+            (method != null && method.isNotEmpty) ? method : 'Malipo',
+        reference: reference,
+        paidAt: now,
+      );
+
+      final updatedPayments = [...localCurrent.payments, newPayment];
+
       final updatedLocal = localCurrent.copyWith(
         status: newStatus,
         amountPaid: newPaid,
@@ -525,8 +571,9 @@ class InvoiceRepository {
             ? reference
             : localCurrent.paymentReference,
         paidAtUtc: newStatus == InvoiceStatus.paid
-            ? DateTime.now()
+            ? now
             : localCurrent.paidAtUtc,
+        payments: updatedPayments,
         isSynced: false,
       );
       localCurrent = updatedLocal;
@@ -540,6 +587,8 @@ class InvoiceRepository {
           'amount': amount,
           if (method != null && method.isNotEmpty) 'method': method,
           if (reference != null && reference.isNotEmpty) 'reference': reference,
+          'paymentId': paymentId,
+          'paidAt': now.toUtc().toIso8601String(),
         },
       );
       if (response.statusCode == 200 && response.data is Map) {

@@ -29,6 +29,7 @@ public sealed class Tenant : AggregateRoot
     public string? BankAccountNumber { get; private set; }
     public string? BankBranchOrSwift { get; private set; }
     public string? MobileMoneyDetails { get; private set; }
+    public string? PaymentAccountsJson { get; private set; }
     public string? InvoiceTerms { get; private set; }
     public string? AuthorizedSignatoryName { get; private set; }
     public string? AuthorizedSignatoryTitle { get; private set; }
@@ -78,7 +79,8 @@ public sealed class Tenant : AggregateRoot
         string? mobileMoneyDetails = null,
         string? invoiceTerms = null,
         string? authorizedSignatoryName = null,
-        string? authorizedSignatoryTitle = null)
+        string? authorizedSignatoryTitle = null,
+        string? paymentAccountsJson = null)
     {
         Name = name.Trim();
         ContactEmail = contactEmail;
@@ -91,6 +93,7 @@ public sealed class Tenant : AggregateRoot
         if (bankAccountNumber != null) BankAccountNumber = string.IsNullOrWhiteSpace(bankAccountNumber) ? null : bankAccountNumber.Trim();
         if (bankBranchOrSwift != null) BankBranchOrSwift = string.IsNullOrWhiteSpace(bankBranchOrSwift) ? null : bankBranchOrSwift.Trim();
         if (mobileMoneyDetails != null) MobileMoneyDetails = string.IsNullOrWhiteSpace(mobileMoneyDetails) ? null : mobileMoneyDetails.Trim();
+        if (paymentAccountsJson != null) PaymentAccountsJson = string.IsNullOrWhiteSpace(paymentAccountsJson) ? null : paymentAccountsJson.Trim();
         if (invoiceTerms != null) InvoiceTerms = string.IsNullOrWhiteSpace(invoiceTerms) ? null : invoiceTerms.Trim();
         if (authorizedSignatoryName != null) AuthorizedSignatoryName = string.IsNullOrWhiteSpace(authorizedSignatoryName) ? null : authorizedSignatoryName.Trim();
         if (authorizedSignatoryTitle != null) AuthorizedSignatoryTitle = string.IsNullOrWhiteSpace(authorizedSignatoryTitle) ? null : authorizedSignatoryTitle.Trim();

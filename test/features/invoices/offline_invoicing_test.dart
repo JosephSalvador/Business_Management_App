@@ -51,6 +51,135 @@ void main() {
 
       final restoredSummary = CustomerInvoiceSummary.fromJson(summaryJson);
       expect(restoredSummary.isSynced, isFalse);
+  group('Multiple Payment Accounts & Split Invoice Payments', () {
+    test('PaymentAccount round-trip serialization and legacy synthesis in Organization', () {
+      final accounts = [
+        const PaymentAccount(
+          id: 'acc-1',
+          type: PaymentAccountType.bank,
+          providerName: 'CRDB Bank',
+          accountName: 'Dar Enterprises TZS',
+          accountNumber: '01502233445500',
+          branchOrSwift: 'Tower Branch / CORUTZTZ',
+          currency: 'TZS',
+          isDefault: true,
+        ),
+        const PaymentAccount(
+          id: 'acc-2',
+          type: PaymentAccountType.mobileMoney,
+          providerName: 'M-Pesa (Vodacom)',
+          accountName: 'Dar Enterprises Lipa',
+          accountNumber: '556677',
+          isDefault: false,
+        ),
+      ];
+
+      final org = Organization(
+        name: 'Dar Enterprises',
+        paymentAccounts: accounts,
+      );
+
+      final orgJson = org.toJson();
+      expect(orgJson['paymentAccounts'], isList);
+      expect((orgJson['paymentAccounts'] as List).length, 2);
+
+      final restoredOrg = Organization.fromJson(orgJson);
+      expect(restoredOrg.paymentAccounts.length, 2);
+      expect(restoredOrg.paymentAccounts[0].providerName, 'CRDB Bank');
+      expect(restoredOrg.paymentAccounts[0].isBank, isTrue);
+      expect(restoredOrg.paymentAccounts[1].providerName, 'M-Pesa (Vodacom)');
+      expect(restoredOrg.paymentAccounts[1].isMobileMoney, isTrue);
+      expect(restoredOrg.formattedPaymentInstructions, contains('CRDB Bank'));
+      expect(restoredOrg.formattedPaymentInstructions, contains('M-Pesa (Vodacom)'));
+
+      // Test legacy single fields synthesis when paymentAccounts is empty
+      final legacyOrgJson = {
+        'name': 'Legacy Business',
+        'bankName': 'NMB Bank',
+        'bankAccountName': 'Legacy Acc',
+        'bankAccountNumber': '12345678',
+        'mobileMoneyDetails': 'M-Pesa Till: 998877',
+      };
+      final synthesizedOrg = Organization.fromJson(legacyOrgJson);
+      expect(synthesizedOrg.paymentAccounts.length, 2);
+      expect(synthesizedOrg.paymentAccounts.any((a) => a.providerName == 'NMB Bank'), isTrue);
+      expect(synthesizedOrg.paymentAccounts.any((a) => a.accountNumber == '998877'), isTrue);
+    });
+
+    test('CustomerInvoicePayment serialization and invoice payment history tracking', () {
+      final payment1 = CustomerInvoicePayment(
+        id: 'pmt-1',
+        amount: 200000.0,
+        method: 'Bank Transfer',
+        reference: 'CRDB-TX-998811',
+        paidAtUtc: DateTime.utc(2026, 11, 1, 10, 0),
+      );
+      final payment2 = CustomerInvoicePayment(
+        id: 'pmt-2',
+        amount: 150000.0,
+        method: 'M-Pesa',
+        reference: 'MPESA-QK8829',
+        paidAtUtc: DateTime.utc(2026, 11, 2, 14, 30),
+      );
+
+      final pmtJson = payment1.toJson();
+      final restoredPayment = CustomerInvoicePayment.fromJson(pmtJson);
+      expect(restoredPayment.id, 'pmt-1');
+      expect(restoredPayment.amount, 200000.0);
+      expect(restoredPayment.method, 'Bank Transfer');
+      expect(restoredPayment.reference, 'CRDB-TX-998811');
+
+      final invoiceJson = {
+        'id': 'inv-split',
+        'number': 'CINV-2026-7777',
+        'customerName': 'Split Payer Ltd',
+        'currency': 'TZS',
+        'issueDate': '2026-11-01T08:00:00.000Z',
+        'status': 1,
+        'subtotal': 500000.0,
+        'totalAmount': 500000.0,
+        'amountPaid': 350000.0,
+        'balanceDue': 150000.0,
+        'payments': [payment1.toJson(), payment2.toJson()],
+        'lines': [
+          {
+            'id': 'line-1',
+            'description': 'Product A',
+            'quantity': 10.0,
+            'unitPrice': 50000.0,
+            'lineTotal': 500000.0,
+          }
+        ],
+      };
+
+      final invoice = CustomerInvoice.fromJson(invoiceJson);
+      expect(invoice.payments.length, 2);
+      expect(invoice.payments[0].amount, 200000.0);
+      expect(invoice.payments[1].amount, 150000.0);
+      expect(invoice.amountPaid, 350000.0);
+
+      // Verify legacy invoice with amountPaid > 0 but empty payments synthesizes payment
+      final legacyInvoiceJson = {
+        'id': 'inv-legacy',
+        'number': 'CINV-2026-8888',
+        'customerName': 'Legacy Payer',
+        'currency': 'TZS',
+        'issueDate': '2026-11-01T08:00:00.000Z',
+        'paidAtUtc': '2026-11-01T09:00:00.000Z',
+        'paymentMethod': 'Cash',
+        'paymentReference': 'REC-001',
+        'status': 1,
+        'subtotal': 100000.0,
+        'totalAmount': 100000.0,
+        'amountPaid': 50000.0,
+        'balanceDue': 50000.0,
+        'lines': [],
+      };
+      final legacyInvoice = CustomerInvoice.fromJson(legacyInvoiceJson);
+      expect(legacyInvoice.payments.length, 1);
+      expect(legacyInvoice.payments.first.amount, 50000.0);
+      expect(legacyInvoice.payments.first.method, 'Cash');
+      expect(legacyInvoice.payments.first.reference, 'REC-001');
     });
   });
 
@@ -296,6 +425,67 @@ void main() {
         expect(bytes[2], 0x44);
         expect(bytes[3], 0x46);
       }
+    });
+
+    test('generates A4 and 80mm thermal receipts with multiple payment accounts and payments list', () async {
+      final multiPayInvoice = sampleInvoice.copyWith(
+        amountPaid: 350000.0,
+        balanceDue: 210500.0,
+        status: InvoiceStatus.partiallyPaid,
+        payments: [
+          CustomerInvoicePayment(
+            id: 'p1',
+            amount: 200000.0,
+            method: 'CRDB Bank',
+            reference: 'CRDB-TX-101',
+            paidAtUtc: DateTime.utc(2026, 11, 1, 10, 0),
+          ),
+          CustomerInvoicePayment(
+            id: 'p2',
+            amount: 150000.0,
+            method: 'M-Pesa',
+            reference: 'MPESA-REF-202',
+            paidAtUtc: DateTime.utc(2026, 11, 2, 11, 30),
+          ),
+        ],
+      );
+
+      final multiAccountOrg = sampleOrg.copyWith(
+        paymentAccounts: const [
+          PaymentAccount(
+            id: 'acc-1',
+            type: PaymentAccountType.bank,
+            providerName: 'CRDB Bank',
+            accountName: 'Dar Enterprises TZS',
+            accountNumber: '01502233445500',
+            currency: 'TZS',
+            isDefault: true,
+          ),
+          PaymentAccount(
+            id: 'acc-2',
+            type: PaymentAccountType.mobileMoney,
+            providerName: 'M-Pesa',
+            accountNumber: '556677',
+            isDefault: false,
+          ),
+        ],
+      );
+
+      final a4Bytes = await generator.generateInvoiceA4(
+        invoice: multiPayInvoice,
+        organization: multiAccountOrg,
+        isSwahili: true,
+      );
+      expect(a4Bytes, isNotEmpty);
+      expect(a4Bytes[0], 0x25); // %PDF-
+
+      final thermalBytes = await generator.generateInvoiceThermal80mm(
+        invoice: multiPayInvoice,
+        organization: multiAccountOrg,
+        isSwahili: true,
+      );
+      expect(thermalBytes, isNotEmpty);
+      expect(thermalBytes[0], 0x25); // %PDF-
     });
   });
 }

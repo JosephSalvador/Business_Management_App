@@ -23,7 +23,8 @@ public sealed record UpdateOrganizationCommand(
     string? MobileMoneyDetails = null,
     string? InvoiceTerms = null,
     string? AuthorizedSignatoryName = null,
-    string? AuthorizedSignatoryTitle = null) : IRequest<Result<OrganizationDto>>;
+    string? AuthorizedSignatoryTitle = null,
+    string? PaymentAccountsJson = null) : IRequest<Result<OrganizationDto>>;
 
 public sealed class UpdateOrganizationCommandHandler
     : IRequestHandler<UpdateOrganizationCommand, Result<OrganizationDto>>
@@ -61,9 +62,10 @@ public sealed class UpdateOrganizationCommandHandler
             command.BankAccountNumber,
             command.BankBranchOrSwift,
             command.MobileMoneyDetails,
-            command. InvoiceTerms,
+            command.InvoiceTerms,
             command.AuthorizedSignatoryName,
-            command.AuthorizedSignatoryTitle);
+            command.AuthorizedSignatoryTitle,
+            command.PaymentAccountsJson);
 
         if (!string.IsNullOrWhiteSpace(command.CountryCode))
         {
@@ -93,7 +95,8 @@ public sealed class UpdateOrganizationCommandHandler
             tenant.MobileMoneyDetails,
             tenant.InvoiceTerms,
             tenant.AuthorizedSignatoryName,
-            tenant.AuthorizedSignatoryTitle);
+            tenant.AuthorizedSignatoryTitle,
+            tenant.PaymentAccountsJson);
 
         return Result.Success(dto);
     }

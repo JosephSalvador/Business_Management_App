@@ -45,7 +45,11 @@ public static class CustomerInvoiceMappers
         invoice.DiscountAmount,
         invoice.PaymentInstructions,
         invoice.AuthorizedSignatoryName,
-        invoice.AuthorizedSignatoryTitle);
+        invoice.AuthorizedSignatoryTitle,
+        invoice.GetPayments()
+            .Select(p => new CustomerInvoicePaymentDto(
+                p.Id, p.Amount, p.Method, p.Reference, p.PaidAtUtc))
+            .ToList());
 
     public static CustomerInvoiceSummaryDto ToSummary(CustomerInvoice invoice) => new(
         invoice.Id,
@@ -73,6 +77,13 @@ public sealed record CustomerInvoiceLineRequest(
     string UnitOfMeasure = "Pcs",
     decimal DiscountAmount = 0m);
 
+public sealed record CustomerInvoicePaymentRequest(
+    decimal Amount,
+    string? Method = null,
+    string? Reference = null,
+    DateTime? PaidAt = null,
+    Guid? Id = null);
+
 public sealed record CreateCustomerInvoiceCommand(
     IReadOnlyList<CustomerInvoiceLineRequest> Lines,
     Guid? CustomerId = null,
@@ -96,7 +107,8 @@ public sealed record CreateCustomerInvoiceCommand(
     string? PaymentInstructions = null,
     string? AuthorizedSignatoryName = null,
     string? AuthorizedSignatoryTitle = null,
-    Guid? Id = null)
+    Guid? Id = null,
+    IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null)
     : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed record CreateInvoiceCommand(
@@ -122,7 +134,8 @@ public sealed record CreateInvoiceCommand(
     string? PaymentInstructions = null,
     string? AuthorizedSignatoryName = null,
     string? AuthorizedSignatoryTitle = null,
-    Guid? Id = null)
+    Guid? Id = null,
+    IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null)
     : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateInvoiceCommandHandler
@@ -157,7 +170,8 @@ public sealed class CreateInvoiceCommandHandler
             request.PaymentInstructions,
             request.AuthorizedSignatoryName,
             request.AuthorizedSignatoryTitle,
-            request.Id), cancellationToken);
+            request.Id,
+            request.InitialPayments), cancellationToken);
 }
 
 public sealed class CreateCustomerInvoiceCommandHandler
@@ -269,7 +283,24 @@ public sealed class CreateCustomerInvoiceCommandHandler
                 command.AuthorizedSignatoryTitle,
                 command.Id);
 
-            if (command.InitialAmountPaid > 0)
+            if (command.InitialPayments is { Count: > 0 } initialPayments)
+            {
+                foreach (var payment in initialPayments)
+                {
+                    if (payment.Amount > 0 && invoice.BalanceDue > 0)
+                    {
+                        var deposit = Math.Min(payment.Amount, invoice.BalanceDue);
+                        invoice.RecordPayment(
+                            deposit,
+                            payment.Method,
+                            payment.Reference,
+                            _tenantContext.UserId,
+                            payment.PaidAt ?? now,
+                            payment.Id);
+                    }
+                }
+            }
+            else if (command.InitialAmountPaid > 0)
             {
                 var deposit = Math.Min(command.InitialAmountPaid, invoice.TotalAmount);
                 if (deposit > 0)
@@ -298,7 +329,9 @@ public sealed record RecordCustomerInvoicePaymentCommand(
     Guid Id,
     decimal Amount,
     string? Method = null,
-    string? Reference = null)
+    string? Reference = null,
+    DateTime? PaidAt = null,
+    Guid? PaymentId = null)
     : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class RecordCustomerInvoicePaymentCommandHandler
@@ -335,7 +368,9 @@ public sealed class RecordCustomerInvoicePaymentCommandHandler
                 command.Amount,
                 command.Method,
                 command.Reference,
-                _tenantContext.UserId);
+                _tenantContext.UserId,
+                command.PaidAt ?? DateTime.UtcNow,
+                command.PaymentId);
         }
         catch (ArgumentException exception)
         {

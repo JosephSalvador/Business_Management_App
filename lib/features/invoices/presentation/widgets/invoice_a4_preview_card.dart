@@ -711,6 +711,12 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
             ),
           ],
 
+          _buildPaymentHistoryTable(
+            numberFormat: numberFormat,
+            currency: currency,
+            primaryColor: primaryColor,
+          ),
+
           const SizedBox(height: 20),
 
           // Payment Details (Left) + "Issued by, signature:" with Signature Image (Right)
@@ -1193,6 +1199,12 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                 ],
               ],
             ),
+          ),
+
+          _buildPaymentHistoryTable(
+            numberFormat: numberFormat,
+            currency: organization.currency ?? 'TZS',
+            primaryColor: primaryColor,
           ),
 
           const SizedBox(height: 12),
@@ -2108,6 +2120,12 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
               ],
             ),
           ),
+          if (invoice.payments.isNotEmpty)
+            _buildPaymentHistoryTable(
+              numberFormat: NumberFormat('#,##0.##'),
+              currency: organization.currency ?? 'TZS',
+              primaryColor: primaryColor,
+            ),
         ],
       ),
     );
@@ -2370,6 +2388,85 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
     );
   }
 
+  Widget _buildPaymentHistoryTable({
+    required NumberFormat numberFormat,
+    required String currency,
+    required Color primaryColor,
+  }) {
+    if (invoice.payments.isEmpty) return const SizedBox.shrink();
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Icon(Icons.history, size: 14, color: primaryColor),
+            const SizedBox(width: 5),
+            Text(
+              isSwahili
+                  ? 'Historia ya Malipo (Payments Received):'
+                  : 'Payment History / Receipts:',
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: _slate700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _slate200),
+          ),
+          child: Table(
+            border: const TableBorder.symmetric(
+              inside: BorderSide(color: _slate200, width: 0.5),
+            ),
+            columnWidths: const {
+              0: FlexColumnWidth(2.6),
+              1: FlexColumnWidth(2.2),
+              2: FlexColumnWidth(2.7),
+              3: FlexColumnWidth(2.5),
+            },
+            children: [
+              TableRow(
+                decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
+                children: [
+                  _gridCell(isSwahili ? 'Tarehe' : 'Date', isHeader: true),
+                  _gridCell(isSwahili ? 'Njia' : 'Method', isHeader: true),
+                  _gridCell(
+                      isSwahili ? 'Kumbukumbu' : 'Reference', isHeader: true),
+                  _gridCell(
+                    isSwahili ? 'Kiasi ($currency)' : 'Amount ($currency)',
+                    isHeader: true,
+                    alignRight: true,
+                  ),
+                ],
+              ),
+              for (final pmt in invoice.payments)
+                TableRow(
+                  children: [
+                    _gridCell(dateFormat.format(pmt.paidAtUtc.toLocal())),
+                    _gridCell(pmt.method),
+                    _gridCell(pmt.reference ?? '-'),
+                    _gridCell(
+                      numberFormat.format(pmt.amount),
+                      alignRight: true,
+                      isBold: true,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Uint8List? _decodeBase64Bytes(String? rawBase64) {
     if (rawBase64 == null || rawBase64.trim().isEmpty) return null;
     try {
@@ -2389,6 +2486,9 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
     if (invoice.paymentInstructions != null &&
         invoice.paymentInstructions!.trim().isNotEmpty) {
       return invoice.paymentInstructions!.trim();
+    }
+    if (organization.paymentAccounts.isNotEmpty) {
+      return organization.formattedPaymentInstructions;
     }
     final lines = <String>[];
     if (organization.bankName != null &&

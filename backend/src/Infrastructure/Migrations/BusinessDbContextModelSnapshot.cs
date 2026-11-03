@@ -2318,6 +2318,9 @@ namespace BusinessOS.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("PaymentsJson")
+                        .HasColumnType("text");
+
                     b.Property<string>("PaymentTerms")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -3917,6 +3920,9 @@ namespace BusinessOS.Infrastructure.Migrations
                     b.Property<string>("MobileMoneyDetails")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
+
+                    b.Property<string>("PaymentAccountsJson")
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()

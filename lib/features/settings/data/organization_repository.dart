@@ -1,6 +1,115 @@
+import 'dart:convert';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/app_exception.dart';
 import '../../../core/storage/offline_cache_dao.dart';
+
+enum PaymentAccountType {
+  bank,
+  mobileMoney;
+
+  String get label =>
+      this == PaymentAccountType.bank ? 'Benki' : 'Simu / Lipa Namba';
+
+  static PaymentAccountType fromString(String? value) {
+    if (value == null) return PaymentAccountType.bank;
+    final v = value.toLowerCase().trim();
+    if (v.contains('mobile') ||
+        v.contains('simu') ||
+        v.contains('lipa') ||
+        v.contains('mpesa') ||
+        v.contains('m-pesa') ||
+        v.contains('airtel') ||
+        v.contains('tigo') ||
+        v.contains('halo')) {
+      return PaymentAccountType.mobileMoney;
+    }
+    return PaymentAccountType.bank;
+  }
+}
+
+class PaymentAccount {
+  const PaymentAccount({
+    required this.id,
+    required this.type,
+    required this.name,
+    required this.accountNumber,
+    this.accountName,
+    this.branchOrSwift,
+    this.currency,
+    this.isDefault = false,
+  });
+
+  final String id;
+  final PaymentAccountType type;
+  final String name; // e.g. "CRDB Bank", "M-Pesa Lipa Namba"
+  final String accountNumber; // e.g. "01528392019", "552233"
+  final String? accountName; // e.g. "Acme Enterprises"
+  final String? branchOrSwift; // e.g. "Kariakoo Branch / CORUTZTZ"
+  final String? currency; // e.g. "TZS", "USD"
+  final bool isDefault;
+
+  String get formattedDisplay {
+    final acctNameStr =
+        (accountName != null && accountName!.trim().isNotEmpty)
+            ? ' (${accountName!.trim()})'
+            : '';
+    final branchStr =
+        (branchOrSwift != null && branchOrSwift!.trim().isNotEmpty)
+            ? ' [${branchOrSwift!.trim()}]'
+            : '';
+    final currStr =
+        (currency != null && currency!.trim().isNotEmpty)
+            ? ' ($currency)'
+            : '';
+    final prefix = type == PaymentAccountType.bank ? 'Bank' : 'Mobile';
+    return '$prefix: $name - $accountNumber$acctNameStr$currStr$branchStr';
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type == PaymentAccountType.bank ? 'bank' : 'mobile_money',
+        'name': name,
+        'accountNumber': accountNumber,
+        'accountName': accountName,
+        'branchOrSwift': branchOrSwift,
+        'currency': currency,
+        'isDefault': isDefault,
+      };
+
+  factory PaymentAccount.fromJson(Map<String, dynamic> json) => PaymentAccount(
+        id: (json['id'] as String?) ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        type: PaymentAccountType.fromString(json['type'] as String?),
+        name: (json['name'] as String?) ?? '',
+        accountNumber: (json['accountNumber'] as String?) ?? '',
+        accountName: json['accountName'] as String?,
+        branchOrSwift: json['branchOrSwift'] as String?,
+        currency: json['currency'] as String?,
+        isDefault: json['isDefault'] as bool? ?? false,
+      );
+
+  PaymentAccount copyWith({
+    String? id,
+    PaymentAccountType? type,
+    String? name,
+    String? accountNumber,
+    String? accountName,
+    String? branchOrSwift,
+    String? currency,
+    bool? isDefault,
+  }) =>
+      PaymentAccount(
+        id: id ?? this.id,
+        type: type ?? this.type,
+        name: name ?? this.name,
+        accountNumber: accountNumber ?? this.accountNumber,
+        accountName: accountName ?? this.accountName,
+        branchOrSwift: branchOrSwift ?? this.branchOrSwift,
+        currency: currency ?? this.currency,
+        isDefault: isDefault ?? this.isDefault,
+      );
+}
 
 class Organization {
   const Organization({
@@ -25,6 +134,7 @@ class Organization {
     this.invoiceTerms,
     this.authorizedSignatoryName,
     this.authorizedSignatoryTitle,
+    this.paymentAccounts = const [],
   });
 
   final String? name;
@@ -48,6 +158,7 @@ class Organization {
   final String? invoiceTerms;
   final String? authorizedSignatoryName;
   final String? authorizedSignatoryTitle;
+  final List<PaymentAccount> paymentAccounts;
 
   bool get hasLogo => logoBase64 != null && logoBase64!.trim().isNotEmpty;
   bool get hasSignature =>
@@ -57,6 +168,14 @@ class Organization {
       letterheadHeaderBase64!.trim().isNotEmpty;
 
   String get formattedPaymentInstructions {
+    if (paymentAccounts.isNotEmpty) {
+      final lines = <String>[];
+      for (final acc in paymentAccounts) {
+        lines.add(acc.formattedDisplay);
+      }
+      return lines.join('\n');
+    }
+
     final lines = <String>[];
     if (bankName != null && bankName!.trim().isNotEmpty) {
       final acctName =
@@ -79,57 +198,123 @@ class Organization {
     return lines.join('\n');
   }
 
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        'address': address,
-        'phone': phone,
-        'contactPhone': phone,
-        'email': email,
-        'contactEmail': email,
-        'website': website,
-        'taxId': taxId,
-        'countryCode': countryCode,
-        'currency': currency,
-        'logoBase64': logoBase64,
-        'signatureBase64': signatureBase64,
-        'letterheadHeaderBase64': letterheadHeaderBase64,
-        'prePrintedTopMarginMm': prePrintedTopMarginMm,
-        'hideHeaderForPrePrinted': hideHeaderForPrePrinted,
-        'bankName': bankName,
-        'bankAccountName': bankAccountName,
-        'bankAccountNumber': bankAccountNumber,
-        'bankBranchOrSwift': bankBranchOrSwift,
-        'mobileMoneyDetails': mobileMoneyDetails,
-        'invoiceTerms': invoiceTerms,
-        'authorizedSignatoryName': authorizedSignatoryName,
-        'authorizedSignatoryTitle': authorizedSignatoryTitle,
-      };
+  Map<String, dynamic> toJson() {
+    final bankAcc = paymentAccounts.where((a) => a.type == PaymentAccountType.bank).firstOrNull;
+    final mobAcc = paymentAccounts.where((a) => a.type == PaymentAccountType.mobileMoney).firstOrNull;
 
-  factory Organization.fromJson(Map<String, dynamic> json) => Organization(
-        name: json['name'] as String?,
-        address: json['address'] as String?,
-        phone: (json['phone'] as String?) ?? (json['contactPhone'] as String?),
-        email: (json['email'] as String?) ?? (json['contactEmail'] as String?),
-        website: json['website'] as String?,
-        taxId: json['taxId'] as String?,
-        countryCode: json['countryCode'] as String?,
-        currency: json['currency'] as String?,
-        logoBase64: json['logoBase64'] as String?,
-        signatureBase64: json['signatureBase64'] as String?,
-        letterheadHeaderBase64: json['letterheadHeaderBase64'] as String?,
-        prePrintedTopMarginMm:
-            (json['prePrintedTopMarginMm'] as num?)?.toDouble(),
-        hideHeaderForPrePrinted:
-            json['hideHeaderForPrePrinted'] as bool? ?? false,
-        bankName: json['bankName'] as String?,
-        bankAccountName: json['bankAccountName'] as String?,
-        bankAccountNumber: json['bankAccountNumber'] as String?,
-        bankBranchOrSwift: json['bankBranchOrSwift'] as String?,
-        mobileMoneyDetails: json['mobileMoneyDetails'] as String?,
-        invoiceTerms: json['invoiceTerms'] as String?,
-        authorizedSignatoryName: json['authorizedSignatoryName'] as String?,
-        authorizedSignatoryTitle: json['authorizedSignatoryTitle'] as String?,
-      );
+    return {
+      'name': name,
+      'address': address,
+      'phone': phone,
+      'contactPhone': phone,
+      'email': email,
+      'contactEmail': email,
+      'website': website,
+      'taxId': taxId,
+      'countryCode': countryCode,
+      'currency': currency,
+      'logoBase64': logoBase64,
+      'signatureBase64': signatureBase64,
+      'letterheadHeaderBase64': letterheadHeaderBase64,
+      'prePrintedTopMarginMm': prePrintedTopMarginMm,
+      'hideHeaderForPrePrinted': hideHeaderForPrePrinted,
+      'bankName': bankName ?? bankAcc?.name,
+      'bankAccountName': bankAccountName ?? bankAcc?.accountName,
+      'bankAccountNumber': bankAccountNumber ?? bankAcc?.accountNumber,
+      'bankBranchOrSwift': bankBranchOrSwift ?? bankAcc?.branchOrSwift,
+      'mobileMoneyDetails': mobileMoneyDetails ??
+          (mobAcc != null ? '${mobAcc.name}: ${mobAcc.accountNumber}' : null),
+      'invoiceTerms': invoiceTerms,
+      'authorizedSignatoryName': authorizedSignatoryName,
+      'authorizedSignatoryTitle': authorizedSignatoryTitle,
+      'paymentAccounts': paymentAccounts.map((a) => a.toJson()).toList(),
+      'paymentAccountsJson': jsonEncode(paymentAccounts.map((a) => a.toJson()).toList()),
+    };
+  }
+
+  factory Organization.fromJson(Map<String, dynamic> json) {
+    var accounts = <PaymentAccount>[];
+    if (json['paymentAccounts'] is List) {
+      accounts = (json['paymentAccounts'] as List)
+          .whereType<Map<dynamic, dynamic>>()
+          .map((item) =>
+              PaymentAccount.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } else if (json['paymentAccountsJson'] is String &&
+        (json['paymentAccountsJson'] as String).trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(json['paymentAccountsJson'] as String);
+        if (decoded is List) {
+          accounts = decoded
+              .whereType<Map<dynamic, dynamic>>()
+              .map((item) =>
+                  PaymentAccount.fromJson(Map<String, dynamic>.from(item)))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    final bankName = json['bankName'] as String?;
+    final bankAccountName = json['bankAccountName'] as String?;
+    final bankAccountNumber = json['bankAccountNumber'] as String?;
+    final bankBranchOrSwift = json['bankBranchOrSwift'] as String?;
+    final mobileMoneyDetails = json['mobileMoneyDetails'] as String?;
+
+    // Auto-synthesize payment accounts from legacy fields if accounts list is empty
+    if (accounts.isEmpty) {
+      if ((bankName != null && bankName.trim().isNotEmpty) ||
+          (bankAccountNumber != null && bankAccountNumber.trim().isNotEmpty)) {
+        accounts.add(PaymentAccount(
+          id: 'legacy_bank_1',
+          type: PaymentAccountType.bank,
+          name: (bankName != null && bankName.trim().isNotEmpty)
+              ? bankName.trim()
+              : 'Bank Account',
+          accountNumber: bankAccountNumber?.trim() ?? '',
+          accountName: bankAccountName?.trim(),
+          branchOrSwift: bankBranchOrSwift?.trim(),
+          isDefault: true,
+        ));
+      }
+      if (mobileMoneyDetails != null &&
+          mobileMoneyDetails.trim().isNotEmpty) {
+        accounts.add(PaymentAccount(
+          id: 'legacy_mobile_1',
+          type: PaymentAccountType.mobileMoney,
+          name: 'Mobile Money',
+          accountNumber: mobileMoneyDetails.trim(),
+          isDefault: accounts.isEmpty,
+        ));
+      }
+    }
+
+    return Organization(
+      name: json['name'] as String?,
+      address: json['address'] as String?,
+      phone: (json['phone'] as String?) ?? (json['contactPhone'] as String?),
+      email: (json['email'] as String?) ?? (json['contactEmail'] as String?),
+      website: json['website'] as String?,
+      taxId: json['taxId'] as String?,
+      countryCode: json['countryCode'] as String?,
+      currency: json['currency'] as String?,
+      logoBase64: json['logoBase64'] as String?,
+      signatureBase64: json['signatureBase64'] as String?,
+      letterheadHeaderBase64: json['letterheadHeaderBase64'] as String?,
+      prePrintedTopMarginMm:
+          (json['prePrintedTopMarginMm'] as num?)?.toDouble(),
+      hideHeaderForPrePrinted:
+          json['hideHeaderForPrePrinted'] as bool? ?? false,
+      bankName: bankName,
+      bankAccountName: bankAccountName,
+      bankAccountNumber: bankAccountNumber,
+      bankBranchOrSwift: bankBranchOrSwift,
+      mobileMoneyDetails: mobileMoneyDetails,
+      invoiceTerms: json['invoiceTerms'] as String?,
+      authorizedSignatoryName: json['authorizedSignatoryName'] as String?,
+      authorizedSignatoryTitle: json['authorizedSignatoryTitle'] as String?,
+      paymentAccounts: accounts,
+    );
+  }
 }
 
 class OrganizationRepository {
@@ -252,6 +437,14 @@ class OrganizationRepository {
       authorizedSignatoryTitle: body.containsKey('authorizedSignatoryTitle')
           ? body['authorizedSignatoryTitle'] as String?
           : current.authorizedSignatoryTitle,
+      paymentAccounts: body.containsKey('paymentAccounts') &&
+              body['paymentAccounts'] is List
+          ? (body['paymentAccounts'] as List)
+              .whereType<Map<dynamic, dynamic>>()
+              .map((item) =>
+                  PaymentAccount.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : current.paymentAccounts,
     );
 
     if (_cache != null) {
@@ -283,6 +476,8 @@ class OrganizationRepository {
         'invoiceTerms': optimistic.invoiceTerms,
         'authorizedSignatoryName': optimistic.authorizedSignatoryName,
         'authorizedSignatoryTitle': optimistic.authorizedSignatoryTitle,
+        'paymentAccountsJson': jsonEncode(
+            optimistic.paymentAccounts.map((a) => a.toJson()).toList()),
       };
       final response = await _apiClient.put<dynamic>(
         '/api/v1/organization',
@@ -340,6 +535,9 @@ class OrganizationRepository {
           primary.authorizedSignatoryName ?? fallback.authorizedSignatoryName,
       authorizedSignatoryTitle:
           primary.authorizedSignatoryTitle ?? fallback.authorizedSignatoryTitle,
+      paymentAccounts: primary.paymentAccounts.isNotEmpty
+          ? primary.paymentAccounts
+          : fallback.paymentAccounts,
     );
   }
 }

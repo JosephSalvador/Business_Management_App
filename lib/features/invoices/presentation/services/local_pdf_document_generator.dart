@@ -65,6 +65,9 @@ class LocalPdfDocumentGenerator {
         invoice.paymentInstructions!.trim().isNotEmpty) {
       return invoice.paymentInstructions!.trim();
     }
+    if (organization != null && organization.paymentAccounts.isNotEmpty) {
+      return organization.formattedPaymentInstructions;
+    }
     final lines = <String>[];
     if (organization?.bankName != null &&
         organization!.bankName!.trim().isNotEmpty) {
@@ -738,6 +741,14 @@ class LocalPdfDocumentGenerator {
           isBold: true,
         ),
       ],
+
+      _buildPdfPaymentHistoryTable(
+        invoice: invoice,
+        numFmt: numFmt,
+        currency: currency,
+        isSwahili: isSwahili,
+      ),
+
       pw.SizedBox(height: 18),
 
       // Payment Instructions (Left) + "Issued by, signature:" (Right)
@@ -1112,6 +1123,14 @@ class LocalPdfDocumentGenerator {
           ],
         ),
       ),
+
+      _buildPdfPaymentHistoryTable(
+        invoice: invoice,
+        numFmt: numFmt,
+        currency: currency,
+        isSwahili: isSwahili,
+      ),
+
       pw.SizedBox(height: 12),
       pw.Text(
         paymentInstructions,
@@ -1799,6 +1818,14 @@ class LocalPdfDocumentGenerator {
           ),
         ],
       ),
+
+      _buildPdfPaymentHistoryTable(
+        invoice: invoice,
+        numFmt: numFmt,
+        currency: currency,
+        isSwahili: isSwahili,
+      ),
+
       pw.SizedBox(height: 16),
 
       // QR Code + Authorized Signatory / Official Stamp Box
@@ -1896,6 +1923,8 @@ class LocalPdfDocumentGenerator {
     final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
     final numFmt = NumberFormat('#,##0.##');
     String fmtMoney(double amount) => '$currency ${numFmt.format(amount)}';
+    final paymentInstructions =
+        _resolvePaymentInstructions(invoice, organization, isSwahili);
 
     final qrData =
         '${invoice.number}|${invoice.customerLabel}|${fmtMoney(invoice.totalAmount)}';
@@ -2025,6 +2054,60 @@ class LocalPdfDocumentGenerator {
               _buildThermalRow('Paid:', fmtMoney(invoice.amountPaid)),
             _buildThermalRow('BAL DUE:', fmtMoney(invoice.balanceDue),
                 isBold: true, fontSize: 9.5),
+
+            if (invoice.payments.isNotEmpty) ...[
+              pw.SizedBox(height: 4),
+              _buildThermalDashedLine(),
+              pw.SizedBox(height: 3),
+              pw.Text(
+                isSwahili ? 'STAKABADHI ZA MALIPO:' : 'PAYMENTS RECORDED:',
+                style: pw.TextStyle(
+                  fontSize: 7.5,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              for (final p in invoice.payments)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 1),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Text(
+                          '${p.method}${p.reference != null ? " (${p.reference})" : ""}',
+                          style: const pw.TextStyle(fontSize: 7),
+                          maxLines: 1,
+                        ),
+                      ),
+                      pw.Text(
+                        fmtMoney(p.amount),
+                        style: pw.TextStyle(
+                          fontSize: 7,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+
+            if (paymentInstructions.isNotEmpty) ...[
+              pw.SizedBox(height: 4),
+              _buildThermalDashedLine(),
+              pw.SizedBox(height: 3),
+              pw.Text(
+                isSwahili ? 'MAELEKEZO YA KULIPA:' : 'PAYMENT INFO:',
+                style: pw.TextStyle(
+                  fontSize: 7.5,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Text(
+                paymentInstructions,
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 6.5, color: _slate700),
+              ),
+            ],
 
             pw.SizedBox(height: 6),
             _buildThermalDashedLine(),
@@ -2506,6 +2589,75 @@ class LocalPdfDocumentGenerator {
           ),
         ],
       ),
+    );
+  }
+
+  static pw.Widget _buildPdfPaymentHistoryTable({
+    required CustomerInvoice invoice,
+    required NumberFormat numFmt,
+    required String currency,
+    required bool isSwahili,
+  }) {
+    if (invoice.payments.isEmpty) return pw.SizedBox.shrink();
+    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.SizedBox(height: 8),
+        pw.Text(
+          isSwahili
+              ? 'Historia ya Malipo (Payments Received):'
+              : 'Payment History / Receipts:',
+          style: pw.TextStyle(
+            color: _slate700,
+            fontSize: 8.5,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 3),
+        pw.TableHelper.fromTextArray(
+          headers: [
+            isSwahili ? 'Tarehe' : 'Date',
+            isSwahili ? 'Njia' : 'Method',
+            isSwahili ? 'Kumbukumbu' : 'Reference',
+            isSwahili ? 'Kiasi ($currency)' : 'Amount ($currency)',
+          ],
+          data: [
+            for (final pmt in invoice.payments)
+              [
+                dateFmt.format(pmt.paidAtUtc.toLocal()),
+                pmt.method,
+                pmt.reference ?? '-',
+                numFmt.format(pmt.amount),
+              ],
+          ],
+          border: const pw.TableBorder(
+            bottom: pw.BorderSide(color: _slate200, width: 0.6),
+            horizontalInside: pw.BorderSide(color: _slate200, width: 0.5),
+          ),
+          headerStyle: pw.TextStyle(
+            color: _defaultPrimary,
+            fontSize: 7.5,
+            fontWeight: pw.FontWeight.bold,
+          ),
+          headerDecoration: const pw.BoxDecoration(color: _slate100),
+          headerHeight: 18,
+          cellHeight: 18,
+          cellStyle: const pw.TextStyle(color: _slate700, fontSize: 7.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2.6),
+            1: const pw.FlexColumnWidth(2.2),
+            2: const pw.FlexColumnWidth(2.7),
+            3: const pw.FlexColumnWidth(2.5),
+          },
+          cellAlignments: {
+            0: pw.Alignment.centerLeft,
+            1: pw.Alignment.centerLeft,
+            2: pw.Alignment.centerLeft,
+            3: pw.Alignment.centerRight,
+          },
+        ),
+      ],
     );
   }
 

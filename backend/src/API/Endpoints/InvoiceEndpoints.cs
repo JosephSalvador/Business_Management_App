@@ -83,14 +83,15 @@ public static class InvoiceEndpoints
                 request.PaymentInstructions,
                 request.AuthorizedSignatoryName,
                 request.AuthorizedSignatoryTitle,
-                request.Id),
+                request.Id,
+                request.InitialPayments),
             cancellationToken)).ToApiResult();
 
     private static async Task<IResult> RecordPaymentAsync(
         Guid invoiceId, RecordPaymentRequest request, ISender sender, CancellationToken cancellationToken)
         => (await sender.Send(
             new RecordCustomerInvoicePaymentCommand(
-                invoiceId, request.Amount, request.Method, request.Reference),
+                invoiceId, request.Amount, request.Method, request.Reference, request.PaidAt, request.PaymentId),
             cancellationToken)).ToApiResult();
 
     private static async Task<IResult> VoidInvoiceAsync(
@@ -121,10 +122,13 @@ public static class InvoiceEndpoints
         string? PaymentInstructions = null,
         string? AuthorizedSignatoryName = null,
         string? AuthorizedSignatoryTitle = null,
-        Guid? Id = null);
+        Guid? Id = null,
+        IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null);
 
     private sealed record RecordPaymentRequest(
         decimal Amount,
         string? Method = null,
-        string? Reference = null);
+        string? Reference = null,
+        DateTime? PaidAt = null,
+        Guid? PaymentId = null);
 }
