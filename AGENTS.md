@@ -256,6 +256,13 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Frontend Preview & PDF Generator — In `invoice_a4_preview_card.dart` and `local_pdf_document_generator.dart`, render multiple payment accounts in payment instructions and render the Payment History table when payments exist.
 - [x] Task 7: Unit Tests & Verification — Add unit tests in `test/features/invoices/offline_invoicing_test.dart` for multiple payment accounts parsing, formatting, and split payment recording.
 - [x] Task 8: Bump version code to `1.0.0+82` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 9: Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflows (`deploy-azure.yml` and `build-clients.yml`).
+- [x] Task 9: Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflows (`deploy-azure.yml` Run 41634091050 and `build-clients.yml` Run 41630721623).
+
+## Implementation Plan — Production Azure Database Schema Self-Healing & Missing Columns Fix
+- [x] Task 1: Diagnose Azure PostgreSQL 500 error on `GET /api/v1/workspaces/mine` (`42703: column t.AuthorizedSignatoryName does not exist`).
+- [x] Task 2: Update `backend/src/API/Program.cs` with idempotent DDL (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`) guaranteeing all columns on `Tenants`, `CustomerInvoices`, `CustomerInvoiceLines`, tables `DocumentTemplates`, `TenantDocumentConfigurations`, `DeliveryNotes`, `DeliveryNoteItems`, and indexes exist on startup.
+- [x] Task 3: Register migration history entries (`20261029100000_AddCompleteInvoiceAndBrandingElements`, `20261031180000_AddDeliveryNotesAndDocumentIndexes`, `20261031190000_AddDocumentTemplatesAndTenantConfigurations`, `20261103130000_AddMultiplePaymentMethodsAndInvoicePayments`) with `ON CONFLICT DO NOTHING`.
+- [x] Task 4: Deploy update to Azure Container Apps production via `deploy-azure.yml` (Run 41636111394).
+- [x] Task 5: Verify container health (`/health` HTTP 200) and live database queries (`/api/v1/auth/check-availability` HTTP 200).
 
 
