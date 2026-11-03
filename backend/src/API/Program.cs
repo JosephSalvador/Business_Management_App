@@ -305,6 +305,8 @@ var schemaSelfHealingStatements = new (string sql, string description)[]
 
     (@"ALTER TABLE public.""CustomerInvoiceLines"" ADD COLUMN IF NOT EXISTS ""UnitOfMeasure"" character varying(50) DEFAULT 'Pcs';", "CustomerInvoiceLines.UnitOfMeasure"),
     (@"ALTER TABLE public.""CustomerInvoiceLines"" ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0;", "CustomerInvoiceLines.DiscountAmount"),
+    (@"ALTER TABLE public.""CustomerInvoiceLines"" ADD COLUMN IF NOT EXISTS ""TenantId"" uuid;", "CustomerInvoiceLines.TenantId"),
+    (@"UPDATE public.""CustomerInvoiceLines"" l SET ""TenantId"" = i.""TenantId"" FROM public.""CustomerInvoices"" i WHERE l.""CustomerInvoiceId"" = i.""Id"" AND l.""TenantId"" IS NULL;", "CustomerInvoiceLines.BackfillTenantId"),
 
     (@"CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoices_TenantId_CreatedAt"" ON public.""CustomerInvoices"" (""TenantId"", ""CreatedAt"");", "Index IX_CustomerInvoices_TenantId_CreatedAt"),
     (@"CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoiceLines_TenantId_CreatedAt"" ON public.""CustomerInvoiceLines"" (""TenantId"", ""CreatedAt"");", "Index IX_CustomerInvoiceLines_TenantId_CreatedAt"),
