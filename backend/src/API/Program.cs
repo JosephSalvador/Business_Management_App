@@ -304,36 +304,9 @@ else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.
                 CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
               );");
 
-        // 2. Self-Healing: Purge any phantom entries in __EFMigrationsHistory where migrations
-        // were prematurely marked as applied but the underlying tables were never created.
-        var templatesExist = await db.Database.SqlQueryRaw<int>(
-            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'DocumentTemplates'").FirstOrDefaultAsync();
-
-        if (templatesExist == 0)
-        {
-            await db.Database.ExecuteSqlRawAsync(
-                @"DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261031190000_AddDocumentTemplatesAndTenantConfigurations';");
-        }
-
-        var deliveryNotesExist = await db.Database.SqlQueryRaw<int>(
-            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'DeliveryNotes'").FirstOrDefaultAsync();
-
-        if (deliveryNotesExist == 0)
-        {
-            await db.Database.ExecuteSqlRawAsync(
-                @"DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261031180000_AddDeliveryNotesAndDocumentIndexes';");
-        }
-
-        var paymentsJsonColExists = await db.Database.SqlQueryRaw<int>(
-            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'CustomerInvoices' AND column_name = 'PaymentsJson'").FirstOrDefaultAsync();
-
-        if (paymentsJsonColExists == 0)
-        {
-            await db.Database.ExecuteSqlRawAsync(
-                @"DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261103130000_AddMultiplePaymentMethodsAndInvoicePayments';");
-        }
-
-        // 3. Fallback Idempotent DDL: Guarantee DocumentTemplates, TenantConfigurations, and Payment columns exist
+        // 2. Self-Healing & Fallback Idempotent DDL:
+        // Guarantee DocumentTemplates, TenantDocumentConfigurations, DeliveryNotes, DeliveryNoteItems,
+        // and all required branding, invoice, and payment columns exist idempotently.
         await db.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS public.""DocumentTemplates"" (
                 ""Id"" uuid NOT NULL,
@@ -428,14 +401,51 @@ else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.
             CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_CreatedAt"" ON public.""DeliveryNotes"" (""TenantId"", ""CreatedAt"");
             CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Status"" ON public.""DeliveryNotes"" (""TenantId"", ""Status"");
             CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Number"" ON public.""DeliveryNotes"" (""TenantId"", ""Number"");
+            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_InvoiceId"" ON public.""DeliveryNotes"" (""TenantId"", ""InvoiceId"");
             CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_DeliveryNoteId"" ON public.""DeliveryNoteItems"" (""DeliveryNoteId"");
             CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_TenantId_CreatedAt"" ON public.""DeliveryNoteItems"" (""TenantId"", ""CreatedAt"");
 
             ALTER TABLE IF EXISTS public.""Tenants""
+                ADD COLUMN IF NOT EXISTS ""LogoBase64"" text,
+                ADD COLUMN IF NOT EXISTS ""BankName"" character varying(150),
+                ADD COLUMN IF NOT EXISTS ""BankAccountName"" character varying(200),
+                ADD COLUMN IF NOT EXISTS ""BankAccountNumber"" character varying(100),
+                ADD COLUMN IF NOT EXISTS ""BankBranchOrSwift"" character varying(150),
+                ADD COLUMN IF NOT EXISTS ""MobileMoneyDetails"" character varying(300),
+                ADD COLUMN IF NOT EXISTS ""InvoiceTerms"" text,
+                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150),
+                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150),
                 ADD COLUMN IF NOT EXISTS ""PaymentAccountsJson"" text;
 
             ALTER TABLE IF EXISTS public.""CustomerInvoices""
+                ADD COLUMN IF NOT EXISTS ""DocumentTitle"" character varying(50) DEFAULT 'INVOICE',
+                ADD COLUMN IF NOT EXISTS ""ReferenceNumber"" character varying(100),
+                ADD COLUMN IF NOT EXISTS ""PaymentTerms"" character varying(100),
+                ADD COLUMN IF NOT EXISTS ""CustomerAttention"" character varying(200),
+                ADD COLUMN IF NOT EXISTS ""CustomerPhone"" character varying(50),
+                ADD COLUMN IF NOT EXISTS ""CustomerEmail"" character varying(320),
+                ADD COLUMN IF NOT EXISTS ""CustomerAddress"" text,
+                ADD COLUMN IF NOT EXISTS ""CustomerTin"" character varying(64),
+                ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS ""PaymentInstructions"" text,
+                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150),
+                ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150),
                 ADD COLUMN IF NOT EXISTS ""PaymentsJson"" text;
+
+            ALTER TABLE IF EXISTS public.""CustomerInvoiceLines""
+                ADD COLUMN IF NOT EXISTS ""UnitOfMeasure"" character varying(50) DEFAULT 'Pcs',
+                ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0;
+
+            CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoices_TenantId_CreatedAt"" ON public.""CustomerInvoices"" (""TenantId"", ""CreatedAt"");
+            CREATE INDEX IF NOT EXISTS ""IX_CustomerInvoiceLines_TenantId_CreatedAt"" ON public.""CustomerInvoiceLines"" (""TenantId"", ""CreatedAt"");
+
+            INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+            VALUES
+                ('20261029100000_AddCompleteInvoiceAndBrandingElements', '9.0.0'),
+                ('20261031180000_AddDeliveryNotesAndDocumentIndexes', '9.0.0'),
+                ('20261031190000_AddDocumentTemplatesAndTenantConfigurations', '9.0.0'),
+                ('20261103130000_AddMultiplePaymentMethodsAndInvoicePayments', '9.0.0')
+            ON CONFLICT DO NOTHING;
         ");
     }
     catch (Exception ex)
