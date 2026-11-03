@@ -380,6 +380,57 @@ else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.
             CREATE UNIQUE INDEX IF NOT EXISTS ""IX_TenantDocumentConfigurations_TenantId_DocumentType""
                 ON public.""TenantDocumentConfigurations"" (""TenantId"", ""DocumentType"");
 
+            CREATE TABLE IF NOT EXISTS public.""DeliveryNotes"" (
+                ""Id"" uuid NOT NULL,
+                ""TenantId"" uuid NOT NULL,
+                ""Number"" character varying(50) NOT NULL,
+                ""InvoiceId"" uuid,
+                ""InvoiceNumber"" character varying(50),
+                ""CustomerId"" uuid,
+                ""CustomerName"" character varying(200),
+                ""CustomerAttention"" character varying(200),
+                ""CustomerPhone"" character varying(50),
+                ""DeliveryAddress"" text,
+                ""IssueDate"" timestamp with time zone NOT NULL,
+                ""Status"" integer NOT NULL,
+                ""VehicleNumber"" character varying(50),
+                ""DriverName"" character varying(150),
+                ""DriverPhone"" character varying(50),
+                ""ReceivedByName"" character varying(150),
+                ""Notes"" text,
+                ""DispatchedAtUtc"" timestamp with time zone,
+                ""DeliveredAtUtc"" timestamp with time zone,
+                ""CancelledAtUtc"" timestamp with time zone,
+                ""CreatedAt"" timestamp with time zone NOT NULL,
+                ""CreatedBy"" uuid,
+                ""UpdatedAt"" timestamp with time zone,
+                ""UpdatedBy"" uuid,
+                CONSTRAINT ""PK_DeliveryNotes"" PRIMARY KEY (""Id"")
+            );
+
+            CREATE TABLE IF NOT EXISTS public.""DeliveryNoteItems"" (
+                ""Id"" uuid NOT NULL,
+                ""TenantId"" uuid NOT NULL,
+                ""DeliveryNoteId"" uuid NOT NULL,
+                ""ProductId"" uuid,
+                ""Description"" character varying(500) NOT NULL,
+                ""UnitOfMeasure"" character varying(50) NOT NULL,
+                ""QuantityOrdered"" numeric(18,4) NOT NULL,
+                ""QuantityDelivered"" numeric(18,4) NOT NULL,
+                ""LineIndex"" integer NOT NULL,
+                ""CreatedAt"" timestamp with time zone NOT NULL,
+                ""CreatedBy"" uuid,
+                ""UpdatedAt"" timestamp with time zone,
+                ""UpdatedBy"" uuid,
+                CONSTRAINT ""PK_DeliveryNoteItems"" PRIMARY KEY (""Id"")
+            );
+
+            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_CreatedAt"" ON public.""DeliveryNotes"" (""TenantId"", ""CreatedAt"");
+            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Status"" ON public.""DeliveryNotes"" (""TenantId"", ""Status"");
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DeliveryNotes_TenantId_Number"" ON public.""DeliveryNotes"" (""TenantId"", ""Number"");
+            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_DeliveryNoteId"" ON public.""DeliveryNoteItems"" (""DeliveryNoteId"");
+            CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_TenantId_CreatedAt"" ON public.""DeliveryNoteItems"" (""TenantId"", ""CreatedAt"");
+
             ALTER TABLE IF EXISTS public.""Tenants""
                 ADD COLUMN IF NOT EXISTS ""PaymentAccountsJson"" text;
 
@@ -392,9 +443,24 @@ else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.
         Console.WriteLine($"[Startup Migration Healing Warning] {ex.Message}");
     }
 
-    await db.Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>()
-        .SeedAsync(cancellationToken: default, createDemoTenant: true);
+    try
+    {
+        await db.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Startup MigrateAsync Warning] {ex.Message}");
+    }
+
+    try
+    {
+        await scope.ServiceProvider.GetRequiredService<BusinessOS.Infrastructure.DatabaseSeeder>()
+            .SeedAsync(cancellationToken: default, createDemoTenant: true);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Startup Seeding Warning] {ex.Message}");
+    }
 }
 
 await app.RunAsync();

@@ -1214,6 +1214,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.Property(i => i.UnitOfMeasure).IsRequired().HasMaxLength(50);
                 entity.Property(i => i.QuantityOrdered).IsRequired().HasColumnType("decimal(18,4)");
                 entity.Property(i => i.QuantityDelivered).IsRequired().HasColumnType("decimal(18,4)");
+                entity.Property(i => i.LineIndex).IsRequired();
                 entity.HasIndex(i => i.DeliveryNoteId);
                 entity.HasIndex(i => new { i.TenantId, i.CreatedAt });
                 entity.HasQueryFilter(i => FilterTenantId == null || i.TenantId == FilterTenantId);

@@ -37,6 +37,7 @@ public sealed class DeliveryNoteItem : Entity
     public decimal QuantityOrdered { get; private set; }
     public decimal QuantityDelivered { get; private set; }
     public int OrderIndex { get; private set; }
+    public int LineIndex { get => OrderIndex; private set => OrderIndex = value; }
 
     internal static DeliveryNoteItem Create(
         Guid tenantId, Guid deliveryNoteId, DeliveryNoteItemSpec spec, int orderIndex)
