@@ -296,32 +296,100 @@ else if (app.Environment.IsEnvironment("LocalPreProduction") || app.Environment.
 
     try
     {
-        var tableCount = await db.Database.SqlQueryRaw<int>(
-            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'AuditLogs'").FirstOrDefaultAsync();
+        // 1. Ensure __EFMigrationsHistory table exists
+        await db.Database.ExecuteSqlRawAsync(
+            @"CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
+                ""MigrationId"" character varying(150) NOT NULL,
+                ""ProductVersion"" character varying(32) NOT NULL,
+                CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+              );");
 
-        if (tableCount > 0)
+        // 2. Self-Healing: Purge any phantom entries in __EFMigrationsHistory where migrations
+        // were prematurely marked as applied but the underlying tables were never created.
+        var templatesExist = await db.Database.SqlQueryRaw<int>(
+            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'DocumentTemplates'").FirstOrDefaultAsync();
+
+        if (templatesExist == 0)
         {
             await db.Database.ExecuteSqlRawAsync(
-                @"CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
-                    ""MigrationId"" character varying(150) NOT NULL,
-                    ""ProductVersion"" character varying(32) NOT NULL,
-                    CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
-                  );");
-
-            var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
-            foreach (var migrationId in pending)
-            {
-                await db.Database.ExecuteSqlRawAsync(
-                    @"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
-                      VALUES ({0}, '10.0.0')
-                      ON CONFLICT (""MigrationId"") DO NOTHING;",
-                    migrationId);
-            }
+                @"DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261031190000_AddDocumentTemplatesAndTenantConfigurations';");
         }
+
+        var deliveryNotesExist = await db.Database.SqlQueryRaw<int>(
+            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'DeliveryNotes'").FirstOrDefaultAsync();
+
+        if (deliveryNotesExist == 0)
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                @"DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261031180000_AddDeliveryNotesAndDocumentIndexes';");
+        }
+
+        var paymentsJsonColExists = await db.Database.SqlQueryRaw<int>(
+            @"SELECT COUNT(*)::int AS ""Value"" FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'CustomerInvoices' AND column_name = 'PaymentsJson'").FirstOrDefaultAsync();
+
+        if (paymentsJsonColExists == 0)
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                @"DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261103130000_AddMultiplePaymentMethodsAndInvoicePayments';");
+        }
+
+        // 3. Fallback Idempotent DDL: Guarantee DocumentTemplates, TenantConfigurations, and Payment columns exist
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS public.""DocumentTemplates"" (
+                ""Id"" uuid NOT NULL,
+                ""Name"" character varying(100) NOT NULL,
+                ""Description"" character varying(500),
+                ""DocumentType"" integer NOT NULL,
+                ""LiquidLayout"" text NOT NULL,
+                ""ThumbnailBase64"" text,
+                ""EngineVersion"" character varying(50) NOT NULL,
+                ""IsActive"" boolean NOT NULL,
+                ""IsDefault"" boolean NOT NULL,
+                ""DisplayOrder"" integer NOT NULL,
+                ""CreatedAt"" timestamp with time zone NOT NULL,
+                ""CreatedBy"" uuid,
+                ""UpdatedAt"" timestamp with time zone,
+                ""UpdatedBy"" uuid,
+                CONSTRAINT ""PK_DocumentTemplates"" PRIMARY KEY (""Id"")
+            );
+
+            CREATE TABLE IF NOT EXISTS public.""TenantDocumentConfigurations"" (
+                ""Id"" uuid NOT NULL,
+                ""TenantId"" uuid NOT NULL,
+                ""DocumentType"" integer NOT NULL,
+                ""ActiveTemplateId"" uuid NOT NULL,
+                ""CustomLiquidOverride"" text,
+                ""ThemePrimaryHex"" character varying(20),
+                ""ThemeSecondaryHex"" character varying(20),
+                ""LogoUrl"" character varying(500),
+                ""ShowLogo"" boolean NOT NULL,
+                ""FooterNotes"" text,
+                ""CreatedAt"" timestamp with time zone NOT NULL,
+                ""CreatedBy"" uuid,
+                ""UpdatedAt"" timestamp with time zone,
+                ""UpdatedBy"" uuid,
+                CONSTRAINT ""PK_TenantDocumentConfigurations"" PRIMARY KEY (""Id"")
+            );
+
+            CREATE INDEX IF NOT EXISTS ""IX_DocumentTemplates_DocumentType_IsActive_DisplayOrder""
+                ON public.""DocumentTemplates"" (""DocumentType"", ""IsActive"", ""DisplayOrder"");
+
+            CREATE INDEX IF NOT EXISTS ""IX_TenantDocumentConfigurations_ActiveTemplateId""
+                ON public.""TenantDocumentConfigurations"" (""ActiveTemplateId"");
+
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_TenantDocumentConfigurations_TenantId_DocumentType""
+                ON public.""TenantDocumentConfigurations"" (""TenantId"", ""DocumentType"");
+
+            ALTER TABLE IF EXISTS public.""Tenants""
+                ADD COLUMN IF NOT EXISTS ""PaymentAccountsJson"" text;
+
+            ALTER TABLE IF EXISTS public.""CustomerInvoices""
+                ADD COLUMN IF NOT EXISTS ""PaymentsJson"" text;
+        ");
     }
-    catch
+    catch (Exception ex)
     {
-        // Fallback to standard migration if information_schema query is not supported
+        Console.WriteLine($"[Startup Migration Healing Warning] {ex.Message}");
     }
 
     await db.Database.MigrateAsync();

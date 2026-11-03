@@ -571,10 +571,12 @@ public sealed class DatabaseSeeder
 
     private async Task EnsureDocumentTemplatesSeededAsync(CancellationToken cancellationToken)
     {
-        if (await _db.DocumentTemplates.AnyAsync(cancellationToken))
+        try
         {
-            return;
-        }
+            if (await _db.DocumentTemplates.AnyAsync(cancellationToken))
+            {
+                return;
+            }
 
         var templates = new List<DocumentTemplate>
         {
@@ -936,4 +938,9 @@ table { width: 100%; border-collapse: collapse; }
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Seeded {Count} default marketplace document templates.", templates.Count);
     }
+    catch (Exception ex)
+    {
+        _logger.LogWarning(ex, "DocumentTemplates seeding skipped or deferred: {Message}", ex.Message);
+    }
+}
 }
