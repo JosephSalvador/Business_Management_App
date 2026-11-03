@@ -76,19 +76,25 @@ class InvoiceLine {
 typedef CustomerInvoiceLine = InvoiceLine;
 
 class CustomerInvoicePayment {
-  const CustomerInvoicePayment({
+  CustomerInvoicePayment({
     required this.id,
     required this.amount,
-    required this.paymentMethod,
+    String? paymentMethod,
+    String? method,
     this.reference,
-    required this.paidAt,
-  });
+    DateTime? paidAt,
+    DateTime? paidAtUtc,
+  })  : paymentMethod = paymentMethod ?? method ?? 'Malipo',
+        paidAt = paidAt ?? paidAtUtc ?? DateTime.now();
 
   final String id;
   final double amount;
   final String paymentMethod;
   final String? reference;
   final DateTime paidAt;
+
+  String get method => paymentMethod;
+  DateTime get paidAtUtc => paidAt;
 
   Map<String, dynamic> toJson() => {
         'id': id,

@@ -51,6 +51,9 @@ void main() {
 
       final restoredSummary = CustomerInvoiceSummary.fromJson(summaryJson);
       expect(restoredSummary.isSynced, isFalse);
+    });
+  });
+
   group('Multiple Payment Accounts & Split Invoice Payments', () {
     test('PaymentAccount round-trip serialization and legacy synthesis in Organization', () {
       final accounts = [

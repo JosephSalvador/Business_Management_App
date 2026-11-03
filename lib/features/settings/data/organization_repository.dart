@@ -32,17 +32,19 @@ class PaymentAccount {
   const PaymentAccount({
     required this.id,
     required this.type,
-    required this.name,
+    String? name,
+    String? providerName,
     required this.accountNumber,
     this.accountName,
     this.branchOrSwift,
     this.currency,
     this.isDefault = false,
-  });
+  }) : name = name ?? providerName ?? '';
 
   final String id;
   final PaymentAccountType type;
   final String name; // e.g. "CRDB Bank", "M-Pesa Lipa Namba"
+  String get providerName => name;
   final String accountNumber; // e.g. "01528392019", "552233"
   final String? accountName; // e.g. "Acme Enterprises"
   final String? branchOrSwift; // e.g. "Kariakoo Branch / CORUTZTZ"
@@ -315,6 +317,60 @@ class Organization {
       paymentAccounts: accounts,
     );
   }
+
+  Organization copyWith({
+    String? name,
+    String? address,
+    String? phone,
+    String? email,
+    String? website,
+    String? taxId,
+    String? countryCode,
+    String? currency,
+    String? logoBase64,
+    String? signatureBase64,
+    String? letterheadHeaderBase64,
+    double? prePrintedTopMarginMm,
+    bool? hideHeaderForPrePrinted,
+    String? bankName,
+    String? bankAccountName,
+    String? bankAccountNumber,
+    String? bankBranchOrSwift,
+    String? mobileMoneyDetails,
+    String? invoiceTerms,
+    String? authorizedSignatoryName,
+    String? authorizedSignatoryTitle,
+    List<PaymentAccount>? paymentAccounts,
+  }) =>
+      Organization(
+        name: name ?? this.name,
+        address: address ?? this.address,
+        phone: phone ?? this.phone,
+        email: email ?? this.email,
+        website: website ?? this.website,
+        taxId: taxId ?? this.taxId,
+        countryCode: countryCode ?? this.countryCode,
+        currency: currency ?? this.currency,
+        logoBase64: logoBase64 ?? this.logoBase64,
+        signatureBase64: signatureBase64 ?? this.signatureBase64,
+        letterheadHeaderBase64:
+            letterheadHeaderBase64 ?? this.letterheadHeaderBase64,
+        prePrintedTopMarginMm:
+            prePrintedTopMarginMm ?? this.prePrintedTopMarginMm,
+        hideHeaderForPrePrinted:
+            hideHeaderForPrePrinted ?? this.hideHeaderForPrePrinted,
+        bankName: bankName ?? this.bankName,
+        bankAccountName: bankAccountName ?? this.bankAccountName,
+        bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+        bankBranchOrSwift: bankBranchOrSwift ?? this.bankBranchOrSwift,
+        mobileMoneyDetails: mobileMoneyDetails ?? this.mobileMoneyDetails,
+        invoiceTerms: invoiceTerms ?? this.invoiceTerms,
+        authorizedSignatoryName:
+            authorizedSignatoryName ?? this.authorizedSignatoryName,
+        authorizedSignatoryTitle:
+            authorizedSignatoryTitle ?? this.authorizedSignatoryTitle,
+        paymentAccounts: paymentAccounts ?? this.paymentAccounts,
+      );
 }
 
 class OrganizationRepository {
