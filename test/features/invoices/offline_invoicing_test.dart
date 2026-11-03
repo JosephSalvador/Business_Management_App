@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jolinx_app/features/invoices/domain/delivery_note.dart';
+import 'package:jolinx_app/features/invoices/domain/document_template.dart';
 import 'package:jolinx_app/features/invoices/domain/invoice.dart';
 import 'package:jolinx_app/features/invoices/presentation/services/local_pdf_document_generator.dart';
 import 'package:jolinx_app/features/settings/data/organization_repository.dart';
@@ -260,5 +261,37 @@ void main() {
       expect(bytes[2], 0x44);
       expect(bytes[3], 0x46);
     });
+
+    test('generates A4 PDF bytes across all 4 InvoiceLayoutStyle archetypes (modernRibbon, executiveCorporate, classicGrid, customLetterhead)', () async {
+      for (final style in InvoiceLayoutStyle.values) {
+        final cfg = TenantDocumentConfiguration(
+          documentType: DocumentType.invoice,
+          activeTemplateId: style.templateId,
+          activeTemplateName: style.titleEn,
+          themePrimaryHex: style.defaultPrimaryHex,
+          themeSecondaryHex: style.defaultSecondaryHex,
+          showLogo: true,
+          footerNotes: 'Custom template footer note for ${style.name}',
+        );
+        final orgWithBranding = sampleOrg.copyWith(
+          website: 'www.darent.co.tz',
+          hideHeaderForPrePrinted: style == InvoiceLayoutStyle.customLetterhead,
+          prePrintedTopMarginMm: 50.0,
+        );
+        final Uint8List bytes = await generator.generateInvoiceA4(
+          invoice: sampleInvoice,
+          organization: orgWithBranding,
+          templateConfig: cfg,
+          isSwahili: false,
+        );
+
+        expect(bytes, isNotEmpty, reason: 'Failed for layout style ${style.name}');
+        expect(bytes[0], 0x25);
+        expect(bytes[1], 0x50);
+        expect(bytes[2], 0x44);
+        expect(bytes[3], 0x46);
+      }
+    });
   });
 }
+

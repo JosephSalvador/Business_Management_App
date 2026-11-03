@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../../settings/data/organization_repository.dart';
 import '../../domain/delivery_note.dart';
+import '../../domain/document_template.dart';
 import '../../domain/invoice.dart';
 
 final localPdfDocumentGeneratorProvider =
@@ -93,10 +94,14 @@ class LocalPdfDocumentGenerator {
 
   String _resolveNotes(
     CustomerInvoice invoice,
-    Organization? organization,
-  ) {
+    Organization? organization, [
+    String? templateFooterNotes,
+  ]) {
     if (invoice.notes != null && invoice.notes!.trim().isNotEmpty) {
       return invoice.notes!.trim();
+    }
+    if (templateFooterNotes != null && templateFooterNotes.trim().isNotEmpty) {
+      return templateFooterNotes.trim();
     }
     if (organization?.invoiceTerms != null &&
         organization!.invoiceTerms!.trim().isNotEmpty) {
@@ -106,18 +111,29 @@ class LocalPdfDocumentGenerator {
   }
 
   // =========================================================================
-  // 1. INVOICE - A4 CORPORATE STANDARD PROFILE
+  // 1. INVOICE - A4 CORPORATE STANDARD PROFILE (MULTI-LAYOUT ENGINE)
   // =========================================================================
 
   Future<Uint8List> generateInvoiceA4({
     required CustomerInvoice invoice,
     Organization? organization,
+    TenantDocumentConfiguration? templateConfig,
     String? primaryHex,
     String? secondaryHex,
     bool isSwahili = false,
   }) async {
-    final primaryColor = _parseHex(primaryHex, _defaultPrimary);
-    final secondaryColor = _parseHex(secondaryHex, _defaultSecondary);
+    final style = templateConfig?.layoutStyle ??
+        InvoiceLayoutStyle.executiveCorporate;
+    final effectivePrimaryHex =
+        primaryHex ?? templateConfig?.themePrimaryHex ?? style.defaultPrimaryHex;
+    final effectiveSecondaryHex = secondaryHex ??
+        templateConfig?.themeSecondaryHex ??
+        style.defaultSecondaryHex;
+
+    final primaryColor = _parseHex(effectivePrimaryHex, _defaultPrimary);
+    final secondaryColor = _parseHex(effectiveSecondaryHex, _defaultSecondary);
+    final showLogo = templateConfig?.showLogo ?? true;
+
     final String orgName =
         (organization?.name != null && organization!.name!.trim().isNotEmpty)
             ? organization.name!.trim()
@@ -136,13 +152,18 @@ class LocalPdfDocumentGenerator {
     );
 
     final dateFmt = DateFormat('dd MMM yyyy');
+    final slashDateFmt = DateFormat('dd/MM/yyyy');
     final numFmt = NumberFormat('#,##0.##');
     String fmtMoney(double amount) => '$currency ${numFmt.format(amount)}';
 
-    final logoImage = _decodeLogo(organization?.logoBase64);
+    final logoImage =
+        showLogo ? _decodeLogo(organization?.logoBase64) : null;
+    final signatureImage = _decodeLogo(organization?.signatureBase64);
+    final letterheadImage = _decodeLogo(organization?.letterheadHeaderBase64);
     final paymentInstructions =
         _resolvePaymentInstructions(invoice, organization, isSwahili);
-    final notesAndTerms = _resolveNotes(invoice, organization);
+    final notesAndTerms =
+        _resolveNotes(invoice, organization, templateConfig?.footerNotes);
     final signatoryName =
         (invoice.authorizedSignatoryName?.trim().isNotEmpty ?? false)
             ? invoice.authorizedSignatoryName!.trim()
@@ -188,18 +209,684 @@ class LocalPdfDocumentGenerator {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        footer: (context) => pw.Container(
-          margin: const pw.EdgeInsets.only(top: 14),
-          padding: const pw.EdgeInsets.only(top: 8),
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(top: pw.BorderSide(color: _slate200, width: 0.5)),
+        footer: (context) => style == InvoiceLayoutStyle.modernRibbon
+            ? _buildModernRibbonFooter(
+                context: context,
+                organization: organization,
+                orgName: orgName,
+                invoice: invoice,
+                isSwahili: isSwahili,
+              )
+            : pw.Container(
+                margin: const pw.EdgeInsets.only(top: 14),
+                padding: const pw.EdgeInsets.only(top: 8),
+                decoration: const pw.BoxDecoration(
+                  border: pw.Border(
+                    top: pw.BorderSide(color: _slate200, width: 0.5),
+                  ),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      '$orgName  |  ${invoice.documentTitle} #${invoice.number}',
+                      style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                    ),
+                    pw.Text(
+                      '${isSwahili ? "Ukurasa" : "Page"} ${context.pageNumber} / ${context.pagesCount}',
+                      style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                    ),
+                  ],
+                ),
+              ),
+        build: (context) {
+          switch (style) {
+            case InvoiceLayoutStyle.modernRibbon:
+              return _buildModernRibbonPdfBody(
+                invoice: invoice,
+                organization: organization,
+                orgName: orgName,
+                initials: initials,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
+                showLogo: showLogo,
+                logoImage: logoImage,
+                signatureImage: signatureImage,
+                slashDateFmt: slashDateFmt,
+                numFmt: numFmt,
+                currency: currency,
+                fmtMoney: fmtMoney,
+                paymentInstructions: paymentInstructions,
+                notesAndTerms: notesAndTerms,
+                signatoryName: signatoryName,
+                signatoryTitle: signatoryTitle,
+                isSwahili: isSwahili,
+              );
+            case InvoiceLayoutStyle.classicGrid:
+              return _buildClassicGridPdfBody(
+                invoice: invoice,
+                organization: organization,
+                orgName: orgName,
+                initials: initials,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
+                showLogo: showLogo,
+                logoImage: logoImage,
+                signatureImage: signatureImage,
+                slashDateFmt: slashDateFmt,
+                numFmt: numFmt,
+                currency: currency,
+                fmtMoney: fmtMoney,
+                paymentInstructions: paymentInstructions,
+                notesAndTerms: notesAndTerms,
+                signatoryName: signatoryName,
+                signatoryTitle: signatoryTitle,
+                isSwahili: isSwahili,
+              );
+            case InvoiceLayoutStyle.customLetterhead:
+              return _buildCustomLetterheadPdfBody(
+                invoice: invoice,
+                organization: organization,
+                orgName: orgName,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
+                letterheadImage: letterheadImage,
+                signatureImage: signatureImage,
+                dateFmt: dateFmt,
+                numFmt: numFmt,
+                currency: currency,
+                fmtMoney: fmtMoney,
+                paymentInstructions: paymentInstructions,
+                notesAndTerms: notesAndTerms,
+                signatoryName: signatoryName,
+                signatoryTitle: signatoryTitle,
+                qrData: qrData,
+                isSwahili: isSwahili,
+              );
+            case InvoiceLayoutStyle.executiveCorporate:
+              return _buildExecutiveCorporatePdfBody(
+                invoice: invoice,
+                organization: organization,
+                orgName: orgName,
+                initials: initials,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
+                showLogo: showLogo,
+                logoImage: logoImage,
+                signatureImage: signatureImage,
+                dateFmt: dateFmt,
+                numFmt: numFmt,
+                currency: currency,
+                fmtMoney: fmtMoney,
+                paymentInstructions: paymentInstructions,
+                notesAndTerms: notesAndTerms,
+                signatoryName: signatoryName,
+                signatoryTitle: signatoryTitle,
+                qrData: qrData,
+                isSwahili: isSwahili,
+              );
+          }
+        },
+      ),
+    );
+
+    return document.save();
+  }
+
+  // ── 1A. MODERN RIBBON PDF BODY (Matches the uploaded Gold & Charcoal sample) ──
+  List<pw.Widget> _buildModernRibbonPdfBody({
+    required CustomerInvoice invoice,
+    required Organization? organization,
+    required String orgName,
+    required String initials,
+    required PdfColor primaryColor,
+    required PdfColor secondaryColor,
+    required bool showLogo,
+    required pw.MemoryImage? logoImage,
+    required pw.MemoryImage? signatureImage,
+    required DateFormat slashDateFmt,
+    required NumberFormat numFmt,
+    required String currency,
+    required String Function(double) fmtMoney,
+    required String paymentInstructions,
+    required String notesAndTerms,
+    required String signatoryName,
+    required String signatoryTitle,
+    required bool isSwahili,
+  }) {
+    final isPrimaryLight = primaryColor.luminance > 0.55;
+    final ribbonFg = isPrimaryLight ? _defaultPrimary : PdfColors.white;
+
+    return [
+      // Top Row: Stacked Logo + Business Name (Left) | "Invoice #2022435" (Right)
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Expanded(
+            flex: 6,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                if (showLogo) ...[
+                  if (logoImage != null)
+                    pw.Container(
+                      width: 60,
+                      height: 60,
+                      child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                    )
+                  else
+                    pw.Container(
+                      width: 48,
+                      height: 48,
+                      alignment: pw.Alignment.center,
+                      decoration: pw.BoxDecoration(
+                        color: primaryColor,
+                        borderRadius:
+                            const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      ),
+                      child: pw.Text(
+                        initials,
+                        style: pw.TextStyle(
+                          color: ribbonFg,
+                          fontSize: 16,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  pw.SizedBox(height: 8),
+                ],
+                pw.Text(
+                  orgName,
+                  style: pw.TextStyle(
+                    color: _defaultPrimary,
+                    fontSize: 17,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                if (organization?.taxId != null &&
+                    organization!.taxId!.trim().isNotEmpty)
+                  pw.Text(
+                    'TIN: ${organization.taxId!.trim()}',
+                    style: const pw.TextStyle(color: _slate500, fontSize: 9),
+                  ),
+              ],
+            ),
           ),
-          child: pw.Row(
+          pw.SizedBox(width: 14),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Text(
+                'Invoice ${invoice.number}',
+                style: const pw.TextStyle(
+                  color: _defaultPrimary,
+                  fontSize: 16,
+                ),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                invoice.documentTitle,
+                style: const pw.TextStyle(color: _slate500, fontSize: 9.5),
+              ),
+            ],
+          ),
+        ],
+      ),
+      pw.SizedBox(height: 18),
+
+      // Second Row: BILL TO (Left) | Issue date / Due date / Reference (Right)
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Expanded(
+            flex: 6,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  isSwahili ? 'KWA MTEJA (BILL TO)' : 'BILL TO',
+                  style: pw.TextStyle(
+                    color: _defaultPrimary,
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  invoice.customerLabel,
+                  style: pw.TextStyle(
+                    color: _defaultPrimary,
+                    fontSize: 11.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                if (invoice.customerAttention != null &&
+                    invoice.customerAttention!.trim().isNotEmpty)
+                  pw.Text(
+                    'Attn: ${invoice.customerAttention!.trim()}',
+                    style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                  ),
+                if (invoice.customerAddress != null &&
+                    invoice.customerAddress!.trim().isNotEmpty)
+                  pw.Text(
+                    invoice.customerAddress!.trim(),
+                    style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                  ),
+                if (invoice.customerPhone != null &&
+                    invoice.customerPhone!.trim().isNotEmpty)
+                  pw.Text(
+                    invoice.customerPhone!.trim(),
+                    style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                  ),
+                if (invoice.customerEmail != null &&
+                    invoice.customerEmail!.trim().isNotEmpty)
+                  pw.Text(
+                    invoice.customerEmail!.trim(),
+                    style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                  ),
+                if (invoice.customerTin != null &&
+                    invoice.customerTin!.trim().isNotEmpty)
+                  pw.Text(
+                    'TIN: ${invoice.customerTin!.trim()}',
+                    style: pw.TextStyle(
+                      color: _slate700,
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          pw.SizedBox(width: 14),
+          pw.Expanded(
+            flex: 4,
+            child: pw.Column(
+              children: [
+                _buildTotalRow(
+                  isSwahili ? 'Tarehe:' : 'Issue date:',
+                  slashDateFmt.format(invoice.issueDate.toLocal()),
+                  isBold: true,
+                ),
+                _buildTotalRow(
+                  isSwahili ? 'Mwisho:' : 'Due date:',
+                  invoice.dueDate != null
+                      ? slashDateFmt.format(invoice.dueDate!.toLocal())
+                      : slashDateFmt.format(invoice.issueDate.toLocal()),
+                  isBold: true,
+                ),
+                pw.SizedBox(height: 6),
+                _buildTotalRow(
+                  isSwahili ? 'Kumbukumbu:' : 'Reference:',
+                  (invoice.referenceNumber != null &&
+                          invoice.referenceNumber!.trim().isNotEmpty)
+                      ? invoice.referenceNumber!.trim()
+                      : invoice.number,
+                  isBold: true,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      pw.SizedBox(height: 16),
+
+      // Third Row: 4-Column Colored Highlight Ribbon
+      pw.Row(
+        children: [
+          pw.Expanded(
+            flex: 3,
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: primaryColor,
+                border: const pw.Border(
+                  right: pw.BorderSide(color: PdfColors.white, width: 1),
+                ),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isSwahili ? 'Na. ya Ankara' : 'Invoice No.',
+                    style: pw.TextStyle(color: ribbonFg, fontSize: 8.5),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    invoice.number,
+                    style: pw.TextStyle(
+                      color: ribbonFg,
+                      fontSize: 11.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          pw.Expanded(
+            flex: 3,
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: primaryColor,
+                border: const pw.Border(
+                  right: pw.BorderSide(color: PdfColors.white, width: 1),
+                ),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isSwahili ? 'Tarehe' : 'Issue date',
+                    style: pw.TextStyle(color: ribbonFg, fontSize: 8.5),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    slashDateFmt.format(invoice.issueDate.toLocal()),
+                    style: pw.TextStyle(
+                      color: ribbonFg,
+                      fontSize: 11.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          pw.Expanded(
+            flex: 3,
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: primaryColor,
+                border: const pw.Border(
+                  right: pw.BorderSide(color: PdfColors.white, width: 1),
+                ),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isSwahili ? 'Mwisho' : 'Due date',
+                    style: pw.TextStyle(color: ribbonFg, fontSize: 8.5),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    invoice.dueDate != null
+                        ? slashDateFmt.format(invoice.dueDate!.toLocal())
+                        : '-',
+                    style: pw.TextStyle(
+                      color: ribbonFg,
+                      fontSize: 11.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          pw.Expanded(
+            flex: 4,
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              color: secondaryColor,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isSwahili
+                        ? 'Jumla ($currency)'
+                        : 'Total due ($currency)',
+                    style: const pw.TextStyle(
+                      color: PdfColors.white,
+                      fontSize: 8.5,
+                    ),
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    numFmt.format(
+                      invoice.balanceDue > 0
+                          ? invoice.balanceDue
+                          : invoice.totalAmount,
+                    ),
+                    style: pw.TextStyle(
+                      color: PdfColors.white,
+                      fontSize: 12.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      pw.SizedBox(height: 16),
+
+      // Fourth Row: Minimalist Horizontal-Rule Item Table
+      pw.TableHelper.fromTextArray(
+        headers: [
+          isSwahili ? 'Maelezo' : 'Description',
+          isSwahili ? 'Idadi' : 'Quantity',
+          isSwahili ? 'Bei ($currency)' : 'Unit price ($currency)',
+          isSwahili ? 'Jumla ($currency)' : 'Amount ($currency)',
+        ],
+        data: [
+          for (final line in invoice.lines)
+            [
+              line.description,
+              numFmt.format(line.quantity),
+              numFmt.format(line.unitPrice),
+              numFmt.format(line.lineTotal),
+            ],
+        ],
+        border: const pw.TableBorder(
+          bottom: pw.BorderSide(color: _slate200, width: 0.7),
+          horizontalInside: pw.BorderSide(color: _slate200, width: 0.6),
+        ),
+        headerStyle: pw.TextStyle(
+          color: _defaultPrimary,
+          fontSize: 9,
+          fontWeight: pw.FontWeight.bold,
+        ),
+        headerHeight: 22,
+        cellHeight: 22,
+        cellStyle: const pw.TextStyle(color: _defaultPrimary, fontSize: 9),
+        columnWidths: {
+          0: const pw.FlexColumnWidth(4.5),
+          1: const pw.FlexColumnWidth(1.5),
+          2: const pw.FlexColumnWidth(2.0),
+          3: const pw.FlexColumnWidth(2.0),
+        },
+        cellAlignments: {
+          0: pw.Alignment.centerLeft,
+          1: pw.Alignment.centerRight,
+          2: pw.Alignment.centerRight,
+          3: pw.Alignment.centerRight,
+        },
+      ),
+      pw.SizedBox(height: 10),
+
+      // Totals Section
+      _buildTotalRow(
+        isSwahili ? 'Jumla Ndogo (Subtotal):' : 'Subtotal:',
+        fmtMoney(invoice.subtotal),
+      ),
+      if (invoice.discountAmount > 0)
+        _buildTotalRow(
+          isSwahili ? 'Punguzo (Discount):' : 'Discount:',
+          '-${fmtMoney(invoice.discountAmount)}',
+          valueColor: _amber700,
+        ),
+      pw.SizedBox(height: 4),
+      _buildTotalRow(
+        isSwahili ? 'Jumla ($currency):' : 'Total ($currency):',
+        fmtMoney(invoice.totalAmount),
+        isBold: true,
+        fontSize: 10.5,
+      ),
+      if (invoice.amountPaid > 0) ...[
+        _buildTotalRow(
+          isSwahili ? 'Imelipwa (Paid):' : 'Amount Paid:',
+          '-${fmtMoney(invoice.amountPaid)}',
+          valueColor: _green700,
+        ),
+        _buildTotalRow(
+          isSwahili ? 'Salio (Balance Due):' : 'Balance Due:',
+          fmtMoney(invoice.balanceDue),
+          isBold: true,
+        ),
+      ],
+      pw.SizedBox(height: 18),
+
+      // Payment Instructions (Left) + "Issued by, signature:" (Right)
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Expanded(
+            flex: 6,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  isSwahili ? 'Maelekezo ya Malipo:' : 'Payment Details:',
+                  style: pw.TextStyle(
+                    color: _slate700,
+                    fontSize: 8.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  paymentInstructions,
+                  style: const pw.TextStyle(
+                    color: _slate700,
+                    fontSize: 8.5,
+                    lineSpacing: 1.5,
+                  ),
+                ),
+                if (notesAndTerms.isNotEmpty) ...[
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    notesAndTerms,
+                    style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          pw.SizedBox(width: 14),
+          pw.Expanded(
+            flex: 4,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  isSwahili
+                      ? 'Imetolewa na, sahihi:'
+                      : 'Issued by, signature:',
+                  style: pw.TextStyle(
+                    color: _defaultPrimary,
+                    fontSize: 8.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 6),
+                if (signatureImage != null)
+                  pw.Container(
+                    height: 46,
+                    width: 130,
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                  )
+                else if (signatoryName.isNotEmpty)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 6),
+                    child: pw.Text(
+                      signatoryName,
+                      style: pw.TextStyle(
+                        color: _defaultPrimary,
+                        fontSize: 13,
+                        fontWeight: pw.FontWeight.bold,
+                        fontStyle: pw.FontStyle.italic,
+                      ),
+                    ),
+                  )
+                else
+                  pw.SizedBox(height: 24),
+                pw.Container(width: 120, height: 0.7, color: _slate200),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  signatoryName.isNotEmpty ? signatoryName : signatoryTitle,
+                  style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  pw.Widget _buildModernRibbonFooter({
+    required pw.Context context,
+    required Organization? organization,
+    required String orgName,
+    required CustomerInvoice invoice,
+    required bool isSwahili,
+  }) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(top: 12),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              if (organization?.phone != null &&
+                  organization!.phone!.trim().isNotEmpty)
+                pw.Text(
+                  'Tel: ${organization.phone!.trim()}',
+                  style: const pw.TextStyle(
+                    color: _defaultPrimary,
+                    fontSize: 8.5,
+                  ),
+                ),
+              if (organization?.website != null &&
+                  organization!.website!.trim().isNotEmpty)
+                pw.Text(
+                  organization.website!.trim(),
+                  style: const pw.TextStyle(
+                    color: _defaultPrimary,
+                    fontSize: 8.5,
+                  ),
+                ),
+              if (organization?.email != null &&
+                  organization!.email!.trim().isNotEmpty)
+                pw.Text(
+                  organization.email!.trim(),
+                  style: const pw.TextStyle(
+                    color: _defaultPrimary,
+                    fontSize: 8.5,
+                  ),
+                ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Divider(color: _slate700, thickness: 0.8),
+          pw.SizedBox(height: 3),
+          pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text(
-                '$orgName  |  ${invoice.documentTitle} #${invoice.number}',
-                style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                [
+                  orgName,
+                  if (organization?.address != null &&
+                      organization!.address!.trim().isNotEmpty)
+                    organization.address!.trim(),
+                ].join('  |  '),
+                style: const pw.TextStyle(color: _slate700, fontSize: 8),
               ),
               pw.Text(
                 '${isSwahili ? "Ukurasa" : "Page"} ${context.pageNumber} / ${context.pagesCount}',
@@ -207,28 +894,386 @@ class LocalPdfDocumentGenerator {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  // ── 1B. CLASSIC WHOLESALE GRID PDF BODY ──
+  List<pw.Widget> _buildClassicGridPdfBody({
+    required CustomerInvoice invoice,
+    required Organization? organization,
+    required String orgName,
+    required String initials,
+    required PdfColor primaryColor,
+    required PdfColor secondaryColor,
+    required bool showLogo,
+    required pw.MemoryImage? logoImage,
+    required pw.MemoryImage? signatureImage,
+    required DateFormat slashDateFmt,
+    required NumberFormat numFmt,
+    required String currency,
+    required String Function(double) fmtMoney,
+    required String paymentInstructions,
+    required String notesAndTerms,
+    required String signatoryName,
+    required String signatoryTitle,
+    required bool isSwahili,
+  }) {
+    return [
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        color: primaryColor,
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              invoice.documentTitle.toUpperCase(),
+              style: pw.TextStyle(
+                color: PdfColors.white,
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.Text(
+              'NO: ${invoice.number}',
+              style: pw.TextStyle(
+                color: PdfColors.white,
+                fontSize: 11.5,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ],
         ),
-        build: (context) => [
-          // Header Accent Ribbon
-          pw.Container(
-            height: 5,
-            decoration: pw.BoxDecoration(
-              color: primaryColor,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
+      ),
+      pw.Container(
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: primaryColor, width: 0.9),
+        ),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    orgName.toUpperCase(),
+                    style: pw.TextStyle(
+                      color: primaryColor,
+                      fontSize: 11.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  if (organization?.address != null &&
+                      organization!.address!.trim().isNotEmpty)
+                    pw.Text(
+                      organization.address!.trim(),
+                      style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                    ),
+                  if (organization?.phone != null &&
+                      organization!.phone!.trim().isNotEmpty)
+                    pw.Text(
+                      'Tel: ${organization.phone!.trim()}',
+                      style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                    ),
+                  if (organization?.taxId != null &&
+                      organization!.taxId!.trim().isNotEmpty)
+                    pw.Text(
+                      'TIN: ${organization.taxId!.trim()}',
+                      style: pw.TextStyle(
+                        color: _slate700,
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 14),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isSwahili ? 'MTEJA (CUSTOMER):' : 'CUSTOMER / BUYER:',
+                    style: pw.TextStyle(
+                      color: secondaryColor,
+                      fontSize: 8.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Text(
+                    invoice.customerLabel,
+                    style: pw.TextStyle(
+                      color: _defaultPrimary,
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  if (invoice.customerAddress != null &&
+                      invoice.customerAddress!.trim().isNotEmpty)
+                    pw.Text(
+                      invoice.customerAddress!.trim(),
+                      style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                    ),
+                  if (invoice.customerPhone != null &&
+                      invoice.customerPhone!.trim().isNotEmpty)
+                    pw.Text(
+                      'Tel: ${invoice.customerPhone!.trim()}',
+                      style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                    ),
+                  pw.Text(
+                    '${isSwahili ? "Tarehe" : "Date"}: ${slashDateFmt.format(invoice.issueDate.toLocal())}',
+                    style: pw.TextStyle(
+                      color: _defaultPrimary,
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      pw.SizedBox(height: 12),
+      pw.TableHelper.fromTextArray(
+        headers: [
+          '#',
+          isSwahili ? 'Bidhaa / Maelezo' : 'Description',
+          isSwahili ? 'Idadi' : 'Qty',
+          isSwahili ? 'Bei ($currency)' : 'Rate',
+          isSwahili ? 'Jumla ($currency)' : 'Amount',
+        ],
+        data: [
+          for (var i = 0; i < invoice.lines.length; i++)
+            [
+              '${i + 1}',
+              invoice.lines[i].description,
+              numFmt.format(invoice.lines[i].quantity),
+              numFmt.format(invoice.lines[i].unitPrice),
+              numFmt.format(invoice.lines[i].lineTotal),
+            ],
+        ],
+        border: pw.TableBorder.all(color: primaryColor, width: 0.8),
+        headerStyle: pw.TextStyle(
+          color: PdfColors.white,
+          fontSize: 8.5,
+          fontWeight: pw.FontWeight.bold,
+        ),
+        headerDecoration: pw.BoxDecoration(color: primaryColor),
+        headerHeight: 22,
+        cellHeight: 20,
+        cellStyle: const pw.TextStyle(color: _defaultPrimary, fontSize: 8.5),
+        columnWidths: {
+          0: const pw.FixedColumnWidth(24),
+          1: const pw.FlexColumnWidth(4.2),
+          2: const pw.FlexColumnWidth(1.3),
+          3: const pw.FlexColumnWidth(1.8),
+          4: const pw.FlexColumnWidth(2.0),
+        },
+        cellAlignments: {
+          0: pw.Alignment.center,
+          1: pw.Alignment.centerLeft,
+          2: pw.Alignment.centerRight,
+          3: pw.Alignment.centerRight,
+          4: pw.Alignment.centerRight,
+        },
+      ),
+      pw.Container(
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          color: _slate50,
+          border: pw.Border.all(color: primaryColor, width: 0.8),
+        ),
+        child: pw.Column(
+          children: [
+            _buildTotalRow(
+              isSwahili ? 'JUMLA KUU ($currency):' : 'TOTAL ($currency):',
+              fmtMoney(invoice.totalAmount),
+              isBold: true,
+              fontSize: 10.5,
+              valueColor: primaryColor,
+            ),
+            if (invoice.amountPaid > 0) ...[
+              _buildTotalRow(
+                isSwahili ? 'Imelipwa (Paid):' : 'Amount Paid:',
+                '-${fmtMoney(invoice.amountPaid)}',
+                valueColor: _green700,
+              ),
+              _buildTotalRow(
+                isSwahili ? 'Salio (Balance Due):' : 'Balance Due:',
+                fmtMoney(invoice.balanceDue),
+                isBold: true,
+              ),
+            ],
+          ],
+        ),
+      ),
+      pw.SizedBox(height: 12),
+      pw.Text(
+        paymentInstructions,
+        style: const pw.TextStyle(color: _slate700, fontSize: 8.5),
+      ),
+      pw.SizedBox(height: 22),
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                if (signatureImage != null)
+                  pw.Container(
+                    height: 40,
+                    child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                  )
+                else
+                  pw.SizedBox(height: 24),
+                pw.Divider(color: primaryColor, thickness: 0.8),
+                pw.Text(
+                  isSwahili
+                      ? 'Imetolewa Na (Sahihi & Muhuri)'
+                      : 'Prepared & Authorized By',
+                  style: pw.TextStyle(
+                    color: _slate700,
+                    fontSize: 8.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
-          pw.SizedBox(height: 14),
+          pw.SizedBox(width: 24),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.SizedBox(height: 24),
+                pw.Divider(color: primaryColor, thickness: 0.8),
+                pw.Text(
+                  isSwahili
+                      ? 'Imepokelewa Na Mteja (Sahihi)'
+                      : 'Received & Accepted By Customer',
+                  style: pw.TextStyle(
+                    color: _slate700,
+                    fontSize: 8.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
 
-          // Header Title and Organization Info
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Expanded(
-                flex: 6,
-                child: pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
+  // ── 1C. CUSTOM LETTERHEAD / PRE-PRINTED PAPER PDF BODY ──
+  List<pw.Widget> _buildCustomLetterheadPdfBody({
+    required CustomerInvoice invoice,
+    required Organization? organization,
+    required String orgName,
+    required PdfColor primaryColor,
+    required PdfColor secondaryColor,
+    required pw.MemoryImage? letterheadImage,
+    required pw.MemoryImage? signatureImage,
+    required DateFormat dateFmt,
+    required NumberFormat numFmt,
+    required String currency,
+    required String Function(double) fmtMoney,
+    required String paymentInstructions,
+    required String notesAndTerms,
+    required String signatoryName,
+    required String signatoryTitle,
+    required String qrData,
+    required bool isSwahili,
+  }) {
+    final topMarginMm = organization?.prePrintedTopMarginMm ?? 38.0;
+    return [
+      if (organization?.hideHeaderForPrePrinted ?? false)
+        pw.SizedBox(height: topMarginMm * PdfPageFormat.mm)
+      else if (letterheadImage != null) ...[
+        pw.Container(
+          width: double.infinity,
+          child: pw.Image(letterheadImage, fit: pw.BoxFit.fitWidth),
+        ),
+        pw.SizedBox(height: 12),
+      ],
+      ..._buildExecutiveCorporatePdfBody(
+        invoice: invoice,
+        organization: organization,
+        orgName: orgName,
+        initials: 'JB',
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor,
+        showLogo: false,
+        logoImage: null,
+        signatureImage: signatureImage,
+        dateFmt: dateFmt,
+        numFmt: numFmt,
+        currency: currency,
+        fmtMoney: fmtMoney,
+        paymentInstructions: paymentInstructions,
+        notesAndTerms: notesAndTerms,
+        signatoryName: signatoryName,
+        signatoryTitle: signatoryTitle,
+        qrData: qrData,
+        isSwahili: isSwahili,
+        omitSellerHeader: (organization?.hideHeaderForPrePrinted ?? false) ||
+            letterheadImage != null,
+      ),
+    ];
+  }
+
+  // ── 1D. EXECUTIVE CORPORATE PDF BODY ──
+  List<pw.Widget> _buildExecutiveCorporatePdfBody({
+    required CustomerInvoice invoice,
+    required Organization? organization,
+    required String orgName,
+    required String initials,
+    required PdfColor primaryColor,
+    required PdfColor secondaryColor,
+    required bool showLogo,
+    required pw.MemoryImage? logoImage,
+    required pw.MemoryImage? signatureImage,
+    required DateFormat dateFmt,
+    required NumberFormat numFmt,
+    required String currency,
+    required String Function(double) fmtMoney,
+    required String paymentInstructions,
+    required String notesAndTerms,
+    required String signatoryName,
+    required String signatoryTitle,
+    required String qrData,
+    required bool isSwahili,
+    bool omitSellerHeader = false,
+  }) {
+    return [
+      if (!omitSellerHeader) ...[
+        // Header Accent Ribbon
+        pw.Container(
+          height: 5,
+          decoration: pw.BoxDecoration(
+            color: primaryColor,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
+          ),
+        ),
+        pw.SizedBox(height: 14),
+
+        // Header Title and Organization Info
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Expanded(
+              flex: 6,
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (showLogo) ...[
                     if (logoImage != null)
                       pw.Container(
                         width: 48,
@@ -240,8 +1285,7 @@ class LocalPdfDocumentGenerator {
                           borderRadius:
                               const pw.BorderRadius.all(pw.Radius.circular(6)),
                         ),
-                        child:
-                            pw.Image(logoImage, fit: pw.BoxFit.contain),
+                        child: pw.Image(logoImage, fit: pw.BoxFit.contain),
                       )
                     else
                       pw.Container(
@@ -263,565 +1307,569 @@ class LocalPdfDocumentGenerator {
                           ),
                         ),
                       ),
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(
-                            orgName.toUpperCase(),
-                            style: pw.TextStyle(
-                              color: primaryColor,
-                              fontSize: 15,
-                              fontWeight: pw.FontWeight.bold,
+                  ],
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          orgName.toUpperCase(),
+                          style: pw.TextStyle(
+                            color: primaryColor,
+                            fontSize: 15,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        if (organization?.taxId != null &&
+                            organization!.taxId!.trim().isNotEmpty)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(top: 2),
+                            child: pw.Text(
+                              'TIN: ${organization.taxId!.trim()}',
+                              style: pw.TextStyle(
+                                color: secondaryColor,
+                                fontSize: 9.5,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
                             ),
                           ),
-                          if (organization?.taxId != null &&
-                              organization!.taxId!.trim().isNotEmpty)
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.only(top: 2),
-                              child: pw.Text(
-                                'TIN: ${organization.taxId!.trim()}',
-                                style: pw.TextStyle(
-                                  color: secondaryColor,
-                                  fontSize: 9.5,
-                                  fontWeight: pw.FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          if (organization?.address != null &&
-                              organization!.address!.trim().isNotEmpty)
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.only(top: 2),
-                              child: pw.Text(
-                                organization.address!.trim(),
-                                style: const pw.TextStyle(
-                                  color: _slate700,
-                                  fontSize: 9,
-                                ),
-                              ),
-                            ),
-                          if (organization?.phone != null &&
-                              organization!.phone!.trim().isNotEmpty)
-                            pw.Text(
-                              'Tel: ${organization.phone!.trim()}',
+                        if (organization?.address != null &&
+                            organization!.address!.trim().isNotEmpty)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(top: 2),
+                            child: pw.Text(
+                              organization.address!.trim(),
                               style: const pw.TextStyle(
                                 color: _slate700,
                                 fontSize: 9,
                               ),
                             ),
-                          if (organization?.email != null &&
-                              organization!.email!.trim().isNotEmpty)
-                            pw.Text(
-                              organization.email!.trim(),
-                              style: const pw.TextStyle(
-                                color: _slate700,
-                                fontSize: 9,
-                              ),
+                          ),
+                        if (organization?.phone != null &&
+                            organization!.phone!.trim().isNotEmpty)
+                          pw.Text(
+                            'Tel: ${organization.phone!.trim()}',
+                            style: const pw.TextStyle(
+                              color: _slate700,
+                              fontSize: 9,
                             ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(width: 12),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: primaryColor,
-                      borderRadius:
-                          const pw.BorderRadius.all(pw.Radius.circular(4)),
-                    ),
-                    child: pw.Text(
-                      invoice.documentTitle.toUpperCase(),
-                      style: pw.TextStyle(
-                        color: PdfColors.white,
-                        fontSize: 12,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
+                          ),
+                        if (organization?.email != null &&
+                            organization!.email!.trim().isNotEmpty)
+                          pw.Text(
+                            organization.email!.trim(),
+                            style: const pw.TextStyle(
+                              color: _slate700,
+                              fontSize: 9,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  pw.SizedBox(height: 4),
-                  pw.Text(
-                    '#${invoice.number}',
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 12),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: pw.BoxDecoration(
+                    color: primaryColor,
+                    borderRadius:
+                        const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  ),
+                  child: pw.Text(
+                    invoice.documentTitle.toUpperCase(),
                     style: pw.TextStyle(
-                      color: _slate700,
-                      fontSize: 11.5,
+                      color: PdfColors.white,
+                      fontSize: 12,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
-                  pw.SizedBox(height: 2),
-                  pw.Text(
-                    '${isSwahili ? "Tarehe" : "Issue Date"}: ${dateFmt.format(invoice.issueDate.toLocal())}',
-                    style: const pw.TextStyle(color: _slate500, fontSize: 8.5),
-                  ),
-                  if (invoice.dueDate != null)
-                    pw.Text(
-                      '${isSwahili ? "Mwisho" : "Due Date"}: ${dateFmt.format(invoice.dueDate!.toLocal())}',
-                      style: pw.TextStyle(
-                        color: invoice.isOverdue ? _red700 : _slate500,
-                        fontSize: 8.5,
-                        fontWeight: invoice.isOverdue
-                            ? pw.FontWeight.bold
-                            : pw.FontWeight.normal,
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 14),
-
-          // Bill To & Terms Card
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: _slate50,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              border: pw.Border.all(color: _slate200, width: 0.6),
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Expanded(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        isSwahili
-                            ? 'KWA MTEJA / MPOKEAJI (BILL TO):'
-                            : 'BILL TO (RECEIVER):',
-                        style: pw.TextStyle(
-                          color: _slate500,
-                          fontSize: 8,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        invoice.customerLabel,
-                        style: pw.TextStyle(
-                          color: primaryColor,
-                          fontSize: 12.5,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      if (invoice.customerAttention != null &&
-                          invoice.customerAttention!.trim().isNotEmpty)
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(top: 2),
-                          child: pw.Text(
-                            'Attn: ${invoice.customerAttention!.trim()}',
-                            style: pw.TextStyle(
-                              color: _slate700,
-                              fontSize: 9,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      if (invoice.customerAddress != null &&
-                          invoice.customerAddress!.trim().isNotEmpty)
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(top: 1.5),
-                          child: pw.Text(
-                            invoice.customerAddress!.trim(),
-                            style: const pw.TextStyle(
-                              color: _slate700,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                      if (invoice.customerPhone != null &&
-                          invoice.customerPhone!.trim().isNotEmpty)
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(top: 1.5),
-                          child: pw.Text(
-                            'Tel: ${invoice.customerPhone!.trim()}',
-                            style: const pw.TextStyle(
-                              color: _slate700,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                      if (invoice.customerEmail != null &&
-                          invoice.customerEmail!.trim().isNotEmpty)
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(top: 1.5),
-                          child: pw.Text(
-                            'Email: ${invoice.customerEmail!.trim()}',
-                            style: const pw.TextStyle(
-                              color: _slate700,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                      if (invoice.customerTin != null &&
-                          invoice.customerTin!.trim().isNotEmpty)
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(top: 2),
-                          child: pw.Text(
-                            'TIN: ${invoice.customerTin!.trim()}',
-                            style: pw.TextStyle(
-                              color: secondaryColor,
-                              fontSize: 9,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  '#${invoice.number}',
+                  style: pw.TextStyle(
+                    color: _slate700,
+                    fontSize: 11.5,
+                    fontWeight: pw.FontWeight.bold,
                   ),
                 ),
-                pw.SizedBox(width: 12),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    if (invoice.referenceNumber != null &&
-                        invoice.referenceNumber!.trim().isNotEmpty)
-                      pw.Text(
-                        '${isSwahili ? "Kumbukumbu" : "Ref / PO"}: ${invoice.referenceNumber!.trim()}',
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  '${isSwahili ? "Tarehe" : "Issue Date"}: ${dateFmt.format(invoice.issueDate.toLocal())}',
+                  style: const pw.TextStyle(color: _slate500, fontSize: 8.5),
+                ),
+                if (invoice.dueDate != null)
+                  pw.Text(
+                    '${isSwahili ? "Mwisho" : "Due Date"}: ${dateFmt.format(invoice.dueDate!.toLocal())}',
+                    style: pw.TextStyle(
+                      color: invoice.isOverdue ? _red700 : _slate500,
+                      fontSize: 8.5,
+                      fontWeight: invoice.isOverdue
+                          ? pw.FontWeight.bold
+                          : pw.FontWeight.normal,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 14),
+      ],
+
+      // Bill To & Terms Card
+      pw.Container(
+        padding: const pw.EdgeInsets.all(12),
+        decoration: pw.BoxDecoration(
+          color: _slate50,
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+          border: pw.Border.all(color: _slate200, width: 0.6),
+        ),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isSwahili
+                        ? 'KWA MTEJA / MPOKEAJI (BILL TO):'
+                        : 'BILL TO (RECEIVER):',
+                    style: pw.TextStyle(
+                      color: _slate500,
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 3),
+                  pw.Text(
+                    invoice.customerLabel,
+                    style: pw.TextStyle(
+                      color: primaryColor,
+                      fontSize: 12.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  if (invoice.customerAttention != null &&
+                      invoice.customerAttention!.trim().isNotEmpty)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(top: 2),
+                      child: pw.Text(
+                        'Attn: ${invoice.customerAttention!.trim()}',
                         style: pw.TextStyle(
                           color: _slate700,
                           fontSize: 9,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
-                    if (invoice.paymentTerms != null &&
-                        invoice.paymentTerms!.trim().isNotEmpty)
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.only(top: 2),
-                        child: pw.Text(
-                          '${isSwahili ? "Masharti" : "Terms"}: ${invoice.paymentTerms!.trim()}',
-                          style: const pw.TextStyle(
-                            color: _slate500,
-                            fontSize: 8.5,
-                          ),
-                        ),
-                      ),
-                    pw.SizedBox(height: 6),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: pw.BoxDecoration(
-                        color: invoice.status == InvoiceStatus.paid
-                            ? const PdfColor.fromInt(0xFFDCFCE7)
-                            : (invoice.status == InvoiceStatus.partiallyPaid
-                                ? const PdfColor.fromInt(0xFFFEF3C7)
-                                : const PdfColor.fromInt(0xFFFEE2E2)),
-                        borderRadius:
-                            const pw.BorderRadius.all(pw.Radius.circular(4)),
-                      ),
+                    ),
+                  if (invoice.customerAddress != null &&
+                      invoice.customerAddress!.trim().isNotEmpty)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(top: 1.5),
                       child: pw.Text(
-                        invoice.status == InvoiceStatus.paid
-                            ? (isSwahili ? 'IMELIPWA' : 'PAID')
-                            : invoice.status == InvoiceStatus.partiallyPaid
-                                ? (isSwahili ? 'IMELIPWA NUSU' : 'PARTIAL')
-                                : (isSwahili ? 'INASUBIRI MALIPO' : 'UNPAID'),
-                        style: pw.TextStyle(
-                          fontSize: 8,
-                          fontWeight: pw.FontWeight.bold,
-                          color: invoice.status == InvoiceStatus.paid
-                              ? _green700
-                              : (invoice.status == InvoiceStatus.partiallyPaid
-                                  ? _amber700
-                                  : _red700),
+                        invoice.customerAddress!.trim(),
+                        style: const pw.TextStyle(
+                          color: _slate700,
+                          fontSize: 9,
                         ),
                       ),
                     ),
-                  ],
+                  if (invoice.customerPhone != null &&
+                      invoice.customerPhone!.trim().isNotEmpty)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(top: 1.5),
+                      child: pw.Text(
+                        'Tel: ${invoice.customerPhone!.trim()}',
+                        style: const pw.TextStyle(
+                          color: _slate700,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                  if (invoice.customerEmail != null &&
+                      invoice.customerEmail!.trim().isNotEmpty)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(top: 1.5),
+                      child: pw.Text(
+                        'Email: ${invoice.customerEmail!.trim()}',
+                        style: const pw.TextStyle(
+                          color: _slate700,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                  if (invoice.customerTin != null &&
+                      invoice.customerTin!.trim().isNotEmpty)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(top: 2),
+                      child: pw.Text(
+                        'TIN: ${invoice.customerTin!.trim()}',
+                        style: pw.TextStyle(
+                          color: secondaryColor,
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 12),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                if (invoice.referenceNumber != null &&
+                    invoice.referenceNumber!.trim().isNotEmpty)
+                  pw.Text(
+                    '${isSwahili ? "Kumbukumbu" : "Ref / PO"}: ${invoice.referenceNumber!.trim()}',
+                    style: pw.TextStyle(
+                      color: _slate700,
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                if (invoice.paymentTerms != null &&
+                    invoice.paymentTerms!.trim().isNotEmpty)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 2),
+                    child: pw.Text(
+                      '${isSwahili ? "Masharti" : "Terms"}: ${invoice.paymentTerms!.trim()}',
+                      style: const pw.TextStyle(
+                        color: _slate500,
+                        fontSize: 8.5,
+                      ),
+                    ),
+                  ),
+                pw.SizedBox(height: 6),
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: pw.BoxDecoration(
+                    color: invoice.status == InvoiceStatus.paid
+                        ? const PdfColor.fromInt(0xFFDCFCE7)
+                        : (invoice.status == InvoiceStatus.partiallyPaid
+                            ? const PdfColor.fromInt(0xFFFEF3C7)
+                            : const PdfColor.fromInt(0xFFFEE2E2)),
+                    borderRadius:
+                        const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  ),
+                  child: pw.Text(
+                    invoice.status == InvoiceStatus.paid
+                        ? (isSwahili ? 'IMELIPWA' : 'PAID')
+                        : invoice.status == InvoiceStatus.partiallyPaid
+                            ? (isSwahili ? 'IMELIPWA NUSU' : 'PARTIAL')
+                            : (isSwahili ? 'INASUBIRI MALIPO' : 'UNPAID'),
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                      color: invoice.status == InvoiceStatus.paid
+                          ? _green700
+                          : (invoice.status == InvoiceStatus.partiallyPaid
+                              ? _amber700
+                              : _red700),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          pw.SizedBox(height: 14),
+          ],
+        ),
+      ),
+      pw.SizedBox(height: 14),
 
-          // Items Table
-          pw.TableHelper.fromTextArray(
-            headers: [
-              '#',
-              isSwahili ? 'Bidhaa / Huduma' : 'Item Description',
-              isSwahili ? 'Kipimo' : 'Unit',
-              isSwahili ? 'Idadi' : 'Qty',
-              isSwahili ? 'Bei ($currency)' : 'Unit Price',
-              isSwahili ? 'Punguzo' : 'Discount',
-              isSwahili ? 'Jumla ($currency)' : 'Line Total',
+      // Items Table
+      pw.TableHelper.fromTextArray(
+        headers: [
+          '#',
+          isSwahili ? 'Bidhaa / Huduma' : 'Item Description',
+          isSwahili ? 'Kipimo' : 'Unit',
+          isSwahili ? 'Idadi' : 'Qty',
+          isSwahili ? 'Bei ($currency)' : 'Unit Price',
+          isSwahili ? 'Punguzo' : 'Discount',
+          isSwahili ? 'Jumla ($currency)' : 'Line Total',
+        ],
+        data: [
+          for (var i = 0; i < invoice.lines.length; i++)
+            [
+              '${i + 1}',
+              invoice.lines[i].description,
+              invoice.lines[i].unitOfMeasure.isNotEmpty
+                  ? invoice.lines[i].unitOfMeasure
+                  : 'Pcs',
+              numFmt.format(invoice.lines[i].quantity),
+              numFmt.format(invoice.lines[i].unitPrice),
+              invoice.lines[i].discountAmount > 0
+                  ? '-${numFmt.format(invoice.lines[i].discountAmount)}'
+                  : '-',
+              numFmt.format(invoice.lines[i].lineTotal),
             ],
-            data: [
-              for (var i = 0; i < invoice.lines.length; i++)
-                [
-                  '${i + 1}',
-                  invoice.lines[i].description,
-                  invoice.lines[i].unitOfMeasure.isNotEmpty
-                      ? invoice.lines[i].unitOfMeasure
-                      : 'Pcs',
-                  numFmt.format(invoice.lines[i].quantity),
-                  numFmt.format(invoice.lines[i].unitPrice),
-                  invoice.lines[i].discountAmount > 0
-                      ? '-${numFmt.format(invoice.lines[i].discountAmount)}'
-                      : '-',
-                  numFmt.format(invoice.lines[i].lineTotal),
-                ],
-            ],
-            border: pw.TableBorder.all(color: _slate200, width: 0.5),
-            headerStyle: pw.TextStyle(
-              color: PdfColors.white,
-              fontSize: 8.5,
-              fontWeight: pw.FontWeight.bold,
-            ),
-            headerDecoration: pw.BoxDecoration(color: primaryColor),
-            headerHeight: 24,
-            cellHeight: 22,
-            cellStyle: const pw.TextStyle(color: _slate700, fontSize: 8.5),
-            columnWidths: {
-              0: const pw.FixedColumnWidth(24),
-              1: const pw.FlexColumnWidth(3.5),
-              2: const pw.FlexColumnWidth(1.0),
-              3: const pw.FlexColumnWidth(0.9),
-              4: const pw.FlexColumnWidth(1.4),
-              5: const pw.FlexColumnWidth(1.1),
-              6: const pw.FlexColumnWidth(1.5),
-            },
-            cellAlignments: {
-              0: pw.Alignment.center,
-              1: pw.Alignment.centerLeft,
-              2: pw.Alignment.center,
-              3: pw.Alignment.centerRight,
-              4: pw.Alignment.centerRight,
-              5: pw.Alignment.centerRight,
-              6: pw.Alignment.centerRight,
-            },
-            oddRowDecoration: const pw.BoxDecoration(color: _slate50),
-          ),
-          pw.SizedBox(height: 14),
+        ],
+        border: pw.TableBorder.all(color: _slate200, width: 0.5),
+        headerStyle: pw.TextStyle(
+          color: PdfColors.white,
+          fontSize: 8.5,
+          fontWeight: pw.FontWeight.bold,
+        ),
+        headerDecoration: pw.BoxDecoration(color: primaryColor),
+        headerHeight: 24,
+        cellHeight: 22,
+        cellStyle: const pw.TextStyle(color: _slate700, fontSize: 8.5),
+        columnWidths: {
+          0: const pw.FixedColumnWidth(24),
+          1: const pw.FlexColumnWidth(3.5),
+          2: const pw.FlexColumnWidth(1.0),
+          3: const pw.FlexColumnWidth(0.9),
+          4: const pw.FlexColumnWidth(1.4),
+          5: const pw.FlexColumnWidth(1.1),
+          6: const pw.FlexColumnWidth(1.5),
+        },
+        cellAlignments: {
+          0: pw.Alignment.center,
+          1: pw.Alignment.centerLeft,
+          2: pw.Alignment.center,
+          3: pw.Alignment.centerRight,
+          4: pw.Alignment.centerRight,
+          5: pw.Alignment.centerRight,
+          6: pw.Alignment.centerRight,
+        },
+        oddRowDecoration: const pw.BoxDecoration(color: _slate50),
+      ),
+      pw.SizedBox(height: 14),
 
-          // Financial Summary + Payment Instructions
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Payment Instructions & Terms
-              pw.Expanded(
-                flex: 6,
-                child: pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    color: _slate50,
-                    borderRadius:
-                        const pw.BorderRadius.all(pw.Radius.circular(6)),
-                    border: pw.Border.all(color: _slate200, width: 0.6),
+      // Financial Summary + Payment Instructions
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Payment Instructions & Terms
+          pw.Expanded(
+            flex: 6,
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: _slate50,
+                borderRadius:
+                    const pw.BorderRadius.all(pw.Radius.circular(6)),
+                border: pw.Border.all(color: _slate200, width: 0.6),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isSwahili
+                        ? 'MAELEKEZO YA MALIPO (PAYMENT DETAILS)'
+                        : 'PAYMENT INSTRUCTIONS',
+                    style: pw.TextStyle(
+                      color: primaryColor,
+                      fontSize: 8.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        isSwahili
-                            ? 'MAELEKEZO YA MALIPO (PAYMENT DETAILS)'
-                            : 'PAYMENT INSTRUCTIONS',
-                        style: pw.TextStyle(
-                          color: primaryColor,
-                          fontSize: 8.5,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    paymentInstructions,
+                    style: const pw.TextStyle(
+                      color: _slate700,
+                      fontSize: 8.5,
+                      lineSpacing: 2,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    isSwahili
+                        ? 'Taja namba ya ankara #${invoice.number} unapofanya malipo.'
+                        : 'Please quote Invoice #${invoice.number} when making payment.',
+                    style: pw.TextStyle(
+                      color: secondaryColor,
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  if (notesAndTerms.isNotEmpty) ...[
+                    pw.SizedBox(height: 8),
+                    pw.Divider(color: _slate200, thickness: 0.5),
+                    pw.Text(
+                      isSwahili
+                          ? 'MASHARTI NA MAELEZO:'
+                          : 'TERMS & NOTES:',
+                      style: pw.TextStyle(
+                        color: _slate500,
+                        fontSize: 7.5,
+                        fontWeight: pw.FontWeight.bold,
                       ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        paymentInstructions,
-                        style: const pw.TextStyle(
-                          color: _slate700,
-                          fontSize: 8.5,
-                          lineSpacing: 2,
-                        ),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      notesAndTerms,
+                      style: const pw.TextStyle(
+                        color: _slate700,
+                        fontSize: 8,
                       ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        isSwahili
-                            ? 'Taja namba ya ankara #${invoice.number} unapofanya malipo.'
-                            : 'Please quote Invoice #${invoice.number} when making payment.',
-                        style: pw.TextStyle(
-                          color: secondaryColor,
-                          fontSize: 8,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      if (notesAndTerms.isNotEmpty) ...[
-                        pw.SizedBox(height: 8),
-                        pw.Divider(color: _slate200, thickness: 0.5),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          pw.SizedBox(width: 14),
+          // Totals Table
+          pw.Expanded(
+            flex: 5,
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: _slate50,
+                borderRadius:
+                    const pw.BorderRadius.all(pw.Radius.circular(6)),
+                border: pw.Border.all(color: _slate200, width: 0.6),
+              ),
+              child: pw.Column(
+                children: [
+                  _buildTotalRow(
+                    isSwahili ? 'Jumla Ndogo:' : 'Subtotal:',
+                    fmtMoney(invoice.subtotal),
+                  ),
+                  if (invoice.discountAmount > 0)
+                    _buildTotalRow(
+                      isSwahili ? 'Punguzo:' : 'Discount:',
+                      '-${fmtMoney(invoice.discountAmount)}',
+                      valueColor: _amber700,
+                    ),
+                  pw.Divider(color: _slate200, thickness: 0.6),
+                  _buildTotalRow(
+                    isSwahili ? 'JUMLA KUU:' : 'TOTAL AMOUNT:',
+                    fmtMoney(invoice.totalAmount),
+                    isBold: true,
+                    fontSize: 10.5,
+                    valueColor: primaryColor,
+                  ),
+                  if (invoice.amountPaid > 0)
+                    _buildTotalRow(
+                      isSwahili ? 'Kiasi Kilicholipwa:' : 'Amount Paid:',
+                      '-${fmtMoney(invoice.amountPaid)}',
+                      valueColor: _green700,
+                    ),
+                  pw.SizedBox(height: 6),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      color: primaryColor,
+                      borderRadius:
+                          const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    ),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
                         pw.Text(
-                          isSwahili
-                              ? 'MASHARTI NA MAELEZO:'
-                              : 'TERMS & NOTES:',
+                          isSwahili ? 'SALIO LA KULIPWA:' : 'BALANCE DUE:',
                           style: pw.TextStyle(
-                            color: _slate500,
-                            fontSize: 7.5,
+                            color: PdfColors.white,
+                            fontSize: 8.5,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
-                        pw.SizedBox(height: 2),
                         pw.Text(
-                          notesAndTerms,
-                          style: const pw.TextStyle(
-                            color: _slate700,
-                            fontSize: 8,
+                          fmtMoney(invoice.balanceDue),
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-              pw.SizedBox(width: 14),
-              // Totals Table
-              pw.Expanded(
-                flex: 5,
-                child: pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    color: _slate50,
-                    borderRadius:
-                        const pw.BorderRadius.all(pw.Radius.circular(6)),
-                    border: pw.Border.all(color: _slate200, width: 0.6),
-                  ),
-                  child: pw.Column(
-                    children: [
-                      _buildTotalRow(
-                        isSwahili ? 'Jumla Ndogo:' : 'Subtotal:',
-                        fmtMoney(invoice.subtotal),
-                      ),
-                      if (invoice.discountAmount > 0)
-                        _buildTotalRow(
-                          isSwahili ? 'Punguzo:' : 'Discount:',
-                          '-${fmtMoney(invoice.discountAmount)}',
-                          valueColor: _amber700,
-                        ),
-                      pw.Divider(color: _slate200, thickness: 0.6),
-                      _buildTotalRow(
-                        isSwahili ? 'JUMLA KUU:' : 'TOTAL AMOUNT:',
-                        fmtMoney(invoice.totalAmount),
-                        isBold: true,
-                        fontSize: 10.5,
-                        valueColor: primaryColor,
-                      ),
-                      if (invoice.amountPaid > 0)
-                        _buildTotalRow(
-                          isSwahili ? 'Kiasi Kilicholipwa:' : 'Amount Paid:',
-                          '-${fmtMoney(invoice.amountPaid)}',
-                          valueColor: _green700,
-                        ),
-                      pw.SizedBox(height: 6),
-                      pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        decoration: pw.BoxDecoration(
-                          color: primaryColor,
-                          borderRadius:
-                              const pw.BorderRadius.all(pw.Radius.circular(4)),
-                        ),
-                        child: pw.Row(
-                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                          children: [
-                            pw.Text(
-                              isSwahili ? 'SALIO LA KULIPWA:' : 'BALANCE DUE:',
-                              style: pw.TextStyle(
-                                color: PdfColors.white,
-                                fontSize: 8.5,
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                            pw.Text(
-                              fmtMoney(invoice.balanceDue),
-                              style: pw.TextStyle(
-                                color: PdfColors.white,
-                                fontSize: 10,
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 16),
-
-          // QR Code + Authorized Signatory / Official Stamp Box
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.end,
-            children: [
-              pw.Container(
-                width: 58,
-                height: 58,
-                padding: const pw.EdgeInsets.all(3),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: _slate200, width: 0.6),
-                  borderRadius:
-                      const pw.BorderRadius.all(pw.Radius.circular(4)),
-                ),
-                child: pw.BarcodeWidget(
-                  barcode: pw.Barcode.qrCode(),
-                  data: qrData,
-                ),
-              ),
-              pw.SizedBox(width: 14),
-              pw.Expanded(
-                child: pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: _slate200, width: 0.6),
-                    borderRadius:
-                        const pw.BorderRadius.all(pw.Radius.circular(6)),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'FOR: ${orgName.toUpperCase()}',
-                        style: pw.TextStyle(
-                          color: _slate500,
-                          fontSize: 8,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 20),
-                      pw.Divider(color: _slate700, thickness: 0.6),
-                      if (signatoryName.isNotEmpty)
-                        pw.Text(
-                          signatoryName,
-                          style: pw.TextStyle(
-                            color: primaryColor,
-                            fontSize: 9.5,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      pw.Text(
-                        '$signatoryTitle  |  ${isSwahili ? "Sahihi & Muhuri" : "Signature & Official Stamp"}',
-                        style: const pw.TextStyle(
-                          color: _slate500,
-                          fontSize: 8,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
-    );
+      pw.SizedBox(height: 16),
 
-    return document.save();
+      // QR Code + Authorized Signatory / Official Stamp Box
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Container(
+            width: 58,
+            height: 58,
+            padding: const pw.EdgeInsets.all(3),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: _slate200, width: 0.6),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.BarcodeWidget(
+              barcode: pw.Barcode.qrCode(),
+              data: qrData,
+            ),
+          ),
+          pw.SizedBox(width: 14),
+          pw.Expanded(
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: _slate200, width: 0.6),
+                borderRadius:
+                    const pw.BorderRadius.all(pw.Radius.circular(6)),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'FOR: ${orgName.toUpperCase()}',
+                    style: pw.TextStyle(
+                      color: _slate500,
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  if (signatureImage != null) ...[
+                    pw.SizedBox(height: 4),
+                    pw.Container(
+                      height: 36,
+                      child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
+                    ),
+                  ] else
+                    pw.SizedBox(height: 18),
+                  pw.Divider(color: _slate700, thickness: 0.6),
+                  if (signatoryName.isNotEmpty)
+                    pw.Text(
+                      signatoryName,
+                      style: pw.TextStyle(
+                        color: primaryColor,
+                        fontSize: 9.5,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  pw.Text(
+                    '$signatoryTitle  |  ${isSwahili ? "Sahihi & Muhuri" : "Signature & Official Stamp"}',
+                    style: const pw.TextStyle(
+                      color: _slate500,
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
   }
 
   // =========================================================================

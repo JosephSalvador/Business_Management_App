@@ -12,6 +12,7 @@ import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
+import '../../application/document_template_controller.dart';
 import '../../data/invoice_providers.dart';
 import '../../domain/document_template.dart';
 import '../../domain/invoice.dart';
@@ -59,6 +60,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
   late bool _isThermal;
   late String _themePrimaryHex;
   late String _themeSecondaryHex;
+  InvoiceLayoutStyle _selectedLayoutStyle = InvoiceLayoutStyle.modernRibbon;
+  bool _showLogo = true;
+  String? _customFooterNotes;
   bool? _isSynced;
 
   Timer? _debounceTimer;
@@ -70,7 +74,21 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     _isThermal = widget.initialIsThermal;
     _themePrimaryHex = widget.initialThemePrimaryHex;
     _themeSecondaryHex = widget.initialThemeSecondaryHex;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      try {
+        await ref.read(documentTemplateControllerProvider.notifier).ensureLoaded();
+        if (!mounted) return;
+        final cfg =
+            ref.read(documentTemplateControllerProvider).currentInvoiceConfiguration;
+        setState(() {
+          _selectedLayoutStyle = cfg.layoutStyle;
+          _themePrimaryHex = cfg.themePrimaryHex ?? _themePrimaryHex;
+          _themeSecondaryHex = cfg.themeSecondaryHex ?? _themeSecondaryHex;
+          _showLogo = cfg.showLogo;
+          _customFooterNotes = cfg.footerNotes;
+        });
+      } catch (_) {}
       if (mounted) _fetchAndRenderPdf();
     });
   }
@@ -93,6 +111,15 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     _debounceFetch();
   }
 
+  void _onLayoutStyleChanged(InvoiceLayoutStyle style) {
+    setState(() {
+      _selectedLayoutStyle = style;
+      _themePrimaryHex = style.defaultPrimaryHex;
+      _themeSecondaryHex = style.defaultSecondaryHex;
+    });
+    _debounceFetch();
+  }
+
   void _debounceFetch() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -112,9 +139,6 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       _errorMessage = null;
     });
 
-    // ON-DEVICE NATIVE PDF LAYOUT COMPILER
-    // Compiles executive corporate A4 or 80mm thermal PDFs with logo,
-    // full receiver details, bank/mobile-money details, and QR code.
     try {
       final localCompiler = ref.read(localPdfDocumentGeneratorProvider);
       final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
@@ -139,6 +163,15 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           }
         }
         isDocSynced = invoice.isSynced;
+        final activeConfig = TenantDocumentConfiguration(
+          documentType: DocumentType.invoice,
+          activeTemplateId: _selectedLayoutStyle.templateId,
+          activeTemplateName: _selectedLayoutStyle.titleEn,
+          themePrimaryHex: _themePrimaryHex,
+          themeSecondaryHex: _themeSecondaryHex,
+          showLogo: _showLogo,
+          footerNotes: _customFooterNotes,
+        );
         pdfBytes = _isThermal
             ? await localCompiler.generateInvoiceThermal80mm(
                 invoice: invoice,
@@ -148,6 +181,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
             : await localCompiler.generateInvoiceA4(
                 invoice: invoice,
                 organization: org,
+                templateConfig: activeConfig,
                 primaryHex: _themePrimaryHex,
                 secondaryHex: _themeSecondaryHex,
                 isSwahili: isSwahili,
@@ -535,6 +569,38 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           onChanged: (profile) => _toggleLayoutProfile(profile.isThermal),
           isSwahili: isSw,
         ),
+        if (!_isThermal && widget.documentType == DocumentType.invoice) ...[
+          const SizedBox(height: 18),
+          Text(
+            isSw ? 'Mtindo wa Ankara (Template Style)' : 'Invoice Template Style',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.resolveTextPrimary(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: InvoiceLayoutStyle.values.map((style) {
+              final selected = _selectedLayoutStyle == style;
+              return ChoiceChip(
+                selected: selected,
+                label: Text(
+                  style.title(isSw),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                onSelected: (_) => _onLayoutStyleChanged(style),
+              );
+            }).toList(),
+          ),
+        ],
         const SizedBox(height: 20),
         CommercialPalettePicker(
           primaryHex: _themePrimaryHex,

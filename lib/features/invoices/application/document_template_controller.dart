@@ -60,6 +60,43 @@ class DocumentTemplateState {
       .where((t) => t.documentType == selectedDocumentType)
       .toList(growable: false);
 
+  /// Resolves the live [TenantDocumentConfiguration] for invoices (reflecting unsaved studio edits
+  /// when on the Invoice tab, or the saved invoice configuration otherwise).
+  TenantDocumentConfiguration get currentInvoiceConfiguration {
+    if (selectedDocumentType == DocumentType.invoice &&
+        activeTemplateId.isNotEmpty) {
+      final activeSummary = templates
+          .where((t) => t.id == activeTemplateId)
+          .firstOrNull;
+      return TenantDocumentConfiguration(
+        id: configurations[DocumentType.invoice]?.id ?? 'local-invoice-cfg',
+        tenantId: configurations[DocumentType.invoice]?.tenantId ?? '',
+        documentType: DocumentType.invoice,
+        activeTemplateId: activeTemplateId,
+        activeTemplateName: activeSummary?.name ??
+            configurations[DocumentType.invoice]?.activeTemplateName,
+        customLiquidOverride: customLiquidOverride,
+        themePrimaryHex: themePrimaryHex,
+        themeSecondaryHex: themeSecondaryHex,
+        showLogo: showLogo,
+        footerNotes: footerNotes,
+      );
+    }
+    return configurations[DocumentType.invoice] ??
+        TenantDocumentConfiguration(
+          id: 'default-invoice-cfg',
+          tenantId: '',
+          documentType: DocumentType.invoice,
+          activeTemplateId: activeTemplateId.isNotEmpty
+              ? activeTemplateId
+              : InvoiceLayoutStyle.executiveCorporate.id,
+          themePrimaryHex: themePrimaryHex,
+          themeSecondaryHex: themeSecondaryHex,
+          showLogo: showLogo,
+          footerNotes: footerNotes,
+        );
+  }
+
   DocumentTemplateState copyWith({
     DocumentType? selectedDocumentType,
     List<DocumentTemplateSummary>? templates,
@@ -114,6 +151,12 @@ class DocumentTemplateController extends Notifier<DocumentTemplateState> {
       _debounceTimer?.cancel();
     });
     return const DocumentTemplateState();
+  }
+
+  Future<void> ensureLoaded() async {
+    if (state.templates.isEmpty && !state.isLoading) {
+      await load();
+    }
   }
 
   Future<void> load() async {
@@ -202,7 +245,26 @@ class DocumentTemplateController extends Notifier<DocumentTemplateState> {
       return;
     }
 
-    state = state.copyWith(activeTemplateId: templateId);
+    final summary = state.templates.where((t) => t.id == templateId).firstOrNull;
+    final style = InvoiceLayoutStyle.resolve(
+      templateId: templateId,
+      templateName: summary?.name,
+    );
+
+    // If current colors match one of the built-in archetype defaults, switch to the newly selected archetype's default palette
+    final defaultHexes = InvoiceLayoutStyle.values
+        .map((s) => s.defaultPrimaryHex.toUpperCase())
+        .toSet();
+    final shouldApplyStylePalette =
+        defaultHexes.contains(state.themePrimaryHex.toUpperCase());
+
+    state = state.copyWith(
+      activeTemplateId: templateId,
+      themePrimaryHex:
+          shouldApplyStylePalette ? style.defaultPrimaryHex : state.themePrimaryHex,
+      themeSecondaryHex:
+          shouldApplyStylePalette ? style.defaultSecondaryHex : state.themeSecondaryHex,
+    );
     await _loadTemplateDetailAndPreview(templateId);
   }
 

@@ -8,10 +8,15 @@ class Organization {
     this.address,
     this.phone,
     this.email,
+    this.website,
     this.taxId,
     this.countryCode,
     this.currency,
     this.logoBase64,
+    this.signatureBase64,
+    this.letterheadHeaderBase64,
+    this.prePrintedTopMarginMm,
+    this.hideHeaderForPrePrinted = false,
     this.bankName,
     this.bankAccountName,
     this.bankAccountNumber,
@@ -26,10 +31,15 @@ class Organization {
   final String? address;
   final String? phone;
   final String? email;
+  final String? website;
   final String? taxId;
   final String? countryCode;
   final String? currency;
   final String? logoBase64;
+  final String? signatureBase64;
+  final String? letterheadHeaderBase64;
+  final double? prePrintedTopMarginMm;
+  final bool hideHeaderForPrePrinted;
   final String? bankName;
   final String? bankAccountName;
   final String? bankAccountNumber;
@@ -40,19 +50,27 @@ class Organization {
   final String? authorizedSignatoryTitle;
 
   bool get hasLogo => logoBase64 != null && logoBase64!.trim().isNotEmpty;
+  bool get hasSignature =>
+      signatureBase64 != null && signatureBase64!.trim().isNotEmpty;
+  bool get hasLetterheadHeader =>
+      letterheadHeaderBase64 != null &&
+      letterheadHeaderBase64!.trim().isNotEmpty;
 
   String get formattedPaymentInstructions {
     final lines = <String>[];
     if (bankName != null && bankName!.trim().isNotEmpty) {
-      final acctName = (bankAccountName != null && bankAccountName!.trim().isNotEmpty)
-          ? ' (${bankAccountName!.trim()})'
-          : '';
-      final acctNo = (bankAccountNumber != null && bankAccountNumber!.trim().isNotEmpty)
-          ? ' - A/C: ${bankAccountNumber!.trim()}'
-          : '';
-      final swift = (bankBranchOrSwift != null && bankBranchOrSwift!.trim().isNotEmpty)
-          ? ' [${bankBranchOrSwift!.trim()}]'
-          : '';
+      final acctName =
+          (bankAccountName != null && bankAccountName!.trim().isNotEmpty)
+              ? ' (${bankAccountName!.trim()})'
+              : '';
+      final acctNo =
+          (bankAccountNumber != null && bankAccountNumber!.trim().isNotEmpty)
+              ? ' - A/C: ${bankAccountNumber!.trim()}'
+              : '';
+      final swift =
+          (bankBranchOrSwift != null && bankBranchOrSwift!.trim().isNotEmpty)
+              ? ' [${bankBranchOrSwift!.trim()}]'
+              : '';
       lines.add('Bank: ${bankName!.trim()}$acctNo$acctName$swift');
     }
     if (mobileMoneyDetails != null && mobileMoneyDetails!.trim().isNotEmpty) {
@@ -68,10 +86,15 @@ class Organization {
         'contactPhone': phone,
         'email': email,
         'contactEmail': email,
+        'website': website,
         'taxId': taxId,
         'countryCode': countryCode,
         'currency': currency,
         'logoBase64': logoBase64,
+        'signatureBase64': signatureBase64,
+        'letterheadHeaderBase64': letterheadHeaderBase64,
+        'prePrintedTopMarginMm': prePrintedTopMarginMm,
+        'hideHeaderForPrePrinted': hideHeaderForPrePrinted,
         'bankName': bankName,
         'bankAccountName': bankAccountName,
         'bankAccountNumber': bankAccountNumber,
@@ -87,10 +110,17 @@ class Organization {
         address: json['address'] as String?,
         phone: (json['phone'] as String?) ?? (json['contactPhone'] as String?),
         email: (json['email'] as String?) ?? (json['contactEmail'] as String?),
+        website: json['website'] as String?,
         taxId: json['taxId'] as String?,
         countryCode: json['countryCode'] as String?,
         currency: json['currency'] as String?,
         logoBase64: json['logoBase64'] as String?,
+        signatureBase64: json['signatureBase64'] as String?,
+        letterheadHeaderBase64: json['letterheadHeaderBase64'] as String?,
+        prePrintedTopMarginMm:
+            (json['prePrintedTopMarginMm'] as num?)?.toDouble(),
+        hideHeaderForPrePrinted:
+            json['hideHeaderForPrePrinted'] as bool? ?? false,
         bankName: json['bankName'] as String?,
         bankAccountName: json['bankAccountName'] as String?,
         bankAccountNumber: json['bankAccountNumber'] as String?,
@@ -172,6 +202,9 @@ class OrganizationRepository {
           : (body.containsKey('contactEmail')
               ? body['contactEmail'] as String?
               : current.email),
+      website: body.containsKey('website')
+          ? body['website'] as String?
+          : current.website,
       taxId:
           body.containsKey('taxId') ? body['taxId'] as String? : current.taxId,
       countryCode: body.containsKey('countryCode')
@@ -183,6 +216,18 @@ class OrganizationRepository {
       logoBase64: body.containsKey('logoBase64')
           ? body['logoBase64'] as String?
           : current.logoBase64,
+      signatureBase64: body.containsKey('signatureBase64')
+          ? body['signatureBase64'] as String?
+          : current.signatureBase64,
+      letterheadHeaderBase64: body.containsKey('letterheadHeaderBase64')
+          ? body['letterheadHeaderBase64'] as String?
+          : current.letterheadHeaderBase64,
+      prePrintedTopMarginMm: body.containsKey('prePrintedTopMarginMm')
+          ? (body['prePrintedTopMarginMm'] as num?)?.toDouble()
+          : current.prePrintedTopMarginMm,
+      hideHeaderForPrePrinted: body.containsKey('hideHeaderForPrePrinted')
+          ? (body['hideHeaderForPrePrinted'] as bool? ?? false)
+          : current.hideHeaderForPrePrinted,
       bankName: body.containsKey('bankName')
           ? body['bankName'] as String?
           : current.bankName,
@@ -221,10 +266,15 @@ class OrganizationRepository {
         'contactPhone': optimistic.phone,
         'email': optimistic.email,
         'contactEmail': optimistic.email,
+        'website': optimistic.website,
         'taxId': optimistic.taxId,
         'countryCode': optimistic.countryCode ?? 'TZ',
         'currency': optimistic.currency ?? 'TZS',
         'logoBase64': optimistic.logoBase64,
+        'signatureBase64': optimistic.signatureBase64,
+        'letterheadHeaderBase64': optimistic.letterheadHeaderBase64,
+        'prePrintedTopMarginMm': optimistic.prePrintedTopMarginMm,
+        'hideHeaderForPrePrinted': optimistic.hideHeaderForPrePrinted,
         'bankName': optimistic.bankName,
         'bankAccountName': optimistic.bankAccountName,
         'bankAccountNumber': optimistic.bankAccountNumber,
@@ -265,14 +315,24 @@ class OrganizationRepository {
       address: primary.address ?? fallback.address,
       phone: primary.phone ?? fallback.phone,
       email: primary.email ?? fallback.email,
+      website: primary.website ?? fallback.website,
       taxId: primary.taxId ?? fallback.taxId,
       countryCode: primary.countryCode ?? fallback.countryCode,
       currency: primary.currency ?? fallback.currency,
       logoBase64: primary.logoBase64 ?? fallback.logoBase64,
+      signatureBase64: primary.signatureBase64 ?? fallback.signatureBase64,
+      letterheadHeaderBase64:
+          primary.letterheadHeaderBase64 ?? fallback.letterheadHeaderBase64,
+      prePrintedTopMarginMm:
+          primary.prePrintedTopMarginMm ?? fallback.prePrintedTopMarginMm,
+      hideHeaderForPrePrinted:
+          primary.hideHeaderForPrePrinted || fallback.hideHeaderForPrePrinted,
       bankName: primary.bankName ?? fallback.bankName,
       bankAccountName: primary.bankAccountName ?? fallback.bankAccountName,
-      bankAccountNumber: primary.bankAccountNumber ?? fallback.bankAccountNumber,
-      bankBranchOrSwift: primary.bankBranchOrSwift ?? fallback.bankBranchOrSwift,
+      bankAccountNumber:
+          primary.bankAccountNumber ?? fallback.bankAccountNumber,
+      bankBranchOrSwift:
+          primary.bankBranchOrSwift ?? fallback.bankBranchOrSwift,
       mobileMoneyDetails:
           primary.mobileMoneyDetails ?? fallback.mobileMoneyDetails,
       invoiceTerms: primary.invoiceTerms ?? fallback.invoiceTerms,

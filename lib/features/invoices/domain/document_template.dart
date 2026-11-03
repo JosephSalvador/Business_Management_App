@@ -23,6 +23,113 @@ enum DocumentType {
   }
 }
 
+/// Visual layout archetypes for A4 corporate invoices.
+/// Works 100% offline in both [InvoiceA4PreviewCard] and [LocalPdfDocumentGenerator].
+enum InvoiceLayoutStyle {
+  /// Matches the Modern Ribbon design: stacked logo + business name top-left,
+  /// large Invoice # top-right, 4-cell colored highlight ribbon (Primary + Secondary),
+  /// clean horizontal-rule table, signature image under totals, and bottom contact bar.
+  modernRibbon(
+    id: 'tpl-invoice-modern-ribbon',
+    titleEn: 'Modern Ribbon (Gold & Charcoal)',
+    titleSw: 'Kisasa chenye Ukanda wa Rangi (Modern Ribbon)',
+    subtitleEn:
+        'Highlight summary bar, clean borderless table, signature & bottom contact bar',
+    subtitleSw:
+        'Ukanda wa muhtasari wa rangi, jedwali safi, sahihi na mawasiliano chini',
+    defaultPrimaryHex: '#F5B041',
+    defaultSecondaryHex: '#333333',
+  ),
+
+  /// Executive corporate layout: top brand bar, boxed metadata card, tinted Bill-To card,
+  /// striped table header, Bank/Mobile Money box, and official Stamp/Signatory box.
+  executiveCorporate(
+    id: 'tpl-invoice-executive-corporate',
+    titleEn: 'Executive Corporate',
+    titleSw: 'Rasmi ya Kampuni (Executive Corporate)',
+    subtitleEn:
+        'Structured corporate header, tinted Bill-To box, bank instructions & stamp box',
+    subtitleSw:
+        'Muundo rasmi wa kampuni, kisanduku cha mteja, maelekezo ya benki na muhuri',
+    defaultPrimaryHex: '#0F172A',
+    defaultSecondaryHex: '#0D9488',
+  ),
+
+  /// Traditional wholesale / Tally-style full grid layout with outer and inner table borders
+  /// and dual signature lines (Prepared By & Received By).
+  classicGrid(
+    id: 'tpl-invoice-classic-grid',
+    titleEn: 'Classic Wholesale Grid',
+    titleSw: 'Jedwali Kamili la Jumla (Classic Grid)',
+    subtitleEn:
+        'Full bordered grid around seller, customer, and items with dual signatures',
+    subtitleSw:
+        'Mistari kamili ya jedwali kwa muuzaji, mteja na bidhaa pamoja na sahihi mbili',
+    defaultPrimaryHex: '#1E3A8A',
+    defaultSecondaryHex: '#475569',
+  ),
+
+  /// Custom Letterhead / Pre-Printed Stationery mode: either renders an uploaded
+  /// full-width top header graphic or leaves a configurable top margin for physical letterhead paper.
+  customLetterhead(
+    id: 'tpl-invoice-custom-letterhead',
+    titleEn: 'Custom Letterhead / Pre-Printed Paper',
+    titleSw: 'nembo ya Juu / Karatasi Iliyochapishwa (Letterhead)',
+    subtitleEn:
+        'Upload your designer header banner or leave top space for pre-printed paper',
+    subtitleSw:
+        'Weka picha ya kichwa cha karatasi (letterhead) au acha nafasi ya juu kwa karatasi maalum',
+    defaultPrimaryHex: '#0F172A',
+    defaultSecondaryHex: '#334155',
+  );
+
+  const InvoiceLayoutStyle({
+    required this.id,
+    required this.titleEn,
+    required this.titleSw,
+    required this.subtitleEn,
+    required this.subtitleSw,
+    required this.defaultPrimaryHex,
+    required this.defaultSecondaryHex,
+  });
+
+  final String id;
+  final String titleEn;
+  final String titleSw;
+  final String subtitleEn;
+  final String subtitleSw;
+  final String defaultPrimaryHex;
+  final String defaultSecondaryHex;
+
+  String get templateId => id;
+  String title(bool isSw) => isSw ? titleSw : titleEn;
+  String subtitle(bool isSw) => isSw ? subtitleSw : subtitleEn;
+
+  static InvoiceLayoutStyle resolve({
+    String? templateId,
+    String? templateName,
+  }) {
+    final combined =
+        '${templateId ?? ''} ${templateName ?? ''}'.trim().toLowerCase();
+    if (combined.contains('ribbon') ||
+        combined.contains('modern') ||
+        combined.contains('minimalist') ||
+        combined.contains('11111111-1111-1111-1111-111111111101')) {
+      return InvoiceLayoutStyle.modernRibbon;
+    }
+    if (combined.contains('grid') ||
+        combined.contains('classic') ||
+        combined.contains('wholesale') ||
+        combined.contains('11111111-1111-1111-1111-111111111102')) {
+      return InvoiceLayoutStyle.classicGrid;
+    }
+    if (combined.contains('letterhead') || combined.contains('preprinted')) {
+      return InvoiceLayoutStyle.customLetterhead;
+    }
+    return InvoiceLayoutStyle.executiveCorporate;
+  }
+}
+
 class DocumentTemplateSummary {
   const DocumentTemplateSummary({
     required this.id,
@@ -46,6 +153,11 @@ class DocumentTemplateSummary {
       name.toLowerCase().contains('thermal') ||
       (description?.toLowerCase().contains('thermal') ?? false) ||
       (description?.toLowerCase().contains('80mm') ?? false);
+
+  InvoiceLayoutStyle get layoutStyle => InvoiceLayoutStyle.resolve(
+        templateId: id,
+        templateName: name,
+      );
 
   factory DocumentTemplateSummary.fromJson(Map<String, dynamic> json) {
     final docTypeVal = json['documentType'];
@@ -118,8 +230,8 @@ class DocumentTemplateDetail {
 
 class TenantDocumentConfiguration {
   const TenantDocumentConfiguration({
-    required this.id,
-    required this.tenantId,
+    this.id = '',
+    this.tenantId = '',
     required this.documentType,
     required this.activeTemplateId,
     this.activeTemplateName,
@@ -143,6 +255,11 @@ class TenantDocumentConfiguration {
   final bool showLogo;
   final String? footerNotes;
 
+  InvoiceLayoutStyle get layoutStyle => InvoiceLayoutStyle.resolve(
+        templateId: activeTemplateId,
+        templateName: activeTemplateName,
+      );
+
   factory TenantDocumentConfiguration.fromJson(Map<String, dynamic> json) {
     final docTypeVal = json['documentType'];
     final docType = docTypeVal is int
@@ -163,6 +280,20 @@ class TenantDocumentConfiguration {
       footerNotes: json['footerNotes']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'tenantId': tenantId,
+        'documentType': documentType.value,
+        'activeTemplateId': activeTemplateId,
+        'activeTemplateName': activeTemplateName,
+        'customLiquidOverride': customLiquidOverride,
+        'themePrimaryHex': themePrimaryHex,
+        'themeSecondaryHex': themeSecondaryHex,
+        'logoUrl': logoUrl,
+        'showLogo': showLogo,
+        'footerNotes': footerNotes,
+      };
 
   Map<String, dynamic> toUpdateRequestJson() => {
         'activeTemplateId': activeTemplateId,

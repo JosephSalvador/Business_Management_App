@@ -9,6 +9,7 @@ import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_repository.dart';
+import '../../application/document_template_controller.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
 import '../services/customer_invoice_pdf_service.dart';
@@ -36,6 +37,7 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     super.initState();
     Future.microtask(() {
       ref.read(settingsControllerProvider.notifier).load();
+      ref.read(documentTemplateControllerProvider.notifier).ensureLoaded();
       _load();
     });
   }
@@ -88,10 +90,13 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     if (_sharingPdf) return;
     setState(() => _sharingPdf = true);
     try {
+      final templateConfig =
+          ref.read(documentTemplateControllerProvider).currentInvoiceConfiguration;
       await ref.read(customerInvoicePdfServiceProvider).shareA4Pdf(
             invoice: invoice,
             organization: organization,
             isSwahili: isSwahili,
+            templateConfig: templateConfig,
           );
     } finally {
       if (mounted) {

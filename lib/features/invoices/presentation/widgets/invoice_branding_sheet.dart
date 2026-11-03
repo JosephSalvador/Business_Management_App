@@ -6,11 +6,13 @@ import '../../../../core/platform/logo_picker_service.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
+import '../../application/document_template_controller.dart';
+import '../../domain/document_template.dart';
 
 /// Opens a comprehensive bottom sheet where any business user can:
-/// 1. Upload their company logo from phone gallery / file picker
-/// 2. Or generate a crisp Brand Monogram Logo in one tap
-/// 3. Configure Bank Details, Mobile Money (Lipa Namba), Default Terms, and Authorized Signatory
+/// 1. Choose their Invoice Template Style (Modern Ribbon, Executive Corporate, Classic Grid, Custom Letterhead)
+/// 2. Upload their company logo, digital signature/stamp, or full-width letterhead banner
+/// 3. Configure Website, Bank Details, Mobile Money (Lipa Namba), Default Terms, and Authorized Signatory
 Future<void> showInvoiceBrandingSheet(
   BuildContext context, {
   Organization? organization,
@@ -22,7 +24,7 @@ Future<void> showInvoiceBrandingSheet(
       org = await container.read(organizationRepositoryProvider).get();
     } catch (_) {}
   }
-      if (!context.mounted) return;
+  if (!context.mounted) return;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -47,6 +49,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
   late final TextEditingController _tinController;
   late final TextEditingController _phoneController;
   late final TextEditingController _emailController;
+  late final TextEditingController _websiteController;
   late final TextEditingController _addressController;
   late final TextEditingController _bankNameController;
   late final TextEditingController _bankAccountNameController;
@@ -59,12 +62,24 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
   late final TextEditingController _monogramInitialsController;
 
   String? _logoBase64;
+  String? _signatureBase64;
+  String? _letterheadHeaderBase64;
+  bool _hideHeaderForPrePrinted = false;
+  double _prePrintedTopMarginMm = 45.0;
+
+  InvoiceLayoutStyle _selectedLayoutStyle = InvoiceLayoutStyle.modernRibbon;
+  String _primaryHex = '#D97706';
+  String _secondaryHex = '#5B8DEF';
+
   bool _saving = false;
   bool _pickingLogo = false;
+  bool _pickingSignature = false;
+  bool _pickingLetterhead = false;
   Color _selectedBrandColor = const Color(0xFF0F2942);
 
   static const _brandPalette = <Color>[
     Color(0xFF0F2942), // Executive Navy
+    Color(0xFFD97706), // Warm Amber (Sample Match)
     Color(0xFF1E40AF), // Royal Blue
     Color(0xFF047857), // Emerald Corporate
     Color(0xFF7C2D12), // Bronze / Terracotta
@@ -78,10 +93,16 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
     super.initState();
     final org = widget.organization;
     _logoBase64 = org.logoBase64;
+    _signatureBase64 = org.signatureBase64;
+    _letterheadHeaderBase64 = org.letterheadHeaderBase64;
+    _hideHeaderForPrePrinted = org.hideHeaderForPrePrinted;
+    _prePrintedTopMarginMm = org.prePrintedTopMarginMm;
+
     _nameController = TextEditingController(text: org.name ?? '');
     _tinController = TextEditingController(text: org.taxId ?? '');
     _phoneController = TextEditingController(text: org.phone ?? '');
     _emailController = TextEditingController(text: org.email ?? '');
+    _websiteController = TextEditingController(text: org.website ?? '');
     _addressController = TextEditingController(text: org.address ?? '');
     _bankNameController = TextEditingController(text: org.bankName ?? '');
     _bankAccountNameController =
@@ -102,6 +123,18 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
       text: org.authorizedSignatoryTitle ?? 'Authorized Signatory',
     );
     _monogramInitialsController = TextEditingController();
+
+    Future.microtask(() async {
+      await ref.read(documentTemplateControllerProvider.notifier).ensureLoaded();
+      if (!mounted) return;
+      final cfg =
+          ref.read(documentTemplateControllerProvider).currentInvoiceConfiguration;
+      setState(() {
+        _selectedLayoutStyle = cfg.layoutStyle;
+        _primaryHex = cfg.themePrimaryHex ?? _primaryHex;
+        _secondaryHex = cfg.themeSecondaryHex ?? _secondaryHex;
+      });
+    });
   }
 
   @override
@@ -111,6 +144,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
       _tinController,
       _phoneController,
       _emailController,
+      _websiteController,
       _addressController,
       _bankNameController,
       _bankAccountNameController,
@@ -143,6 +177,34 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
     }
   }
 
+  Future<void> _pickSignatureFromGallery() async {
+    if (_pickingSignature) return;
+    setState(() => _pickingSignature = true);
+    try {
+      final picked = await LogoPickerService.pickFromDevice();
+      if (!mounted) return;
+      if (picked != null && picked.isNotEmpty) {
+        setState(() => _signatureBase64 = picked);
+      }
+    } finally {
+      if (mounted) setState(() => _pickingSignature = false);
+    }
+  }
+
+  Future<void> _pickLetterheadFromGallery() async {
+    if (_pickingLetterhead) return;
+    setState(() => _pickingLetterhead = true);
+    try {
+      final picked = await LogoPickerService.pickFromDevice();
+      if (!mounted) return;
+      if (picked != null && picked.isNotEmpty) {
+        setState(() => _letterheadHeaderBase64 = picked);
+      }
+    } finally {
+      if (mounted) setState(() => _pickingLetterhead = false);
+    }
+  }
+
   Future<void> _generateMonogramLogo() async {
     final name = _nameController.text.trim().isNotEmpty
         ? _nameController.text.trim()
@@ -167,8 +229,13 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
         'taxId': _tinController.text.trim(),
         'phone': _phoneController.text.trim(),
         'email': _emailController.text.trim(),
+        'website': _websiteController.text.trim(),
         'address': _addressController.text.trim(),
         'logoBase64': _logoBase64 ?? '',
+        'signatureBase64': _signatureBase64 ?? '',
+        'letterheadHeaderBase64': _letterheadHeaderBase64 ?? '',
+        'hideHeaderForPrePrinted': _hideHeaderForPrePrinted,
+        'prePrintedTopMarginMm': _prePrintedTopMarginMm,
         'bankName': _bankNameController.text.trim(),
         'bankAccountName': _bankAccountNameController.text.trim(),
         'bankAccountNumber': _bankAccountNumberController.text.trim(),
@@ -178,14 +245,22 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
         'authorizedSignatoryName': _signatoryNameController.text.trim(),
         'authorizedSignatoryTitle': _signatoryTitleController.text.trim(),
       });
+
+      final tplNotifier = ref.read(documentTemplateControllerProvider.notifier);
+      await tplNotifier.switchDocumentType(DocumentType.invoice);
+      await tplNotifier.selectTemplate(_selectedLayoutStyle.templateId);
+      tplNotifier.updatePrimaryHex(_primaryHex);
+      tplNotifier.updateSecondaryHex(_secondaryHex);
+      await tplNotifier.saveConfiguration();
+
       if (!mounted) return;
       final isSw = Localizations.localeOf(context).languageCode == 'sw';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isSw
-                ? 'Nembo na taarifa za ankara zimehifadhiwa!'
-                : 'Business logo & invoice settings saved!',
+                ? 'Mtindo wa ankara, nembo na sahihi vimehifadhiwa!'
+                : 'Invoice template, logo & signature settings saved!',
           ),
           backgroundColor: AppColors.success,
         ),
@@ -205,6 +280,9 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
   Widget build(BuildContext context) {
     final isSw = Localizations.localeOf(context).languageCode == 'sw';
     final logoBytes = LogoPickerService.decodeLogoBytes(_logoBase64);
+    final signatureBytes = LogoPickerService.decodeLogoBytes(_signatureBase64);
+    final letterheadBytes =
+        LogoPickerService.decodeLogoBytes(_letterheadHeaderBase64);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -253,6 +331,138 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                   controller: scrollController,
                   padding: const EdgeInsets.all(20),
                   children: [
+                    // 0. TEMPLATE LAYOUT STYLE SECTION
+                    _SectionHeader(
+                      icon: Icons.dashboard_customize_outlined,
+                      title: isSw
+                          ? 'Mtindo wa Ankara (Invoice Template Layout)'
+                          : 'Invoice Template Layout Style',
+                      subtitle: isSw
+                          ? 'Chagua muundo wa ankara unaolingana na biashara yako au weka karatasi yako (Letterhead)'
+                          : 'Choose a layout archetype or upload your own designer letterhead',
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: InvoiceLayoutStyle.values.map((style) {
+                        final selected = _selectedLayoutStyle == style;
+                        return ChoiceChip(
+                          selected: selected,
+                          label: Text(
+                            style.title(isSw),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                          onSelected: (_) {
+                            setState(() {
+                              _selectedLayoutStyle = style;
+                              _primaryHex = style.defaultPrimaryHex;
+                              _secondaryHex = style.defaultSecondaryHex;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    if (_selectedLayoutStyle ==
+                        InvoiceLayoutStyle.customLetterhead) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.resolveSurfaceSecondary(context),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.resolveBorder(context),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                isSw
+                                    ? 'Ninatumia Karatasi Iliyochapishwa Tayari (Pre-Printed Paper)'
+                                    : 'Use Physical Pre-Printed Stationery Paper',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.resolveTextPrimary(context),
+                                ),
+                              ),
+                              subtitle: Text(
+                                isSw
+                                    ? 'Huacha nafasi wazi juu (${_prePrintedTopMarginMm.round()}mm) ili isigongane na kichwa cha karatasi yako'
+                                    : 'Leaves a blank top margin (${_prePrintedTopMarginMm.round()}mm) for your physical letterhead',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color:
+                                      AppColors.resolveTextSecondary(context),
+                                ),
+                              ),
+                              value: _hideHeaderForPrePrinted,
+                              onChanged: (v) => setState(
+                                  () => _hideHeaderForPrePrinted = v),
+                            ),
+                            if (_hideHeaderForPrePrinted)
+                              Slider(
+                                value: _prePrintedTopMarginMm.clamp(20.0, 90.0),
+                                min: 20.0,
+                                max: 90.0,
+                                divisions: 14,
+                                label: '${_prePrintedTopMarginMm.round()} mm',
+                                onChanged: (v) => setState(
+                                    () => _prePrintedTopMarginMm = v),
+                              )
+                            else ...[
+                              if (letterheadBytes != null) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(
+                                    letterheadBytes,
+                                    height: 76,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _pickingLetterhead
+                                          ? null
+                                          : _pickLetterheadFromGallery,
+                                      icon: const Icon(
+                                          Icons.upload_file_outlined,
+                                          size: 18),
+                                      label: Text(
+                                        isSw
+                                            ? 'Pakia Bango la Juu (Letterhead Banner)'
+                                            : 'Upload Full-Width Letterhead Banner',
+                                      ),
+                                    ),
+                                  ),
+                                  if (letterheadBytes != null)
+                                    IconButton(
+                                      onPressed: () => setState(() =>
+                                          _letterheadHeaderBase64 = null),
+                                      icon: const Icon(Icons.delete_outline,
+                                          color: AppColors.error),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+
                     // 1. LOGO SECTION
                     _SectionHeader(
                       icon: Icons.image_outlined,
@@ -425,10 +635,10 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                       icon: Icons.business_outlined,
                       title: isSw
                           ? '2. Taarifa za Muuzaji (Seller Identity)'
-                          : '2. Seller Identity (Header Info)',
+                          : '2. Seller Identity (Header & Footer Info)',
                       subtitle: isSw
-                          ? 'Jina rasmi la kampuni, TIN, simu na anwani'
-                          : 'Legal trading name, TIN, phone, email & address',
+                          ? 'Jina rasmi la kampuni, TIN, simu, tovuti (website) na anwani'
+                          : 'Legal trading name, TIN, phone, website, email & address',
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -463,11 +673,27 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: _emailController,
-                      decoration: InputDecoration(
-                        labelText: isSw ? 'Barua Pepe (Email)' : 'Business Email',
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              labelText: isSw ? 'Barua Pepe (Email)' : 'Business Email',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _websiteController,
+                            decoration: InputDecoration(
+                              labelText: isSw ? 'Tovuti (Website)' : 'Website',
+                              hintText: 'www.kampuni.co.tz',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -553,15 +779,89 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                     ),
                     const SizedBox(height: 24),
 
-                    // 4. TERMS & AUTHORIZED SIGNATORY
+                    // 4. TERMS, DIGITAL SIGNATURE & AUTHORIZED SIGNATORY
                     _SectionHeader(
                       icon: Icons.draw_outlined,
                       title: isSw
-                          ? '4. Masharti ya Ankara na Sahihi Rasmi'
-                          : '4. Default Terms & Authorized Signatory',
+                          ? '4. Sahihi Rasmi (Signature / Stamp) na Masharti'
+                          : '4. Digital Signature / Stamp & Default Terms',
                       subtitle: isSw
-                          ? 'Jina la mwidhinishaji na masharti yanayochapishwa chini ya A4'
-                          : 'Printed at the bottom of the A4 invoice beside the Stamp box',
+                          ? 'Pakia picha ya sahihi au mhuri ("Issued by, signature:") na masharti ya ankara'
+                          : 'Upload your signature/stamp image ("Issued by, signature:") and terms',
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.resolveSurfaceSecondary(context),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.resolveBorder(context),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 110,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.resolveBorder(context),
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: signatureBytes != null
+                                ? Image.memory(
+                                    signatureBytes,
+                                    fit: BoxFit.contain,
+                                  )
+                                : Center(
+                                    child: Text(
+                                      isSw ? 'Hakuna Sahihi' : 'No Signature',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: AppColors.resolveTextSecondary(
+                                            context),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: _pickingSignature
+                                      ? null
+                                      : _pickSignatureFromGallery,
+                                  icon: const Icon(Icons.draw_outlined,
+                                      size: 16),
+                                  label: Text(
+                                    isSw
+                                        ? 'Pakia Picha ya Sahihi / Mhuri'
+                                        : 'Upload Signature / Stamp',
+                                  ),
+                                ),
+                                if (signatureBytes != null)
+                                  TextButton.icon(
+                                    onPressed: () => setState(
+                                        () => _signatureBase64 = null),
+                                    icon: const Icon(Icons.delete_outline,
+                                        size: 15, color: AppColors.error),
+                                    label: Text(
+                                      isSw ? 'Ondoa Sahihi' : 'Remove Signature',
+                                      style: const TextStyle(
+                                          color: AppColors.error, fontSize: 11),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(

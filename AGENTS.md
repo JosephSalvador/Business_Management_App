@@ -242,3 +242,11 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Upgrade `local_pdf_document_generator.dart` and `invoice_preview_screen.dart` to compile executive corporate A4 and 80mm thermal PDFs locally with logo, full receiver details, bank/mobile-money fallback, and signatory/stamp box inside a true A4 aspect-ratio frame.
 - [x] Task 6: Bump version to `1.0.0+80` in `pubspec.yaml` and `app_update_service.dart`, commit, push, and trigger remote CI/CD (`deploy-azure.yml` and `build-clients.yml`).
 
+## Implementation Plan — Custom Client Invoice Templates, Multi-Layout Engine & Brand Assets (Build 81)
+- [x] Task 1: Extend `Organization` & `OrganizationRepository` with `website`, `signatureBase64`, `letterheadHeaderBase64`, `hideHeaderForPrePrinted`, and `prePrintedTopMarginMm`.
+- [x] Task 2: Add `InvoiceLayoutStyle` enum (`modernRibbon`, `executiveCorporate`, `classicGrid`, `customLetterhead`), built-in offline templates, and local persistence in `DocumentTemplateRepository` & `DocumentTemplateController`.
+- [x] Task 3: Upgrade `InvoiceA4PreviewCard` and `LocalPdfDocumentGenerator.generateInvoiceA4` (and `CustomerInvoicePdfService`) to render all 4 layout styles, including the exact `Modern Ribbon` sample match (4-cell highlight bar, borderless table, `"Issued by, signature:"` image, and bottom `Phone | Website | Email` bar), `Classic Wholesale Grid`, and `Custom Letterhead / Pre-Printed Paper`.
+- [x] Task 4: Upgrade `InvoiceBrandingSheet`, `DocumentTemplatesPage` (60fps live `InvoiceA4PreviewCard`), and `InvoicePreviewScreen` with layout style selectors and upload controls for Logo, Digital Signature/Stamp, Letterhead Banner, Pre-Printed Paper margin, and Website.
+- [x] Task 5: Add unit tests in `test/features/invoices/offline_invoicing_test.dart` for all 4 layout styles, bump version to `1.0.0+81`, push, and trigger `build-clients.yml`.
+
+

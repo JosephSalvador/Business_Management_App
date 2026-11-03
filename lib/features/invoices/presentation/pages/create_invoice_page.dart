@@ -13,6 +13,7 @@ import '../../../products/application/products_controller.dart';
 import '../../../products/domain/product.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_repository.dart';
+import '../../application/document_template_controller.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
 import '../widgets/invoice_a4_preview_card.dart';
@@ -104,6 +105,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       ref.read(customersControllerProvider.notifier).load();
       ref.read(productsControllerProvider.notifier).load();
       ref.read(settingsControllerProvider.notifier).load();
+      ref.read(documentTemplateControllerProvider.notifier).ensureLoaded();
     });
   }
 

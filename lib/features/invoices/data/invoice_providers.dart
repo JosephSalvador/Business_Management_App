@@ -54,5 +54,6 @@ final deliveryNoteRepositoryProvider = Provider<DeliveryNoteRepository>(
 final documentTemplateRepositoryProvider = Provider<DocumentTemplateRepository>(
   (ref) => DocumentTemplateRepository(
     apiClient: ref.watch(apiClientProvider),
+    cache: ref.watch(offlineCacheDaoProvider),
   ),
 );

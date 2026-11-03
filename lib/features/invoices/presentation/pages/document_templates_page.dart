@@ -2,14 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
 
+import '../../../../app/providers.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../../settings/application/settings_controller.dart';
+import '../../../settings/data/organization_repository.dart';
 import '../../application/document_template_controller.dart';
+import '../../domain/document_template.dart';
+import '../../domain/invoice.dart';
+import '../services/local_pdf_document_generator.dart';
 import '../widgets/commercial_palette_picker.dart';
 import '../widgets/custom_override_field.dart';
 import '../widgets/document_selector_toggle.dart';
+import '../widgets/invoice_a4_preview_card.dart';
+import '../widgets/invoice_branding_sheet.dart';
 import '../widgets/preview_frame/preview_frame.dart';
 import '../widgets/print_profile_selector.dart';
 import '../widgets/template_marketplace_grid.dart';
@@ -35,6 +45,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
     super.initState();
     _phoneTabController = TabController(length: 2, vsync: this);
     Future.microtask(() {
+      ref.read(settingsControllerProvider.notifier).load();
       ref.read(documentTemplateControllerProvider.notifier).load();
     });
   }
@@ -44,6 +55,76 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
     _phoneTabController.dispose();
     _footerNotesController.dispose();
     super.dispose();
+  }
+
+  Organization _resolveOrganization() {
+    final settingsState = ref.watch(settingsControllerProvider);
+    if (settingsState is SettingsLoaded) {
+      return settingsState.organization;
+    }
+    return const Organization(
+      name: 'Your Business Name',
+      phone: '+255 700 123 456',
+      email: 'info@yourbusiness.co.tz',
+      website: 'www.yourbusiness.co.tz',
+      address: 'Samora Avenue, Dar es Salaam, Tanzania',
+      taxId: '123-456-789',
+      currency: 'TZS',
+    );
+  }
+
+  CustomerInvoice _buildSampleInvoice(Organization org) {
+    final now = DateTime.now();
+    return CustomerInvoice(
+      id: 'sample-preview',
+      invoiceNumber: '2026435',
+      documentTitle: 'INVOICE',
+      customerId: 'sample-client',
+      customerName: 'Kilimanjaro Logistics Ltd',
+      customerAttention: 'Attn: Procurement Manager',
+      customerTin: '109-876-543',
+      customerPhone: '+255 754 900 100',
+      customerEmail: 'accounts@kililogistics.co.tz',
+      customerAddress: 'Plot 42, Nyerere Road, Dar es Salaam',
+      issueDate: now,
+      dueDate: now.add(const Duration(days: 14)),
+      paymentTerms: 'Net 14',
+      referenceNumber: 'INV-057',
+      currency: org.currency ?? 'TZS',
+      subtotal: 1250000,
+      discountTotal: 50000,
+      taxTotal: 0,
+      totalAmount: 1200000,
+      paidAmount: 200000,
+      balanceDue: 1000000,
+      status: InvoiceStatus.partiallyPaid,
+      notes: _footerNotesController.text.trim().isNotEmpty
+          ? _footerNotesController.text.trim()
+          : (org.invoiceTerms ??
+              'Thank you for your business. Please quote the invoice number on payment.'),
+      authorizedSignatoryName: org.authorizedSignatoryName ?? 'Authorized Signatory',
+      authorizedSignatoryTitle: org.authorizedSignatoryTitle ?? 'Finance Director',
+      lines: const [
+        InvoiceLine(
+          id: 'l1',
+          description: 'Enterprise Supply & Installation Package',
+          unitOfMeasure: 'Lot',
+          quantity: 1,
+          unitPrice: 750000,
+          discountAmount: 0,
+          lineTotal: 750000,
+        ),
+        InvoiceLine(
+          id: 'l2',
+          description: 'Annual Preventative Maintenance & Support',
+          unitOfMeasure: 'Service',
+          quantity: 2,
+          unitPrice: 250000,
+          discountAmount: 50000,
+          lineTotal: 450000,
+        ),
+      ],
+    );
   }
 
   Color _parseColor(String hex) {
@@ -56,10 +137,28 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
   }
 
   Future<void> _handlePrintNow(DocumentTemplateState state) async {
-    if (_isPrinting || state.previewHtml == null) return;
+    if (_isPrinting) return;
     setState(() => _isPrinting = true);
     try {
-      await documentPreviewFrame.printDocument(state.previewHtml);
+      if (state.selectedDocumentType == DocumentType.invoice &&
+          !state.isThermal) {
+        final org = _resolveOrganization();
+        final sample = _buildSampleInvoice(org);
+        final isSw = Localizations.localeOf(context).languageCode == 'sw';
+        final bytes = await LocalPdfDocumentGenerator().generateInvoiceA4(
+          invoice: sample,
+          organization: org,
+          templateConfig: state.currentInvoiceConfiguration,
+          isSwahili: isSw,
+        );
+        await Printing.layoutPdf(
+          name: 'invoice-template-sample.pdf',
+          format: PdfPageFormat.a4,
+          onLayout: (_) async => bytes,
+        );
+      } else if (state.previewHtml != null) {
+        await documentPreviewFrame.printDocument(state.previewHtml);
+      }
     } finally {
       if (mounted) setState(() => _isPrinting = false);
     }
@@ -507,10 +606,29 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
 
         // 5. Document Content Options
         _FormSectionCard(
-          title: isSw ? 'Nembo & Maelezo ya Chini' : 'Branding & Terms',
+          title: isSw ? 'Nembo, Sahihi & Maelezo ya Chini' : 'Logo, Signature & Terms',
           icon: Icons.tune_outlined,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              OutlinedButton.icon(
+                onPressed: () => showInvoiceBrandingSheet(
+                  context,
+                  organization: _resolveOrganization(),
+                ),
+                icon: const Icon(Icons.verified_outlined, size: 18),
+                label: Text(
+                  isSw
+                      ? 'Pakia Nembo, Sahihi (Signature) au Letterhead'
+                      : 'Upload Logo, Signature/Stamp or Letterhead',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 value: state.showLogo,
@@ -584,6 +702,10 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
     bool isSw,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final org = _resolveOrganization();
+    final isA4Invoice =
+        state.selectedDocumentType == DocumentType.invoice && !state.isThermal;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -626,7 +748,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                     ],
                   ),
                 ),
-                if (state.isPreviewLoading) ...[
+                if (state.isPreviewLoading && !isA4Invoice) ...[
                   const SizedBox(width: 10),
                   const SizedBox(
                     width: 12,
@@ -652,7 +774,7 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                'LIVE PREVIEW STREAM',
+                isA4Invoice ? '60FPS NATIVE A4 PREVIEW' : 'LIVE PREVIEW STREAM',
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 10,
@@ -668,12 +790,22 @@ class _DocumentTemplatesPageState extends ConsumerState<DocumentTemplatesPage>
 
         // Isolated live stream container
         Expanded(
-          child: documentPreviewFrame.buildFrame(
-            context: context,
-            htmlContent: state.previewHtml,
-            isThermal: state.isThermal,
-            isLoading: state.isPreviewLoading,
-          ),
+          child: isA4Invoice
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: InvoiceA4PreviewCard(
+                    invoice: _buildSampleInvoice(org),
+                    organization: org,
+                    isSwahili: isSw,
+                    templateConfig: state.currentInvoiceConfiguration,
+                  ),
+                )
+              : documentPreviewFrame.buildFrame(
+                  context: context,
+                  htmlContent: state.previewHtml,
+                  isThermal: state.isThermal,
+                  isLoading: state.isPreviewLoading,
+                ),
         ),
       ],
     );
