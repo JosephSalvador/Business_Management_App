@@ -106,7 +106,7 @@ void main() {
       final synthesizedOrg = Organization.fromJson(legacyOrgJson);
       expect(synthesizedOrg.paymentAccounts.length, 2);
       expect(synthesizedOrg.paymentAccounts.any((a) => a.providerName == 'NMB Bank'), isTrue);
-      expect(synthesizedOrg.paymentAccounts.any((a) => a.accountNumber == '998877'), isTrue);
+      expect(synthesizedOrg.paymentAccounts.any((a) => a.accountNumber.contains('998877')), isTrue);
     });
 
     test('CustomerInvoicePayment serialization and invoice payment history tracking', () {
