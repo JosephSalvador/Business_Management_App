@@ -1026,7 +1026,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                                     Expanded(
                                       flex: 3,
                                       child: DropdownButtonFormField<String>(
-                                        value:
+                                        initialValue:
                                             _initialPaymentEntries[i].method,
                                         isExpanded: true,
                                         dropdownColor: cardBg,
@@ -1548,11 +1548,10 @@ class _LineInputs {
 
 class _InitialPaymentEntry {
   _InitialPaymentEntry({
-    String method = 'Bank Transfer',
+    this.method = 'Bank Transfer',
     String? amountText,
     String? referenceText,
-  })  : method = method,
-        amountController = TextEditingController(text: amountText ?? ''),
+  })  : amountController = TextEditingController(text: amountText ?? ''),
         referenceController = TextEditingController(text: referenceText ?? '');
 
   String method;

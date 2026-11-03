@@ -1146,8 +1146,8 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                                 CircleAvatar(
                                   radius: 18,
                                   backgroundColor: isBank
-                                      ? AppColors.primary.withOpacity(0.12)
-                                      : Colors.green.withOpacity(0.12),
+                                      ? AppColors.primary.withValues(alpha: 0.12)
+                                      : Colors.green.withValues(alpha: 0.12),
                                   child: Icon(
                                     isBank
                                         ? Icons.account_balance
@@ -1211,7 +1211,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                                               ),
                                               decoration: BoxDecoration(
                                                 color: AppColors.primary
-                                                    .withOpacity(0.15),
+                                                    .withValues(alpha: 0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(6),
                                               ),

@@ -131,6 +131,7 @@ class InvoicesController extends Notifier<InvoicesState> {
     String? paymentTerms,
     DateTime? issueDate,
     DateTime? dueDate,
+    double discountAmount = 0,
     double initialAmountPaid = 0,
     List<CustomerInvoicePayment>? initialPayments,
     String? paymentMethod,

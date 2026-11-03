@@ -51,6 +51,9 @@ class PaymentAccount {
   final String? currency; // e.g. "TZS", "USD"
   final bool isDefault;
 
+  bool get isBank => type == PaymentAccountType.bank;
+  bool get isMobileMoney => type == PaymentAccountType.mobileMoney;
+
   String get formattedDisplay {
     final acctNameStr =
         (accountName != null && accountName!.trim().isNotEmpty)
