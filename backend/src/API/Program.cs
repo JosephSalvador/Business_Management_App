@@ -275,6 +275,7 @@ app.MapDocumentTemplateEndpoints();
 app.MapNotificationEndpoints();
 app.MapTenantProvisioningEndpoints();
 app.MapAppVersionEndpoints();
+app.MapPublicInvoiceVerificationEndpoints();
 
 var schemaSelfHealingStatements = new (string sql, string description)[]
 {
@@ -302,6 +303,9 @@ var schemaSelfHealingStatements = new (string sql, string description)[]
     (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150);", "CustomerInvoices.AuthorizedSignatoryName"),
     (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150);", "CustomerInvoices.AuthorizedSignatoryTitle"),
     (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""PaymentsJson"" text;", "CustomerInvoices.PaymentsJson"),
+    (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""VerificationToken"" character varying(32);", "CustomerInvoices.VerificationToken"),
+    (@"UPDATE public.""CustomerInvoices"" SET ""VerificationToken"" = SUBSTRING(REPLACE(""Id""::text, '-', ''), 1, 16) WHERE ""VerificationToken"" IS NULL;", "CustomerInvoices.BackfillVerificationToken"),
+    (@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CustomerInvoices_VerificationToken"" ON public.""CustomerInvoices"" (""VerificationToken"");", "Index IX_CustomerInvoices_VerificationToken"),
 
     (@"ALTER TABLE public.""CustomerInvoiceLines"" ADD COLUMN IF NOT EXISTS ""UnitOfMeasure"" character varying(50) DEFAULT 'Pcs';", "CustomerInvoiceLines.UnitOfMeasure"),
     (@"ALTER TABLE public.""CustomerInvoiceLines"" ADD COLUMN IF NOT EXISTS ""DiscountAmount"" numeric(18,2) DEFAULT 0;", "CustomerInvoiceLines.DiscountAmount"),

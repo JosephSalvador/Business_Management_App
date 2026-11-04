@@ -824,6 +824,8 @@ public interface ICustomerInvoiceRepository
         Guid tenantId, Guid id, CancellationToken cancellationToken = default);
     Task<CustomerInvoice?> GetByNumberAsync(
         Guid tenantId, string number, CancellationToken cancellationToken = default);
+    Task<CustomerInvoice?> GetByVerificationTokenAsync(
+        string token, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CustomerInvoice>> ListAsync(
         Guid tenantId, int page, int pageSize, CustomerInvoiceListFilter filter,
         CancellationToken cancellationToken = default);

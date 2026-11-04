@@ -1148,10 +1148,12 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
                 entity.Property(i => i.Notes).HasColumnType("text");
                 entity.Property(i => i.AuthorizedSignatoryName).HasMaxLength(150);
                 entity.Property(i => i.AuthorizedSignatoryTitle).HasMaxLength(150);
+                entity.Property(i => i.VerificationToken).IsRequired().HasMaxLength(32);
                 entity.HasIndex(i => i.TenantId);
                 entity.HasIndex(i => new { i.TenantId, i.Status });
                 entity.HasIndex(i => new { i.TenantId, i.Number }).IsUnique();
                 entity.HasIndex(i => new { i.TenantId, i.CreatedAt });
+                entity.HasIndex(i => i.VerificationToken).IsUnique();
                 entity.HasMany(i => i.Lines)
                     .WithOne()
                     .HasForeignKey(l => l.CustomerInvoiceId)

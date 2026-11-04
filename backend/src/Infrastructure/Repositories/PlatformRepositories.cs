@@ -2796,6 +2796,26 @@ public sealed class CustomerInvoiceRepository : ICustomerInvoiceRepository
             .FirstOrDefaultAsync(
                 i => i.TenantId == tenantId && i.Number == number, cancellationToken);
 
+    public Task<CustomerInvoice?> GetByVerificationTokenAsync(
+        string token, CancellationToken cancellationToken = default)
+    {
+        var cleanToken = (token ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(cleanToken))
+        {
+            return Task.FromResult<CustomerInvoice?>(null);
+        }
+
+        var isGuid = Guid.TryParse(cleanToken, out var parsedGuid);
+
+        return _db.CustomerInvoices
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(i => i.Lines)
+            .FirstOrDefaultAsync(
+                i => i.VerificationToken == cleanToken || (isGuid && i.Id == parsedGuid),
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<CustomerInvoice>> ListAsync(
         Guid tenantId, int page, int pageSize, CustomerInvoiceListFilter filter,
         CancellationToken cancellationToken = default)

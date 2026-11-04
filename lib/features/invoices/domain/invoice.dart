@@ -158,6 +158,7 @@ class CustomerInvoice {
     this.authorizedSignatoryName,
     this.authorizedSignatoryTitle,
     this.isSynced = true,
+    this.verificationToken,
   }) : number = number ?? invoiceNumber ?? '';
 
   final String id;
@@ -192,6 +193,15 @@ class CustomerInvoice {
   final List<InvoiceLine> lines;
   final List<CustomerInvoicePayment> payments;
   final bool isSynced;
+  final String? verificationToken;
+
+  String get effectiveVerificationToken {
+    if (verificationToken != null && verificationToken!.trim().isNotEmpty) {
+      return verificationToken!.trim();
+    }
+    final cleanId = id.replaceAll('-', '');
+    return cleanId.length >= 16 ? cleanId.substring(0, 16) : cleanId;
+  }
 
   String get invoiceNumber => number;
 
@@ -224,6 +234,7 @@ class CustomerInvoice {
         referenceNumber: referenceNumber,
         currency: currency,
         isSynced: isSynced,
+        verificationToken: effectiveVerificationToken,
       );
 
   CustomerInvoice copyWith({
@@ -235,6 +246,7 @@ class CustomerInvoice {
     DateTime? paidAtUtc,
     List<CustomerInvoicePayment>? payments,
     bool? isSynced,
+    String? verificationToken,
   }) =>
       CustomerInvoice(
         id: id,
@@ -269,6 +281,7 @@ class CustomerInvoice {
         lines: lines,
         payments: payments ?? this.payments,
         isSynced: isSynced ?? this.isSynced,
+        verificationToken: verificationToken ?? this.verificationToken,
       );
 
   Map<String, dynamic> toJson() => {
@@ -304,6 +317,7 @@ class CustomerInvoice {
         'lines': [for (final line in lines) line.toJson()],
         'payments': [for (final p in payments) p.toJson()],
         'isSynced': isSynced,
+        'verificationToken': effectiveVerificationToken,
       };
 
   factory CustomerInvoice.fromJson(Map<String, dynamic> json) {
@@ -366,6 +380,7 @@ class CustomerInvoice {
       paymentReference: paymentReference,
       paidAtUtc: paidAtUtc,
       isSynced: (json['isSynced'] as bool?) ?? true,
+      verificationToken: _optionalString(json, 'verificationToken'),
       lines: rawLines is List
           ? rawLines
               .whereType<Map<dynamic, dynamic>>()
@@ -394,6 +409,7 @@ class CustomerInvoiceSummary {
     this.referenceNumber,
     this.currency = 'TZS',
     this.isSynced = true,
+    this.verificationToken,
   });
 
   final String id;
@@ -410,6 +426,15 @@ class CustomerInvoiceSummary {
   final double amountPaid;
   final double balanceDue;
   final bool isSynced;
+  final String? verificationToken;
+
+  String get effectiveVerificationToken {
+    if (verificationToken != null && verificationToken!.trim().isNotEmpty) {
+      return verificationToken!.trim();
+    }
+    final cleanId = id.replaceAll('-', '');
+    return cleanId.length >= 16 ? cleanId.substring(0, 16) : cleanId;
+  }
 
   String get customerLabel =>
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
@@ -438,6 +463,7 @@ class CustomerInvoiceSummary {
       amountPaid: _requiredDouble(json, 'amountPaid'),
       balanceDue: _requiredDouble(json, 'balanceDue'),
       isSynced: (json['isSynced'] as bool?) ?? true,
+      verificationToken: _optionalString(json, 'verificationToken'),
     );
   }
 
@@ -456,6 +482,7 @@ class CustomerInvoiceSummary {
         'amountPaid': amountPaid,
         'balanceDue': balanceDue,
         'isSynced': isSynced,
+        'verificationToken': effectiveVerificationToken,
       };
 }
 

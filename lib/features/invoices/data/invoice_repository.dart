@@ -239,6 +239,7 @@ class InvoiceRepository {
       lines: mergedLines,
       payments: remote.payments.isNotEmpty ? remote.payments : local.payments,
       isSynced: true,
+      verificationToken: remote.effectiveVerificationToken,
     );
   }
 
@@ -470,6 +471,7 @@ class InvoiceRepository {
       if (authorizedSignatoryTitle != null &&
           authorizedSignatoryTitle.trim().isNotEmpty)
         'authorizedSignatoryTitle': authorizedSignatoryTitle.trim(),
+      'verificationToken': localInvoice.effectiveVerificationToken,
     };
 
     // 4. Enqueue into persistent SyncQueue

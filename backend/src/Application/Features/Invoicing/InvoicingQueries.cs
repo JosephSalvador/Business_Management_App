@@ -76,3 +76,108 @@ public sealed class GetCustomerInvoiceQueryHandler
         return Result.Success(CustomerInvoiceMappers.ToDto(invoice));
     }
 }
+
+// ── Get Public Invoice Verification ──────────────────────────────────
+public sealed record GetPublicInvoiceVerificationQuery(string Token)
+    : IRequest<Result<PublicInvoiceVerificationDto>>;
+
+public sealed class GetPublicInvoiceVerificationQueryHandler
+    : IRequestHandler<GetPublicInvoiceVerificationQuery, Result<PublicInvoiceVerificationDto>>
+{
+    private readonly ICustomerInvoiceRepository _invoices;
+    private readonly ITenantRepository _tenants;
+
+    public GetPublicInvoiceVerificationQueryHandler(
+        ICustomerInvoiceRepository invoices,
+        ITenantRepository tenants)
+    {
+        _invoices = invoices;
+        _tenants = tenants;
+    }
+
+    public async Task<Result<PublicInvoiceVerificationDto>> Handle(
+        GetPublicInvoiceVerificationQuery query, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(query.Token))
+        {
+            return Error.Validation("Verification token is required.");
+        }
+
+        var invoice = await _invoices.GetByVerificationTokenAsync(query.Token.Trim(), cancellationToken);
+        if (invoice is null)
+        {
+            return Error.NotFound("Invoice not found or invalid verification token.");
+        }
+
+        var tenant = await _tenants.GetByIdAsync(invoice.TenantId, cancellationToken);
+        var orgDto = new PublicInvoiceVerificationTenantDto(
+            tenant?.Name ?? "Verified Merchant",
+            tenant?.TaxId,
+            tenant?.ContactEmail,
+            tenant?.ContactPhone,
+            tenant?.Address,
+            tenant?.LogoBase64,
+            tenant?.BankName,
+            tenant?.BankAccountName,
+            tenant?.BankAccountNumber,
+            tenant?.BankBranchOrSwift,
+            tenant?.MobileMoneyDetails,
+            tenant?.PaymentAccountsJson,
+            tenant?.InvoiceTerms);
+
+        var lines = invoice.Lines
+            .OrderBy(l => l.OrderIndex)
+            .Select(l => new PublicInvoiceVerificationLineDto(
+                l.Id,
+                l.Description,
+                l.Quantity,
+                l.UnitPrice,
+                l.TaxRatePercent,
+                l.LineTotal,
+                l.TaxAmount,
+                l.UnitOfMeasure,
+                l.DiscountAmount))
+            .ToList();
+
+        var payments = invoice.GetPayments()
+            .Select(p => new CustomerInvoicePaymentDto(
+                p.Id, p.Amount, p.Method, p.Reference, p.PaidAtUtc))
+            .ToList();
+
+        var dto = new PublicInvoiceVerificationDto(
+            invoice.Id,
+            invoice.Number,
+            invoice.VerificationToken,
+            invoice.DocumentTitle,
+            invoice.ReferenceNumber,
+            invoice.PaymentTerms,
+            invoice.CustomerName,
+            invoice.CustomerAttention,
+            invoice.CustomerPhone,
+            invoice.CustomerEmail,
+            invoice.CustomerAddress,
+            invoice.CustomerTin,
+            invoice.Currency,
+            invoice.IssueDate,
+            invoice.DueDate,
+            invoice.Status,
+            invoice.Subtotal,
+            invoice.DiscountAmount,
+            invoice.TaxAmount,
+            invoice.TotalAmount,
+            invoice.AmountPaid,
+            invoice.BalanceDue,
+            invoice.PaymentInstructions,
+            invoice.Notes,
+            invoice.AuthorizedSignatoryName,
+            invoice.AuthorizedSignatoryTitle,
+            invoice.PaidAtUtc,
+            lines,
+            payments,
+            orgDto,
+            DateTime.UtcNow,
+            IsAuthentic: true);
+
+        return Result.Success(dto);
+    }
+}

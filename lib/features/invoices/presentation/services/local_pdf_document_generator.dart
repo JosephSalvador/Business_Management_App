@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../../core/config/app_config.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../domain/delivery_note.dart';
 import '../../domain/document_template.dart';
@@ -184,17 +185,14 @@ class LocalPdfDocumentGenerator {
                     ? 'Sahihi Iliyoidhinishwa'
                     : 'Authorized Signatory'));
 
-    final qrData = [
-      invoice.documentTitle,
-      'No: ${invoice.number}',
-      'Org: $orgName',
-      if (organization?.taxId != null && organization!.taxId!.trim().isNotEmpty)
-        'TIN: ${organization.taxId!.trim()}',
-      'Client: ${invoice.customerLabel}',
-      'Total: ${fmtMoney(invoice.totalAmount)}',
-      'Balance: ${fmtMoney(invoice.balanceDue)}',
-      'Date: ${dateFmt.format(invoice.issueDate.toLocal())}',
-    ].join(' | ');
+    final verificationBaseUrl = () {
+      try {
+        return AppConfig.instance.publicVerificationBaseUrl;
+      } catch (_) {
+        return 'https://api.jolinx.org/v';
+      }
+    }();
+    final qrData = '$verificationBaseUrl/${invoice.effectiveVerificationToken}';
 
     final words = orgName
         .split(RegExp(r'\s+'))
@@ -1832,18 +1830,31 @@ class LocalPdfDocumentGenerator {
       pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          pw.Container(
-            width: 58,
-            height: 58,
-            padding: const pw.EdgeInsets.all(3),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _slate200, width: 0.6),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-            ),
-            child: pw.BarcodeWidget(
-              barcode: pw.Barcode.qrCode(),
-              data: qrData,
-            ),
+          pw.Column(
+            mainAxisSize: pw.MainAxisSize.min,
+            children: [
+              pw.Container(
+                width: 58,
+                height: 58,
+                padding: const pw.EdgeInsets.all(3),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: _slate200, width: 0.6),
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                ),
+                child: pw.BarcodeWidget(
+                  barcode: pw.Barcode.qrCode(),
+                  data: qrData,
+                ),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                isSwahili ? 'Skani kuhakiki' : 'Scan to verify',
+                style: const pw.TextStyle(
+                  color: _slate500,
+                  fontSize: 6.5,
+                ),
+              ),
+            ],
           ),
           pw.SizedBox(width: 14),
           pw.Expanded(
@@ -1926,8 +1937,14 @@ class LocalPdfDocumentGenerator {
     final paymentInstructions =
         _resolvePaymentInstructions(invoice, organization, isSwahili);
 
-    final qrData =
-        '${invoice.number}|${invoice.customerLabel}|${fmtMoney(invoice.totalAmount)}';
+    final verificationBaseUrl = () {
+      try {
+        return AppConfig.instance.publicVerificationBaseUrl;
+      } catch (_) {
+        return 'https://api.jolinx.org/v';
+      }
+    }();
+    final qrData = '$verificationBaseUrl/${invoice.effectiveVerificationToken}';
 
     document.addPage(
       pw.Page(
@@ -2121,6 +2138,11 @@ class LocalPdfDocumentGenerator {
                 barcode: pw.Barcode.qrCode(),
                 data: qrData,
               ),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              isSwahili ? 'Skani kuhakiki ankara' : 'Scan to verify invoice',
+              style: const pw.TextStyle(fontSize: 6.5, color: _slate500),
             ),
             pw.SizedBox(height: 4),
             pw.Text(

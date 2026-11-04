@@ -84,7 +84,8 @@ public static class InvoiceEndpoints
                 request.AuthorizedSignatoryName,
                 request.AuthorizedSignatoryTitle,
                 request.Id,
-                request.InitialPayments),
+                request.InitialPayments,
+                request.VerificationToken),
             cancellationToken)).ToApiResult();
 
     private static async Task<IResult> RecordPaymentAsync(
@@ -123,7 +124,8 @@ public static class InvoiceEndpoints
         string? AuthorizedSignatoryName = null,
         string? AuthorizedSignatoryTitle = null,
         Guid? Id = null,
-        IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null);
+        IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null,
+        string? VerificationToken = null);
 
     private sealed record RecordPaymentRequest(
         decimal Amount,

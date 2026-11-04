@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../application/document_template_controller.dart';
 import '../../domain/document_template.dart';
@@ -99,14 +100,14 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                     ? 'Sahihi Iliyoidhinishwa'
                     : 'Authorized Signatory');
 
-    final qrData = [
-      invoice.documentTitle,
-      'No: ${invoice.invoiceNumber}',
-      'Seller: ${organization.name ?? ""}',
-      'Client: ${invoice.customerLabel}',
-      'Total: ${fmtMoney(invoice.totalAmount)}',
-      'Balance: ${fmtMoney(invoice.balanceDue)}',
-    ].join(' | ');
+    final verificationBaseUrl = () {
+      try {
+        return AppConfig.instance.publicVerificationBaseUrl;
+      } catch (_) {
+        return 'https://api.jolinx.org/v';
+      }
+    }();
+    final qrData = '$verificationBaseUrl/${invoice.effectiveVerificationToken}';
 
     switch (style) {
       case InvoiceLayoutStyle.modernRibbon:
@@ -2141,18 +2142,33 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _slate200),
-          ),
-          child: QrImageView(
-            data: qrData,
-            size: 60,
-            padding: EdgeInsets.zero,
-          ),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _slate200),
+              ),
+              child: QrImageView(
+                data: qrData,
+                size: 60,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              isSwahili ? 'Skani kuhakiki' : 'Scan to verify',
+              style: const TextStyle(
+                fontSize: 7.5,
+                fontWeight: FontWeight.w600,
+                color: _slate500,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
         const SizedBox(width: 14),
         Expanded(

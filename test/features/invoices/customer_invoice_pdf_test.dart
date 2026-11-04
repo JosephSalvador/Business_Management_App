@@ -80,6 +80,22 @@ void main() {
       expect(restored.authorizedSignatoryName, 'Jobert Salvador');
       expect(restored.authorizedSignatoryTitle, 'Managing Director');
       expect(restored.lines.single.unitOfMeasure, 'Pcs');
+      expect(restored.effectiveVerificationToken, 'inv100');
+    });
+
+    test('computes deterministic verification token for offline resilience', () {
+      final invoice = CustomerInvoice(
+        id: 'c8f49896-e260-4c7b-bf55-08149ba58ea0',
+        invoiceNumber: 'INV-001',
+        issueDate: DateTime.now(),
+        status: InvoiceStatus.unpaid,
+        subtotal: 1000,
+        totalAmount: 1000,
+      );
+      expect(invoice.effectiveVerificationToken, 'c8f49896e2604c7b');
+
+      final withCustom = invoice.copyWith(verificationToken: 'custom-token-99');
+      expect(withCustom.effectiveVerificationToken, 'custom-token-99');
     });
 
     test('generates a valid A4 PDF byte stream with seller branding and items',

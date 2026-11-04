@@ -33,7 +33,8 @@ public sealed class CustomerInvoice : AggregateRoot
         string? paymentInstructions,
         string? notes,
         string? authorizedSignatoryName,
-        string? authorizedSignatoryTitle)
+        string? authorizedSignatoryTitle,
+        string? verificationToken = null)
         : base(id)
     {
         TenantId = tenantId;
@@ -56,6 +57,9 @@ public sealed class CustomerInvoice : AggregateRoot
         Notes = notes;
         AuthorizedSignatoryName = authorizedSignatoryName;
         AuthorizedSignatoryTitle = authorizedSignatoryTitle;
+        VerificationToken = string.IsNullOrWhiteSpace(verificationToken)
+            ? id.ToString("N")[..16]
+            : verificationToken.Trim().ToLowerInvariant();
         Status = CustomerInvoiceStatus.Unpaid;
         CreatedAt = DateTime.UtcNow;
     }
@@ -80,6 +84,7 @@ public sealed class CustomerInvoice : AggregateRoot
     public string? AuthorizedSignatoryName { get; private set; }
     public string? AuthorizedSignatoryTitle { get; private set; }
     public CustomerInvoiceStatus Status { get; private set; }
+    public string VerificationToken { get; private set; }
     public decimal Subtotal { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal TaxAmount { get; private set; }
@@ -118,7 +123,8 @@ public sealed class CustomerInvoice : AggregateRoot
         string? paymentInstructions = null,
         string? authorizedSignatoryName = null,
         string? authorizedSignatoryTitle = null,
-        Guid? id = null)
+        Guid? id = null,
+        string? verificationToken = null)
     {
         if (string.IsNullOrWhiteSpace(number))
         {
@@ -169,7 +175,8 @@ public sealed class CustomerInvoice : AggregateRoot
             string.IsNullOrWhiteSpace(paymentInstructions) ? null : paymentInstructions.Trim(),
             string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             string.IsNullOrWhiteSpace(authorizedSignatoryName) ? null : authorizedSignatoryName.Trim(),
-            string.IsNullOrWhiteSpace(authorizedSignatoryTitle) ? null : authorizedSignatoryTitle.Trim());
+            string.IsNullOrWhiteSpace(authorizedSignatoryTitle) ? null : authorizedSignatoryTitle.Trim(),
+            verificationToken);
 
         for (var index = 0; index < specs.Count; index++)
         {

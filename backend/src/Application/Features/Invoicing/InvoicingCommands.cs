@@ -49,7 +49,8 @@ public static class CustomerInvoiceMappers
         invoice.GetPayments()
             .Select(p => new CustomerInvoicePaymentDto(
                 p.Id, p.Amount, p.Method, p.Reference, p.PaidAtUtc))
-            .ToList());
+            .ToList(),
+        invoice.VerificationToken);
 
     public static CustomerInvoiceSummaryDto ToSummary(CustomerInvoice invoice) => new(
         invoice.Id,
@@ -65,7 +66,8 @@ public static class CustomerInvoiceMappers
         invoice.CreatedAt,
         invoice.DocumentTitle,
         invoice.ReferenceNumber,
-        invoice.Currency);
+        invoice.Currency,
+        invoice.VerificationToken);
 }
 
 // ── Create Customer Invoice ─────────────────────────────────────────
@@ -108,7 +110,8 @@ public sealed record CreateCustomerInvoiceCommand(
     string? AuthorizedSignatoryName = null,
     string? AuthorizedSignatoryTitle = null,
     Guid? Id = null,
-    IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null)
+    IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null,
+    string? VerificationToken = null)
     : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed record CreateInvoiceCommand(
@@ -135,7 +138,8 @@ public sealed record CreateInvoiceCommand(
     string? AuthorizedSignatoryName = null,
     string? AuthorizedSignatoryTitle = null,
     Guid? Id = null,
-    IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null)
+    IReadOnlyList<CustomerInvoicePaymentRequest>? InitialPayments = null,
+    string? VerificationToken = null)
     : IRequest<Result<CustomerInvoiceDto>>, IRequiresTenantAdvisoryLock;
 
 public sealed class CreateInvoiceCommandHandler
@@ -171,7 +175,8 @@ public sealed class CreateInvoiceCommandHandler
             request.AuthorizedSignatoryName,
             request.AuthorizedSignatoryTitle,
             request.Id,
-            request.InitialPayments), cancellationToken);
+            request.InitialPayments,
+            request.VerificationToken), cancellationToken);
 }
 
 public sealed class CreateCustomerInvoiceCommandHandler
@@ -281,7 +286,8 @@ public sealed class CreateCustomerInvoiceCommandHandler
                 command.PaymentInstructions,
                 command.AuthorizedSignatoryName,
                 command.AuthorizedSignatoryTitle,
-                command.Id);
+                command.Id,
+                command.VerificationToken);
 
             if (command.InitialPayments is { Count: > 0 } initialPayments)
             {

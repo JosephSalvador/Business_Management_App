@@ -36,6 +36,12 @@ class AppConfig {
   /// when the primary host is unreachable or returns 502/503/504.
   final Uri? apiFallbackUrl;
 
+  /// Public verification base URL for invoice QR codes (e.g. `https://api.jolinx.org/v`).
+  String get publicVerificationBaseUrl => '${apiBaseUrl.origin}/v';
+
+  /// Helper to build public verification URL for a given token.
+  String buildVerificationUrl(String token) => '$publicVerificationBaseUrl/$token';
+
   /// IANA timezone name from the device (e.g. `EAT`).
   String get timezone => DateTime.now().timeZoneName;
 

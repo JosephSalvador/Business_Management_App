@@ -53,7 +53,8 @@ public sealed record CustomerInvoiceDto(
     string? PaymentInstructions = null,
     string? AuthorizedSignatoryName = null,
     string? AuthorizedSignatoryTitle = null,
-    IReadOnlyList<CustomerInvoicePaymentDto>? Payments = null);
+    IReadOnlyList<CustomerInvoicePaymentDto>? Payments = null,
+    string? VerificationToken = null);
 
 public sealed record CustomerInvoiceSummaryDto(
     Guid Id,
@@ -69,5 +70,66 @@ public sealed record CustomerInvoiceSummaryDto(
     DateTime CreatedAt,
     string DocumentTitle = "INVOICE",
     string? ReferenceNumber = null,
-    string Currency = "TZS");
+    string Currency = "TZS",
+    string? VerificationToken = null);
+
+public sealed record PublicInvoiceVerificationLineDto(
+    Guid Id,
+    string Description,
+    decimal Quantity,
+    decimal UnitPrice,
+    decimal TaxRatePercent,
+    decimal LineTotal,
+    decimal TaxAmount,
+    string UnitOfMeasure,
+    decimal DiscountAmount);
+
+public sealed record PublicInvoiceVerificationTenantDto(
+    string Name,
+    string? TaxId,
+    string? ContactEmail,
+    string? ContactPhone,
+    string? Address,
+    string? LogoBase64,
+    string? BankName,
+    string? BankAccountName,
+    string? BankAccountNumber,
+    string? BankBranchOrSwift,
+    string? MobileMoneyDetails,
+    string? PaymentAccountsJson,
+    string? InvoiceTerms);
+
+public sealed record PublicInvoiceVerificationDto(
+    Guid Id,
+    string Number,
+    string VerificationToken,
+    string DocumentTitle,
+    string? ReferenceNumber,
+    string? PaymentTerms,
+    string? CustomerName,
+    string? CustomerAttention,
+    string? CustomerPhone,
+    string? CustomerEmail,
+    string? CustomerAddress,
+    string? CustomerTin,
+    string Currency,
+    DateTime IssueDate,
+    DateTime? DueDate,
+    CustomerInvoiceStatus Status,
+    decimal Subtotal,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal TotalAmount,
+    decimal AmountPaid,
+    decimal BalanceDue,
+    string? PaymentInstructions,
+    string? Notes,
+    string? AuthorizedSignatoryName,
+    string? AuthorizedSignatoryTitle,
+    DateTime? PaidAtUtc,
+    IReadOnlyList<PublicInvoiceVerificationLineDto> Lines,
+    IReadOnlyList<CustomerInvoicePaymentDto> Payments,
+    PublicInvoiceVerificationTenantDto Organization,
+    DateTime VerifiedAtUtc,
+    bool IsAuthentic = true);
 
