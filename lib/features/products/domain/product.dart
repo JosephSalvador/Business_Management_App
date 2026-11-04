@@ -25,6 +25,7 @@ class Product {
     required this.status,
     this.taxCategoryId,
     this.costPrice,
+    this.aisleBin,
   });
 
   final String id;
@@ -39,6 +40,7 @@ class Product {
   final int status;
   final String? taxCategoryId;
   final double? costPrice;
+  final String? aisleBin;
 
   bool get isActive => status == ProductStatus.active;
 
@@ -55,6 +57,7 @@ class Product {
         status: (json['status'] as num).toInt(),
         taxCategoryId: json['taxCategoryId'] as String?,
         costPrice: (json['costPrice'] as num?)?.toDouble(),
+        aisleBin: json['aisleBin'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -70,6 +73,7 @@ class Product {
         'status': status,
         'taxCategoryId': taxCategoryId,
         'costPrice': costPrice,
+        'aisleBin': aisleBin,
       };
 
   Map<String, dynamic> toCreateBody() => {
@@ -84,6 +88,7 @@ class Product {
         'status': ProductStatus.active,
         if (taxCategoryId != null) 'taxCategoryId': taxCategoryId,
         if (costPrice != null) 'costPrice': costPrice,
+        if (hasText(aisleBin)) 'aisleBin': aisleBin!.trim(),
       };
 
   /// The update endpoint has no productType field — it is immutable once a

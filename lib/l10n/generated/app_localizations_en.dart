@@ -3059,4 +3059,101 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get posEnterPriceSubmit => 'Add to Cart';
+
+  @override
+  String get barcodeScannerTitle => 'Barcode Scanner';
+
+  @override
+  String get barcodeScannerPrompt => 'Point camera at barcode or QR code';
+
+  @override
+  String get barcodeScanContinuous => 'Continuous Mode';
+
+  @override
+  String get barcodeScanSingle => 'Single Scan';
+
+  @override
+  String get barcodeTorchOn => 'Torch On';
+
+  @override
+  String get barcodeTorchOff => 'Torch Off';
+
+  @override
+  String get barcodeGenerate => 'Generate Barcode';
+
+  @override
+  String get barcodeGenerateCode128 => 'Code 128 (Alphanumeric)';
+
+  @override
+  String get barcodeGenerateEan13 => 'EAN-13 (Standard Retail)';
+
+  @override
+  String get barcodeSymbology => 'Symbology';
+
+  @override
+  String get barcodeCustomPrefix => 'Prefix';
+
+  @override
+  String get barcodeSettingsTitle => 'Barcode & Labels';
+
+  @override
+  String get barcodeSettingsSubtitle =>
+      'Configure barcode symbologies, styles & sticker sizes';
+
+  @override
+  String get barcodePrintLabel => 'Print Label';
+
+  @override
+  String get barcodePrintLabels => 'Print Labels';
+
+  @override
+  String get barcodeLabelSize => 'Label Size';
+
+  @override
+  String get barcodeLabelWidth => 'Width (mm)';
+
+  @override
+  String get barcodeLabelHeight => 'Height (mm)';
+
+  @override
+  String get barcodeLabelQuantity => 'Number of Copies';
+
+  @override
+  String get barcodeLabelPrintBluetooth => 'Print via Bluetooth';
+
+  @override
+  String get barcodeLabelPrintPdf => 'Print / Share PDF';
+
+  @override
+  String get barcodeLabelCustomSize => 'Custom Size (mm)';
+
+  @override
+  String get barcodeDigitalStockroomTitle => 'Stock Locator';
+
+  @override
+  String get barcodeAisleBin => 'Aisle / Shelf / Bin';
+
+  @override
+  String get barcodeAisleBinHint => 'e.g. Aisle 3, Bin B-12';
+
+  @override
+  String get barcodeLocation => 'Location';
+
+  @override
+  String get barcodeMultiBranchStock => 'Stock in All Branches';
+
+  @override
+  String get barcodeFastMover => 'Fast Mover';
+
+  @override
+  String get barcodeLowStockWarning => 'Low Stock Alert';
+
+  @override
+  String get barcodeScanProduct => 'Scan Barcode';
+
+  @override
+  String barcodeNotFound(String code) => 'Product not found for barcode: $code';
+
+  @override
+  String barcodeItemAdded(String name) => '$name added to cart';
 }

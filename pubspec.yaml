@@ -2,7 +2,7 @@ name: jolinx_app
 description: JOLINX Business OS — offline-first business management for East African shops.
 
 publish_to: 'none'
-version: 1.0.0+84
+version: 1.0.0+85
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -51,6 +51,8 @@ dependencies:
   printing: ^5.13.2
   qr: ^3.0.2
   qr_flutter: ^4.1.0
+  barcode_widget: ^2.0.4
+  mobile_scanner: ^6.0.4
 
 dev_dependencies:
   flutter_test:

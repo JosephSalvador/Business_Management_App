@@ -208,6 +208,16 @@ class SettingsPage extends ConsumerWidget {
               onTap: () => context.push(Routes.receiptSettings),
             ),
             _SettingsTile(
+              icon: Icons.qr_code_scanner_outlined,
+              title: Localizations.localeOf(context).languageCode == 'sw'
+                  ? 'Barcode na Lebo'
+                  : 'Barcode & Labels',
+              subtitle: Localizations.localeOf(context).languageCode == 'sw'
+                  ? 'Aina ya barcode (Code 128 / EAN-13), saizi za lebo na tochi'
+                  : 'Symbologies (Code 128 / EAN-13), sticker sizes & styles',
+              onTap: () => context.push(Routes.barcodeSettings),
+            ),
+            _SettingsTile(
               icon: Icons.access_time_outlined,
               title: loc.settingsTimezone,
               subtitle: AppConfig.instance.timezone,

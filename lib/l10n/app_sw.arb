@@ -1168,5 +1168,51 @@
       }
     }
   },
-  "posEnterPriceSubmit": "Weka Kwenye Kikapu"
+  "posEnterPriceSubmit": "Weka Kwenye Kikapu",
+  "barcodeScannerTitle": "Skana Barcode",
+  "barcodeScannerPrompt": "Elekeza kamera kwenye barcode au QR kodi",
+  "barcodeScanContinuous": "Hali ya Kuendelea",
+  "barcodeScanSingle": "Scan Moja",
+  "barcodeTorchOn": "Washa Tochi",
+  "barcodeTorchOff": "Zima Tochi",
+  "barcodeGenerate": "Tengeneza Barcode",
+  "barcodeGenerateCode128": "Code 128 (Herufi na Namba)",
+  "barcodeGenerateEan13": "EAN-13 (Kawaida ya Mauzo)",
+  "barcodeSymbology": "Aina ya Barcode",
+  "barcodeCustomPrefix": "Kiambishi cha Mwanzo",
+  "barcodeSettingsTitle": "Barcode na Lebo",
+  "barcodeSettingsSubtitle": "Weka mtindo wa barcode na vipimo vya lebo",
+  "barcodePrintLabel": "Chapa Lebo",
+  "barcodePrintLabels": "Chapa Lebo",
+  "barcodeLabelSize": "Ukubwa wa Lebo",
+  "barcodeLabelWidth": "Upana (mm)",
+  "barcodeLabelHeight": "Kimo (mm)",
+  "barcodeLabelQuantity": "Idadi ya Nakala",
+  "barcodeLabelPrintBluetooth": "Chapa kupitia Bluetooth",
+  "barcodeLabelPrintPdf": "Chapa / Tuma PDF",
+  "barcodeLabelCustomSize": "Ukubwa Maalum (mm)",
+  "barcodeDigitalStockroomTitle": "Tafuta Mahali pa Stock",
+  "barcodeAisleBin": "Uchochoro / Rafu / Boksi",
+  "barcodeAisleBinHint": "mf. Rafu 3, Boksi B-12",
+  "barcodeLocation": "Mahali",
+  "barcodeMultiBranchStock": "Stock Katika Matawi Yote",
+  "barcodeFastMover": "Inayotoka Haraka",
+  "barcodeLowStockWarning": "Tahadhari ya Stock Ndogo",
+  "barcodeScanProduct": "Skana Barcode",
+  "barcodeNotFound": "Bidhaa haikupatikana kwa barcode: {code}",
+  "@barcodeNotFound": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "barcodeItemAdded": "{name} imeongezwa kwenye kikapu",
+  "@barcodeItemAdded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

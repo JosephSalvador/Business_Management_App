@@ -289,3 +289,16 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: In `error_mapper.dart`, preserve backend error message on 404 (`NotFoundException(message ?? 'Taarifa hazipatikani.')`).
 - [x] Task 5: Bump client version code to `1.0.0+84` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 6: Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml` (Run 41810430474).
+
+## Implementation Plan — Enterprise Barcode System, Custom Symbologies, Universal Label Sizing & Staging Build (Build 85)
+- [x] Task 1: Dependencies & Permissions — Add `barcode_widget: ^2.0.4`, `mobile_scanner: ^6.0.4`, and `android.permission.CAMERA` in `AndroidManifest.xml`.
+- [x] Task 2: Domain & Persistence Layer — Create `BarcodeSettingsStore` with custom prefix, symbology choice (Code 128, EAN-13, Both), display toggles, custom sticker dimensions (arbitrary mm width/height), and continuous roll support.
+- [x] Task 3: Barcode & Label Engine — Create `BarcodeGeneratorService` (Code 128, GS1 modulo-10 check digits for EAN-13 & UPC-A, format detection) and `BarcodeLabelPrinterService` (dynamic vector rendering for any label size in mm and A4 multi-label sheets).
+- [x] Task 4: Zero-Focus Hardware & Mobile Scanner Services — Create `HardwareScannerListener` (capturing keystroke wedge barcode scanners <65ms interval with Enter/Tab terminators) and `MobileBarcodeScannerModal` (reticle overlay, torch toggle, multi-format camera scanning).
+- [x] Task 5: Digital Stockrooms & Spatial Mapping — Add `aisleBin` to `Product` model, `CachedCatalogDao` barcode lookups, and `DigitalStockroomSheet` displaying multi-branch stock levels and exact bin coordinates.
+- [x] Task 6: POS & Workflow Integration — Wire hardware scanner & camera scan to `pos_page.dart` (instant add-to-cart respecting advisory stock), `product_form_page.dart` (scan, generate, preview & print), `stock_page.dart` (quick locate modal), and `purchase_form_page.dart` (receiving scan).
+- [x] Task 7: Settings & Localization — Create `BarcodeLabelSettingsPage` with live sample preview and full English/Swahili translations across 32 strings.
+- [x] Task 8: Unit Testing & Verification — Create unit test suites `test/core/barcode/barcode_generator_test.dart` and `test/features/inventory/barcode_label_printer_service_test.dart`.
+- [x] Task 9: Version Bump — Bump client version code to `1.0.0+85` in `pubspec.yaml` and `app_update_service.dart`.
+- [ ] Task 10: Remote Staging Build & Artifact Verification — Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml` with `deploy_target: staging`.
+

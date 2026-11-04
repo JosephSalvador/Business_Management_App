@@ -1168,5 +1168,51 @@
       }
     }
   },
-  "posEnterPriceSubmit": "Add to Cart"
+  "posEnterPriceSubmit": "Add to Cart",
+  "barcodeScannerTitle": "Barcode Scanner",
+  "barcodeScannerPrompt": "Point camera at barcode or QR code",
+  "barcodeScanContinuous": "Continuous Mode",
+  "barcodeScanSingle": "Single Scan",
+  "barcodeTorchOn": "Torch On",
+  "barcodeTorchOff": "Torch Off",
+  "barcodeGenerate": "Generate Barcode",
+  "barcodeGenerateCode128": "Code 128 (Alphanumeric)",
+  "barcodeGenerateEan13": "EAN-13 (Standard Retail)",
+  "barcodeSymbology": "Symbology",
+  "barcodeCustomPrefix": "Prefix",
+  "barcodeSettingsTitle": "Barcode & Labels",
+  "barcodeSettingsSubtitle": "Configure barcode symbologies, styles & sticker sizes",
+  "barcodePrintLabel": "Print Label",
+  "barcodePrintLabels": "Print Labels",
+  "barcodeLabelSize": "Label Size",
+  "barcodeLabelWidth": "Width (mm)",
+  "barcodeLabelHeight": "Height (mm)",
+  "barcodeLabelQuantity": "Number of Copies",
+  "barcodeLabelPrintBluetooth": "Print via Bluetooth",
+  "barcodeLabelPrintPdf": "Print / Share PDF",
+  "barcodeLabelCustomSize": "Custom Size (mm)",
+  "barcodeDigitalStockroomTitle": "Stock Locator",
+  "barcodeAisleBin": "Aisle / Shelf / Bin",
+  "barcodeAisleBinHint": "e.g. Aisle 3, Bin B-12",
+  "barcodeLocation": "Location",
+  "barcodeMultiBranchStock": "Stock in All Branches",
+  "barcodeFastMover": "Fast Mover",
+  "barcodeLowStockWarning": "Low Stock Alert",
+  "barcodeScanProduct": "Scan Barcode",
+  "barcodeNotFound": "Product not found for barcode: {code}",
+  "@barcodeNotFound": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "barcodeItemAdded": "{name} added to cart",
+  "@barcodeItemAdded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

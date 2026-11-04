@@ -140,6 +140,24 @@ class CachedCatalogDao {
         .getSingleOrNull();
   }
 
+  /// Looks a product row up by its barcode offline.
+  Future<CachedProduct?> byBarcode(String tenantId, String barcode) {
+    final clean = barcode.trim();
+    return (_db.select(_db.cachedProducts)
+          ..where((t) => t.tenantId.equals(tenantId) & t.barcode.equals(clean)))
+        .getSingleOrNull();
+  }
+
+  /// Looks up a product by matching either barcode, SKU, or product ID.
+  Future<CachedProduct?> byBarcodeOrSku(String tenantId, String code) async {
+    final clean = code.trim();
+    final byBar = await byBarcode(tenantId, clean);
+    if (byBar != null) return byBar;
+    final byS = await bySku(tenantId, clean);
+    if (byS != null) return byS;
+    return byId(tenantId, clean);
+  }
+
   /// Last-known server balance minus quantities held by still-pending offline
   /// sales. This projection is what the POS sells against (M5.5); the cache
   /// itself is never modified by sales.

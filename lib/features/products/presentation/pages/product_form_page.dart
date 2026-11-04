@@ -9,6 +9,11 @@ import '../../../../l10n/loc.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../onboarding/application/workspace_controller.dart';
 import '../../../../core/network/app_exception.dart';
+import '../../../../core/barcode/barcode_display_card.dart';
+import '../../../../core/barcode/barcode_generator_service.dart';
+import '../../../../core/barcode/mobile_barcode_scanner_modal.dart';
+import '../../../../core/storage/barcode_settings_store.dart';
+import '../../../inventory/presentation/widgets/print_barcode_label_dialog.dart';
 import '../../application/catalog_controller.dart';
 import '../../data/product_repository.dart';
 import '../../domain/product.dart';
@@ -36,6 +41,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _wholesalePrice = TextEditingController();
   final _sku = TextEditingController();
   final _barcode = TextEditingController();
+  final _aisleBin = TextEditingController();
   final _description = TextEditingController();
   String? _unitId;
   String? _categoryId;
@@ -65,6 +71,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _wholesalePrice.dispose();
     _sku.dispose();
     _barcode.dispose();
+    _aisleBin.dispose();
     _description.dispose();
     super.dispose();
   }
@@ -359,11 +366,58 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             hintText: context.loc.productFormOptional,
           ),
         )),
+        _field(Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _barcode,
+              decoration: InputDecoration(
+                labelText: context.loc.productFormBarcode,
+                hintText: context.loc.productFormOptional,
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.qr_code_scanner, size: 20),
+                      tooltip: context.loc.barcodeScanProduct,
+                      onPressed: _scanBarcodeWithCamera,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.auto_awesome, size: 20),
+                      tooltip: context.loc.barcodeGenerate,
+                      onPressed: _autoGenerateBarcode,
+                    ),
+                  ],
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            if (_barcode.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              BarcodeDisplayCard(
+                barcode: _barcode.text.trim(),
+                productName: _name.text.isEmpty ? null : _name.text.trim(),
+                sku: _sku.text.isEmpty ? null : _sku.text.trim(),
+                height: 48,
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.print_outlined, size: 16),
+                  label: Text(context.loc.barcodePrintLabel),
+                  onPressed: _printLabelForProduct,
+                ),
+              ),
+            ],
+          ],
+        )),
         _field(TextFormField(
-          controller: _barcode,
+          controller: _aisleBin,
           decoration: InputDecoration(
-            labelText: context.loc.productFormBarcode,
-            hintText: context.loc.productFormOptional,
+            labelText: context.loc.barcodeAisleBin,
+            hintText: context.loc.barcodeAisleBinHint,
+            prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
           ),
         )),
         _field(TextFormField(
@@ -409,6 +463,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         _name.text = product.name;
         _sku.text = product.sku ?? '';
         _barcode.text = product.barcode ?? '';
+        _aisleBin.text = product.aisleBin ?? '';
         _description.text = product.description ?? '';
         _unitId = ready.units.any((u) => u.id == product.unitOfMeasureId)
             ? product.unitOfMeasureId
@@ -447,6 +502,30 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     }
   }
 
+  Future<void> _scanBarcodeWithCamera() async {
+    final code = await showMobileBarcodeScanner(context);
+    if (code != null && code.isNotEmpty && mounted) {
+      setState(() => _barcode.text = code);
+    }
+  }
+
+  void _autoGenerateBarcode() {
+    final settings = ref.read(barcodeSettingsProvider);
+    final generated = BarcodeGeneratorService.generateFromSettings(settings);
+    setState(() => _barcode.text = generated);
+  }
+
+  void _printLabelForProduct() {
+    final price = double.tryParse(_price.text.replaceAll(',', ''));
+    showPrintBarcodeLabelDialog(
+      context,
+      productName: _name.text.isEmpty ? 'Bidhaa' : _name.text.trim(),
+      barcode: _barcode.text.trim(),
+      price: price,
+      sku: _sku.text.trim().isEmpty ? null : _sku.text.trim(),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -468,6 +547,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       brandId: _brandId,
       taxCategoryId: _taxCategoryId,
       costPrice: double.tryParse(_costPrice.text.trim().replaceAll(',', '.')),
+      aisleBin:
+          Product.hasText(_aisleBin.text) ? _aisleBin.text.trim() : null,
     );
     final rawSellingPrice =
         double.tryParse(_price.text.trim().replaceAll(',', '.'));

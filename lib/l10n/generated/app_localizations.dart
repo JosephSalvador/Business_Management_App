@@ -5911,6 +5911,39 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add to Cart'**
   String get posEnterPriceSubmit;
+
+  String get barcodeScannerTitle;
+  String get barcodeScannerPrompt;
+  String get barcodeScanContinuous;
+  String get barcodeScanSingle;
+  String get barcodeTorchOn;
+  String get barcodeTorchOff;
+  String get barcodeGenerate;
+  String get barcodeGenerateCode128;
+  String get barcodeGenerateEan13;
+  String get barcodeSymbology;
+  String get barcodeCustomPrefix;
+  String get barcodeSettingsTitle;
+  String get barcodeSettingsSubtitle;
+  String get barcodePrintLabel;
+  String get barcodePrintLabels;
+  String get barcodeLabelSize;
+  String get barcodeLabelWidth;
+  String get barcodeLabelHeight;
+  String get barcodeLabelQuantity;
+  String get barcodeLabelPrintBluetooth;
+  String get barcodeLabelPrintPdf;
+  String get barcodeLabelCustomSize;
+  String get barcodeDigitalStockroomTitle;
+  String get barcodeAisleBin;
+  String get barcodeAisleBinHint;
+  String get barcodeLocation;
+  String get barcodeMultiBranchStock;
+  String get barcodeFastMover;
+  String get barcodeLowStockWarning;
+  String get barcodeScanProduct;
+  String barcodeNotFound(String code);
+  String barcodeItemAdded(String name);
 }
 
 class _AppLocalizationsDelegate

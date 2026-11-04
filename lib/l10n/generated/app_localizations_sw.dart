@@ -3068,4 +3068,102 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get posEnterPriceSubmit => 'Weka Kwenye Kikapu';
+
+  @override
+  String get barcodeScannerTitle => 'Skana Barcode';
+
+  @override
+  String get barcodeScannerPrompt => 'Elekeza kamera kwenye barcode au QR kodi';
+
+  @override
+  String get barcodeScanContinuous => 'Hali ya Kuendelea';
+
+  @override
+  String get barcodeScanSingle => 'Scan Moja';
+
+  @override
+  String get barcodeTorchOn => 'Washa Tochi';
+
+  @override
+  String get barcodeTorchOff => 'Zima Tochi';
+
+  @override
+  String get barcodeGenerate => 'Tengeneza Barcode';
+
+  @override
+  String get barcodeGenerateCode128 => 'Code 128 (Herufi na Namba)';
+
+  @override
+  String get barcodeGenerateEan13 => 'EAN-13 (Kawaida ya Mauzo)';
+
+  @override
+  String get barcodeSymbology => 'Aina ya Barcode';
+
+  @override
+  String get barcodeCustomPrefix => 'Kiambishi cha Mwanzo';
+
+  @override
+  String get barcodeSettingsTitle => 'Barcode na Lebo';
+
+  @override
+  String get barcodeSettingsSubtitle =>
+      'Weka mtindo wa barcode na vipimo vya lebo';
+
+  @override
+  String get barcodePrintLabel => 'Chapa Lebo';
+
+  @override
+  String get barcodePrintLabels => 'Chapa Lebo';
+
+  @override
+  String get barcodeLabelSize => 'Ukubwa wa Lebo';
+
+  @override
+  String get barcodeLabelWidth => 'Upana (mm)';
+
+  @override
+  String get barcodeLabelHeight => 'Kimo (mm)';
+
+  @override
+  String get barcodeLabelQuantity => 'Idadi ya Nakala';
+
+  @override
+  String get barcodeLabelPrintBluetooth => 'Chapa kupitia Bluetooth';
+
+  @override
+  String get barcodeLabelPrintPdf => 'Chapa / Tuma PDF';
+
+  @override
+  String get barcodeLabelCustomSize => 'Ukubwa Maalum (mm)';
+
+  @override
+  String get barcodeDigitalStockroomTitle => 'Tafuta Mahali pa Stock';
+
+  @override
+  String get barcodeAisleBin => 'Uchochoro / Rafu / Boksi';
+
+  @override
+  String get barcodeAisleBinHint => 'mf. Rafu 3, Boksi B-12';
+
+  @override
+  String get barcodeLocation => 'Mahali';
+
+  @override
+  String get barcodeMultiBranchStock => 'Stock Katika Matawi Yote';
+
+  @override
+  String get barcodeFastMover => 'Inayotoka Haraka';
+
+  @override
+  String get barcodeLowStockWarning => 'Tahadhari ya Stock Ndogo';
+
+  @override
+  String get barcodeScanProduct => 'Skana Barcode';
+
+  @override
+  String barcodeNotFound(String code) =>
+      'Bidhaa haikupatikana kwa barcode: $code';
+
+  @override
+  String barcodeItemAdded(String name) => '$name imeongezwa kwenye kikapu';
 }

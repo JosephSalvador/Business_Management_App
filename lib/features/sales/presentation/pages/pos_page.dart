@@ -26,6 +26,9 @@ import 'sync_status_sheet.dart';
 import 'payment_sheet.dart';
 import 'parked_carts_sheet.dart';
 import 'shift_close_sheet.dart';
+import '../../../../core/barcode/hardware_scanner_listener.dart';
+import '../../../../core/barcode/mobile_barcode_scanner_modal.dart';
+import '../../../../core/storage/cached_catalog_dao.dart' show LocalProductCodes;
 
 /// POS page: search products, add to cart, pay.
 /// Works online and offline — offline sales sync when internet returns.
@@ -73,6 +76,65 @@ class _PosPageState extends ConsumerState<PosPage> {
     _debounce = Timer(const Duration(milliseconds: 300), () {
       ref.read(posCatalogControllerProvider.notifier).load(search: value);
     });
+  }
+
+  Future<void> _handleHardwareBarcodeScan(String barcode) async {
+    final clean = barcode.trim();
+    if (clean.isEmpty) return;
+
+    final auth = ref.read(authControllerProvider);
+    final tenantId = auth.maybeWhen(
+      authenticated: (s) => s.tenant.id,
+      orElse: () => '',
+    );
+    if (tenantId.isEmpty) return;
+
+    final dao = ref.read(localSalesServiceProvider).catalog;
+    final product = await dao.byBarcodeOrSku(tenantId, clean);
+
+    if (product == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.loc.barcodeNotFound(clean)),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    final posProduct = PosProduct(
+      productId: product.productId,
+      name: product.name,
+      sku: product.sku,
+      price: product.retailPrice,
+      projectedQuantity:
+          await dao.projectedQuantity(tenantId, product.productId),
+      isService: product.productType == LocalProductCodes.typeService,
+    );
+
+    _addToCart(posProduct);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.loc.barcodeItemAdded(product.name)),
+          duration: const Duration(milliseconds: 1200),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _startCameraScanner() async {
+    await showMobileBarcodeScanner(
+      context,
+      continuous: true,
+      onContinuousScan: _handleHardwareBarcodeScan,
+    );
   }
 
   @override
@@ -153,34 +215,39 @@ class _PosPageState extends ConsumerState<PosPage> {
             ),
           ],
         ),
-        body: WaveBackground(
-          child: Responsive.isDesktop(context) || Responsive.isTablet(context)
-              ? _DesktopLayout(
-                  catalog: catalog,
-                  cart: cart,
-                  searchController: _searchController,
-                  onSearchChanged: _onSearchChanged,
-                  onQuickSale: _startQuickSale,
-                  onAddToCart: _addToCart,
-                  onQuickQuantity: _quickQuantity,
-                  loc: loc,
-                  customerId: _selectedCustomerId,
-                  customerName: _selectedCustomerName,
-                  quickSalePanel:
-                      _quickSaleActive ? _buildQuickSalePanel() : null,
-                )
-              : _MobileLayout(
-                  catalog: catalog,
-                  cart: cart,
-                  searchController: _searchController,
-                  onSearchChanged: _onSearchChanged,
-                  onQuickSale: _startQuickSale,
-                  onAddToCart: _addToCart,
-                  onQuickQuantity: _quickQuantity,
-                  loc: loc,
-                  quickSalePanel:
-                      _quickSaleActive ? _buildQuickSalePanel() : null,
-                ),
+        body: HardwareScannerListener(
+          onBarcodeScanned: _handleHardwareBarcodeScan,
+          child: WaveBackground(
+            child: Responsive.isDesktop(context) || Responsive.isTablet(context)
+                ? _DesktopLayout(
+                    catalog: catalog,
+                    cart: cart,
+                    searchController: _searchController,
+                    onSearchChanged: _onSearchChanged,
+                    onScanBarcode: _startCameraScanner,
+                    onQuickSale: _startQuickSale,
+                    onAddToCart: _addToCart,
+                    onQuickQuantity: _quickQuantity,
+                    loc: loc,
+                    customerId: _selectedCustomerId,
+                    customerName: _selectedCustomerName,
+                    quickSalePanel:
+                        _quickSaleActive ? _buildQuickSalePanel() : null,
+                  )
+                : _MobileLayout(
+                    catalog: catalog,
+                    cart: cart,
+                    searchController: _searchController,
+                    onSearchChanged: _onSearchChanged,
+                    onScanBarcode: _startCameraScanner,
+                    onQuickSale: _startQuickSale,
+                    onAddToCart: _addToCart,
+                    onQuickQuantity: _quickQuantity,
+                    loc: loc,
+                    quickSalePanel:
+                        _quickSaleActive ? _buildQuickSalePanel() : null,
+                  ),
+          ),
         ),
         bottomNavigationBar:
             (Responsive.isDesktop(context) || Responsive.isTablet(context))
@@ -536,33 +603,49 @@ Widget _buildSearchBar({
   required TextEditingController controller,
   required ValueChanged<String> onChanged,
   required AppLocalizations loc,
+  VoidCallback? onScanBarcode,
 }) {
   return Padding(
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-    child: TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        hintText: loc.posSearchProducts,
-        prefixIcon: Icon(Icons.search,
-            size: 20, color: AppColors.resolveTextTertiary(context)),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.outline),
+    child: Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: loc.posSearchProducts,
+              prefixIcon: Icon(Icons.search,
+                  size: 20, color: AppColors.resolveTextTertiary(context)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.outline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.outline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: AppColors.primary, width: 1.5),
+              ),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            textInputAction: TextInputAction.search,
+            onChanged: onChanged,
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-      textInputAction: TextInputAction.search,
-      onChanged: onChanged,
+        if (onScanBarcode != null) ...[
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.qr_code_scanner, size: 22),
+            tooltip: loc.barcodeScanProduct,
+            onPressed: onScanBarcode,
+          ),
+        ],
+      ],
     ),
   );
 }
@@ -626,6 +709,7 @@ class _MobileLayout extends StatelessWidget {
     required this.cart,
     required this.searchController,
     required this.onSearchChanged,
+    this.onScanBarcode,
     required this.onQuickSale,
     required this.onAddToCart,
     required this.onQuickQuantity,
@@ -637,6 +721,7 @@ class _MobileLayout extends StatelessWidget {
   final CartState cart;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
+  final VoidCallback? onScanBarcode;
   final VoidCallback onQuickSale;
   final void Function(PosProduct) onAddToCart;
   final void Function(PosProduct) onQuickQuantity;
@@ -653,10 +738,12 @@ class _MobileLayout extends StatelessWidget {
     return Column(
       children: [
         _buildSearchBar(
-            context: context,
-            controller: searchController,
-            onChanged: onSearchChanged,
-            loc: loc),
+          context: context,
+          controller: searchController,
+          onChanged: onSearchChanged,
+          onScanBarcode: onScanBarcode,
+          loc: loc,
+        ),
         _buildQuickSaleButton(onPressed: onQuickSale, loc: loc),
         Expanded(
           child: _buildProductArea(
@@ -679,6 +766,7 @@ class _DesktopLayout extends StatelessWidget {
     required this.cart,
     required this.searchController,
     required this.onSearchChanged,
+    this.onScanBarcode,
     required this.onQuickSale,
     required this.onAddToCart,
     required this.onQuickQuantity,
@@ -692,6 +780,7 @@ class _DesktopLayout extends StatelessWidget {
   final CartState cart;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
+  final VoidCallback? onScanBarcode;
   final VoidCallback onQuickSale;
   final void Function(PosProduct) onAddToCart;
   final void Function(PosProduct) onQuickQuantity;
@@ -713,10 +802,12 @@ class _DesktopLayout extends StatelessWidget {
               Column(
                 children: [
                   _buildSearchBar(
-                      context: context,
-                      controller: searchController,
-                      onChanged: onSearchChanged,
-                      loc: loc),
+                    context: context,
+                    controller: searchController,
+                    onChanged: onSearchChanged,
+                    onScanBarcode: onScanBarcode,
+                    loc: loc,
+                  ),
                   _buildQuickSaleButton(onPressed: onQuickSale, loc: loc),
                   Expanded(
                     child: _buildProductArea(

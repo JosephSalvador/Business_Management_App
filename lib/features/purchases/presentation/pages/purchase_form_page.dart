@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:collection/collection.dart';
 import '../../../../app/providers.dart';
+import '../../../../core/barcode/mobile_barcode_scanner_modal.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
@@ -958,27 +960,59 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Tafuta kwa jina, SKU, au barcode...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _query.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _query = '');
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Tafuta kwa jina, SKU, au barcode...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _query.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _query = '');
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 10),
+                        isDense: true,
+                      ),
+                      onChanged: (v) =>
+                          setState(() => _query = v.trim().toLowerCase()),
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  isDense: true,
-                ),
-                onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    icon: const Icon(Icons.qr_code_scanner, size: 20),
+                    tooltip: 'Skana Barcode',
+                    onPressed: () async {
+                      final code = await showMobileBarcodeScanner(context);
+                      if (code != null && code.isNotEmpty) {
+                        final q = code.trim().toLowerCase();
+                        _searchController.text = code.trim();
+                        setState(() => _query = q);
+                        if (productsState is ProductsReady) {
+                          final match = productsState.products.firstWhereOrNull(
+                            (p) =>
+                                (p.barcode?.toLowerCase() == q) ||
+                                (p.sku?.toLowerCase() == q),
+                          );
+                          if (match != null) {
+                            widget.onSelect(match);
+                            Navigator.of(context).pop();
+                          }
+                        }
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
             const Divider(height: 12),

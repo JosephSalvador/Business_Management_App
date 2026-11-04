@@ -24,6 +24,7 @@ class ProductDraft {
     this.brandId,
     this.taxCategoryId,
     this.costPrice,
+    this.aisleBin,
   });
 
   final String name;
@@ -36,6 +37,7 @@ class ProductDraft {
   final String? brandId;
   final String? taxCategoryId;
   final double? costPrice;
+  final String? aisleBin;
 
   Product toDomain() => Product(
         id: '',
@@ -50,6 +52,7 @@ class ProductDraft {
         status: ProductStatus.active,
         taxCategoryId: taxCategoryId,
         costPrice: costPrice,
+        aisleBin: aisleBin,
       );
 }
 
