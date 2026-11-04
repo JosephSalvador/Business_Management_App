@@ -52,8 +52,7 @@ jobs:
             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json")
 
-          echo "Zones found in Cloudflare account:"
-          echo "$ZONES_RES" | jq -r '.result[]? | "- Zone: \(.name) (ID: \(.id), Status: \(.status))"'
+          echo "Raw Zones response: $ZONES_RES"
 
           PRIMARY_ZONE_ID=$(echo "$ZONES_RES" | jq -r '.result[0].id // "5437d5518f6a7c86d595e9d77e91d76c"')
           PRIMARY_ZONE_NAME=$(echo "$ZONES_RES" | jq -r '.result[0].name // "joberthix.xyz"')
@@ -67,7 +66,7 @@ jobs:
             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json")
 
-          echo "$DNS_RES" | jq -r '.result[]? | "[\(.type)] \(.name) -> \(.content) (Proxied: \(.proxied))"'
+          echo "Raw DNS response: $DNS_RES"
 
           echo ""
           echo "=========================================================="
@@ -77,7 +76,7 @@ jobs:
             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json")
 
-          echo "$WORKERS_RES" | jq -r '.result[]? | "- Worker: \(.id // .name) (Modified: \(.modified_on // "N/A"))"'
+          echo "Raw Workers response: $WORKERS_RES"
 
           echo ""
           echo "=========================================================="
@@ -87,7 +86,7 @@ jobs:
             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json")
 
-          echo "$ROUTES_RES" | jq -r '.result[]? | "- Pattern: \(.pattern) -> Script: \(.script)"'
+          echo "Raw Routes response: $ROUTES_RES"
 
           if [ "$ACTION" = "setup_verify" ]; then
             TARGET_DOMAIN="${SUBDOMAIN}.${PRIMARY_ZONE_NAME}"
@@ -96,14 +95,12 @@ jobs:
             echo "5. Setting Up Subdomain: $TARGET_DOMAIN"
             echo "=========================================================="
 
-            # Identify worker script (prefer jolinx-api-router or first available worker)
             WORKER_SCRIPT=$(echo "$WORKERS_RES" | jq -r '.result[]? | select((.id // .name) | contains("api") or contains("router")) | (.id // .name)' | head -n 1)
             if [ -z "$WORKER_SCRIPT" ]; then
               WORKER_SCRIPT=$(echo "$WORKERS_RES" | jq -r '.result[0].id // .result[0].name // "jolinx-api-router"')
             fi
             echo "Target Worker Script: $WORKER_SCRIPT"
 
-            # Check if DNS record for TARGET_DOMAIN already exists
             EXISTING_DNS_ID=$(echo "$DNS_RES" | jq -r --arg td "$TARGET_DOMAIN" '.result[]? | select(.name == $td) | .id')
 
             if [ -n "$EXISTING_DNS_ID" ]; then
@@ -114,10 +111,9 @@ jobs:
                 -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
                 -H "Content-Type: application/json" \
                 -d "{\"type\":\"A\",\"name\":\"${SUBDOMAIN}\",\"content\":\"192.0.2.1\",\"ttl\":1,\"proxied\":true}")
-              echo "Create DNS result: $(echo "$CREATE_DNS_RES" | jq -c '{success: .success, errors: .errors}')"
+              echo "Create DNS result: $CREATE_DNS_RES"
             fi
 
-            # Check if worker route already exists
             EXISTING_ROUTE_ID=$(echo "$ROUTES_RES" | jq -r --arg pat "${TARGET_DOMAIN}/*" '.result[]? | select(.pattern == $pat) | .id')
 
             if [ -n "$EXISTING_ROUTE_ID" ]; then
@@ -128,37 +124,9 @@ jobs:
                 -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
                 -H "Content-Type: application/json" \
                 -d "{\"pattern\":\"${TARGET_DOMAIN}/*\",\"script\":\"${WORKER_SCRIPT}\"}")
-              echo "Create Route result: $(echo "$CREATE_ROUTE_RES" | jq -c '{success: .success, errors: .errors}')"
+              echo "Create Route result: $CREATE_ROUTE_RES"
             fi
 
             echo ""
             echo "::notice title=Subdomain Configured::https://${TARGET_DOMAIN} route created on Cloudflare pointing to $WORKER_SCRIPT!"
-          elif [ "$ACTION" = "attach_pages" ]; then
-            echo ""
-            echo "=========================================================="
-            echo "Attaching domain '$DOMAIN' to Cloudflare Pages project '$PROJECT_NAME'..."
-            echo "=========================================================="
-            RESPONSE=$(curl -s -X POST \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}/domains" \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -d "{\"name\": \"${DOMAIN}\"}")
-
-            echo "Response: $RESPONSE"
-
-            echo "Setting production_branch of '$PROJECT_NAME' to 'staging' so custom domains serve it..."
-            BRANCH_RES=$(curl -s -X PATCH \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}" \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -d '{"production_branch": "staging"}')
-            echo "Branch Update: $BRANCH_RES"
-
-            echo "Ensuring DNS CNAME record exists in Cloudflare zone..."
-            DNS_RESPONSE=$(curl -s -X POST \
-              "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/dns_records" \
-              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -d "{\"type\":\"CNAME\",\"name\":\"${DOMAIN}\",\"content\":\"${PROJECT_NAME}.pages.dev\",\"ttl\":1,\"proxied\":true}")
-            echo "DNS Response: $DNS_RESPONSE"
           fi
