@@ -300,5 +300,5 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 7: Settings & Localization — Create `BarcodeLabelSettingsPage` with live sample preview and full English/Swahili translations across 32 strings.
 - [x] Task 8: Unit Testing & Verification — Create unit test suites `test/core/barcode/barcode_generator_test.dart` and `test/features/inventory/barcode_label_printer_service_test.dart`.
 - [x] Task 9: Version Bump — Bump client version code to `1.0.0+85` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 10: Remote Staging Build & Artifact Verification — Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml` with `deploy_target: staging`.
+- [x] Task 10: Remote Staging Build & Artifact Verification — Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml` with `deploy_target: staging` (Run 41822188611 — APK published to `releases/tag/staging-latest`).
 
