@@ -265,4 +265,23 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Deploy update to Azure Container Apps production via `deploy-azure.yml` (Run 41636111394).
 - [x] Task 5: Verify container health (`/health` HTTP 200) and live database queries (`/api/v1/auth/check-availability` HTTP 200).
 
+## Implementation Plan — Public Invoice QR Verification Page, Direct PDF & API Endpoints (Build 83)
+- [x] Task 1: Backend Domain & Persistence — Add `VerificationToken` to `CustomerInvoice.cs`, map unique index in `BusinessDbContext.cs`, and add idempotent startup DDL in `Program.cs`.
+- [x] Task 2: Backend Application CQRS & Public DTOs — Add `GetByVerificationTokenAsync` to `ICustomerInvoiceRepository`, add `PublicInvoiceVerificationDto`, and implement `GetPublicInvoiceVerificationQueryHandler`.
+- [x] Task 3: High-Speed Verification HTML Renderer — Create `InvoiceVerificationHtmlRenderer.cs` rendering an ultra-lightweight (<18KB), responsive verification page in <5ms with official seal, live payment status, issuer TIN/profile, line items, payment instructions, print stylesheet, and direct PDF download.
+- [x] Task 4: Public Verification Endpoints — Create `PublicInvoiceVerificationEndpoints.cs` mapping `GET /v/{token}` (HTML), `GET /v/{token}/pdf` (PDF binary download), and `GET /api/v1/public/invoices/{token}` (JSON) with anonymous rate-limited access.
+- [x] Task 5: Frontend Invoice QR Encoding — Update `invoice_a4_preview_card.dart` and `local_pdf_document_generator.dart` (both A4 and 80mm thermal roll) to encode the public verification URL instead of raw text, with caption `"Skani kuhakiki / Scan to verify"`.
+- [x] Task 6: Offline Resilience & Serialization — Add deterministic slug generation (`id.replaceAll('-', '').substring(0, 16)`) in `invoice.dart` and `invoice_repository.dart` for offline-created invoices.
+- [x] Task 7: Version Bump — Bump client version to `1.0.0+83` in `pubspec.yaml` and `app_update_service.dart`.
+- [x] Task 8: Production Deployment & Release — Deploy backend to Azure Container Apps production (`deploy-azure.yml` Run 41803657182) and build/publish multi-platform release bundles to GitHub Releases (`build-clients.yml` Run 41804705051).
+
+## Implementation Plan — Automated Azure PostgreSQL Disaster Recovery Backup
+- [x] Task 1: Update `.github/workflows/db-backup.yml` to authenticate via `secrets.AZURE_CREDENTIALS` (used by `deploy-azure.yml`).
+- [x] Task 2: Dynamically discover active `ConnectionStrings__Default` from Azure Container App `jolinx-api` on `rg-jolinx-prod`.
+- [x] Task 3: Temporarily whitelist GitHub Actions runner IP in Azure PostgreSQL flexible server firewall (`businessos-pg-prod`) with `always()` cleanup.
+- [x] Task 4: Parse connection parameters in Python into standard PG environment variables and mask sensitive passwords with `::add-mask`.
+- [x] Task 5: Execute custom compressed `pg_dump` for Production (`businessos`) and Staging (`businessos_staging`) and upload 90-day retention artifact.
+- [x] Task 6: Verify end-to-end execution on GitHub Actions (Run 41806147121 completed with SUCCESS).
+
+
 
