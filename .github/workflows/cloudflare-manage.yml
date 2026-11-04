@@ -1,0 +1,123 @@
+name: Cloudflare Domain & Verification Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform (inspect | setup_verify)'
+        required: true
+        default: 'inspect'
+        type: choice
+        options:
+          - inspect
+          - setup_verify
+      subdomain:
+        description: 'Subdomain prefix for verification (e.g. verify, v, check)'
+        required: false
+        default: 'verify'
+
+jobs:
+  manage-cloudflare:
+    name: Cloudflare Management
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect or Configure Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
+          ACTION: ${{ inputs.action }}
+          SUBDOMAIN: ${{ inputs.subdomain }}
+        run: |
+          set -e
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not configured in repository secrets."
+            exit 1
+          fi
+
+          echo "=========================================================="
+          echo "1. Checking Cloudflare Zones (Domains)..."
+          echo "=========================================================="
+          ZONES_RES=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json")
+
+          echo "Zones response summary:"
+          echo "$ZONES_RES" | jq -r '.result[] | "- Zone: \(.name) (ID: \(.id), Status: \(.status))"'
+
+          PRIMARY_ZONE_ID=$(echo "$ZONES_RES" | jq -r '.result[0].id // empty')
+          PRIMARY_ZONE_NAME=$(echo "$ZONES_RES" | jq -r '.result[0].name // empty')
+          echo "Primary Zone: $PRIMARY_ZONE_NAME ($PRIMARY_ZONE_ID)"
+
+          echo ""
+          echo "=========================================================="
+          echo "2. Listing Existing DNS Records for $PRIMARY_ZONE_NAME..."
+          echo "=========================================================="
+          DNS_RES=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/dns_records?per_page=50" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json")
+
+          echo "$DNS_RES" | jq -r '.result[] | "[\(.type)] \(.name) -> \(.content) (Proxied: \(.proxied))"'
+
+          echo ""
+          echo "=========================================================="
+          echo "3. Listing Cloudflare Worker Scripts..."
+          echo "=========================================================="
+          WORKERS_RES=$(curl -s -X GET "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json")
+
+          echo "$WORKERS_RES" | jq -r '.result[]? | "- Worker: \(.id // .name) (Modified: \(.modified_on // "N/A"))"'
+
+          echo ""
+          echo "=========================================================="
+          echo "4. Listing Worker Routes for $PRIMARY_ZONE_NAME..."
+          echo "=========================================================="
+          ROUTES_RES=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/workers/routes" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json")
+
+          echo "$ROUTES_RES" | jq -r '.result[]? | "- Pattern: \(.pattern) -> Script: \(.script)"'
+
+          if [ "$ACTION" = "setup_verify" ]; then
+            TARGET_DOMAIN="${SUBDOMAIN}.${PRIMARY_ZONE_NAME}"
+            echo ""
+            echo "=========================================================="
+            echo "5. Setting Up Subdomain: $TARGET_DOMAIN"
+            echo "=========================================================="
+
+            # Find matching worker script (e.g. jolinx-api-router or first available worker)
+            WORKER_SCRIPT=$(echo "$WORKERS_RES" | jq -r '.result[0].id // .result[0].name // "jolinx-api-router"')
+            echo "Using Worker script: $WORKER_SCRIPT"
+
+            # Check if DNS record for TARGET_DOMAIN already exists
+            EXISTING_DNS_ID=$(echo "$DNS_RES" | jq -r --arg td "$TARGET_DOMAIN" '.result[] | select(.name == $td) | .id')
+
+            if [ -n "$EXISTING_DNS_ID" ]; then
+              echo "DNS record for $TARGET_DOMAIN already exists (ID: $EXISTING_DNS_ID)."
+            else
+              echo "Creating proxied DNS A/AAAA or CNAME dummy record for $TARGET_DOMAIN (192.0.2.1)..."
+              # Cloudflare worker routes require a proxied DNS record to exist in the zone
+              CREATE_DNS_RES=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/dns_records" \
+                -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{\"type\":\"A\",\"name\":\"${SUBDOMAIN}\",\"content\":\"192.0.2.1\",\"ttl\":1,\"proxied\":true}")
+              echo "Create DNS result: $(echo "$CREATE_DNS_RES" | jq -c '{success: .success, errors: .errors}')"
+            fi
+
+            # Check if worker route already exists
+            EXISTING_ROUTE_ID=$(echo "$ROUTES_RES" | jq -r --arg pat "${TARGET_DOMAIN}/*" '.result[]? | select(.pattern == $pat) | .id')
+
+            if [ -n "$EXISTING_ROUTE_ID" ]; then
+              echo "Worker route for ${TARGET_DOMAIN}/* already exists (ID: $EXISTING_ROUTE_ID)."
+            else
+              echo "Creating Worker route: ${TARGET_DOMAIN}/* -> $WORKER_SCRIPT..."
+              CREATE_ROUTE_RES=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/workers/routes" \
+                -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{\"pattern\":\"${TARGET_DOMAIN}/*\",\"script\":\"${WORKER_SCRIPT}\"}")
+              echo "Create Route result: $(echo "$CREATE_ROUTE_RES" | jq -c '{success: .success, errors: .errors}')"
+            fi
+
+            echo ""
+            echo "::notice title=Subdomain Ready::Verification subdomain https://${TARGET_DOMAIN} is configured on Cloudflare!"
+          fi
