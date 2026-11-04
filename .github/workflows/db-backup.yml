@@ -14,49 +14,191 @@ jobs:
     name: Backup Azure PostgreSQL Databases
     runs-on: ubuntu-latest
     steps:
-      - name: Check if DATABASE_URL secret is configured
-        id: check-secret
+      - name: Check Credentials Configuration
+        id: check-creds
         env:
+          AZURE_CREDS: ${{ secrets.AZURE_CREDENTIALS }}
           DB_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          if [ -z "$DB_URL" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::DATABASE_URL secret is not set yet. Add it in GitHub Settings -> Secrets -> Actions to enable automated nightly pg_dump backups."
-          else
+          if [ -n "$AZURE_CREDS" ]; then
+            echo "has_azure_creds=true" >> "$GITHUB_OUTPUT"
             echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Using Azure Credentials for dynamic connection discovery."
+          elif [ -n "$DB_URL" ]; then
+            echo "has_azure_creds=false" >> "$GITHUB_OUTPUT"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Using static DATABASE_URL secret."
+          else
+            echo "has_azure_creds=false" >> "$GITHUB_OUTPUT"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Neither AZURE_CREDENTIALS nor DATABASE_URL secret is set. Cannot run automated backup."
           fi
 
+      - name: Log in to Azure
+        if: steps.check-creds.outputs.has_azure_creds == 'true'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Discover Live DB Connection & Configure Firewall
+        if: steps.check-creds.outputs.has_azure_creds == 'true'
+        id: azure-db
+        run: |
+          az extension add --name containerapp --upgrade --yes > /dev/null 2>&1 || true
+
+          echo "Fetching active connection string from Container App 'jolinx-api'..."
+          # 1. Check direct environment variable
+          RAW_CONN=$(az containerapp show \
+            --name jolinx-api \
+            --resource-group rg-jolinx-prod \
+            --query "properties.template.containers[0].env[?name=='ConnectionStrings__Default'].value" \
+            -o tsv 2>/dev/null || true)
+
+          # 2. Check secretRef if env var references a secret
+          if [ -z "$RAW_CONN" ]; then
+            SECRET_REF=$(az containerapp show \
+              --name jolinx-api \
+              --resource-group rg-jolinx-prod \
+              --query "properties.template.containers[0].env[?name=='ConnectionStrings__Default'].secretRef" \
+              -o tsv 2>/dev/null || true)
+            if [ -n "$SECRET_REF" ]; then
+              RAW_CONN=$(az containerapp secret show \
+                --name jolinx-api \
+                --resource-group rg-jolinx-prod \
+                --secret-name "$SECRET_REF" \
+                --query value -o tsv 2>/dev/null || true)
+            fi
+          fi
+
+          # 3. Fallback: list all secrets in Container App
+          if [ -z "$RAW_CONN" ]; then
+            RAW_CONN=$(az containerapp secret list \
+              --name jolinx-api \
+              --resource-group rg-jolinx-prod \
+              --show-values \
+              --query "[?contains(name, 'conn') || contains(name, 'default') || contains(name, 'postgres')].value | [0]" \
+              -o tsv 2>/dev/null || true)
+          fi
+
+          if [ -z "$RAW_CONN" ]; then
+            echo "::error::Could not extract ConnectionStrings__Default from Azure Container App."
+            exit 1
+          fi
+
+          echo "raw_conn=$RAW_CONN" >> "$GITHUB_OUTPUT"
+
+          # Temporarily whitelist GitHub runner IP on Azure PostgreSQL flexible server
+          RUNNER_IP=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me || true)
+          if [ -n "$RUNNER_IP" ]; then
+            echo "Whitelisting GitHub Actions runner IP ($RUNNER_IP) in PostgreSQL firewall..."
+            az postgres flexible-server firewall-rule create \
+              --resource-group rg-jolinx-prod \
+              --name businessos-pg-prod \
+              --rule-name "gh-actions-backup-${{ github.run_id }}" \
+              --start-ip-address "$RUNNER_IP" \
+              --end-ip-address "$RUNNER_IP" \
+              --output none 2>/dev/null || true
+            echo "firewall_rule_added=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Parse Connection String into PostgreSQL Environment
+        if: steps.check-creds.outputs.configured == 'true'
+        env:
+          AZURE_RAW_CONN: ${{ steps.azure-db.outputs.raw_conn }}
+          FALLBACK_DB_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python3 - << 'EOF'
+          import os
+          import re
+          from urllib.parse import urlparse, unquote
+
+          raw = os.environ.get('AZURE_RAW_CONN', '').strip()
+          fallback = os.environ.get('FALLBACK_DB_URL', '').strip()
+
+          pghost = ''
+          pgport = '5432'
+          pguser = ''
+          pgpass = ''
+          pgdb = 'businessos'
+
+          if raw:
+              items = {}
+              for part in raw.split(';'):
+                  if '=' in part:
+                      k, v = part.split('=', 1)
+                      items[k.strip().lower()] = v.strip()
+              pghost = items.get('host') or items.get('server') or ''
+              pgport = items.get('port') or '5432'
+              pguser = items.get('username') or items.get('user id') or items.get('user') or ''
+              pgpass = items.get('password') or ''
+              pgdb = items.get('database') or 'businessos'
+          elif fallback:
+              u = urlparse(fallback)
+              pghost = u.hostname or ''
+              pgport = str(u.port or 5432)
+              pguser = unquote(u.username or '')
+              pgpass = unquote(u.password or '')
+              pgdb = u.path.lstrip('/') or 'businessos'
+
+          if not pghost or not pguser or not pgpass:
+              print("::error::Missing required PostgreSQL connection parameters (Host, User, or Password).")
+              exit(1)
+
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"PGHOST={pghost}\n")
+              f.write(f"PGPORT={pgport}\n")
+              f.write(f"PGUSER={pguser}\n")
+              f.write(f"PGPASSWORD={pgpass}\n")
+              f.write(f"PGDATABASE={pgdb}\n")
+              f.write("PGSSLMODE=require\n")
+
+          # Mask password from public logs
+          print(f"::add-mask::{pgpass}")
+          print(f"Target Database Host: {pghost}:{pgport}")
+          print(f"Target Database User: {pguser}")
+          print(f"Target Database Name: {pgdb}")
+          EOF
+
       - name: Install PostgreSQL Client
-        if: steps.check-secret.outputs.configured == 'true'
+        if: steps.check-creds.outputs.configured == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
       - name: Run pg_dump compressed backups (Production & Staging)
-        if: steps.check-secret.outputs.configured == 'true'
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        if: steps.check-creds.outputs.configured == 'true'
         run: |
           mkdir -p backups
           TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
 
-          echo "Dumping Production database..."
+          echo "Dumping Production database ($PGDATABASE)..."
           PROD_FILE="backups/jolinx-prod-backup-${TIMESTAMP}.dump"
-          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --compress=9 --file="$PROD_FILE"
+          pg_dump --format=custom --no-owner --no-acl --compress=9 --file="$PROD_FILE"
           ls -lh "$PROD_FILE"
 
           # Automatically dump Staging if it exists on the same server
-          STAGING_URL="${DATABASE_URL/\/businessos?/\/businessos_staging?}"
+          STAGING_DB="${PGDATABASE}_staging"
           STAGING_FILE="backups/jolinx-staging-backup-${TIMESTAMP}.dump"
-          echo "Dumping Staging database..."
-          if pg_dump "$STAGING_URL" --format=custom --no-owner --no-acl --compress=9 --file="$STAGING_FILE" 2>/dev/null; then
+          echo "Dumping Staging database ($STAGING_DB)..."
+          if PGDATABASE="$STAGING_DB" pg_dump --format=custom --no-owner --no-acl --compress=9 --file="$STAGING_FILE" 2>/dev/null; then
             ls -lh "$STAGING_FILE"
           else
-            echo "Note: Staging dump skipped or not reachable."
+            echo "Note: Staging database ($STAGING_DB) skipped or not reachable."
           fi
 
+      - name: Clean up PostgreSQL Runner Firewall Rule
+        if: always() && steps.azure-db.outputs.firewall_rule_added == 'true'
+        run: |
+          echo "Removing temporary runner IP firewall rule..."
+          az postgres flexible-server firewall-rule delete \
+            --resource-group rg-jolinx-prod \
+            --name businessos-pg-prod \
+            --rule-name "gh-actions-backup-${{ github.run_id }}" \
+            --yes \
+            --output none 2>/dev/null || true
+
       - name: Upload 90-day Encrypted Artifact Backup
-        if: steps.check-secret.outputs.configured == 'true'
+        if: steps.check-creds.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: jolinx-azure-db-backups-${{ github.run_number }}
