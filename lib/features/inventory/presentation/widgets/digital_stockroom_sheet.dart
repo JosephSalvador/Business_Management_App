@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../app/providers.dart';
-import '../../../../app/router.dart';
 import '../../../../core/barcode/barcode_display_card.dart';
 import '../../../../core/storage/local_database.dart';
 import '../../../../l10n/loc.dart';
@@ -51,32 +49,16 @@ class _DigitalStockroomSheetState
   }
 
   Future<void> _loadDetails() async {
-    final localDb = ref.read(localDatabaseProvider);
-    final auth = ref.read(authControllerProvider);
-    final tenantId = auth.maybeWhen(
-      authenticated: (s) => s.tenant.id,
-      orElse: () => '',
-    );
-
-    if (tenantId.isEmpty) {
+    final tenantId = ref.read(sessionContextProvider).$1;
+    if (tenantId == null || tenantId.isEmpty) {
       if (mounted) setState(() => _loading = false);
       return;
     }
 
-    final product = await (localDb.select(localDb.cachedProducts)
-          ..where((t) =>
-              t.tenantId.equals(tenantId) & t.productId.equals(widget.productId)))
-        .getSingleOrNull();
-
-    final stock = await (localDb.select(localDb.cachedStock)
-          ..where((t) =>
-              t.tenantId.equals(tenantId) & t.productId.equals(widget.productId)))
-        .get();
-
-    final total = await ref
-        .read(localSalesServiceProvider)
-        .catalog
-        .projectedQuantity(tenantId, widget.productId);
+    final catalog = ref.read(localSalesServiceProvider).catalog;
+    final product = await catalog.byId(tenantId, widget.productId);
+    final stock = await catalog.stockForProduct(tenantId, widget.productId);
+    final total = await catalog.projectedQuantity(tenantId, widget.productId);
 
     if (mounted) {
       setState(() {
@@ -348,10 +330,9 @@ class _DigitalStockroomSheetState
                   label: Text(isSw ? 'Uza Sasa' : 'Add to POS'),
                   onPressed: () {
                     ref.read(cartControllerProvider.notifier).add(
-                          productId: product.productId,
-                          name: product.name,
-                          price: product.retailPrice,
-                          sku: product.sku,
+                          product.productId,
+                          product.name,
+                          product.retailPrice ?? 0.0,
                         );
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(

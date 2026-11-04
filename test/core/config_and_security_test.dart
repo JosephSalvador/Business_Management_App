@@ -44,6 +44,32 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('shields Azure origin and defaults to verify.joberthix.xyz in production', () {
+      final config = AppConfig.forTest(
+        environment: AppEnvironment.production,
+        apiBaseUrl: Uri.parse('https://jolinx-api.kindsky-ea584b9f.centralindia.azurecontainerapps.io'),
+      );
+      expect(config.publicVerificationBaseUrl, 'https://verify.joberthix.xyz/v');
+      expect(config.buildVerificationUrl('token123'), 'https://verify.joberthix.xyz/v/token123');
+    });
+
+    test('respects explicit verificationBaseUrl override', () {
+      final config = AppConfig.forTest(
+        environment: AppEnvironment.production,
+        apiBaseUrl: Uri.parse('https://api.jolinx.example'),
+        verificationBaseUrl: 'https://custom-verify.joberthix.xyz/v',
+      );
+      expect(config.publicVerificationBaseUrl, 'https://custom-verify.joberthix.xyz/v');
+    });
+
+    test('falls back to apiBaseUrl origin in dev mode', () {
+      final config = AppConfig.forTest(
+        environment: AppEnvironment.dev,
+        apiBaseUrl: Uri.parse('http://10.0.2.2:5000'),
+      );
+      expect(config.publicVerificationBaseUrl, 'http://10.0.2.2:5000/v');
+    });
   });
 
   group('ApiClient redaction helpers', () {

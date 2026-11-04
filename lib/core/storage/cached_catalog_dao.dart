@@ -252,7 +252,15 @@ class CachedCatalogDao {
         .get();
   }
 
+  /// Returns cached stock rows across all warehouses for a given product.
+  Future<List<CachedStockData>> stockForProduct(String tenantId, String productId) {
+    return (_db.select(_db.cachedStock)
+          ..where((t) => t.tenantId.equals(tenantId) & t.productId.equals(productId)))
+        .get();
+  }
+
   /// Cached warehouse catalog (multi-warehouse hubs + POS). The read model
+
   /// is replaced wholesale on refresh, exactly like products/stock.
   Future<List<CachedWarehouse>> warehouses(String tenantId) {
     return (_db.select(_db.cachedWarehouses)

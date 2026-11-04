@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:business_app/core/storage/barcode_settings_store.dart';
-import 'package:business_app/features/inventory/data/barcode_label_printer_service.dart';
+import 'package:jolinx_app/core/storage/barcode_settings_store.dart';
+import 'package:jolinx_app/features/inventory/data/barcode_label_printer_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

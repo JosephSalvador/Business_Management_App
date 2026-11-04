@@ -4,8 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/storage/barcode_settings_store.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
-import '../../../../shared/format/money.dart';
-import '../data/barcode_label_printer_service.dart';
+import '../../data/barcode_label_printer_service.dart';
 
 Future<void> showPrintBarcodeLabelDialog(
   BuildContext context, {
@@ -117,7 +116,6 @@ class _PrintBarcodeLabelDialogState
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
-    final isSw = Localizations.localeOf(context).languageCode == 'sw';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -160,7 +158,7 @@ class _PrintBarcodeLabelDialogState
                     border: Border.all(color: Colors.black87, width: 1.2),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -185,7 +183,7 @@ class _PrintBarcodeLabelDialogState
                           fontSize: 24,
                           fontFamily: 'monospace',
                           letterSpacing: 2,
-                          color: Colors.black.withOpacity(0.85),
+                          color: Colors.black.withValues(alpha: 0.85),
                         ),
                         maxLines: 1,
                       ),

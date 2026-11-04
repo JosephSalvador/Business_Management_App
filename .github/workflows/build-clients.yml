@@ -108,7 +108,7 @@ jobs:
 
       - name: Generate target .env, install dependencies & localizations
         run: |
-          printf "APP_ENV=%s\nAPI_BASE_URL=%s\nAPI_FALLBACK_URL=%s\n" "${{ steps.cf_env.outputs.app_env }}" "${{ steps.cf_env.outputs.api_url }}" "${{ steps.cf_env.outputs.fallback_url }}" > .env
+          printf "APP_ENV=%s\nAPI_BASE_URL=%s\nAPI_FALLBACK_URL=%s\nPUBLIC_VERIFICATION_URL=%s\n" "${{ steps.cf_env.outputs.app_env }}" "${{ steps.cf_env.outputs.api_url }}" "${{ steps.cf_env.outputs.fallback_url }}" "https://verify.joberthix.xyz/v" > .env
           flutter pub get
           flutter gen-l10n
 

@@ -14,6 +14,7 @@ class AppConfig {
     required this.environment,
     required this.apiBaseUrl,
     this.apiFallbackUrl,
+    this.verificationBaseUrl,
   }) {
     if (environment != AppEnvironment.dev && apiBaseUrl.scheme != 'https') {
       throw StateError(
@@ -36,8 +37,23 @@ class AppConfig {
   /// when the primary host is unreachable or returns 502/503/504.
   final Uri? apiFallbackUrl;
 
-  /// Public verification base URL for invoice QR codes (e.g. `https://api.jolinx.org/v`).
-  String get publicVerificationBaseUrl => '${apiBaseUrl.origin}/v';
+  /// Explicit override for verification base URL (e.g. `https://verify.joberthix.xyz/v`).
+  final String? verificationBaseUrl;
+
+  /// Public verification base URL for invoice QR codes (e.g. `https://verify.joberthix.xyz/v`).
+  /// Always uses branded Cloudflare domain in production to shield Azure infrastructure.
+  String get publicVerificationBaseUrl {
+    if (verificationBaseUrl != null && verificationBaseUrl!.isNotEmpty) {
+      return verificationBaseUrl!.replaceAll(RegExp(r'/+$'), '');
+    }
+    if (_dartDefineVerificationUrl.isNotEmpty) {
+      return _dartDefineVerificationUrl.replaceAll(RegExp(r'/+$'), '');
+    }
+    if (environment == AppEnvironment.production) {
+      return 'https://verify.joberthix.xyz/v';
+    }
+    return '${apiBaseUrl.origin}/v';
+  }
 
   /// Helper to build public verification URL for a given token.
   String buildVerificationUrl(String token) => '$publicVerificationBaseUrl/$token';
@@ -51,6 +67,8 @@ class AppConfig {
   static const _dartDefineFallbackUrl =
       String.fromEnvironment('API_FALLBACK_URL');
   static const _dartDefineEnv = String.fromEnvironment('APP_ENV');
+  static const _dartDefineVerificationUrl =
+      String.fromEnvironment('PUBLIC_VERIFICATION_URL');
 
   static AppConfig? _instance;
 
@@ -61,6 +79,7 @@ class AppConfig {
         'API_BASE_URL' => _dartDefineApiUrl,
         'API_FALLBACK_URL' => _dartDefineFallbackUrl,
         'APP_ENV' => _dartDefineEnv,
+        'PUBLIC_VERIFICATION_URL' => _dartDefineVerificationUrl,
         _ => '',
       };
       if (compileTime.isNotEmpty) {
@@ -111,10 +130,15 @@ class AppConfig {
       fallbackUri = parsedFallback;
     }
 
+    final rawVerification = read('PUBLIC_VERIFICATION_URL').trim();
+    final verificationBaseUrl =
+        rawVerification.isNotEmpty ? rawVerification : null;
+
     _instance = AppConfig._(
       environment: environment,
       apiBaseUrl: uri,
       apiFallbackUrl: fallbackUri,
+      verificationBaseUrl: verificationBaseUrl,
     );
     return _instance!;
   }
@@ -124,11 +148,13 @@ class AppConfig {
     required AppEnvironment environment,
     required Uri apiBaseUrl,
     Uri? apiFallbackUrl,
+    String? verificationBaseUrl,
   }) {
     return AppConfig._(
       environment: environment,
       apiBaseUrl: apiBaseUrl,
       apiFallbackUrl: apiFallbackUrl,
+      verificationBaseUrl: verificationBaseUrl,
     );
   }
 

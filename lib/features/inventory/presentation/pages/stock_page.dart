@@ -33,12 +33,8 @@ class _StockPageState extends ConsumerState<StockPage> {
     final clean = barcode.trim();
     if (clean.isEmpty) return;
 
-    final auth = ref.read(authControllerProvider);
-    final tenantId = auth.maybeWhen(
-      authenticated: (s) => s.tenant.id,
-      orElse: () => '',
-    );
-    if (tenantId.isEmpty) return;
+    final tenantId = ref.read(sessionContextProvider).$1;
+    if (tenantId == null || tenantId.isEmpty) return;
 
     final dao = ref.read(localSalesServiceProvider).catalog;
     final product = await dao.byBarcodeOrSku(tenantId, clean);

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'package:collection/collection.dart';
 import '../../../../app/providers.dart';
 import '../../../../core/barcode/mobile_barcode_scanner_modal.dart';
 import '../../../../l10n/loc.dart';
@@ -998,14 +997,14 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
                         final q = code.trim().toLowerCase();
                         _searchController.text = code.trim();
                         setState(() => _query = q);
-                        if (productsState is ProductsReady) {
-                          final match = productsState.products.firstWhereOrNull(
-                            (p) =>
-                                (p.barcode?.toLowerCase() == q) ||
-                                (p.sku?.toLowerCase() == q),
-                          );
-                          if (match != null) {
-                            widget.onSelect(match);
+                        if (productsState is ProductsLoaded) {
+                          final match = productsState.items
+                              .where((p) =>
+                                  (p.barcode?.toLowerCase() == q) ||
+                                  (p.sku?.toLowerCase() == q))
+                              .firstOrNull;
+                          if (match != null && mounted) {
+                            widget.onProductSelected(match);
                             Navigator.of(context).pop();
                           }
                         }

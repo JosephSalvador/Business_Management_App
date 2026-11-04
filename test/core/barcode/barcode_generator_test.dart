@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:business_app/core/barcode/barcode_generator_service.dart';
-import 'package:business_app/core/storage/barcode_settings_store.dart';
+import 'package:jolinx_app/core/barcode/barcode_generator_service.dart';
+import 'package:jolinx_app/core/storage/barcode_settings_store.dart';
 
 void main() {
   group('BarcodeGeneratorService - Check Digit & Validation', () {
