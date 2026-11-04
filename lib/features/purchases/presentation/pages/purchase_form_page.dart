@@ -992,6 +992,7 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
                     icon: const Icon(Icons.qr_code_scanner, size: 20),
                     tooltip: 'Skana Barcode',
                     onPressed: () async {
+                      final nav = Navigator.of(context);
                       final code = await showMobileBarcodeScanner(context);
                       if (!mounted) return;
                       if (code != null && code.isNotEmpty) {
@@ -1006,7 +1007,7 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
                               .firstOrNull;
                           if (match != null) {
                             widget.onProductSelected(match);
-                            Navigator.of(context).pop();
+                            nav.pop();
                           }
                         }
                       }

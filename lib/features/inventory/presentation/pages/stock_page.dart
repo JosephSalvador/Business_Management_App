@@ -60,6 +60,7 @@ class _StockPageState extends ConsumerState<StockPage> {
 
   Future<void> _scanToInspectStock() async {
     final code = await showMobileBarcodeScanner(context);
+    if (!mounted) return;
     if (code != null && code.isNotEmpty) {
       _handleStockBarcodeScan(code);
     }
