@@ -99,7 +99,7 @@ public static class PublicInvoiceVerificationEndpoints
                 Total: $"{inv.Currency} {l.LineTotal:N2}"))
             .ToList();
 
-        var pdfBytes = MinimalPdfGenerator.CreateDocument(
+        var pdfBytes = BusinessOS.Infrastructure.Services.MinimalPdfGenerator.CreateDocument(
             title: inv.DocumentTitle,
             documentNumber: inv.Number,
             organizationName: inv.Organization.Name,
