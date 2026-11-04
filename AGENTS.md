@@ -282,6 +282,10 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: Parse connection parameters in Python into standard PG environment variables and mask sensitive passwords with `::add-mask`.
 - [x] Task 5: Execute custom compressed `pg_dump` for Production (`businessos`) and Staging (`businessos_staging`) and upload 90-day retention artifact.
 - [x] Task 6: Verify end-to-end execution on GitHub Actions (Run 41806147121 completed with SUCCESS).
-
-
-
+## Implementation Plan — Tablet POS Pause Order & Quick Sale Auto-Resolution (Build 84)
+- [x] Task 1: Add "Weka Oda Pembeni" (Pause Order) icon button (`Icons.pause_circle_outline`) to tablet/desktop cart sidebar (`_DesktopCartSidebar`) alongside the Pay button in `pos_page.dart`.
+- [x] Task 2: Add interactive parked orders badge chip (`"${parkedCarts.length} pembeni"`) in `_DesktopCartSidebar` header to view/restore held orders.
+- [x] Task 3: In `CheckoutController._tryOnline`, auto-resolve `QuickSaleDefaults.provisionalProductId` to real product ID before submitting online to eliminate 404 "Taarifa hazipatikani".
+- [x] Task 4: In `error_mapper.dart`, preserve backend error message on 404 (`NotFoundException(message ?? 'Taarifa hazipatikani.')`).
+- [x] Task 5: Bump client version code to `1.0.0+84` in `pubspec.yaml` and `app_update_service.dart`.
+- [x] Task 6: Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml` (Run 41810430474).
