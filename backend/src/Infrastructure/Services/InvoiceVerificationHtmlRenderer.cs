@@ -21,7 +21,7 @@ public static class InvoiceVerificationHtmlRenderer
         {
             CustomerInvoiceStatus.Paid => "status-paid",
             CustomerInvoiceStatus.PartiallyPaid => "status-partial",
-            CustomerInvoiceStatus.Voided => "status-void",
+            CustomerInvoiceStatus.Void => "status-void",
             _ => "status-unpaid"
         };
 
@@ -29,7 +29,7 @@ public static class InvoiceVerificationHtmlRenderer
         {
             CustomerInvoiceStatus.Paid => "Imelipwa Yote",
             CustomerInvoiceStatus.PartiallyPaid => "Imelipwa Sehemu",
-            CustomerInvoiceStatus.Voided => "Imebatilishwa",
+            CustomerInvoiceStatus.Void => "Imebatilishwa",
             _ => "Haijalipwa (Inadaiwa)"
         };
 
@@ -37,7 +37,7 @@ public static class InvoiceVerificationHtmlRenderer
         {
             CustomerInvoiceStatus.Paid => "Paid in Full",
             CustomerInvoiceStatus.PartiallyPaid => "Partially Paid",
-            CustomerInvoiceStatus.Voided => "Voided",
+            CustomerInvoiceStatus.Void => "Voided",
             _ => "Awaiting Payment"
         };
 
