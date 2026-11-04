@@ -115,7 +115,7 @@ class BarcodeLabelPrinterService {
                         barcode: barcodeEngine,
                         data: item.barcode,
                         drawText: true,
-                        style: pw.TextStyle(
+                        textStyle: pw.TextStyle(
                           fontSize: (heightMm * 0.14).clamp(6.5, 10.0),
                           fontWeight: pw.FontWeight.bold,
                         ),
@@ -209,7 +209,7 @@ class BarcodeLabelPrinterService {
                           barcode: barcodeEngine,
                           data: item.barcode,
                           drawText: true,
-                          style: const pw.TextStyle(fontSize: 7),
+                          textStyle: const pw.TextStyle(fontSize: 7),
                         ),
                       ),
                     ),

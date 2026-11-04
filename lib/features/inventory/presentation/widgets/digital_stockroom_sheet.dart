@@ -7,7 +7,6 @@ import '../../../../core/storage/local_database.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/format/money.dart';
-import '../../../sales/application/cart_controller.dart';
 import 'print_barcode_label_dialog.dart';
 
 /// Modal sheet activated when floor staff scan a product barcode or tap a product
@@ -332,7 +331,7 @@ class _DigitalStockroomSheetState
                     ref.read(cartControllerProvider.notifier).add(
                           product.productId,
                           product.name,
-                          product.retailPrice ?? 0.0,
+                          product.retailPrice,
                         );
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(

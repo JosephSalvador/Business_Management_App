@@ -48,6 +48,7 @@ class _MobileBarcodeScannerSheetState
   late final Animation<double> _laserAnimation;
 
   bool _isContinuous = false;
+  bool _torchOn = false;
   String? _lastScannedCode;
   DateTime? _lastScanTime;
   int _scannedCount = 0;
@@ -166,7 +167,7 @@ class _MobileBarcodeScannerSheetState
                       width: boxWidth,
                       height: boxHeight,
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Stack(
@@ -205,14 +206,14 @@ class _MobileBarcodeScannerSheetState
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Colors.redAccent.withOpacity(0.1),
+                                        Colors.redAccent.withValues(alpha: 0.1),
                                         Colors.redAccent,
-                                        Colors.redAccent.withOpacity(0.1),
+                                        Colors.redAccent.withValues(alpha: 0.1),
                                       ],
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.redAccent.withOpacity(0.8),
+                                        color: Colors.redAccent.withValues(alpha: 0.8),
                                         blurRadius: 6,
                                         spreadRadius: 1,
                                       ),
@@ -242,7 +243,7 @@ class _MobileBarcodeScannerSheetState
             children: [
               IconButton.filled(
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.black.withOpacity(0.6),
+                  backgroundColor: Colors.black.withValues(alpha: 0.6),
                 ),
                 icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () => Navigator.of(context).pop(),
@@ -250,7 +251,7 @@ class _MobileBarcodeScannerSheetState
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -263,22 +264,19 @@ class _MobileBarcodeScannerSheetState
                 ),
               ),
               // Torch Toggle
-              ValueListenableBuilder<TorchState>(
-                valueListenable: _controller.torchState,
-                builder: (context, state, child) {
-                  final isTorchOn = state == TorchState.on;
-                  return IconButton.filled(
-                    style: IconButton.styleFrom(
-                      backgroundColor: isTorchOn
-                          ? Colors.amber.withOpacity(0.9)
-                          : Colors.black.withOpacity(0.6),
-                    ),
-                    icon: Icon(
-                      isTorchOn ? Icons.flash_on : Icons.flash_off,
-                      color: isTorchOn ? Colors.black : Colors.white,
-                    ),
-                    onPressed: () => _controller.toggleTorch(),
-                  );
+              IconButton.filled(
+                style: IconButton.styleFrom(
+                  backgroundColor: _torchOn
+                      ? Colors.amber.withValues(alpha: 0.9)
+                      : Colors.black.withValues(alpha: 0.6),
+                ),
+                icon: Icon(
+                  _torchOn ? Icons.flash_on : Icons.flash_off,
+                  color: _torchOn ? Colors.black : Colors.white,
+                ),
+                onPressed: () async {
+                  await _controller.toggleTorch();
+                  if (mounted) setState(() => _torchOn = !_torchOn);
                 },
               ),
             ],
@@ -309,7 +307,7 @@ class _MobileBarcodeScannerSheetState
                   // Camera Switch
                   IconButton.filled(
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.black.withOpacity(0.6),
+                      backgroundColor: Colors.black.withValues(alpha: 0.6),
                     ),
                     icon: const Icon(Icons.flip_camera_ios, color: Colors.white),
                     onPressed: () => _controller.switchCamera(),
@@ -324,7 +322,7 @@ class _MobileBarcodeScannerSheetState
                     ),
                     label: Text(
                       _isContinuous
-                          ? '${loc.barcodeScanContinuous} (${_scannedCount})'
+                          ? '${loc.barcodeScanContinuous} ($_scannedCount)'
                           : loc.barcodeScanSingle,
                       style: TextStyle(
                         color: _isContinuous ? Colors.white : Colors.black87,

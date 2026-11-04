@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/storage/barcode_settings_store.dart';
 import '../../../../l10n/loc.dart';
-import '../../../../shared/design_system/app_colors.dart';
+import '../../../../shared/format/money.dart';
 import '../../data/barcode_label_printer_service.dart';
 
 Future<void> showPrintBarcodeLabelDialog(

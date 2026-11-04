@@ -993,6 +993,7 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
                     tooltip: 'Skana Barcode',
                     onPressed: () async {
                       final code = await showMobileBarcodeScanner(context);
+                      if (!mounted) return;
                       if (code != null && code.isNotEmpty) {
                         final q = code.trim().toLowerCase();
                         _searchController.text = code.trim();
@@ -1003,7 +1004,7 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
                                   (p.barcode?.toLowerCase() == q) ||
                                   (p.sku?.toLowerCase() == q))
                               .firstOrNull;
-                          if (match != null && mounted) {
+                          if (match != null) {
                             widget.onProductSelected(match);
                             Navigator.of(context).pop();
                           }
