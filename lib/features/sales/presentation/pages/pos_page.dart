@@ -757,16 +757,49 @@ class _DesktopCartSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final loc = context.loc;
+    final parkedCarts = ref.watch(parkedCartsProvider);
     return Column(
       children: [
         // Cart header
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Text(loc.posCart,
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700)),
+              if (parkedCarts.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => showParkedCartsSheet(context),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.pause_circle_outline,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${parkedCarts.length} pembeni',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const Spacer(),
               Text('${cart.itemCount} ${loc.posItemsInCart}',
                   style: TextStyle(
@@ -815,21 +848,46 @@ class _DesktopCartSidebar extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: cart.isEmpty
-                      ? null
-                      : () => showPaymentSheet(
-                            context,
-                            ref,
-                            customerId: customerId,
-                            customerName: customerName,
-                          ),
-                  icon: const Icon(Icons.shopping_cart_checkout, size: 18),
-                  label: Text(loc.posPay, style: const TextStyle(fontSize: 15)),
-                ),
+              Row(
+                children: [
+                  IconButton.outlined(
+                    icon: const Icon(Icons.pause_circle_outline, size: 20),
+                    tooltip: 'Weka Oda Pembeni',
+                    onPressed: cart.isEmpty
+                        ? null
+                        : () async {
+                            await ref.read(parkedCartsProvider.notifier).park(
+                                  cart.lines,
+                                  customerName: customerName,
+                                  customerId: customerId,
+                                );
+                            ref.read(cartControllerProvider.notifier).clear();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Oda imewekwa pembeni!'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: cart.isEmpty
+                          ? null
+                          : () => showPaymentSheet(
+                                context,
+                                ref,
+                                customerId: customerId,
+                                customerName: customerName,
+                              ),
+                      icon: const Icon(Icons.shopping_cart_checkout, size: 18),
+                      label: Text(loc.posPay, style: const TextStyle(fontSize: 15)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

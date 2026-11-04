@@ -78,7 +78,7 @@ AppException mapErrorResponse(int? statusCode, dynamic data) {
       }
       return ForbiddenException();
     case 404:
-      return NotFoundException();
+      return NotFoundException(message ?? 'Taarifa hazipatikani.');
     case 409:
       return ConflictException(message ?? 'Kuna mgongano na taarifa zilizopo.');
     case 429:

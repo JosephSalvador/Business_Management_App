@@ -290,7 +290,30 @@ class CheckoutController extends Notifier<CheckoutState> {
     double? amountTendered,
     String? customerId,
   }) async {
-    final priced = await _refreshPrices(lines, branchId);
+    var effectiveLines = lines;
+    if (lines
+        .any((l) => l.productId == QuickSaleDefaults.provisionalProductId)) {
+      try {
+        final realQuickId = await _repository.getOrCreateQuickSaleProduct();
+        effectiveLines = [
+          for (final line in lines)
+            if (line.productId == QuickSaleDefaults.provisionalProductId)
+              CartLine(
+                productId: realQuickId,
+                name: line.name,
+                unitPrice: line.unitPrice,
+                quantity: line.quantity,
+                unitPriceOverride: line.unitPriceOverride,
+                key: line.key,
+              )
+            else
+              line,
+        ];
+      } catch (_) {
+        // Fall back to original lines; transport/server handlers will decide
+      }
+    }
+    final priced = await _refreshPrices(effectiveLines, branchId);
     final total = priced.fold(0.0, (sum, line) => sum + line.lineTotal);
     return _repository.create(
       body: buildCreateSaleBody(
