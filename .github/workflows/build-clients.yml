@@ -142,6 +142,7 @@ jobs:
           sed -i '/org.gradle.java.home/d' android/gradle.properties
           sed -i 's/-Xmx8G/-Xmx4G/' android/gradle.properties
           flutter build apk --release --target-platform android-arm64 \
+            --android-skip-build-dependency-validation \
             --build-number=${{ github.run_number }} \
             --build-name=1.0.${{ github.run_number }} \
             --dart-define=APP_ENV=${{ steps.cf_env.outputs.app_env }} \
