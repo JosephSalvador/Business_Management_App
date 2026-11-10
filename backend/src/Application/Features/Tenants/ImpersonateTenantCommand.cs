@@ -2,11 +2,9 @@ using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
-using BusinessOS.Infrastructure.Persistence;
 using BusinessOS.Shared;
 using BusinessOS.Shared.Configuration;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace BusinessOS.Application.Features.Tenants;
@@ -23,20 +21,20 @@ public sealed record ImpersonateTenantCommand(Guid TenantId) : IRequest<Result<I
 public sealed class ImpersonateTenantCommandHandler
     : IRequestHandler<ImpersonateTenantCommand, Result<ImpersonationResultDto>>
 {
-    private readonly BusinessDbContext _db;
+    private readonly IFleetAdminRepository _fleet;
     private readonly ITokenService _tokenService;
     private readonly ITenantContext _tenantContext;
     private readonly IAuditLogRepository _auditLogs;
     private readonly IOptions<PlatformAdminOptions> _platformOptions;
 
     public ImpersonateTenantCommandHandler(
-        BusinessDbContext db,
+        IFleetAdminRepository fleet,
         ITokenService tokenService,
         ITenantContext tenantContext,
         IAuditLogRepository auditLogs,
         IOptions<PlatformAdminOptions> platformOptions)
     {
-        _db = db;
+        _fleet = fleet;
         _tokenService = tokenService;
         _tenantContext = tenantContext;
         _auditLogs = auditLogs;
@@ -46,29 +44,21 @@ public sealed class ImpersonateTenantCommandHandler
     public async Task<Result<ImpersonationResultDto>> Handle(
         ImpersonateTenantCommand command, CancellationToken cancellationToken)
     {
-        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == command.TenantId, cancellationToken);
+        var tenant = await _fleet.GetTenantByIdAsync(command.TenantId, cancellationToken);
         if (tenant is null)
         {
             return Error.NotFound("Tenant not found.");
         }
 
         var operatorUserId = _tenantContext.UserId ?? Guid.Empty;
-        var operatorUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == operatorUserId, cancellationToken);
-        var operatorEmail = operatorUser?.Email ?? "platform.operator@jolinx.com";
-
-        // Find primary administrator user in the tenant
-        var primaryAdmin = await _db.Users
-            .Include(u => u.Roles)
-            .Where(u => u.TenantId == command.TenantId && u.IsActive)
-            .OrderBy(u => u.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        var primaryAdmin = await _fleet.GetPrimaryOwnerAsync(command.TenantId, cancellationToken);
 
         var targetUserId = primaryAdmin?.Id ?? Guid.NewGuid();
         var targetEmail = primaryAdmin?.Email ?? $"admin@{tenant.Name.ToLowerInvariant().Replace(" ", "")}.com";
 
         var extraClaims = new Dictionary<string, string>
         {
-            ["impersonated_by"] = operatorEmail,
+            ["impersonated_by"] = _tenantContext.UserId?.ToString() ?? "operator",
             ["is_impersonation"] = "true",
             ["impersonated_at"] = DateTime.UtcNow.ToString("o"),
             ["tenant_name"] = tenant.Name
@@ -109,18 +99,21 @@ public sealed record UpdateTenantFeaturesAdminCommand(
 public sealed class UpdateTenantFeaturesAdminCommandHandler
     : IRequestHandler<UpdateTenantFeaturesAdminCommand, Result<IReadOnlyList<string>>>
 {
-    private readonly BusinessDbContext _db;
+    private readonly ITenantRepository _tenants;
+    private readonly IFeatureFlagRepository _flags;
     private readonly ITenantContext _tenantContext;
     private readonly IAuditLogRepository _auditLogs;
     private readonly ICacheService _cache;
 
     public UpdateTenantFeaturesAdminCommandHandler(
-        BusinessDbContext db,
+        ITenantRepository tenants,
+        IFeatureFlagRepository flags,
         ITenantContext tenantContext,
         IAuditLogRepository auditLogs,
         ICacheService cache)
     {
-        _db = db;
+        _tenants = tenants;
+        _flags = flags;
         _tenantContext = tenantContext;
         _auditLogs = auditLogs;
         _cache = cache;
@@ -129,13 +122,10 @@ public sealed class UpdateTenantFeaturesAdminCommandHandler
     public async Task<Result<IReadOnlyList<string>>> Handle(
         UpdateTenantFeaturesAdminCommand command, CancellationToken cancellationToken)
     {
-        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == command.TenantId, cancellationToken);
+        var tenant = await _tenants.GetByIdAsync(command.TenantId, cancellationToken);
         if (tenant is null) return Error.NotFound("Tenant not found.");
 
-        var existingFlags = await _db.FeatureFlags
-            .Where(f => f.TenantId == command.TenantId)
-            .ToListAsync(cancellationToken);
-
+        var existingFlags = await _flags.ListAsync(command.TenantId, cancellationToken);
         var enabledSet = new HashSet<string>(command.EnabledFeatures, StringComparer.OrdinalIgnoreCase);
 
         foreach (var key in FeatureKeys.All)
@@ -146,15 +136,14 @@ public sealed class UpdateTenantFeaturesAdminCommandHandler
             if (flag is null)
             {
                 var newFlag = FeatureFlag.Create(command.TenantId, key, isDesired);
-                await _db.FeatureFlags.AddAsync(newFlag, cancellationToken);
+                await _flags.AddAsync(newFlag, cancellationToken);
             }
             else if (flag.IsEnabled != isDesired)
             {
                 if (isDesired) flag.Enable(); else flag.Disable();
+                await _flags.UpdateAsync(flag, cancellationToken);
             }
         }
-
-        await _db.SaveChangesAsync(cancellationToken);
 
         // Invalidate capabilities cache for the tenant
         await _cache.RemoveAsync($"tenant:capabilities:{command.TenantId}", cancellationToken);

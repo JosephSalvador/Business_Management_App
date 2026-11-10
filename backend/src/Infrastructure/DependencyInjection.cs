@@ -97,6 +97,11 @@ public static class DependencyInjection
         services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
         services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
         services.AddScoped<IPlatformOperatorRepository, PlatformOperatorRepository>();
+        services.AddScoped<IFleetAdminRepository, FleetAdminRepository>();
+        services.AddScoped<IOmniTenantCatalogRepository, OmniTenantCatalogRepository>();
+        services.AddScoped<IOmniTenantSalesRepository, OmniTenantSalesRepository>();
+        services.AddScoped<IOmniTenantInvoicesRepository, OmniTenantInvoicesRepository>();
+        services.AddScoped<IPlatformTeamRepository, PlatformTeamRepository>();
         services.AddScoped<IAccountMappingService, AccountMappingService>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddSingleton<ICsvExportService, CsvExportService>();

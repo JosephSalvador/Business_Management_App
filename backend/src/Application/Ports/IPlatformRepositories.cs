@@ -933,3 +933,46 @@ public interface IPlatformOperatorRepository
     Task RemoveAsync(PlatformOperator op, CancellationToken cancellationToken = default);
 }
 
+public interface IFleetAdminRepository
+{
+    Task<FleetSummaryDto> GetFleetSummaryAsync(CancellationToken cancellationToken = default);
+    Task<PagedResult<TenantAdminSummaryDto>> ListTenantsAsync(string? search, string? status, string? health, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<TenantAdminDetailDto?> GetTenantDetailAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<Tenant?> GetTenantByIdAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<User?> GetPrimaryOwnerAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface IOmniTenantCatalogRepository
+{
+    Task<PagedResult<OmniProductDto>> ListTenantProductsAsync(Guid tenantId, string? search, bool lowStockOnly, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<Product?> GetProductByIdAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken = default);
+    Task UpdateProductAsync(Product product, CancellationToken cancellationToken = default);
+    Task AdjustProductStockAsync(Guid tenantId, Guid productId, decimal newStockQuantity, string reason, Guid? operatorUserId, CancellationToken cancellationToken = default);
+    Task SeedStarterCatalogAsync(Guid tenantId, string templateType, Guid? operatorUserId, CancellationToken cancellationToken = default);
+}
+
+public interface IOmniTenantSalesRepository
+{
+    Task<PagedResult<OmniSaleSummaryDto>> ListTenantSalesAsync(Guid tenantId, string? search, DateTime? startDate, DateTime? endDate, Guid? cashierId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<OmniSaleDetailDto?> GetTenantSaleDetailAsync(Guid tenantId, Guid saleId, CancellationToken cancellationToken = default);
+    Task<Sale?> GetSaleByIdAsync(Guid tenantId, Guid saleId, CancellationToken cancellationToken = default);
+    Task VoidSaleAsync(Sale sale, string reason, Guid? operatorUserId, CancellationToken cancellationToken = default);
+    Task<PagedResult<OmniCashSessionDto>> ListTenantCashSessionsAsync(Guid tenantId, int page, int pageSize, CancellationToken cancellationToken = default);
+}
+
+public interface IOmniTenantInvoicesRepository
+{
+    Task<PagedResult<OmniInvoiceSummaryDto>> ListTenantInvoicesAsync(Guid tenantId, string? search, string? status, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<CustomerInvoice?> GetInvoiceByIdAsync(Guid tenantId, Guid invoiceId, CancellationToken cancellationToken = default);
+    Task UpdateInvoiceStatusAsync(CustomerInvoice invoice, CustomerInvoiceStatus newStatus, CancellationToken cancellationToken = default);
+}
+
+public interface IPlatformTeamRepository
+{
+    Task<IReadOnlyList<PlatformOperatorDto>> ListPlatformOperatorsAsync(CancellationToken cancellationToken = default);
+    Task<User?> FindUserByEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task AssignPlatformRoleAsync(Guid userId, PlatformRoleType role, CancellationToken cancellationToken = default);
+    Task RevokePlatformRoleAsync(Guid operatorId, CancellationToken cancellationToken = default);
+}
+
+
