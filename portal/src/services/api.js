@@ -312,3 +312,74 @@ export async function revokePlatformRole(operatorId) {
     method: 'DELETE',
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLANS & PACKAGES MANAGEMENT (CONTROL PLANE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listAllPlansAdmin() {
+  return request('/api/v1/admin/billing/plans');
+}
+
+export async function createPlanAdmin(payload) {
+  return request('/api/v1/admin/billing/plans', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updatePlanAdmin(code, payload) {
+  return request(`/api/v1/admin/billing/plans/${code}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VOUCHER MACHINE (CONTROL PLANE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listVouchersAdmin({ page = 1, pageSize = 50, status = '' } = {}) {
+  const params = new URLSearchParams();
+  params.append('page', page);
+  params.append('pageSize', pageSize);
+  if (status) params.append('status', status);
+  return request(`/api/v1/admin/billing/vouchers?${params.toString()}`);
+}
+
+export async function issueVouchersAdmin({ count = 1, valueDays = 30, planCode = 'Pro', targetTenantId = null, expiresAtUtc = null }) {
+  return request('/api/v1/admin/billing/vouchers/issue', {
+    method: 'POST',
+    body: JSON.stringify({
+      count: Number(count),
+      valueDays: Number(valueDays),
+      planCode: planCode || null,
+      targetTenantId: targetTenantId || null,
+      expiresAtUtc: expiresAtUtc || null,
+    }),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENT INSTRUCTIONS (CONTROL PLANE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getPaymentInstructionsAdmin() {
+  return request('/api/v1/admin/billing/payment-instructions');
+}
+
+export async function updatePaymentInstructionsAdmin(payload) {
+  return request('/api/v1/admin/billing/payment-instructions', {
+    method: 'PUT',
+    body: JSON.stringify({
+      mpesaTill: payload.mpesaTill || '',
+      airtelMoney: payload.airtelMoney || '',
+      bankName: payload.bankName || '',
+      bankAccountNumber: payload.bankAccountNumber || '',
+      bankAccountName: payload.bankAccountName || '',
+      whatsAppContact: payload.whatsAppContact || '',
+      notes: payload.notes || '',
+    }),
+  });
+}
+

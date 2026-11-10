@@ -44,7 +44,14 @@ import {
   clearAuthSession,
   getStoredUser,
   getAuthToken,
-  getApiBaseUrl
+  getApiBaseUrl,
+  listAllPlansAdmin,
+  createPlanAdmin,
+  updatePlanAdmin,
+  listVouchersAdmin,
+  issueVouchersAdmin,
+  getPaymentInstructionsAdmin,
+  updatePaymentInstructionsAdmin
 } from './services/api';
 
 const ALL_AVAILABLE_FEATURES = [
@@ -221,174 +228,228 @@ export default function App() {
     setActiveTab('tenant-console');
   };
 
-  // ── Packages State ────────────────────────────────────────────────
-  const [packages, setPackages] = useState([
-    {
-      id: '1',
-      code: 'Starter',
-      name: 'Starter Plan (Kuanza)',
-      monthlyPrice: 20000,
-      currency: 'TZS',
-      isPackage: false,
-      isActive: true,
-      maxBranches: 1,
-      maxUsers: 2,
-      maxProducts: 1000,
-      featureKeys: ['pos.enabled', 'inventory.enabled', 'finance.enabled'],
-    },
-    {
-      id: '2',
-      code: 'Pro',
-      name: 'Growth Pro (Kukua)',
-      monthlyPrice: 45000,
-      currency: 'TZS',
-      isPackage: false,
-      isActive: true,
-      maxBranches: 1,
-      maxUsers: 5,
-      maxProducts: 5000,
-      featureKeys: [
-        'pos.enabled',
-        'inventory.enabled',
-        'purchasing.enabled',
-        'finance.enabled',
-        'crm.enabled',
-        'credit.enabled',
-        'reports.enabled',
-        'pricing.enabled'
-      ],
-    },
-    {
-      id: '3',
-      code: 'Scale',
-      name: 'Scale & Multi-Store (Kushinda)',
-      monthlyPrice: 95000,
-      currency: 'TZS',
-      isPackage: false,
-      isActive: true,
-      maxBranches: 3,
-      maxUsers: 15,
-      maxProducts: null,
-      featureKeys: [
-        'pos.enabled',
-        'inventory.enabled',
-        'purchasing.enabled',
-        'finance.enabled',
-        'crm.enabled',
-        'credit.enabled',
-        'reports.enabled',
-        'pricing.enabled',
-        'multi-branch.enabled',
-        'accounting.enabled'
-      ],
-    },
-    {
-      id: '4',
-      code: 'invoice-manager',
-      name: 'Invoice Manager Add-on',
-      monthlyPrice: 15000,
-      currency: 'TZS',
-      isPackage: true,
-      isActive: true,
-      maxBranches: null,
-      maxUsers: null,
-      maxProducts: null,
-      featureKeys: ['invoicing.enabled'],
-    },
-    {
-      id: '5',
-      code: 'credit-manager',
-      name: 'Credit & Debt Book Add-on',
-      monthlyPrice: 15000,
-      currency: 'TZS',
-      isPackage: true,
-      isActive: true,
-      maxBranches: null,
-      maxUsers: null,
-      maxProducts: null,
-      featureKeys: ['credit.enabled', 'crm.enabled'],
-    },
-  ]);
+  // ── Packages State (Live Database Data) ───────────────────────────
+  const [packages, setPackages] = useState([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packagesError, setPackagesError] = useState(null);
   const [editingPackage, setEditingPackage] = useState(null);
+  const [savingPackage, setSavingPackage] = useState(false);
   const [showAddPackageModal, setShowAddPackageModal] = useState(false);
+  const [creatingPackage, setCreatingPackage] = useState(false);
 
-  // ── Voucher Generator State ───────────────────────────────────────
-  const [vouchers, setVouchers] = useState([
-    {
-      id: 'v1',
-      code: 'JLX-88K2-9M4P',
-      valueDays: 30,
-      status: 'Issued',
-      planCode: 'Pro',
-      targetTenant: 'Mussa Electronics',
-      createdAt: 'Leo',
-    },
-    {
-      id: 'v2',
-      code: 'JLX-44Y7-2K9B',
-      valueDays: 90,
-      status: 'Redeemed',
-      planCode: 'Scale',
-      targetTenant: 'Kariakoo Wholesalers',
-      createdAt: 'Jana',
-    },
-  ]);
+  const fetchPackages = async () => {
+    if (!getAuthToken()) return;
+    setPackagesLoading(true);
+    setPackagesError(null);
+    try {
+      const res = await listAllPlansAdmin();
+      if (Array.isArray(res)) {
+        setPackages(res);
+      } else if (res && Array.isArray(res.items)) {
+        setPackages(res.items);
+      } else {
+        setPackages([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch packages:', err);
+      setPackagesError(err.message || 'Hitilafu ya kupakia vifurushi kutoka seva.');
+      setPackages([]);
+    } finally {
+      setPackagesLoading(false);
+    }
+  };
+
+  const handleSavePackageEdit = async () => {
+    if (!editingPackage) return;
+    setSavingPackage(true);
+    try {
+      await updatePlanAdmin(editingPackage.code, {
+        name: editingPackage.name,
+        monthlyPrice: Number(editingPackage.monthlyPrice),
+        currency: editingPackage.currency || 'TZS',
+        featureKeys: editingPackage.featureKeys || [],
+        maxBranches: editingPackage.maxBranches ? Number(editingPackage.maxBranches) : null,
+        maxUsers: editingPackage.maxUsers ? Number(editingPackage.maxUsers) : null,
+        maxProducts: editingPackage.maxProducts ? Number(editingPackage.maxProducts) : null,
+        isPackage: Boolean(editingPackage.isPackage),
+        isActive: Boolean(editingPackage.isActive),
+      });
+      showNotification(`Kifurushi ${editingPackage.name} kimesasishwa kwenye seva!`);
+      setEditingPackage(null);
+      fetchPackages();
+    } catch (err) {
+      showNotification(`Hitilafu kusasisha kifurushi: ${err.message || 'Jaribu tena'}`);
+    } finally {
+      setSavingPackage(false);
+    }
+  };
+
+  const handleCreatePackage = async (e) => {
+    e.preventDefault();
+    setCreatingPackage(true);
+    const form = e.target;
+    try {
+      const payload = {
+        code: form.code.value.trim(),
+        name: form.name.value.trim(),
+        monthlyPrice: Number(form.monthlyPrice.value),
+        currency: 'TZS',
+        featureKeys: ['pos.enabled', 'inventory.enabled'],
+        maxBranches: form.maxBranches?.value ? Number(form.maxBranches.value) : null,
+        maxUsers: form.maxUsers?.value ? Number(form.maxUsers.value) : null,
+        maxProducts: form.maxProducts?.value ? Number(form.maxProducts.value) : null,
+        isPackage: Boolean(form.isPackage?.checked),
+      };
+      await createPlanAdmin(payload);
+      setShowAddPackageModal(false);
+      showNotification(`Kifurushi kipya kimeundwa kwenye seva!`);
+      fetchPackages();
+    } catch (err) {
+      showNotification(`Hitilafu ya kuunda kifurushi: ${err.message || 'Jaribu tena'}`);
+    } finally {
+      setCreatingPackage(false);
+    }
+  };
+
+  // ── Voucher Generator State (Live Database Data) ──────────────────
+  const [vouchers, setVouchers] = useState([]);
+  const [vouchersLoading, setVouchersLoading] = useState(false);
+  const [vouchersError, setVouchersError] = useState(null);
+  const [voucherPage, setVoucherPage] = useState(1);
+  const [generatingVoucher, setGeneratingVoucher] = useState(false);
   const [newVoucherDays, setNewVoucherDays] = useState(30);
   const [newVoucherPlan, setNewVoucherPlan] = useState('Pro');
   const [newVoucherTarget, setNewVoucherTarget] = useState('');
   const [lastGeneratedVoucher, setLastGeneratedVoucher] = useState(null);
 
-  const generateLuhn32Code = () => {
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let chars = [];
-    let sum = 0;
-    for (let i = 0; i < 11; i++) {
-      const idx = Math.floor(Math.random() * alphabet.length);
-      chars.push(alphabet[idx]);
-      sum += idx * (i + 1);
+  const fetchVouchers = async () => {
+    if (!getAuthToken()) return;
+    setVouchersLoading(true);
+    setVouchersError(null);
+    try {
+      const res = await listVouchersAdmin({ page: voucherPage, pageSize: 50 });
+      if (Array.isArray(res)) {
+        setVouchers(res);
+      } else if (res && Array.isArray(res.items)) {
+        setVouchers(res.items);
+      } else {
+        setVouchers([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch vouchers:', err);
+      setVouchersError(err.message || 'Hitilafu ya kupakia vocha kutoka seva.');
+      setVouchers([]);
+    } finally {
+      setVouchersLoading(false);
     }
-    const checkChar = alphabet[sum % alphabet.length];
-    chars.push(checkChar);
-    return `JLX-${chars.slice(4, 8).join('')}-${chars.slice(8, 12).join('')}`;
   };
 
-  const handleGenerateVoucher = () => {
-    const code = generateLuhn32Code();
-    const newVoucher = {
-      id: Date.now().toString(),
-      code,
-      valueDays: Number(newVoucherDays),
-      status: 'Issued',
-      planCode: newVoucherPlan,
-      targetTenant: newVoucherTarget.trim() || 'Yeyote (Bila Kikwazo)',
-      createdAt: 'Sasa hivi',
-    };
-    setVouchers([newVoucher, ...vouchers]);
-    setLastGeneratedVoucher(newVoucher);
-    showNotification(`Vocha ${code} imetengenezwa kwa ufanisi!`);
+  const handleGenerateVoucher = async () => {
+    setGeneratingVoucher(true);
+    try {
+      const res = await issueVouchersAdmin({
+        count: 1,
+        valueDays: Number(newVoucherDays),
+        planCode: newVoucherPlan,
+        targetTenantId: newVoucherTarget?.trim() || null,
+      });
+
+      const generatedCode = Array.isArray(res) ? res[0] : (res?.codes?.[0] || res?.code);
+      if (generatedCode) {
+        const newVoucher = {
+          code: generatedCode,
+          valueDays: Number(newVoucherDays),
+          status: 'Issued',
+          planCode: newVoucherPlan,
+          targetTenant: newVoucherTarget?.trim() || 'Yeyote (Bila Kikwazo)',
+          createdAt: new Date().toISOString(),
+        };
+        setLastGeneratedVoucher(newVoucher);
+        showNotification(`Vocha ${generatedCode} imetengenezwa kwenye seva!`);
+        fetchVouchers();
+      } else {
+        showNotification('Vocha imetengenezwa kwenye seva.');
+        fetchVouchers();
+      }
+    } catch (err) {
+      showNotification(`Hitilafu ya kuzalisha vocha: ${err.message || 'Jaribu tena'}`);
+    } finally {
+      setGeneratingVoucher(false);
+    }
   };
 
   const handleCopyWhatsAppMessage = (voucher) => {
     const msg = `Habari! Tumepokea malipo yako ya huduma ya Jolinx Business OS.\n\n` +
       `🎟️ Vocha Yako: *${voucher.code}*\n` +
-      `⏳ Muda Uliofunguliwa: *Siku ${voucher.valueDays} (${voucher.planCode})*\n\n` +
+      `⏳ Muda Uliofunguliwa: *Siku ${voucher.valueDays} (${voucher.planCode || 'Pro'})*\n\n` +
       `Fungua app yako kisha uweke namba hii kwenye sehemu ya Malipo, au bofya kiungo hiki kuwasha mara moja:\n` +
-      `👉 https://app.jolinx.com/redeem?code=${voucher.code}\n\n` +
+      `👉 https://staging.jolinx-portal.pages.dev/redeem?code=${voucher.code}\n\n` +
       `Asante kwa kufanya biashara nasi!`;
     navigator.clipboard.writeText(msg);
     showNotification('Ujumbe wa WhatsApp umenakiliwa! Tuma kwa mteja.');
   };
 
-  // ── Dynamic Payment Accounts State ────────────────────────────────
+  // ── Dynamic Payment Accounts State (Live Database Data) ───────────
   const [paymentAccounts, setPaymentAccounts] = useState({
-    mpesaTill: '5523412',
-    airtelMoney: '0788 000 111',
-    bankName: 'CRDB Bank',
-    bankAccountNumber: '0152 4899 2100',
-    bankAccountName: 'Jolinx Technologies Ltd',
-    whatsAppContact: '+255 754 000 000',
-    notes: 'Baada ya kufanya muamala, tuma picha ya meseji WhatsApp au piga simu kuwezeshwa mara moja.',
+    mpesaTill: '',
+    airtelMoney: '',
+    bankName: '',
+    bankAccountNumber: '',
+    bankAccountName: '',
+    whatsAppContact: '',
+    notes: '',
   });
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
+
+  const fetchPaymentAccounts = async () => {
+    if (!getAuthToken()) return;
+    setPaymentLoading(true);
+    setPaymentError(null);
+    try {
+      const res = await getPaymentInstructionsAdmin();
+      if (res) {
+        setPaymentAccounts({
+          mpesaTill: res.mpesaTill || '',
+          airtelMoney: res.airtelMoney || '',
+          bankName: res.bankName || '',
+          bankAccountNumber: res.bankAccountNumber || '',
+          bankAccountName: res.bankAccountName || '',
+          whatsAppContact: res.whatsAppContact || '',
+          notes: res.notes || '',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch payment instructions:', err);
+      setPaymentError(err.message || 'Hitilafu ya kupakia akaunti za malipo.');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleSavePaymentAccounts = async () => {
+    setPaymentSaving(true);
+    try {
+      await updatePaymentInstructionsAdmin(paymentAccounts);
+      showNotification('Akaunti za malipo zimehifadhiwa kwenye seva na kuchapishwa kwenye app zote!');
+    } catch (err) {
+      showNotification(`Hitilafu kuhifadhi: ${err.message || 'Jaribu tena'}`);
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authToken) return;
+    if (activeTab === 'packages') {
+      fetchPackages();
+    } else if (activeTab === 'vouchers') {
+      fetchVouchers();
+    } else if (activeTab === 'payment') {
+      fetchPaymentAccounts();
+    }
+  }, [authToken, activeTab]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -897,90 +958,140 @@ export default function App() {
                   Badilisha bei, majina, na fungua features kwa wakati halisi. App zote za wateja zinapokea mabadiliko haya papo hapo bila kuhitaji update ya Play Store!
                 </p>
               </div>
-              <button
-                onClick={() => setShowAddPackageModal(true)}
-                className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-md shadow-indigo-600/20 transition self-start sm:self-auto"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Ongeza Kifurushi Kipya</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {packages.map((pkg) => (
-                <div
-                  key={pkg.code}
-                  className={`bg-white rounded-2xl border transition-all p-5 flex flex-col justify-between ${
-                    pkg.isPackage
-                      ? 'border-indigo-200 hover:shadow-indigo-100 hover:shadow-md'
-                      : 'border-slate-200 hover:shadow-md'
-                  }`}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={fetchPackages}
+                  disabled={packagesLoading}
+                  className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition shadow-sm"
+                  title="Sasisha Orodha ya Vifurushi"
                 >
-                  <div>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span
-                          className={`text-xs uppercase px-2 py-0.5 rounded font-bold ${
-                            pkg.isPackage
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {pkg.isPackage ? 'Add-on Modular Package' : 'Base Subscription Plan'}
-                        </span>
-                        <h3 className="text-lg font-bold text-slate-900 mt-2">{pkg.name}</h3>
-                        <p className="text-xs text-slate-400 font-mono">Code: {pkg.code}</p>
-                      </div>
-                      <button
-                        onClick={() => setEditingPackage({ ...pkg })}
-                        className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="mt-4 pb-4 border-b border-slate-100">
-                      <div className="flex items-baseline space-x-1">
-                        <span className="text-2xl font-black text-slate-900">
-                          {pkg.monthlyPrice.toLocaleString()} {pkg.currency}
-                        </span>
-                        <span className="text-xs text-slate-500 font-medium">/ mwezi</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                        Features ({pkg.featureKeys.length}):
-                      </span>
-                      <ul className="space-y-1.5 mt-2">
-                        {pkg.featureKeys.map((fKey) => {
-                          const feat = ALL_AVAILABLE_FEATURES.find((f) => f.key === fKey);
-                          return (
-                            <li key={fKey} className="flex items-center text-xs text-slate-700 space-x-2">
-                              <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                              <span className="font-medium">{feat?.name || fKey}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-600">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span>Live kwenye Cloud</span>
-                    </span>
-                    <button
-                      onClick={() => setEditingPackage({ ...pkg })}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
-                    >
-                      Hariri Bei & Features →
-                    </button>
-                  </div>
-                </div>
-              ))}
+                  <RefreshCw className={`w-4 h-4 ${packagesLoading ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  onClick={() => setShowAddPackageModal(true)}
+                  className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-md shadow-indigo-600/20 transition"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Ongeza Kifurushi Kipya</span>
+                </button>
+              </div>
             </div>
+
+            {packagesError && (
+              <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between text-red-700 text-sm">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <span>{packagesError}</span>
+                </div>
+                <button
+                  onClick={fetchPackages}
+                  className="underline font-semibold hover:text-red-900 text-xs"
+                >
+                  Jaribu Tena
+                </button>
+              </div>
+            )}
+
+            {packagesLoading ? (
+              <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-500">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto text-indigo-600 mb-2" />
+                <p className="text-sm">Inapakia vifurushi kutoka seva ya database...</p>
+              </div>
+            ) : packages.length === 0 && !packagesError ? (
+              <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-500 space-y-3">
+                <Package className="w-10 h-10 mx-auto text-slate-300" />
+                <h3 className="text-base font-bold text-slate-700">Hakuna Vifurushi Vilivyoundwa Bado</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Mfumo bado hauna vifurushi au mipango ya malipo iliyosanidiwa. Bofya "Ongeza Kifurushi Kipya" kuanzisha mpango wa kwanza.
+                </p>
+                <button
+                  onClick={() => setShowAddPackageModal(true)}
+                  className="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Unda Kifurushi cha Kwanza</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {packages.map((pkg) => {
+                  const featureKeys = pkg.featureKeys || [];
+                  return (
+                    <div
+                      key={pkg.code}
+                      className={`bg-white rounded-2xl border transition-all p-5 flex flex-col justify-between ${
+                        pkg.isPackage
+                          ? 'border-indigo-200 hover:shadow-indigo-100 hover:shadow-md'
+                          : 'border-slate-200 hover:shadow-md'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span
+                              className={`text-xs uppercase px-2 py-0.5 rounded font-bold ${
+                                pkg.isPackage
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}
+                            >
+                              {pkg.isPackage ? 'Add-on Modular Package' : 'Base Subscription Plan'}
+                            </span>
+                            <h3 className="text-lg font-bold text-slate-900 mt-2">{pkg.name}</h3>
+                            <p className="text-xs text-slate-400 font-mono">Code: {pkg.code}</p>
+                          </div>
+                          <button
+                            onClick={() => setEditingPackage({ ...pkg, featureKeys: [...featureKeys] })}
+                            className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="mt-4 pb-4 border-b border-slate-100">
+                          <div className="flex items-baseline space-x-1">
+                            <span className="text-2xl font-black text-slate-900">
+                              {(pkg.monthlyPrice || 0).toLocaleString()} {pkg.currency || 'TZS'}
+                            </span>
+                            <span className="text-xs text-slate-500 font-medium">/ mwezi</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                            Features ({featureKeys.length}):
+                          </span>
+                          <ul className="space-y-1.5 mt-2">
+                            {featureKeys.map((fKey) => {
+                              const feat = ALL_AVAILABLE_FEATURES.find((f) => f.key === fKey);
+                              return (
+                                <li key={fKey} className="flex items-center text-xs text-slate-700 space-x-2">
+                                  <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                                  <span className="font-medium">{feat?.name || fKey}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <span className="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-600">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span>Live kwenye Cloud</span>
+                        </span>
+                        <button
+                          onClick={() => setEditingPackage({ ...pkg, featureKeys: [...featureKeys] })}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                        >
+                          Hariri Bei & Features →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -988,11 +1099,21 @@ export default function App() {
         {activeTab === 'vouchers' && (
           <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="max-w-2xl">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Mashine ya Vocha za Malipo</h1>
-                <p className="text-sm text-slate-500 mt-1">
-                  Tengeneza namba za vocha zenye ulinzi wa Luhn-32 Checksum. Haziwezi kubahatishwa wala kutumiwa mara mbili. Tuma ujumbe uliopangwa moja kwa moja WhatsApp kwa mteja!
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="max-w-2xl">
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Mashine ya Vocha za Malipo</h1>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Tengeneza namba za vocha zenye ulinzi wa Luhn-32 Checksum kutoka seva. Haziwezi kubahatishwa wala kutumiwa mara mbili. Tuma ujumbe moja kwa moja WhatsApp kwa mteja!
+                  </p>
+                </div>
+                <button
+                  onClick={fetchVouchers}
+                  disabled={vouchersLoading}
+                  className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition shadow-sm self-start sm:self-auto"
+                  title="Sasisha Orodha ya Vocha"
+                >
+                  <RefreshCw className={`w-4 h-4 ${vouchersLoading ? 'animate-spin' : ''}`} />
+                </button>
               </div>
 
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 pb-6 border-b border-slate-200">
@@ -1017,10 +1138,20 @@ export default function App() {
                     onChange={(e) => setNewVoucherPlan(e.target.value)}
                     className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium"
                   >
-                    <option value="Starter">Starter (20,000 TZS)</option>
-                    <option value="Pro">Growth Pro (45,000 TZS)</option>
-                    <option value="Scale">Scale & Multi-Store (95,000 TZS)</option>
-                    <option value="invoice-manager">Invoice Manager Add-on</option>
+                    {packages.length > 0 ? (
+                      packages.map((p) => (
+                        <option key={p.code} value={p.code}>
+                          {p.name} ({(p.monthlyPrice || 0).toLocaleString()} {p.currency || 'TZS'})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Starter">Starter (20,000 TZS)</option>
+                        <option value="Pro">Growth Pro (45,000 TZS)</option>
+                        <option value="Scale">Scale & Multi-Store (95,000 TZS)</option>
+                        <option value="invoice-manager">Invoice Manager Add-on</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -1028,7 +1159,7 @@ export default function App() {
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Funga kwa Mteja (Hiari)</label>
                   <input
                     type="text"
-                    placeholder="Mfano: Mussa Hardware"
+                    placeholder="Weka Tenant ID au jina la mteja"
                     value={newVoucherTarget}
                     onChange={(e) => setNewVoucherTarget(e.target.value)}
                     className="w-full p-2.5 border border-slate-200 rounded-xl text-sm"
@@ -1039,22 +1170,23 @@ export default function App() {
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={handleGenerateVoucher}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl shadow-md transition flex items-center space-x-2"
+                  disabled={generatingVoucher}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl shadow-md transition flex items-center space-x-2"
                 >
-                  <Ticket className="w-4 h-4" />
-                  <span>Tengeneza Vocha Sasa</span>
+                  <Ticket className={`w-4 h-4 ${generatingVoucher ? 'animate-spin' : ''}`} />
+                  <span>{generatingVoucher ? 'Inatengeneza kwenye Seva...' : 'Tengeneza Vocha Sasa'}</span>
                 </button>
               </div>
 
               {lastGeneratedVoucher && (
                 <div className="mt-6 p-4 rounded-xl bg-indigo-50 border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <span className="text-xs uppercase font-bold text-indigo-700">Vocha Mpya Iliyozalishwa:</span>
+                    <span className="text-xs uppercase font-bold text-indigo-700">Vocha Mpya Iliyozalishwa kwenye Seva:</span>
                     <div className="text-2xl font-black font-mono text-indigo-900 tracking-wider">
                       {lastGeneratedVoucher.code}
                     </div>
                     <p className="text-xs text-indigo-700">
-                      Siku {lastGeneratedVoucher.valueDays} • {lastGeneratedVoucher.planCode} • {lastGeneratedVoucher.targetTenant}
+                      Siku {lastGeneratedVoucher.valueDays} • Mpango: {lastGeneratedVoucher.planCode} • Mteja: {lastGeneratedVoucher.targetTenant}
                     </p>
                   </div>
                   <button
@@ -1069,37 +1201,77 @@ export default function App() {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-slate-200 font-bold text-slate-900 text-sm">
-                Historia ya Vocha Zilizotolewa
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                <div className="font-bold text-slate-900 text-sm">
+                  Historia ya Vocha Zilizotolewa ({vouchers.length})
+                </div>
+                <button
+                  onClick={fetchVouchers}
+                  disabled={vouchersLoading}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                  title="Sasisha Vocha"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${vouchersLoading ? 'animate-spin' : ''}`} />
+                </button>
               </div>
-              <div className="divide-y divide-slate-100">
-                {vouchers.map((v) => (
-                  <div key={v.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
-                    <div className="flex items-center space-x-3">
-                      <span className="font-mono font-bold text-slate-900">{v.code}</span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded font-bold ${
-                          v.status === 'Issued'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}
-                      >
-                        {v.status === 'Issued' ? 'Inasubiri Kutumika' : 'Imeshatumika'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      Siku {v.valueDays} • {v.planCode} • Mteja: {v.targetTenant}
-                    </div>
-                    <button
-                      onClick={() => handleCopyWhatsAppMessage(v)}
-                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 flex items-center space-x-1"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Nakili kwa WhatsApp</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
+
+              {vouchersError && (
+                <div className="p-4 bg-red-50 text-red-700 border-b border-red-200 flex items-center justify-between text-xs">
+                  <span>{vouchersError}</span>
+                  <button onClick={fetchVouchers} className="underline font-bold">Jaribu Tena</button>
+                </div>
+              )}
+
+              {vouchersLoading ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-600" />
+                  Inapakia historia ya vocha kutoka seva...
+                </div>
+              ) : vouchers.length === 0 && !vouchersError ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  <Ticket className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  Hakuna vocha zilizotolewa bado. Tengeneza vocha ya kwanza hapo juu.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {vouchers.map((v) => {
+                    const isIssued = v.status === 'Issued' || v.status === 0;
+                    const isRedeemed = v.status === 'Redeemed' || v.status === 1;
+                    const isExpired = v.status === 'Expired' || v.status === 2;
+                    return (
+                      <div key={v.id || v.code} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
+                        <div className="flex items-center space-x-3">
+                          <span className="font-mono font-bold text-slate-900">{v.code}</span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded font-bold ${
+                              isIssued
+                                ? 'bg-blue-100 text-blue-700'
+                                : isRedeemed
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : isExpired
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {isIssued ? 'Inasubiri Kutumika' : isRedeemed ? 'Imeshatumika' : isExpired ? 'Imeisha Muda' : String(v.status)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Siku {v.valueDays} • {v.planCode || 'Zote'} • {v.targetTenantId ? `Mteja: ${v.targetTenantId.slice(0, 8)}...` : (v.targetTenant ? `Mteja: ${v.targetTenant}` : 'Bila Kikwazo')}
+                          {v.createdAt && ` • ${new Date(v.createdAt).toLocaleDateString()}`}
+                        </div>
+                        <button
+                          onClick={() => handleCopyWhatsAppMessage(v)}
+                          className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 flex items-center space-x-1"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Nakili kwa WhatsApp</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1108,98 +1280,133 @@ export default function App() {
         {activeTab === 'payment' && (
           <div className="space-y-6 max-w-3xl">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Akaunti za Malipo ya Wateja</h1>
-              <p className="text-sm text-slate-500 mt-1">
-                Taarifa hizi zinaonyeshwa moja kwa moja kwenye app za wateja wanapotaka kulipia vifurushi. Unaweza kubadilisha namba au benki wakati wowote hapa!
-              </p>
-
-              <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Lipa Namba (M-Pesa Till / Paybill)
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentAccounts.mpesaTill}
-                    onChange={(e) => setPaymentAccounts({ ...paymentAccounts, mpesaTill: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Akaunti za Malipo ya Wateja</h1>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Taarifa hizi zinaonyeshwa moja kwa moja kwenye app za wateja wanapotaka kulipia vifurushi. Zinasasishwa papo hapo kwenye database!
+                  </p>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Namba ya Airtel Money / Tigo Pesa
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentAccounts.airtelMoney}
-                    onChange={(e) => setPaymentAccounts({ ...paymentAccounts, airtelMoney: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Jina la Benki</label>
-                    <input
-                      type="text"
-                      value={paymentAccounts.bankName}
-                      onChange={(e) => setPaymentAccounts({ ...paymentAccounts, bankName: e.target.value })}
-                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Namba ya Akaunti ya Benki</label>
-                    <input
-                      type="text"
-                      value={paymentAccounts.bankAccountNumber}
-                      onChange={(e) => setPaymentAccounts({ ...paymentAccounts, bankAccountNumber: e.target.value })}
-                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Jina la Akaunti (Account Name)</label>
-                  <input
-                    type="text"
-                    value={paymentAccounts.bankAccountName}
-                    onChange={(e) => setPaymentAccounts({ ...paymentAccounts, bankAccountName: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Namba ya WhatsApp kwa Ushahidi wa Malipo
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentAccounts.whatsAppContact}
-                    onChange={(e) => setPaymentAccounts({ ...paymentAccounts, whatsAppContact: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Maelekezo ya Ziada kwa Wateja</label>
-                  <textarea
-                    rows={3}
-                    value={paymentAccounts.notes}
-                    onChange={(e) => setPaymentAccounts({ ...paymentAccounts, notes: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end">
                 <button
-                  onClick={() => showNotification('Akaunti za malipo zimesasishwa na kuchapishwa kwenye app zote!')}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-xl shadow-md transition"
+                  onClick={fetchPaymentAccounts}
+                  disabled={paymentLoading}
+                  className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition shadow-sm"
+                  title="Sasisha Taarifa za Malipo"
                 >
-                  Hifadhi & Tangaza kwenye App
+                  <RefreshCw className={`w-4 h-4 ${paymentLoading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
+
+              {paymentError && (
+                <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between">
+                  <span>{paymentError}</span>
+                  <button onClick={fetchPaymentAccounts} className="underline font-bold">Jaribu Tena</button>
+                </div>
+              )}
+
+              {paymentLoading ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-600" />
+                  Inapakia maelekezo ya malipo kutoka seva...
+                </div>
+              ) : (
+                <div className="mt-6 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Lipa Namba (M-Pesa Till / Paybill)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="mfano: 5523412"
+                      value={paymentAccounts.mpesaTill}
+                      onChange={(e) => setPaymentAccounts({ ...paymentAccounts, mpesaTill: e.target.value })}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Namba ya Airtel Money / Tigo Pesa
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="mfano: 0788 000 111"
+                      value={paymentAccounts.airtelMoney}
+                      onChange={(e) => setPaymentAccounts({ ...paymentAccounts, airtelMoney: e.target.value })}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Jina la Benki</label>
+                      <input
+                        type="text"
+                        placeholder="mfano: CRDB Bank au NMB"
+                        value={paymentAccounts.bankName}
+                        onChange={(e) => setPaymentAccounts({ ...paymentAccounts, bankName: e.target.value })}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Namba ya Akaunti ya Benki</label>
+                      <input
+                        type="text"
+                        placeholder="mfano: 0152 4899 2100"
+                        value={paymentAccounts.bankAccountNumber}
+                        onChange={(e) => setPaymentAccounts({ ...paymentAccounts, bankAccountNumber: e.target.value })}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Jina la Akaunti (Account Name)</label>
+                    <input
+                      type="text"
+                      placeholder="mfano: Jolinx Technologies Ltd"
+                      value={paymentAccounts.bankAccountName}
+                      onChange={(e) => setPaymentAccounts({ ...paymentAccounts, bankAccountName: e.target.value })}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Namba ya WhatsApp kwa Ushahidi wa Malipo
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="mfano: +255 754 000 000"
+                      value={paymentAccounts.whatsAppContact}
+                      onChange={(e) => setPaymentAccounts({ ...paymentAccounts, whatsAppContact: e.target.value })}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Maelekezo ya Ziada kwa Wateja</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Maelekezo ya ziada yatakayoonekana kwenye app..."
+                      value={paymentAccounts.notes}
+                      onChange={(e) => setPaymentAccounts({ ...paymentAccounts, notes: e.target.value })}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={handleSavePaymentAccounts}
+                      disabled={paymentSaving}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium px-6 py-2.5 rounded-xl shadow-md transition flex items-center space-x-2"
+                    >
+                      {paymentSaving && <RefreshCw className="w-4 h-4 animate-spin" />}
+                      <span>{paymentSaving ? 'Inahifadhi Kwenye Seva...' : 'Hifadhi & Tangaza kwenye App'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1362,20 +1569,20 @@ export default function App() {
 
             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end space-x-2">
               <button
+                type="button"
                 onClick={() => setEditingPackage(null)}
                 className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50"
               >
                 Ghairi
               </button>
               <button
-                onClick={() => {
-                  setPackages(packages.map(p => p.code === editingPackage.code ? editingPackage : p));
-                  setEditingPackage(null);
-                  showNotification(`Kifurushi kimesasishwa!`);
-                }}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow"
+                type="button"
+                onClick={handleSavePackageEdit}
+                disabled={savingPackage}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium shadow flex items-center space-x-2"
               >
-                Hifadhi Mabadiliko
+                {savingPackage && <RefreshCw className="w-4 h-4 animate-spin" />}
+                <span>{savingPackage ? 'Inahifadhi Kwenye Seva...' : 'Hifadhi Mabadiliko'}</span>
               </button>
             </div>
           </div>
@@ -1397,26 +1604,7 @@ export default function App() {
             </div>
 
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.target;
-                const newPkg = {
-                  id: Date.now().toString(),
-                  code: form.code.value.trim(),
-                  name: form.name.value.trim(),
-                  monthlyPrice: Number(form.monthlyPrice.value),
-                  currency: 'TZS',
-                  isPackage: form.isPackage.checked,
-                  isActive: true,
-                  maxBranches: null,
-                  maxUsers: null,
-                  maxProducts: null,
-                  featureKeys: ['pos.enabled', 'inventory.enabled'],
-                };
-                setPackages([...packages, newPkg]);
-                setShowAddPackageModal(false);
-                showNotification(`Kifurushi kipya kimeundwa!`);
-              }}
+              onSubmit={handleCreatePackage}
               className="mt-4 space-y-4"
             >
               <div>
@@ -1475,9 +1663,11 @@ export default function App() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow"
+                  disabled={creatingPackage}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium shadow flex items-center space-x-2"
                 >
-                  Unda Kifurushi Sasa
+                  {creatingPackage && <RefreshCw className="w-4 h-4 animate-spin" />}
+                  <span>{creatingPackage ? 'Inaunda Kwenye Seva...' : 'Unda Kifurushi Sasa'}</span>
                 </button>
               </div>
             </form>
