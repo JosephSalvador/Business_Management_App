@@ -121,7 +121,7 @@ public sealed class AdjustTenantStockAdminCommandHandler : IRequestHandler<Adjus
         var product = await _catalog.GetProductByIdAsync(request.TenantId, request.ProductId, cancellationToken);
         if (product is null)
         {
-            return Error.NotFound($"Product {request.ProductId} was not found.");
+            return Result.Failure(Error.NotFound($"Product {request.ProductId} was not found."));
         }
 
         await _catalog.AdjustProductStockAsync(

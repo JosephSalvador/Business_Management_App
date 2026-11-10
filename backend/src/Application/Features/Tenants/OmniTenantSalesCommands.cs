@@ -88,7 +88,7 @@ public sealed class VoidTenantSaleAdminCommandHandler : IRequestHandler<VoidTena
         var sale = await _sales.GetSaleByIdAsync(request.TenantId, request.SaleId, cancellationToken);
         if (sale is null)
         {
-            return Error.NotFound($"Sale {request.SaleId} was not found.");
+            return Result.Failure(Error.NotFound($"Sale {request.SaleId} was not found."));
         }
 
         await _sales.VoidSaleAsync(sale, request.Reason, _tenantContext.UserId, cancellationToken);

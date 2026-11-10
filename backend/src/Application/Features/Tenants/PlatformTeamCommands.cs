@@ -47,18 +47,18 @@ public sealed class AssignPlatformRoleCommandHandler : IRequestHandler<AssignPla
     {
         if (string.IsNullOrWhiteSpace(request.Email))
         {
-            return Error.Validation("Email is required.");
+            return Result.Failure(Error.Validation("Email is required."));
         }
 
         if (!Enum.TryParse<PlatformRoleType>(request.Role, true, out var roleType) || roleType == PlatformRoleType.None)
         {
-            return Error.Validation("Valid role (PlatformStaff or PlatformSuperAdmin) is required.");
+            return Result.Failure(Error.Validation("Valid role (PlatformStaff or PlatformSuperAdmin) is required."));
         }
 
         var user = await _team.FindUserByEmailAsync(request.Email, cancellationToken);
         if (user is null)
         {
-            return Error.NotFound($"User with email '{request.Email}' is not registered yet. Please have them register first.");
+            return Result.Failure(Error.NotFound($"User with email '{request.Email}' is not registered yet. Please have them register first."));
         }
 
         await _team.AssignPlatformRoleAsync(user.Id, roleType, cancellationToken);

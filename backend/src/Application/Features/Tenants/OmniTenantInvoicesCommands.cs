@@ -57,12 +57,12 @@ public sealed class UpdateTenantInvoiceStatusAdminCommandHandler : IRequestHandl
         var invoice = await _invoices.GetInvoiceByIdAsync(request.TenantId, request.InvoiceId, cancellationToken);
         if (invoice is null)
         {
-            return Error.NotFound($"Invoice {request.InvoiceId} was not found.");
+            return Result.Failure(Error.NotFound($"Invoice {request.InvoiceId} was not found."));
         }
 
         if (!Enum.TryParse<CustomerInvoiceStatus>(request.NewStatus, true, out var newStatusEnum))
         {
-            return Error.Validation("Invalid invoice status.");
+            return Result.Failure(Error.Validation("Invalid invoice status."));
         }
 
         await _invoices.UpdateInvoiceStatusAsync(invoice, newStatusEnum, cancellationToken);
