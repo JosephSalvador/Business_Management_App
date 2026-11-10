@@ -227,7 +227,7 @@ export default function App() {
       getCurrentOperator().then((user) => {
         if (user) {
           setCurrentOperator(user);
-          setAuthToken(token);
+          setAuthToken(getAuthToken());
         } else {
           setCurrentOperator(null);
           setAuthToken('');

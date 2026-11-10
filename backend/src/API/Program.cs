@@ -410,10 +410,46 @@ var schemaSelfHealingStatements = new (string sql, string description)[]
     (@"CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_DeliveryNoteId"" ON public.""DeliveryNoteItems"" (""DeliveryNoteId"");", "Index IX_DeliveryNoteItems_DeliveryNoteId"),
     (@"CREATE INDEX IF NOT EXISTS ""IX_DeliveryNoteItems_TenantId_CreatedAt"" ON public.""DeliveryNoteItems"" (""TenantId"", ""CreatedAt"");", "Index IX_DeliveryNoteItems_TenantId_CreatedAt"),
 
+    (@"ALTER TABLE public.""Plans"" ADD COLUMN IF NOT EXISTS ""IsPackage"" boolean NOT NULL DEFAULT false;", "Plans.IsPackage"),
+    (@"ALTER TABLE public.""Vouchers"" ADD COLUMN IF NOT EXISTS ""TargetTenantId"" uuid;", "Vouchers.TargetTenantId"),
+    (@"ALTER TABLE public.""Vouchers"" ADD COLUMN IF NOT EXISTS ""PlanCode"" character varying(50);", "Vouchers.PlanCode"),
+    (@"CREATE INDEX IF NOT EXISTS ""IX_Vouchers_TargetTenantId"" ON public.""Vouchers"" (""TargetTenantId"");", "Index IX_Vouchers_TargetTenantId"),
+
+    (@"CREATE TABLE IF NOT EXISTS public.""PaymentInstructions"" (
+        ""Id"" uuid NOT NULL PRIMARY KEY,
+        ""MpesaTill"" character varying(100) NOT NULL DEFAULT '',
+        ""AirtelMoney"" character varying(100) NOT NULL DEFAULT '',
+        ""BankName"" character varying(100) NOT NULL DEFAULT '',
+        ""BankAccountNumber"" character varying(100) NOT NULL DEFAULT '',
+        ""BankAccountName"" character varying(150) NOT NULL DEFAULT '',
+        ""WhatsAppContact"" character varying(100) NOT NULL DEFAULT '',
+        ""Notes"" character varying(500) NOT NULL DEFAULT '',
+        ""CreatedAt"" timestamp with time zone NOT NULL,
+        ""CreatedBy"" uuid,
+        ""UpdatedAt"" timestamp with time zone,
+        ""UpdatedBy"" uuid
+    );", "Table PaymentInstructions"),
+
+    (@"CREATE TABLE IF NOT EXISTS public.""PlatformOperators"" (
+        ""Id"" uuid NOT NULL PRIMARY KEY,
+        ""UserId"" uuid NOT NULL,
+        ""Role"" integer NOT NULL,
+        ""IsActive"" boolean NOT NULL,
+        ""AssignedAtUtc"" timestamp with time zone NOT NULL,
+        ""AssignedByUserId"" uuid NOT NULL,
+        ""CreatedAt"" timestamp with time zone NOT NULL,
+        ""CreatedBy"" uuid,
+        ""UpdatedAt"" timestamp with time zone,
+        ""UpdatedBy"" uuid,
+        CONSTRAINT ""FK_PlatformOperators_Users_UserId"" FOREIGN KEY (""UserId"") REFERENCES public.""Users"" (""Id"") ON DELETE CASCADE
+    );", "Table PlatformOperators"),
+    (@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PlatformOperators_UserId"" ON public.""PlatformOperators"" (""UserId"");", "Index IX_PlatformOperators_UserId"),
+
     (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261029100000_AddCompleteInvoiceAndBrandingElements', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261029100000"),
     (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261031180000_AddDeliveryNotesAndDocumentIndexes', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261031180000"),
     (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261031190000_AddDocumentTemplatesAndTenantConfigurations', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261031190000"),
-    (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261103130000_AddMultiplePaymentMethodsAndInvoicePayments', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261103130000")
+    (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261103130000_AddMultiplePaymentMethodsAndInvoicePayments', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261103130000"),
+    (@"INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"") VALUES ('20261110120000_AddPlatformOperators', '9.0.0') ON CONFLICT DO NOTHING;", "Migration 20261110120000")
 };
 
 app.MapGet("/health/schema-check", async (BusinessDbContext db) =>

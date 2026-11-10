@@ -154,9 +154,9 @@ public static class BillingEndpoints
             cancellationToken)).ToApiResult();
 
     private static async Task<IResult> ListVouchersAdminAsync(
-        int page, int pageSize, VoucherStatus? status, ISender sender, CancellationToken cancellationToken)
+        int? page, int? pageSize, VoucherStatus? status, ISender sender, CancellationToken cancellationToken)
         => (await sender.Send(
-            new ListVouchersAdminQuery(page > 0 ? page : 1, pageSize > 0 ? pageSize : 50, status),
+            new ListVouchersAdminQuery(page is > 0 ? page.Value : 1, pageSize is > 0 ? pageSize.Value : 50, status),
             cancellationToken)).ToApiResult();
 
     private static async Task<IResult> ListAllPlansAdminAsync(

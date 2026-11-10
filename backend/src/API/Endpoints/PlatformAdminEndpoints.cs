@@ -110,9 +110,9 @@ public static class PlatformAdminEndpoints
         => (await sender.Send(new GetFleetSummaryQuery(), ct)).ToApiResult();
 
     private static async Task<IResult> ListTenantsAsync(
-        string? search, string? status, string? health, int page, int pageSize,
+        string? search, string? status, string? health, int? page, int? pageSize,
         ISender sender, CancellationToken ct)
-        => (await sender.Send(new ListTenantsAdminQuery(search, status, health, page, pageSize), ct)).ToApiResult();
+        => (await sender.Send(new ListTenantsAdminQuery(search, status, health, page is > 0 ? page.Value : 1, pageSize is > 0 ? pageSize.Value : 50), ct)).ToApiResult();
 
     private static async Task<IResult> GetTenantDetailAsync(Guid tenantId, ISender sender, CancellationToken ct)
         => (await sender.Send(new GetTenantDetailAdminQuery(tenantId), ct)).ToApiResult();
