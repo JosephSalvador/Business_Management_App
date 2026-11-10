@@ -47,7 +47,7 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             activeSubscriptions,
             trials,
             expiringIn7Days,
-            atRiskTenants: expiringIn7Days,
+            AtRiskTenants: expiringIn7Days,
             TotalGmv30Days: gmv,
             TotalSalesCount30Days: salesCount,
             TotalProductsCount: productsCount);
@@ -61,7 +61,7 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
-            query = query.Where(t => t.Name.ToLower().Contains(s) || (t.Phone != null && t.Phone.Contains(s)));
+            query = query.Where(t => t.Name.ToLower().Contains(s) || (t.ContactPhone != null && t.ContactPhone.Contains(s)));
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -111,8 +111,8 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             items.Add(new TenantAdminSummaryDto(
                 t.Id,
                 t.Name,
-                t.Phone,
-                Category: null,
+                t.ContactPhone,
+                Category: t.BusinessType,
                 sub?.PlanCode ?? "Pro",
                 subStatus,
                 daysLeft,
@@ -173,8 +173,8 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         return new TenantAdminDetailDto(
             tenant.Id,
             tenant.Name,
-            tenant.Phone,
-            Category: null,
+            tenant.ContactPhone,
+            Category: tenant.BusinessType,
             sub?.PlanCode ?? "Pro",
             subStatus,
             daysLeft,

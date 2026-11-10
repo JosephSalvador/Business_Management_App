@@ -40,14 +40,14 @@ public sealed class JwtTokenService : ITokenService
 
         if (additionalClaims is not null)
         {
-            foreach (var (key, value) in additionalClaims)
+            foreach (var (claimType, claimValue) in additionalClaims)
             {
-                claims.Add(new Claim(key, value));
+                claims.Add(new Claim(claimType, claimValue));
             }
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret));
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
             issuer: _options.Issuer,
