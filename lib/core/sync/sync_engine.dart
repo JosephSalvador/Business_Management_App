@@ -14,7 +14,7 @@ import '../../features/invoices/data/delivery_note_repository.dart';
 import '../../features/invoices/data/invoice_repository.dart';
 import '../../features/purchases/data/purchase_repository.dart';
 import '../../features/sales/data/sale_repository.dart';
-import '../../features/sales/domain/sale.dart' show QuickSaleDefaults;
+import '../../features/sales/domain/sale.dart' show QuickSaleDefaults, SaleDto;
 import '../../features/suppliers/data/supplier_repository.dart';
 import '../storage/sync_queue_dao.dart' show QueuedOperation;
 import 'local_sales_service.dart';
@@ -55,6 +55,7 @@ class SyncEngine {
   SyncEngine({
     required LocalSalesService salesService,
     required SaleRepository repository,
+    FutureOr<String?> Function()? tenantIdOf,
     ExpenseRepository? expenseRepository,
     CustomerRepository? customerRepository,
     InventoryRepository? inventoryRepository,
@@ -66,6 +67,7 @@ class SyncEngine {
     DeliveryNoteRepository? deliveryNoteRepository,
   })  : _salesService = salesService,
         _repository = repository,
+        _tenantIdOf = tenantIdOf,
         _expenseRepository = expenseRepository,
         _customerRepository = customerRepository,
         _inventoryRepository = inventoryRepository,
@@ -78,6 +80,7 @@ class SyncEngine {
 
   final LocalSalesService _salesService;
   final SaleRepository _repository;
+  final FutureOr<String?> Function()? _tenantIdOf;
   final ExpenseRepository? _expenseRepository;
   final CustomerRepository? _customerRepository;
   final InventoryRepository? _inventoryRepository;
@@ -105,8 +108,14 @@ class SyncEngine {
     final outcome = SyncOutcome();
     try {
       while (true) {
+        final activeTenantId = await _tenantIdOf?.call();
+        if (_tenantIdOf != null &&
+            (activeTenantId == null || activeTenantId.isEmpty)) {
+          break;
+        }
         final op = await _salesService.claimNext(
           now: DateTime.now().toUtc(),
+          tenantId: activeTenantId,
           ignoreSchedule: forceRetryAll,
         );
         if (op == null) {
@@ -276,23 +285,46 @@ class SyncEngine {
         }
       }
 
-      if (body['branchId'] == null) {
+      final rawBranchId = body['branchId']?.toString() ?? '';
+      if (rawBranchId.isEmpty ||
+          rawBranchId.startsWith('offline') ||
+          rawBranchId.startsWith('local') ||
+          rawBranchId == '00000000-0000-0000-0000-000000000000') {
         final realBranchId = await _repository.defaultBranchId();
         if (realBranchId != null) {
           body['branchId'] = realBranchId;
         }
       }
 
-      final sale = await _repository.create(
-        body: body,
-        idempotencyKey: op.operationId,
-      );
+      SaleDto sale;
+      try {
+        sale = await _repository.create(
+          body: body,
+          idempotencyKey: op.operationId,
+        );
+      } on NotFoundException {
+        final realBranchId = await _repository.defaultBranchId();
+        if (realBranchId != null && realBranchId != body['branchId']) {
+          body['branchId'] = realBranchId;
+          body.remove('warehouseId');
+          sale = await _repository.create(
+            body: body,
+            idempotencyKey: op.operationId,
+          );
+        } else {
+          rethrow;
+        }
+      }
+
       await _salesService.markSaleSynced(
         clientSaleId: op.aggregateId,
         serverSaleId: sale.id,
         serverNumber: sale.number,
       );
       outcome.synced++;
+      return _DeliveryResult.continue_;
+    } on NotFoundException catch (error) {
+      await _conflict(op, outcome, 'NOT_FOUND', error.message);
       return _DeliveryResult.continue_;
     } on ValidationException catch (error) {
       final code =

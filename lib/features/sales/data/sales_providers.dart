@@ -118,6 +118,7 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   final engine = SyncEngine(
     salesService: ref.watch(localSalesServiceProvider),
     repository: ref.watch(saleRepositoryProvider),
+    tenantIdOf: () => ref.read(sessionContextProvider).$1,
     expenseRepository: expenseRepo,
     customerRepository: customerRepo,
     inventoryRepository: inventoryRepo,
