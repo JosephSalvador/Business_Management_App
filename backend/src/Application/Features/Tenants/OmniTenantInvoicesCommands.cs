@@ -73,7 +73,7 @@ public sealed class UpdateTenantInvoiceStatusAdminCommandHandler : IRequestHandl
                 _tenantContext.UserId,
                 "PlatformOperator.UpdateInvoiceStatus",
                 "CustomerInvoice",
-                invoice.Id,
+                invoice.Id.ToString(),
                 $"Invoice status updated to {newStatusEnum} by Platform Operator"),
             cancellationToken);
 

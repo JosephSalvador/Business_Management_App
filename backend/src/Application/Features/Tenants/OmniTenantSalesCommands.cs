@@ -99,7 +99,7 @@ public sealed class VoidTenantSaleAdminCommandHandler : IRequestHandler<VoidTena
                 _tenantContext.UserId,
                 "PlatformOperator.VoidSale",
                 "Sale",
-                sale.Id,
+                sale.Id.ToString(),
                 $"Voided by Platform Operator: {request.Reason}"),
             cancellationToken);
 

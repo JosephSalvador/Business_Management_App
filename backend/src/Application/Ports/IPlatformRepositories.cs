@@ -947,7 +947,7 @@ public interface IOmniTenantCatalogRepository
 {
     Task<PagedResult<OmniProductDto>> ListTenantProductsAsync(Guid tenantId, string? search, bool lowStockOnly, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Product?> GetProductByIdAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken = default);
-    Task UpdateProductAsync(Product product, CancellationToken cancellationToken = default);
+    Task<OmniProductDto?> UpdateProductAsync(Guid tenantId, Guid productId, string name, string? barcode, decimal buyingPrice, decimal sellingPrice, string? category, bool isActive, CancellationToken cancellationToken = default);
     Task AdjustProductStockAsync(Guid tenantId, Guid productId, decimal newStockQuantity, string reason, Guid? operatorUserId, CancellationToken cancellationToken = default);
     Task SeedStarterCatalogAsync(Guid tenantId, string templateType, Guid? operatorUserId, CancellationToken cancellationToken = default);
 }

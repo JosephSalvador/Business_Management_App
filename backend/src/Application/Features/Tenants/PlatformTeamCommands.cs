@@ -69,7 +69,7 @@ public sealed class AssignPlatformRoleCommandHandler : IRequestHandler<AssignPla
                 _tenantContext.UserId,
                 "PlatformOperator.AssignRole",
                 "PlatformOperator",
-                user.Id,
+                user.Id.ToString(),
                 $"Platform role {roleType} granted to {user.Email}"),
             cancellationToken);
 
@@ -106,7 +106,7 @@ public sealed class RevokePlatformRoleCommandHandler : IRequestHandler<RevokePla
                 _tenantContext.UserId,
                 "PlatformOperator.RevokeRole",
                 "PlatformOperator",
-                request.OperatorId,
+                request.OperatorId.ToString(),
                 $"Platform operator {request.OperatorId} access revoked"),
             cancellationToken);
 

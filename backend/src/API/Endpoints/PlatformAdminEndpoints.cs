@@ -118,26 +118,26 @@ public static class PlatformAdminEndpoints
         => (await sender.Send(new GetTenantDetailAdminQuery(tenantId), ct)).ToApiResult();
 
     private static async Task<IResult> ListTenantProductsAsync(
-        Guid tenantId, string? search, int page, int pageSize, ISender sender, CancellationToken ct)
-        => (await sender.Send(new ListTenantProductsAdminQuery(tenantId, search, page, pageSize), ct)).ToApiResult();
+        Guid tenantId, string? search, bool? lowStockOnly, int? page, int? pageSize, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ListTenantProductsAdminQuery(tenantId, search, lowStockOnly ?? false, page ?? 1, pageSize ?? 50), ct)).ToApiResult();
 
     private static async Task<IResult> UpdateTenantProductAsync(
         Guid tenantId, Guid productId, UpdateTenantProductRequest request, ISender sender, CancellationToken ct)
         => (await sender.Send(new UpdateTenantProductAdminCommand(
-            tenantId, productId, request.Name, request.SellingPrice, request.CostPrice, request.Barcode), ct)).ToApiResult();
+            tenantId, productId, request.Name, request.Barcode, request.BuyingPrice, request.SellingPrice, request.Category, request.IsActive), ct)).ToApiResult();
 
     private static async Task<IResult> AdjustTenantStockAsync(
         Guid tenantId, Guid productId, AdjustStockRequest request, ISender sender, CancellationToken ct)
         => (await sender.Send(new AdjustTenantStockAdminCommand(
-            tenantId, productId, request.WarehouseId, request.NewQuantity, request.Reason), ct)).ToApiResult();
+            tenantId, productId, request.NewQuantity, request.Reason), ct)).ToApiResult();
 
     private static async Task<IResult> SeedStarterCatalogAsync(
         Guid tenantId, SeedStarterCatalogRequest request, ISender sender, CancellationToken ct)
-        => (await sender.Send(new SeedTenantStarterCatalogCommand(tenantId, request.TemplateType), ct)).ToApiResult();
+        => (await sender.Send(new SeedStarterCatalogCommand(tenantId, request.TemplateType), ct)).ToApiResult();
 
     private static async Task<IResult> ListTenantSalesAsync(
-        Guid tenantId, DateTime? from, DateTime? to, int page, int pageSize, ISender sender, CancellationToken ct)
-        => (await sender.Send(new ListTenantSalesAdminQuery(tenantId, from, to, page, pageSize), ct)).ToApiResult();
+        Guid tenantId, string? search, DateTime? from, DateTime? to, Guid? cashierId, int? page, int? pageSize, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ListTenantSalesAdminQuery(tenantId, search, from, to, cashierId, page ?? 1, pageSize ?? 25), ct)).ToApiResult();
 
     private static async Task<IResult> GetTenantSaleDetailAsync(
         Guid tenantId, Guid saleId, ISender sender, CancellationToken ct)
@@ -148,12 +148,12 @@ public static class PlatformAdminEndpoints
         => (await sender.Send(new VoidTenantSaleAdminCommand(tenantId, saleId, request.Reason), ct)).ToApiResult();
 
     private static async Task<IResult> ListTenantCashSessionsAsync(
-        Guid tenantId, int page, int pageSize, ISender sender, CancellationToken ct)
-        => (await sender.Send(new ListTenantCashSessionsAdminQuery(tenantId, page, pageSize), ct)).ToApiResult();
+        Guid tenantId, int? page, int? pageSize, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ListTenantCashSessionsAdminQuery(tenantId, page ?? 1, pageSize ?? 20), ct)).ToApiResult();
 
     private static async Task<IResult> ListTenantInvoicesAsync(
-        Guid tenantId, string? status, int page, int pageSize, ISender sender, CancellationToken ct)
-        => (await sender.Send(new ListTenantInvoicesAdminQuery(tenantId, status, page, pageSize), ct)).ToApiResult();
+        Guid tenantId, string? search, string? status, int? page, int? pageSize, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ListTenantInvoicesAdminQuery(tenantId, search, status, page ?? 1, pageSize ?? 25), ct)).ToApiResult();
 
     private static async Task<IResult> UpdateTenantInvoiceStatusAsync(
         Guid tenantId, Guid invoiceId, UpdateInvoiceStatusRequest request, ISender sender, CancellationToken ct)
@@ -172,15 +172,15 @@ public static class PlatformAdminEndpoints
 
     private static async Task<IResult> AssignPlatformRoleAsync(
         AssignPlatformRoleRequest request, ISender sender, CancellationToken ct)
-        => (await sender.Send(new AssignPlatformRoleCommand(request.Email, request.Role), ct)).ToApiResult();
+        => (await sender.Send(new AssignPlatformRoleCommand(request.Email, request.Role.ToString()), ct)).ToApiResult();
 
     private static async Task<IResult> RevokePlatformRoleAsync(
         Guid id, ISender sender, CancellationToken ct)
         => (await sender.Send(new RevokePlatformRoleCommand(id), ct)).ToApiResult();
 
     // Request records
-    private sealed record UpdateTenantProductRequest(string Name, decimal SellingPrice, decimal? CostPrice, string? Barcode);
-    private sealed record AdjustStockRequest(Guid? WarehouseId, decimal NewQuantity, string Reason);
+    private sealed record UpdateTenantProductRequest(string Name, string? Barcode, decimal BuyingPrice, decimal SellingPrice, string? Category, bool IsActive);
+    private sealed record AdjustStockRequest(decimal NewQuantity, string Reason);
     private sealed record SeedStarterCatalogRequest(string TemplateType);
     private sealed record VoidSaleRequest(string Reason);
     private sealed record UpdateInvoiceStatusRequest(string NewStatus);

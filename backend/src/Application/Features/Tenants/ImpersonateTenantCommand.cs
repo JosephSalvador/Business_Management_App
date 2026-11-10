@@ -1,5 +1,6 @@
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Audit;
+using BusinessOS.Domain.Billing;
 using BusinessOS.Domain.Features;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Shared;
@@ -131,7 +132,7 @@ public sealed class UpdateTenantFeaturesAdminCommandHandler
         foreach (var key in FeatureKeys.All)
         {
             var isDesired = enabledSet.Contains(key);
-            var flag = existingFlags.FirstOrDefault(f => f.FeatureKey == key);
+            var flag = existingFlags.FirstOrDefault(f => f.Key == key);
 
             if (flag is null)
             {
@@ -154,6 +155,7 @@ public sealed class UpdateTenantFeaturesAdminCommandHandler
             operatorUserId,
             "Platform.UpdateFeatures",
             "FeatureFlags",
+            command.TenantId.ToString(),
             string.Join(",", command.EnabledFeatures)),
             cancellationToken);
 

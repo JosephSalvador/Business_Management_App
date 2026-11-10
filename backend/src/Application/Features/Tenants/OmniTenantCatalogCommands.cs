@@ -63,28 +63,21 @@ public sealed class UpdateTenantProductAdminCommandHandler : IRequestHandler<Upd
             return Error.NotFound($"Product {request.ProductId} was not found.");
         }
 
-        product.Update(
+        var updated = await _catalog.UpdateProductAsync(
+            request.TenantId,
+            request.ProductId,
             request.Name,
-            product.Sku,
             request.Barcode,
             request.BuyingPrice,
             request.SellingPrice,
-            product.Description,
-            product.CategoryId,
-            product.UnitOfMeasureId,
-            product.BrandId,
-            product.IsService);
+            request.Category,
+            request.IsActive,
+            cancellationToken);
 
-        if (request.IsActive && !product.IsActive)
+        if (updated is null)
         {
-            product.Activate();
+            return Error.NotFound($"Product {request.ProductId} was not found.");
         }
-        else if (!request.IsActive && product.IsActive)
-        {
-            product.Deactivate();
-        }
-
-        await _catalog.UpdateProductAsync(product, cancellationToken);
 
         await _auditLogs.AddAsync(
             AuditLog.Create(
@@ -92,23 +85,11 @@ public sealed class UpdateTenantProductAdminCommandHandler : IRequestHandler<Upd
                 _tenantContext.UserId,
                 "PlatformOperator.UpdateProduct",
                 "Product",
-                product.Id,
+                product.Id.ToString(),
                 $"Updated by Platform Operator: {request.Name}"),
             cancellationToken);
 
-        return Result.Success(new OmniProductDto(
-            product.Id,
-            product.Name,
-            product.Barcode,
-            product.Sku,
-            Category: request.Category,
-            Unit: "pcs",
-            request.BuyingPrice,
-            request.SellingPrice,
-            CurrentStock: 0,
-            LowStockThreshold: 5,
-            StockStatus: "Normal",
-            product.IsActive));
+        return Result.Success(updated);
     }
 }
 
@@ -157,7 +138,7 @@ public sealed class AdjustTenantStockAdminCommandHandler : IRequestHandler<Adjus
                 _tenantContext.UserId,
                 "PlatformOperator.AdjustStock",
                 "Product",
-                product.Id,
+                product.Id.ToString(),
                 $"Stock adjusted to {request.NewStockQuantity} by Platform Operator. Reason: {request.Reason}"),
             cancellationToken);
 
@@ -197,7 +178,7 @@ public sealed class SeedStarterCatalogCommandHandler : IRequestHandler<SeedStart
                 _tenantContext.UserId,
                 "PlatformOperator.SeedStarterCatalog",
                 "Tenant",
-                request.TenantId,
+                request.TenantId.ToString(),
                 $"Seeded starter catalog template: {request.TemplateType}"),
             cancellationToken);
 

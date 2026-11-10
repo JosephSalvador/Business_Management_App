@@ -1,10 +1,12 @@
-using System.Text.Json;
 using BusinessOS.Application.Features.Common;
 using BusinessOS.Application.Ports;
+using BusinessOS.Domain.Billing;
 using BusinessOS.Domain.Catalog;
+using BusinessOS.Domain.Finance;
 using BusinessOS.Domain.Identity;
 using BusinessOS.Domain.Inventory;
 using BusinessOS.Domain.Invoicing;
+using BusinessOS.Domain.Pricing;
 using BusinessOS.Domain.Sales;
 using BusinessOS.Domain.Tenants;
 using BusinessOS.Infrastructure.Persistence;
@@ -21,22 +23,22 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
     public async Task<FleetSummaryDto> GetFleetSummaryAsync(CancellationToken cancellationToken = default)
     {
         var totalTenants = await _db.Tenants.CountAsync(cancellationToken);
-        var activeSubscriptions = await _db.Subscriptions.CountAsync(s => s.Status == "Active", cancellationToken);
-        var trials = await _db.Subscriptions.CountAsync(s => s.Status == "Trial", cancellationToken);
+        var activeSubscriptions = await _db.Subscriptions.CountAsync(s => s.Status == SubscriptionStatus.Active, cancellationToken);
+        var trials = await _db.Subscriptions.CountAsync(s => s.Status == SubscriptionStatus.Trial, cancellationToken);
 
         var sevenDaysFromNow = DateTime.UtcNow.AddDays(7);
         var expiringIn7Days = await _db.Subscriptions.CountAsync(
-            s => (s.Status == "Active" && s.CurrentPeriodEnd != null && s.CurrentPeriodEnd <= sevenDaysFromNow) ||
-                 (s.Status == "Trial" && s.TrialEndsAt != null && s.TrialEndsAt <= sevenDaysFromNow),
+            s => (s.Status == SubscriptionStatus.Active && s.PaidUntilUtc != null && s.PaidUntilUtc <= sevenDaysFromNow) ||
+                 (s.Status == SubscriptionStatus.Trial && s.TrialEndedAtUtc <= sevenDaysFromNow),
             cancellationToken);
 
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
         var gmv = await _db.Sales
-            .Where(s => s.CompletedAt >= thirtyDaysAgo && s.Status == SaleStatus.Completed)
-            .SumAsync(s => s.TotalAmount.Amount, cancellationToken);
+            .Where(s => s.SaleDate >= thirtyDaysAgo && s.Status == SaleStatus.Completed)
+            .SumAsync(s => (decimal?)s.TotalAmount, cancellationToken) ?? 0m;
 
         var salesCount = await _db.Sales
-            .CountAsync(s => s.CompletedAt >= thirtyDaysAgo && s.Status == SaleStatus.Completed, cancellationToken);
+            .CountAsync(s => s.SaleDate >= thirtyDaysAgo && s.Status == SaleStatus.Completed, cancellationToken);
 
         var productsCount = await _db.Products.CountAsync(cancellationToken);
 
@@ -78,23 +80,23 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         {
             var sub = await _db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.TenantId == t.Id, cancellationToken);
             var totalProducts = await _db.Products.AsNoTracking().CountAsync(p => p.TenantId == t.Id, cancellationToken);
-            var salesCount = await _db.Sales.AsNoTracking().CountAsync(s => s.TenantId == t.Id && s.CompletedAt >= thirtyDaysAgo && s.Status == SaleStatus.Completed, cancellationToken);
+            var salesCount = await _db.Sales.AsNoTracking().CountAsync(s => s.TenantId == t.Id && s.SaleDate >= thirtyDaysAgo && s.Status == SaleStatus.Completed, cancellationToken);
             var invCount = await _db.CustomerInvoices.IgnoreQueryFilters().AsNoTracking().CountAsync(i => i.TenantId == t.Id, cancellationToken);
 
             var todaySalesAmount = await _db.Sales.AsNoTracking()
-                .Where(s => s.TenantId == t.Id && s.CompletedAt >= todayStart && s.Status == SaleStatus.Completed)
-                .SumAsync(s => (decimal?)s.TotalAmount.Amount, cancellationToken) ?? 0m;
+                .Where(s => s.TenantId == t.Id && s.SaleDate >= todayStart && s.Status == SaleStatus.Completed)
+                .SumAsync(s => (decimal?)s.TotalAmount, cancellationToken) ?? 0m;
 
             var gmv = await _db.Sales.AsNoTracking()
-                .Where(s => s.TenantId == t.Id && s.CompletedAt >= thirtyDaysAgo && s.Status == SaleStatus.Completed)
-                .SumAsync(s => (decimal?)s.TotalAmount.Amount, cancellationToken) ?? 0m;
+                .Where(s => s.TenantId == t.Id && s.SaleDate >= thirtyDaysAgo && s.Status == SaleStatus.Completed)
+                .SumAsync(s => (decimal?)s.TotalAmount, cancellationToken) ?? 0m;
 
-            var subStatus = sub?.Status ?? "Trial";
-            var daysLeft = sub?.TrialEndsAt != null
-                ? (int)Math.Max(0, (sub.TrialEndsAt.Value - DateTime.UtcNow).TotalDays)
+            var subStatus = sub?.Status.ToString() ?? "Trial";
+            var daysLeft = sub != null
+                ? (int)Math.Max(0, (sub.TrialEndedAtUtc - DateTime.UtcNow).TotalDays)
                 : 14;
 
-            var paidUntilStr = sub?.CurrentPeriodEnd?.ToString("yyyy-MM-dd");
+            var paidUntilStr = sub?.PaidUntilUtc?.ToString("yyyy-MM-dd");
 
             string healthStatus = "Good";
             if (subStatus == "Active" && salesCount > 20) healthStatus = "Excellent";
@@ -136,32 +138,32 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         var totalProducts = await _db.Products.AsNoTracking().CountAsync(p => p.TenantId == tenantId, cancellationToken);
 
         var lowStock = await _db.StockBalances.AsNoTracking()
-            .CountAsync(sb => sb.TenantId == tenantId && sb.QuantityOnHand <= 5, cancellationToken);
+            .CountAsync(sb => sb.TenantId == tenantId && sb.Quantity <= 5, cancellationToken);
 
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
         var salesCount = await _db.Sales.AsNoTracking()
-            .CountAsync(s => s.TenantId == tenantId && s.CompletedAt >= thirtyDaysAgo && s.Status == SaleStatus.Completed, cancellationToken);
+            .CountAsync(s => s.TenantId == tenantId && s.SaleDate >= thirtyDaysAgo && s.Status == SaleStatus.Completed, cancellationToken);
 
         var invCount = await _db.CustomerInvoices.IgnoreQueryFilters().AsNoTracking()
             .CountAsync(i => i.TenantId == tenantId, cancellationToken);
 
         var todayStart = DateTime.UtcNow.Date;
         var todaySalesAmount = await _db.Sales.AsNoTracking()
-            .Where(s => s.TenantId == tenantId && s.CompletedAt >= todayStart && s.Status == SaleStatus.Completed)
-            .SumAsync(s => (decimal?)s.TotalAmount.Amount, cancellationToken) ?? 0m;
+            .Where(s => s.TenantId == tenantId && s.SaleDate >= todayStart && s.Status == SaleStatus.Completed)
+            .SumAsync(s => (decimal?)s.TotalAmount, cancellationToken) ?? 0m;
 
         var gmv = await _db.Sales.AsNoTracking()
-            .Where(s => s.TenantId == tenantId && s.CompletedAt >= thirtyDaysAgo && s.Status == SaleStatus.Completed)
-            .SumAsync(s => (decimal?)s.TotalAmount.Amount, cancellationToken) ?? 0m;
+            .Where(s => s.TenantId == tenantId && s.SaleDate >= thirtyDaysAgo && s.Status == SaleStatus.Completed)
+            .SumAsync(s => (decimal?)s.TotalAmount, cancellationToken) ?? 0m;
 
         var flags = await _db.FeatureFlags.AsNoTracking().Where(f => f.TenantId == tenantId).ToListAsync(cancellationToken);
         var featureDict = flags.ToDictionary(f => f.Key, f => f.IsEnabled);
 
         var primaryUser = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.TenantId == tenantId, cancellationToken);
 
-        var subStatus = sub?.Status ?? "Trial";
-        var daysLeft = sub?.TrialEndsAt != null
-            ? (int)Math.Max(0, (sub.TrialEndsAt.Value - DateTime.UtcNow).TotalDays)
+        var subStatus = sub?.Status.ToString() ?? "Trial";
+        var daysLeft = sub != null
+            ? (int)Math.Max(0, (sub.TrialEndedAtUtc - DateTime.UtcNow).TotalDays)
             : 14;
 
         string healthStatus = "Good";
@@ -176,7 +178,7 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             sub?.PlanCode ?? "Pro",
             subStatus,
             daysLeft,
-            sub?.CurrentPeriodEnd?.ToString("yyyy-MM-dd"),
+            sub?.PaidUntilUtc?.ToString("yyyy-MM-dd"),
             totalProducts,
             lowStock,
             salesCount,
@@ -222,32 +224,49 @@ public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var productIds = products.Select(p => p.Id).ToList();
+
+        var stockBalances = await _db.StockBalances.AsNoTracking()
+            .Where(sb => sb.TenantId == tenantId && productIds.Contains(sb.ProductId))
+            .GroupBy(sb => sb.ProductId)
+            .Select(g => new { ProductId = g.Key, TotalStock = g.Sum(sb => sb.Quantity) })
+            .ToDictionaryAsync(x => x.ProductId, x => x.TotalStock, cancellationToken);
+
+        var prices = await _db.ProductPrices.AsNoTracking()
+            .Where(pp => pp.TenantId == tenantId && productIds.Contains(pp.ProductId) && pp.PriceType == PriceType.Retail && pp.IsActive)
+            .ToDictionaryAsync(pp => pp.ProductId, pp => pp.Price, cancellationToken);
+
+        var categoryIds = products.Where(p => p.CategoryId.HasValue).Select(p => p.CategoryId!.Value).Distinct().ToList();
+        var categories = await _db.ProductCategories.AsNoTracking()
+            .Where(c => c.TenantId == tenantId && categoryIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
+
         var items = new List<OmniProductDto>();
         foreach (var p in products)
         {
-            var stockOnHand = await _db.StockBalances.AsNoTracking()
-                .Where(sb => sb.TenantId == tenantId && sb.ProductId == p.Id)
-                .SumAsync(sb => (decimal?)sb.QuantityOnHand, cancellationToken) ?? 0m;
-
+            var stockOnHand = stockBalances.TryGetValue(p.Id, out var s) ? s : 0m;
             var threshold = 5m;
             var stockStatus = stockOnHand <= 0 ? "OutOfStock" : (stockOnHand <= threshold ? "LowStock" : "Normal");
 
             if (lowStockOnly && stockStatus == "Normal")
                 continue;
 
+            var sellingPrice = prices.TryGetValue(p.Id, out var sp) ? sp : 0m;
+            var categoryName = p.CategoryId.HasValue && categories.TryGetValue(p.CategoryId.Value, out var cName) ? cName : null;
+
             items.Add(new OmniProductDto(
                 p.Id,
                 p.Name,
                 p.Barcode,
                 p.Sku,
-                Category: null,
+                categoryName,
                 Unit: "pcs",
-                p.CostPrice?.Amount ?? 0m,
-                p.RetailPrice?.Amount ?? 0m,
+                p.CostPrice ?? 0m,
+                sellingPrice,
                 stockOnHand,
                 threshold,
                 stockStatus,
-                p.IsActive));
+                p.Status == ProductStatus.Active));
         }
 
         return new PagedResult<OmniProductDto>(items, page, pageSize, total);
@@ -256,19 +275,114 @@ public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
     public Task<Product?> GetProductByIdAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken = default)
         => _db.Products.FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Id == productId, cancellationToken);
 
-    public async Task UpdateProductAsync(Product product, CancellationToken cancellationToken = default)
+    public async Task<OmniProductDto?> UpdateProductAsync(
+        Guid tenantId,
+        Guid productId,
+        string name,
+        string? barcode,
+        decimal buyingPrice,
+        decimal sellingPrice,
+        string? category,
+        bool isActive,
+        CancellationToken cancellationToken = default)
     {
-        _db.Products.Update(product);
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Id == productId, cancellationToken);
+        if (product is null) return null;
+
+        Guid? categoryId = product.CategoryId;
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            var existingCategory = await _db.ProductCategories.FirstOrDefaultAsync(
+                c => c.TenantId == tenantId && c.Name.ToLower() == category.Trim().ToLower(), cancellationToken);
+            if (existingCategory is null)
+            {
+                existingCategory = ProductCategory.Create(tenantId, category.Trim(), null);
+                await _db.ProductCategories.AddAsync(existingCategory, cancellationToken);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            categoryId = existingCategory.Id;
+        }
+
+        product.UpdateProfile(
+            name,
+            product.Description,
+            categoryId,
+            product.BrandId,
+            product.UnitOfMeasureId,
+            product.TaxCategoryId,
+            buyingPrice);
+
+        product.UpdateIdentifiers(product.Sku, barcode);
+        product.SetStatus(isActive ? ProductStatus.Active : ProductStatus.Inactive);
+
+        var defaultPriceList = await _db.PriceLists.FirstOrDefaultAsync(pl => pl.TenantId == tenantId && pl.IsDefault, cancellationToken);
+        if (defaultPriceList is null)
+        {
+            defaultPriceList = PriceList.Create(tenantId, "Standard Retail", "TZS", isDefault: true);
+            await _db.PriceLists.AddAsync(defaultPriceList, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var price = await _db.ProductPrices.FirstOrDefaultAsync(
+            pp => pp.TenantId == tenantId && pp.ProductId == productId && pp.PriceType == PriceType.Retail, cancellationToken);
+
+        if (price != null)
+        {
+            price.Update(sellingPrice > 0 ? sellingPrice : 1m, defaultPriceList.Currency, minQuantity: 1m, effectiveFrom: null, effectiveTo: null, isActive: true);
+        }
+        else if (sellingPrice > 0)
+        {
+            price = ProductPrice.Assign(
+                tenantId,
+                defaultPriceList.Id,
+                Guid.NewGuid(),
+                productId,
+                variantId: null,
+                branchId: null,
+                PriceType.Retail,
+                sellingPrice,
+                defaultPriceList.Currency,
+                minQuantity: 1m,
+                effectiveFrom: null,
+                effectiveTo: null,
+                isActive: true);
+            await _db.ProductPrices.AddAsync(price, cancellationToken);
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
+
+        var currentStock = await _db.StockBalances.AsNoTracking()
+            .Where(sb => sb.TenantId == tenantId && sb.ProductId == productId)
+            .SumAsync(sb => (decimal?)sb.Quantity, cancellationToken) ?? 0m;
+
+        return new OmniProductDto(
+            product.Id,
+            product.Name,
+            product.Barcode,
+            product.Sku,
+            category,
+            Unit: "pcs",
+            buyingPrice,
+            sellingPrice,
+            currentStock,
+            LowStockThreshold: 5m,
+            StockStatus: currentStock <= 0 ? "OutOfStock" : (currentStock <= 5m ? "LowStock" : "Normal"),
+            product.Status == ProductStatus.Active);
     }
 
     public async Task AdjustProductStockAsync(
         Guid tenantId, Guid productId, decimal newStockQuantity, string reason, Guid? operatorUserId, CancellationToken cancellationToken = default)
     {
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Id == productId, cancellationToken);
+        if (product is null) return;
+
+        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.TenantId == tenantId, cancellationToken);
+        var branchId = branch?.Id ?? Guid.NewGuid();
+
         var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.TenantId == tenantId, cancellationToken);
         if (warehouse is null)
         {
-            warehouse = Warehouse.Create(tenantId, "WH-MAIN", "Main Store", null, null, null);
+            warehouse = Warehouse.Create(tenantId, branchId, "Main Store", "WH-MAIN", null);
             await _db.Warehouses.AddAsync(warehouse, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
         }
@@ -276,33 +390,39 @@ public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
         var balance = await _db.StockBalances.FirstOrDefaultAsync(
             sb => sb.TenantId == tenantId && sb.ProductId == productId && sb.WarehouseId == warehouse.Id, cancellationToken);
 
-        var currentQty = balance?.QuantityOnHand ?? 0m;
+        var currentQty = balance?.Quantity ?? 0m;
         var delta = newStockQuantity - currentQty;
 
         if (balance is null)
         {
             balance = StockBalance.Create(tenantId, warehouse.Id, Guid.Empty, productId, null);
-            balance.Adjust(newStockQuantity);
+            balance.Apply(newStockQuantity);
             await _db.StockBalances.AddAsync(balance, cancellationToken);
         }
-        else
+        else if (delta != 0)
         {
-            balance.Adjust(delta);
+            balance.Apply(delta);
         }
 
-        var movement = StockMovement.Create(
-            tenantId,
-            productId,
-            warehouse.Id,
-            Guid.Empty,
-            null,
-            StockMovementType.Adjustment,
-            delta,
-            $"[Platform Back-Office] {reason}",
-            DateTime.UtcNow,
-            operatorUserId);
+        if (delta != 0)
+        {
+            var movement = StockMovement.Record(
+                tenantId,
+                branchId,
+                warehouse.Id,
+                Guid.Empty,
+                productId,
+                null,
+                StockMovementType.Adjustment,
+                delta,
+                product.UnitOfMeasureId,
+                DateTime.UtcNow,
+                reason: $"[Platform Back-Office] {reason}",
+                createdBy: operatorUserId);
 
-        await _db.StockMovements.AddAsync(movement, cancellationToken);
+            await _db.StockMovements.AddAsync(movement, cancellationToken);
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
     }
 
@@ -335,11 +455,30 @@ public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
             }
         };
 
+        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.TenantId == tenantId, cancellationToken);
+        var branchId = branch?.Id ?? Guid.NewGuid();
+
         var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.TenantId == tenantId, cancellationToken);
         if (warehouse is null)
         {
-            warehouse = Warehouse.Create(tenantId, "WH-MAIN", "Main Store", null, null, null);
+            warehouse = Warehouse.Create(tenantId, branchId, "Main Store", "WH-MAIN", null);
             await _db.Warehouses.AddAsync(warehouse, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var pieceUnit = await _db.UnitsOfMeasure.FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Abbreviation == "PCS", cancellationToken);
+        if (pieceUnit is null)
+        {
+            pieceUnit = UnitOfMeasure.Create(tenantId, "Pieces", "PCS");
+            await _db.UnitsOfMeasure.AddAsync(pieceUnit, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var defaultPriceList = await _db.PriceLists.FirstOrDefaultAsync(pl => pl.TenantId == tenantId && pl.IsDefault, cancellationToken);
+        if (defaultPriceList is null)
+        {
+            defaultPriceList = PriceList.Create(tenantId, "Standard Retail", "TZS", isDefault: true);
+            await _db.PriceLists.AddAsync(defaultPriceList, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
         }
 
@@ -353,34 +492,54 @@ public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
             var product = Product.Create(
                 tenantId: tenantId,
                 name: item.Name,
+                description: $"Starter pack item: {item.Name}",
                 sku: $"SKU-{Random.Shared.Next(10000, 99999)}",
                 barcode: item.Barcode,
-                costPrice: item.Buying,
-                retailPrice: item.Selling,
-                description: $"Starter pack item: {item.Name}",
                 categoryId: null,
-                unitOfMeasureId: null,
                 brandId: null,
-                isService: false);
+                unitOfMeasureId: pieceUnit.Id,
+                productType: ProductType.Product,
+                status: ProductStatus.Active,
+                taxCategoryId: null,
+                costPrice: item.Buying);
 
             await _db.Products.AddAsync(product, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
 
+            var productPrice = ProductPrice.Assign(
+                tenantId,
+                defaultPriceList.Id,
+                Guid.NewGuid(),
+                product.Id,
+                variantId: null,
+                branchId: null,
+                PriceType.Retail,
+                item.Selling,
+                defaultPriceList.Currency,
+                minQuantity: 1m,
+                effectiveFrom: null,
+                effectiveTo: null,
+                isActive: true);
+
+            await _db.ProductPrices.AddAsync(productPrice, cancellationToken);
+
             var balance = StockBalance.Create(tenantId, warehouse.Id, Guid.Empty, product.Id, null);
-            balance.Adjust(item.Stock);
+            balance.Apply(item.Stock);
             await _db.StockBalances.AddAsync(balance, cancellationToken);
 
-            var movement = StockMovement.Create(
+            var movement = StockMovement.Record(
                 tenantId,
-                product.Id,
+                branchId,
                 warehouse.Id,
                 Guid.Empty,
+                product.Id,
                 null,
                 StockMovementType.Adjustment,
                 item.Stock,
-                $"[Starter Pack Seed] {templateType}",
+                pieceUnit.Id,
                 DateTime.UtcNow,
-                operatorUserId);
+                reason: $"[Starter Pack Seed] {templateType}",
+                createdBy: operatorUserId);
 
             await _db.StockMovements.AddAsync(movement, cancellationToken);
         }
@@ -400,20 +559,20 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
     {
         var query = _db.Sales.AsNoTracking().Where(s => s.TenantId == tenantId);
 
-        if (startDate.HasValue) query = query.Where(s => s.CompletedAt >= startDate.Value);
-        if (endDate.HasValue) query = query.Where(s => s.CompletedAt <= endDate.Value);
+        if (startDate.HasValue) query = query.Where(s => s.SaleDate >= startDate.Value);
+        if (endDate.HasValue) query = query.Where(s => s.SaleDate <= endDate.Value);
         if (cashierId.HasValue) query = query.Where(s => s.CashierId == cashierId.Value);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
-            query = query.Where(sale => sale.ReceiptNumber.ToLower().Contains(s));
+            query = query.Where(sale => sale.Number.ToLower().Contains(s));
         }
 
         var total = await query.CountAsync(cancellationToken);
 
         var sales = await query
-            .OrderByDescending(s => s.CompletedAt)
+            .OrderByDescending(s => s.SaleDate)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -422,20 +581,14 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
         foreach (var s in sales)
         {
             var cashier = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == s.CashierId, cancellationToken);
-            var customerName = "Walk-in Customer";
-            if (s.CustomerId.HasValue)
-            {
-                var cust = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == s.CustomerId.Value, cancellationToken);
-                if (cust != null) customerName = cust.Name;
-            }
-
+            var customerName = s.CustomerName ?? "Walk-in Customer";
             var paymentMethod = s.Payments.FirstOrDefault()?.Method.ToString() ?? "Cash";
 
             items.Add(new OmniSaleSummaryDto(
                 s.Id,
-                s.ReceiptNumber,
-                s.CompletedAt,
-                s.TotalAmount.Amount,
+                s.Number,
+                s.SaleDate,
+                s.TotalAmount,
                 customerName,
                 cashier?.FullName ?? "Cashier",
                 s.Status.ToString(),
@@ -451,26 +604,21 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
         if (s is null) return null;
 
         var cashier = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == s.CashierId, cancellationToken);
-        var customerName = "Walk-in Customer";
-        if (s.CustomerId.HasValue)
-        {
-            var cust = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == s.CustomerId.Value, cancellationToken);
-            if (cust != null) customerName = cust.Name;
-        }
+        var customerName = s.CustomerName ?? "Walk-in Customer";
 
         var lines = s.Lines.Select(l => new OmniSaleLineDto(
             l.ProductName,
             l.Quantity,
-            l.UnitPrice.Amount,
-            l.LineTotal.Amount)).ToList();
+            l.UnitPrice,
+            l.LineTotal)).ToList();
 
         var paymentMethod = s.Payments.FirstOrDefault()?.Method.ToString() ?? "Cash";
 
         return new OmniSaleDetailDto(
             s.Id,
-            s.ReceiptNumber,
-            s.CompletedAt,
-            s.TotalAmount.Amount,
+            s.Number,
+            s.SaleDate,
+            s.TotalAmount,
             customerName,
             cashier?.FullName ?? "Cashier",
             s.Status.ToString(),
@@ -483,7 +631,8 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
 
     public async Task VoidSaleAsync(Sale sale, string reason, Guid? operatorUserId, CancellationToken cancellationToken = default)
     {
-        sale.Cancel(reason);
+        var operatorId = operatorUserId.HasValue && operatorUserId.Value != Guid.Empty ? operatorUserId.Value : Guid.NewGuid();
+        sale.Void(reason, operatorId, DateTime.UtcNow);
 
         var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.TenantId == sale.TenantId, cancellationToken);
         if (warehouse != null)
@@ -495,20 +644,22 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
 
                 if (balance != null)
                 {
-                    balance.Adjust(line.Quantity);
+                    balance.Apply(line.Quantity);
                 }
 
-                var movement = StockMovement.Create(
+                var movement = StockMovement.Record(
                     sale.TenantId,
-                    line.ProductId,
+                    sale.BranchId,
                     warehouse.Id,
                     Guid.Empty,
-                    null,
-                    StockMovementType.Adjustment,
+                    line.ProductId,
+                    line.VariantId,
+                    StockMovementType.SaleVoid,
                     line.Quantity,
-                    $"[Sale Voided: {sale.ReceiptNumber}] {reason}",
+                    line.UnitOfMeasureId,
                     DateTime.UtcNow,
-                    operatorUserId);
+                    reason: $"[Sale Voided: {sale.Number}] {reason}",
+                    createdBy: operatorUserId);
 
                 await _db.StockMovements.AddAsync(movement, cancellationToken);
             }
@@ -533,20 +684,19 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
         var items = new List<OmniCashSessionDto>();
         foreach (var cs in sessions)
         {
-            var cashier = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == cs.OpenedBy, cancellationToken);
-            var account = await _db.MoneyAccounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == cs.MoneyAccountId, cancellationToken);
+            var account = await _db.MoneyAccounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == cs.AccountId, cancellationToken);
 
             items.Add(new OmniCashSessionDto(
                 cs.Id,
                 account?.Name ?? "Main Till",
-                cashier?.FullName ?? "Cashier",
+                account?.Name ?? "Cashier",
                 cs.OpenedAt,
                 cs.ClosedAt,
-                cs.OpeningBalance.Amount,
-                cs.TotalSales.Amount,
-                cs.ClosingBalance?.Amount,
-                cs.Variance?.Amount ?? 0m,
-                cs.IsOpen));
+                cs.OpeningCash,
+                (cs.ClosingCash ?? cs.ExpectedCash ?? cs.OpeningCash) - cs.OpeningCash,
+                cs.ClosingCash,
+                cs.Variance ?? 0m,
+                cs.Status == CashSessionStatus.Open));
         }
 
         return new PagedResult<OmniCashSessionDto>(items, page, pageSize, total);
@@ -601,13 +751,13 @@ public sealed class OmniTenantInvoicesRepository : IOmniTenantInvoicesRepository
 
     public async Task UpdateInvoiceStatusAsync(CustomerInvoice invoice, CustomerInvoiceStatus newStatus, CancellationToken cancellationToken = default)
     {
-        if (newStatus == CustomerInvoiceStatus.Cancelled)
+        if (newStatus == CustomerInvoiceStatus.Void)
         {
-            invoice.Cancel("Status updated by Platform Admin");
+            invoice.Void();
         }
         else if (newStatus == CustomerInvoiceStatus.Paid)
         {
-            invoice.RecordPayment(invoice.BalanceDue, "Platform Admin Direct Clearance", DateTime.UtcNow);
+            invoice.RecordPayment(invoice.BalanceDue, "Direct Clearance", "Platform Back-Office Payment");
         }
 
         _db.CustomerInvoices.Update(invoice);
@@ -624,16 +774,16 @@ public sealed class PlatformTeamRepository : IPlatformTeamRepository
     public async Task<IReadOnlyList<PlatformOperatorDto>> ListPlatformOperatorsAsync(CancellationToken cancellationToken = default)
     {
         var operators = await _db.PlatformOperators.AsNoTracking().ToListAsync(cancellationToken);
-        var users = await _db.Users.AsNoTracking().ToListAsync(cancellationToken);
-        var userDict = users.ToDictionary(u => u.Id);
+        var userIds = operators.Select(o => o.UserId).Distinct().ToList();
+        var users = await _db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, cancellationToken);
 
         return operators.Select(op => new PlatformOperatorDto(
             op.Id,
             op.UserId,
-            userDict.TryGetValue(op.UserId, out var u) ? u.Email : "Unknown",
+            users.TryGetValue(op.UserId, out var u) ? u.Email : "Unknown",
             op.Role.ToString(),
             op.IsActive,
-            op.CreatedAt)).ToList();
+            op.AssignedAtUtc)).ToList();
     }
 
     public Task<User?> FindUserByEmailAsync(string email, CancellationToken cancellationToken = default)
@@ -644,12 +794,12 @@ public sealed class PlatformTeamRepository : IPlatformTeamRepository
         var existing = await _db.PlatformOperators.FirstOrDefaultAsync(o => o.UserId == userId, cancellationToken);
         if (existing != null)
         {
-            existing.UpdateRole(role);
+            existing.ChangeRole(role, Guid.Empty);
             _db.PlatformOperators.Update(existing);
         }
         else
         {
-            var op = PlatformOperator.Create(userId, role);
+            var op = PlatformOperator.Create(userId, role, Guid.Empty);
             await _db.PlatformOperators.AddAsync(op, cancellationToken);
         }
 
@@ -661,7 +811,7 @@ public sealed class PlatformTeamRepository : IPlatformTeamRepository
         var op = await _db.PlatformOperators.FirstOrDefaultAsync(o => o.Id == operatorId, cancellationToken);
         if (op != null)
         {
-            op.Revoke();
+            op.Deactivate();
             _db.PlatformOperators.Update(op);
             await _db.SaveChangesAsync(cancellationToken);
         }
