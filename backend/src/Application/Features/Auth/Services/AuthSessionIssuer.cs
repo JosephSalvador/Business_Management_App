@@ -19,25 +19,41 @@ public sealed class AuthSessionIssuer
     private readonly IAuditLogRepository _auditLogs;
     private readonly ITokenService _tokenService;
     private readonly ITenantContext _tenantContext;
+    private readonly IPlatformOperatorRepository _platformOperators;
 
     public AuthSessionIssuer(
         IRoleRepository roles,
         IRefreshTokenRepository refreshTokens,
         IAuditLogRepository auditLogs,
         ITokenService tokenService,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IPlatformOperatorRepository platformOperators)
     {
         _roles = roles;
         _refreshTokens = refreshTokens;
         _auditLogs = auditLogs;
         _tokenService = tokenService;
         _tenantContext = tenantContext;
+        _platformOperators = platformOperators;
     }
 
     public async Task<AuthResponse> IssueAsync(User user, CancellationToken cancellationToken)
     {
         var permissions = await GetPermissionsAsync(user, cancellationToken);
-        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.TenantId, user.Email, permissions);
+
+        var platformOp = await _platformOperators.GetByUserIdAsync(user.Id, cancellationToken);
+        var platformRole = platformOp is { IsActive: true } ? platformOp.Role.ToString() : null;
+
+        IDictionary<string, string>? additionalClaims = null;
+        if (platformRole is not null)
+        {
+            additionalClaims = new Dictionary<string, string>
+            {
+                ["platform_role"] = platformRole
+            };
+        }
+
+        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.TenantId, user.Email, permissions, additionalClaims);
         var rawRefreshToken = _tokenService.GenerateRefreshToken();
         await _refreshTokens.AddAsync(RefreshToken.Create(
             user.Id,
@@ -66,6 +82,7 @@ public sealed class AuthSessionIssuer
                 user.IsActive, user.EmailVerified, permissions)
             {
                 TwoFactorEnabled = user.TwoFactorEnabled,
+                PlatformRole = platformRole,
             });
     }
 

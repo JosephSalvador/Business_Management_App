@@ -923,3 +923,13 @@ public interface INotificationPreferenceRepository
     Task<NotificationPreference?> GetByTenantAndUserAsync(Guid tenantId, Guid? userId, CancellationToken cancellationToken = default);
     Task UpsertAsync(NotificationPreference preference, CancellationToken cancellationToken = default);
 }
+
+public interface IPlatformOperatorRepository
+{
+    Task<PlatformOperator?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PlatformOperator>> ListAllAsync(CancellationToken cancellationToken = default);
+    Task AddAsync(PlatformOperator op, CancellationToken cancellationToken = default);
+    Task UpdateAsync(PlatformOperator op, CancellationToken cancellationToken = default);
+    Task RemoveAsync(PlatformOperator op, CancellationToken cancellationToken = default);
+}
+

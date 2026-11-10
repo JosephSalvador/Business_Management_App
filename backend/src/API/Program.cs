@@ -58,6 +58,7 @@ builder.Services
     .Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName))
     .Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName))
     .Configure<TlsRiskOptions>(builder.Configuration.GetSection(TlsRiskOptions.SectionName))
+    .Configure<PlatformAdminOptions>(builder.Configuration.GetSection(PlatformAdminOptions.SectionName))
     .Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 
 builder.Services
@@ -274,6 +275,7 @@ app.MapDeliveryNoteEndpoints();
 app.MapDocumentTemplateEndpoints();
 app.MapNotificationEndpoints();
 app.MapTenantProvisioningEndpoints();
+app.MapPlatformAdminEndpoints();
 app.MapAppVersionEndpoints();
 app.MapPublicInvoiceVerificationEndpoints();
 

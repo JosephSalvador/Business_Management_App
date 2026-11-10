@@ -119,3 +119,13 @@ public sealed class SecurityOptions
     /// </summary>
     public string TwoFactorEncryptionKey { get; set; } = string.Empty;
 }
+
+public sealed class PlatformAdminOptions
+{
+    public const string SectionName = "PlatformAdmin";
+
+    public string[] AdminEmails { get; set; } = Array.Empty<string>();
+    public string PortalUrl { get; set; } = "https://portal.jolinx.com";
+    public string ClientAppUrl { get; set; } = "https://app.jolinx.com";
+}
+

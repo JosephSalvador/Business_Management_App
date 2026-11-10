@@ -10,7 +10,12 @@ public interface IPasswordHasher
 
 public interface ITokenService
 {
-    string GenerateAccessToken(Guid userId, Guid tenantId, string email, IReadOnlyCollection<string> permissions);
+    string GenerateAccessToken(
+        Guid userId,
+        Guid tenantId,
+        string email,
+        IReadOnlyCollection<string> permissions,
+        IDictionary<string, string>? additionalClaims = null);
     string GenerateRefreshToken();
     string HashRefreshToken(string token);
 }

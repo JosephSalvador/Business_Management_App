@@ -16,19 +16,22 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
     private readonly IRoleRepository _roles;
     private readonly IAuditLogRepository _auditLogs;
     private readonly ITokenService _tokenService;
+    private readonly IPlatformOperatorRepository _platformOperators;
 
     public RefreshTokenCommandHandler(
         IRefreshTokenRepository refreshTokens,
         IUserRepository users,
         IRoleRepository roles,
         IAuditLogRepository auditLogs,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        IPlatformOperatorRepository platformOperators)
     {
         _refreshTokens = refreshTokens;
         _users = users;
         _roles = roles;
         _auditLogs = auditLogs;
         _tokenService = tokenService;
+        _platformOperators = platformOperators;
     }
 
     public async Task<Result<AuthResponse>> Handle(RefreshTokenCommand command, CancellationToken cancellationToken)
@@ -60,7 +63,20 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
         }
 
         var permissions = await GetPermissionsAsync(user, cancellationToken);
-        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.TenantId, user.Email, permissions);
+
+        var platformOp = await _platformOperators.GetByUserIdAsync(user.Id, cancellationToken);
+        var platformRole = platformOp is { IsActive: true } ? platformOp.Role.ToString() : null;
+
+        IDictionary<string, string>? additionalClaims = null;
+        if (platformRole is not null)
+        {
+            additionalClaims = new Dictionary<string, string>
+            {
+                ["platform_role"] = platformRole
+            };
+        }
+
+        var accessToken = _tokenService.GenerateAccessToken(user.Id, user.TenantId, user.Email, permissions, additionalClaims);
         var rawRefreshToken = _tokenService.GenerateRefreshToken();
 
         var replacement = RefreshToken.Create(
@@ -84,7 +100,11 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
             accessToken,
             rawRefreshToken,
             DateTime.UtcNow.AddMinutes(AuthConstants.AccessTokenMinutes),
-            new UserDto(user.Id, user.TenantId, user.Email, user.FullName, user.Phone, user.IsActive, user.EmailVerified, permissions));
+            new UserDto(user.Id, user.TenantId, user.Email, user.FullName, user.Phone, user.IsActive, user.EmailVerified, permissions)
+            {
+                TwoFactorEnabled = user.TwoFactorEnabled,
+                PlatformRole = platformRole,
+            });
 
         return Result.Success(response);
     }

@@ -38,6 +38,7 @@ public sealed record UserDto(
     IReadOnlyList<string> Permissions)
 {
     public bool TwoFactorEnabled { get; init; }
+    public string? PlatformRole { get; init; }
 }
 
 public sealed record CurrentUserDto(
@@ -53,6 +54,7 @@ public sealed record CurrentUserDto(
     IReadOnlyList<string> RoleNames)
 {
     public bool TwoFactorEnabled { get; init; }
+    public string? PlatformRole { get; init; }
 }
 
 public sealed record MfaStatusDto(

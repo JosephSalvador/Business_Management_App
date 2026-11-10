@@ -13,17 +13,20 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
     private readonly IUserRepository _users;
     private readonly IRoleRepository _roles;
     private readonly ITenantRepository _tenants;
+    private readonly IPlatformOperatorRepository _platformOperators;
 
     public GetCurrentUserQueryHandler(
         ITenantContext tenantContext,
         IUserRepository users,
         IRoleRepository roles,
-        ITenantRepository tenants)
+        ITenantRepository tenants,
+        IPlatformOperatorRepository platformOperators)
     {
         _tenantContext = tenantContext;
         _users = users;
         _roles = roles;
         _tenants = tenants;
+        _platformOperators = platformOperators;
     }
 
     public async Task<Result<CurrentUserDto>> Handle(GetCurrentUserQuery request, CancellationToken cancellationToken)
@@ -50,6 +53,9 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
 
         var roleNames = user.Roles.Select(r => r.Name).ToList();
 
+        var platformOp = await _platformOperators.GetByUserIdAsync(user.Id, cancellationToken);
+        var platformRole = platformOp is { IsActive: true } ? platformOp.Role.ToString() : null;
+
         var result = new CurrentUserDto(
             user.Id,
             user.TenantId,
@@ -63,6 +69,7 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
             roleNames)
         {
             TwoFactorEnabled = user.TwoFactorEnabled,
+            PlatformRole = platformRole,
         };
 
         return Result.Success(result);

@@ -96,6 +96,7 @@ public static class DependencyInjection
         services.AddScoped<IAppNotificationRepository, AppNotificationRepository>();
         services.AddScoped<IUserDeviceRepository, UserDeviceRepository>();
         services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
+        services.AddScoped<IPlatformOperatorRepository, PlatformOperatorRepository>();
         services.AddScoped<IAccountMappingService, AccountMappingService>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddSingleton<ICsvExportService, CsvExportService>();

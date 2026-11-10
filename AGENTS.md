@@ -302,3 +302,17 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 9: Version Bump — Bump client version code to `1.0.0+85` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 10: Remote Staging Build & Artifact Verification — Commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml` with `deploy_target: staging` (Run 41822188611 — APK published to `releases/tag/staging-latest`).
 
+## Implementation Plan — Back-Office Portal for Omni-Tenant Management, Platform SuperAdmin Role, and Support Console
+- [x] Task 1: Platform Role Architecture & Domain Security — Create `PlatformRoleType` enum (`None`, `PlatformStaff`, `PlatformSuperAdmin`) and `PlatformOperator` aggregate root in `PlatformRole.cs` with EF mapping in `BusinessDbContext.cs` and migration `20261110120000_AddPlatformOperators.cs`.
+- [x] Task 2: JWT Claims & Token Identity — Extend `ITokenService` and `JwtTokenService` to inject `platform_role` claim into access tokens on sign-in and token refresh.
+- [x] Task 3: Backend Authorization Policies & Minimal APIs — Create `RequirePlatformSuperAdmin()` and `RequirePlatformStaffOrSuperAdmin()` endpoint filters and map endpoints under `/api/v1/admin/fleet/*`, `/api/v1/admin/tenants/{tenantId}/*`, and `/api/v1/admin/platform-team/*`.
+- [x] Task 4: Omni-Tenant Application CQRS Handlers — Implement `FleetManagementQueries.cs`, `OmniTenantCatalogCommands.cs` (product table, inline edit, stock adjust, starter packs), `OmniTenantSalesCommands.cs` (sales table, details, void), `OmniTenantInvoicesCommands.cs` (invoices table, status update), `ImpersonateTenantCommand.cs` (support token minting), and `PlatformTeamCommands.cs` (staff directory & invite/revoke).
+- [x] Task 5: Database Seeder — Seed primary operator `joberthix@gmail.com` as `PlatformSuperAdmin`.
+- [x] Task 6: Portal Central API Client — Create `portal/src/services/api.js` with token storage, base URL configuration, auth headers, and offline fallbacks.
+- [x] Task 7: Portal Omni-Tenant Components — Build `OmniProductsTable.jsx` (inline editing, stock adjustment, starter catalog seeding), `OmniSalesTable.jsx` (sales table, receipt inspector modal, voiding), `OmniInvoicesTable.jsx` (invoices table, balance, status switcher), and `OmniCashSessionsTable.jsx` (POS till drawer sessions).
+- [x] Task 8: Portal Team Management Component — Build `PlatformTeamManager.jsx` for SuperAdmins to manage platform staff and assign/revoke roles.
+- [x] Task 9: Portal Omnipresent Tenant Console — Build `TenantDetailConsole.jsx` with milestone progress tracker (5 steps), health status score, overview KPIs, sub-navigation, and "🚀 Fungua Kwenye App (Support Login)" launcher.
+- [x] Task 10: Upgrade Portal App — Integrate Fleet Directory with KPI cards, search, health/status filters, operator profile badge, and login modal in `portal/src/App.jsx`.
+- [x] Task 11: Client App Support Banner — Update `AuthUser` in `session.dart` and add top amber Support Mode banner in `dashboard_page.dart`.
+- [ ] Task 12: Commit, push to `feature/invoice-delivery`, and verify GitHub Actions deployment to staging (`deploy-azure.yml` -> `jolinx-api-staging`, `deploy-portal.yml` -> Cloudflare Pages `jolinx-portal` staging branch).
+

@@ -25,7 +25,8 @@ public sealed class JwtTokenService : ITokenService
         Guid userId,
         Guid tenantId,
         string email,
-        IReadOnlyCollection<string> permissions)
+        IReadOnlyCollection<string> permissions,
+        IDictionary<string, string>? additionalClaims = null)
     {
         var claims = new List<Claim>
         {
@@ -36,6 +37,14 @@ public sealed class JwtTokenService : ITokenService
         };
 
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));
+
+        if (additionalClaims is not null)
+        {
+            foreach (var (key, value) in additionalClaims)
+            {
+                claims.Add(new Claim(key, value));
+            }
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

@@ -55,6 +55,7 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
     public DbSet<EmailVerificationCode> EmailVerificationCodes => Set<EmailVerificationCode>();
     public DbSet<PasswordResetCode> PasswordResetCodes => Set<PasswordResetCode>();
     public DbSet<InvitationCode> InvitationCodes => Set<InvitationCode>();
+    public DbSet<PlatformOperator> PlatformOperators => Set<PlatformOperator>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Brand> Brands => Set<Brand>();
@@ -282,6 +283,17 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(c => c.CodeHash).IsRequired().HasMaxLength(128);
             entity.HasIndex(c => c.CodeHash).IsUnique();
             entity.HasIndex(c => c.TenantId);
+        });
+
+        modelBuilder.Entity<PlatformOperator>(entity =>
+        {
+            entity.ToTable(Tables.Identity.PlatformOperators, Schemas.Identity);
+            entity.HasKey(o => o.Id);
+            entity.HasIndex(o => o.UserId).IsUnique();
+            entity.Property(o => o.Role).IsRequired();
+            entity.Property(o => o.IsActive).IsRequired();
+            entity.Property(o => o.AssignedAtUtc).IsRequired();
+            entity.HasOne<User>().WithMany().HasForeignKey(o => o.UserId);
         });
 
         modelBuilder.Entity<AuditLog>(entity =>

@@ -25,15 +25,18 @@ public sealed class DatabaseSeeder
     private readonly BusinessDbContext _db;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<DatabaseSeeder> _logger;
+    private readonly Microsoft.Extensions.Options.IOptions<BusinessOS.Shared.Configuration.PlatformAdminOptions>? _platformAdminOptions;
 
     public DatabaseSeeder(
         BusinessDbContext db,
         IPasswordHasher passwordHasher,
-        ILogger<DatabaseSeeder> logger)
+        ILogger<DatabaseSeeder> logger,
+        Microsoft.Extensions.Options.IOptions<BusinessOS.Shared.Configuration.PlatformAdminOptions>? platformAdminOptions = null)
     {
         _db = db;
         _passwordHasher = passwordHasher;
         _logger = logger;
+        _platformAdminOptions = platformAdminOptions;
     }
 
     public async Task SeedAsync(CancellationToken cancellationToken = default, bool createDemoTenant = true)
@@ -116,6 +119,7 @@ public sealed class DatabaseSeeder
         }
 
         await EnsureDocumentTemplatesSeededAsync(cancellationToken);
+        await EnsurePlatformOperatorsSeededAsync(cancellationToken);
 
         if (!createDemoTenant)
         {
@@ -943,4 +947,54 @@ table { width: 100%; border-collapse: collapse; }
         _logger.LogWarning(ex, "DocumentTemplates seeding skipped or deferred: {Message}", ex.Message);
     }
 }
+
+    private async Task EnsurePlatformOperatorsSeededAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var superAdminEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "joberthix@gmail.com",
+                "admin@acme.local",
+                "josephsalvador56@gmail.com"
+            };
+
+            if (_platformAdminOptions?.Value?.AdminEmails is { Length: > 0 } extraEmails)
+            {
+                foreach (var email in extraEmails)
+                {
+                    if (!string.IsNullOrWhiteSpace(email))
+                    {
+                        superAdminEmails.Add(email.Trim());
+                    }
+                }
+            }
+
+            foreach (var email in superAdminEmails)
+            {
+                var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+                if (user is null) continue;
+
+                var existingOp = await _db.PlatformOperators.FirstOrDefaultAsync(o => o.UserId == user.Id, cancellationToken);
+                if (existingOp is null)
+                {
+                    var op = PlatformOperator.Create(user.Id, PlatformRoleType.PlatformSuperAdmin, user.Id);
+                    _db.PlatformOperators.Add(op);
+                    _logger.LogInformation("Seeded PlatformSuperAdmin operator for user '{Email}'.", email);
+                }
+                else if (existingOp.Role != PlatformRoleType.PlatformSuperAdmin || !existingOp.IsActive)
+                {
+                    existingOp.ChangeRole(PlatformRoleType.PlatformSuperAdmin, user.Id);
+                    existingOp.Reactivate();
+                    _logger.LogInformation("Promoted/Reactivated user '{Email}' to PlatformSuperAdmin.", email);
+                }
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Platform operators seeding skipped or deferred: {Message}", ex.Message);
+        }
+    }
 }

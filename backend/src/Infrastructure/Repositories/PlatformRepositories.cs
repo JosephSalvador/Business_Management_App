@@ -3264,3 +3264,32 @@ public sealed class NotificationPreferenceRepository : INotificationPreferenceRe
         await _db.SaveChangesAsync(cancellationToken);
     }
 }
+
+public sealed class PlatformOperatorRepository : IPlatformOperatorRepository
+{
+    private readonly BusinessDbContext _db;
+
+    public PlatformOperatorRepository(BusinessDbContext db) => _db = db;
+
+    public Task<PlatformOperator?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+        => _db.PlatformOperators.FirstOrDefaultAsync(o => o.UserId == userId, cancellationToken);
+
+    public async Task<IReadOnlyList<PlatformOperator>> ListAllAsync(CancellationToken cancellationToken = default)
+        => await _db.PlatformOperators.OrderByDescending(o => o.AssignedAtUtc).ToListAsync(cancellationToken);
+
+    public Task AddAsync(PlatformOperator op, CancellationToken cancellationToken = default)
+        => _db.PlatformOperators.AddAsync(op, cancellationToken).AsTask();
+
+    public Task UpdateAsync(PlatformOperator op, CancellationToken cancellationToken = default)
+    {
+        _db.PlatformOperators.Update(op);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(PlatformOperator op, CancellationToken cancellationToken = default)
+    {
+        _db.PlatformOperators.Remove(op);
+        return Task.CompletedTask;
+    }
+}
+

@@ -50,6 +50,7 @@ public static class Tables
         public const string EmailVerificationCodes = "EmailVerificationCodes";
         public const string PasswordResetCodes = "PasswordResetCodes";
         public const string InvitationCodes = "InvitationCodes";
+        public const string PlatformOperators = "PlatformOperators";
     }
 
     public static class Catalog

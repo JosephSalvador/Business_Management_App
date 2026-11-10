@@ -63,6 +63,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final userName = auth is AuthAuthenticated
         ? auth.session.user.fullName.split(' ').first
         : '';
+    final isImpersonation = auth is AuthAuthenticated && auth.session.user.isImpersonation;
 
     return Scaffold(
       body: state is DashboardLoading
@@ -83,6 +84,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     },
                     userName: userName,
                     connectionQuality: connection,
+                    isImpersonation: isImpersonation,
                   ),
                 ),
     );
@@ -98,6 +100,7 @@ class _DashboardBody extends StatelessWidget {
     required this.onPeriodChanged,
     required this.userName,
     required this.connectionQuality,
+    this.isImpersonation = false,
   });
 
   final DashboardLoaded state;
@@ -105,6 +108,7 @@ class _DashboardBody extends StatelessWidget {
   final ValueChanged<int> onPeriodChanged;
   final String userName;
   final ConnectionQuality connectionQuality;
+  final bool isImpersonation;
 
   List<SalesTrendPoint> _filteredTrend() {
     final now = DateTime.now();
@@ -141,6 +145,35 @@ class _DashboardBody extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
+        if (isImpersonation) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.shield_outlined, size: 18, color: Color(0xFFB45309)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Hali ya Usaidizi (Support Mode) — Umeingia kama Msimamizi wa Jolinx kusaidia duka hili.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         if (state.isFromCache) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

@@ -10,6 +10,8 @@ class AuthUser {
     required this.emailVerified,
     required this.permissions,
     this.twoFactorEnabled = false,
+    this.platformRole,
+    this.isImpersonation = false,
   });
 
   final String id;
@@ -20,6 +22,8 @@ class AuthUser {
   final bool isActive;
   final bool emailVerified;
   final bool twoFactorEnabled;
+  final String? platformRole;
+  final bool isImpersonation;
   final List<String> permissions;
 
   bool hasPermission(String permission) => permissions.contains(permission);
@@ -34,6 +38,8 @@ class AuthUser {
       isActive: json['isActive'] as bool? ?? false,
       emailVerified: json['emailVerified'] as bool? ?? false,
       twoFactorEnabled: json['twoFactorEnabled'] as bool? ?? false,
+      platformRole: json['platformRole'] as String?,
+      isImpersonation: json['isImpersonation'] as bool? ?? false,
       permissions: (json['permissions'] as List<dynamic>? ?? const [])
           .whereType<String>()
           .toList(growable: false),
