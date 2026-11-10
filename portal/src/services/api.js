@@ -7,7 +7,7 @@ const STORAGE_KEY_API_URL = 'jlx_admin_api_url';
 const DEFAULT_API_URL = import.meta.env.VITE_API_BASE_URL ||
   (typeof window !== 'undefined' && window.location.hostname.includes('localhost')
     ? 'http://localhost:5000'
-    : 'https://jolinx-api-staging.ambitioussand-85805eec.centralus.azurecontainerapps.io');
+    : 'https://jolinx-api-staging.kindsky-ea584b9f.centralindia.azurecontainerapps.io');
 
 export const getApiBaseUrl = () => {
   return localStorage.getItem(STORAGE_KEY_API_URL) || DEFAULT_API_URL;
