@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search,
-  FileText,
   RefreshCw,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  XCircle,
-  ChevronDown
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   listTenantInvoices,
-  updateTenantInvoiceStatus
+  updateTenantInvoiceStatus,
 } from '../services/api';
+import {
+  Container,
+  Button,
+  StatusIndicator,
+  Alert,
+} from '../ui/primitives';
 
-export default function OmniInvoicesTable({ tenantId, tenantName, onNotification }) {
+export default function OmniInvoicesTable({ tenantId, onNotification }) {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +30,12 @@ export default function OmniInvoicesTable({ tenantId, tenantName, onNotification
     setLoading(true);
     setError(null);
     try {
-      const res = await listTenantInvoices(tenantId, { search, status: statusFilter, page, pageSize: 25 });
+      const res = await listTenantInvoices(tenantId, {
+        search,
+        status: statusFilter,
+        page,
+        pageSize: 25,
+      });
       if (res && res.items) {
         setInvoices(res.items);
         setTotalCount(res.totalCount || res.items.length);
@@ -40,8 +47,7 @@ export default function OmniInvoicesTable({ tenantId, tenantName, onNotification
         setTotalCount(0);
       }
     } catch (err) {
-      console.error('Could not fetch invoices:', err);
-      setError(err.message || 'Hitilafu ya kupakia ankara kutoka seva.');
+      setError(err.message || 'Failed to load invoices from server.');
       setInvoices([]);
       setTotalCount(0);
     } finally {
@@ -56,153 +62,209 @@ export default function OmniInvoicesTable({ tenantId, tenantName, onNotification
   const handleStatusChange = async (invoice, newStatus) => {
     try {
       await updateTenantInvoiceStatus(tenantId, invoice.id, newStatus);
-      setInvoices(invoices.map(i => i.id === invoice.id ? { ...i, status: newStatus } : i));
-      onNotification?.(`Hali ya ankara ${invoice.invoiceNumber || invoice.id} imebadilishwa kuwa "${newStatus}"!`);
+      setInvoices(
+        invoices.map((i) =>
+          i.id === invoice.id ? { ...i, status: newStatus } : i
+        )
+      );
+      onNotification?.(
+        `Updated invoice ${invoice.invoiceNumber || invoice.number || invoice.id} status to "${newStatus}".`
+      );
     } catch (err) {
-      onNotification?.(`Hitilafu kubadili hali ya ankara: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Failed to update invoice status: ${err.message || 'Please try again'}`
+      );
     }
   };
 
-  const getStatusBadge = (status) => {
-    switch ((status || '').toLowerCase()) {
-      case 'paid':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800"><CheckCircle className="w-3 h-3" /> Imelipwa</span>;
-      case 'partiallypaid':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"><Clock className="w-3 h-3" /> Imelipwa Sehemu</span>;
-      case 'draft':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Rasimu (Draft)</span>;
-      case 'cancelled':
-      case 'voided':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800"><XCircle className="w-3 h-3" /> Imefutwa</span>;
-      default:
-        return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800"><Clock className="w-3 h-3" /> {status}</span>;
-    }
+  const renderStatus = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'paid') return <StatusIndicator type="success">Paid</StatusIndicator>;
+    if (s === 'partiallypaid')
+      return <StatusIndicator type="info">Partially paid</StatusIndicator>;
+    if (s === 'draft')
+      return <StatusIndicator type="pending">Draft</StatusIndicator>;
+    if (s === 'cancelled' || s === 'voided')
+      return <StatusIndicator type="error">Cancelled</StatusIndicator>;
+    if (s === 'overdue')
+      return <StatusIndicator type="error">Overdue</StatusIndicator>;
+    return <StatusIndicator type="warning">{status || 'Issued'}</StatusIndicator>;
   };
 
   return (
     <div className="space-y-4">
-      {/* Top Filter and Actions Ribbon */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="flex-1 flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+      {error && (
+        <Alert
+          type="error"
+          title="Could not load customer invoices"
+          action={
+            <Button size="sm" onClick={fetchInvoices}>
+              Retry
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      )}
+
+      <Container
+        title="Customer invoices"
+        count={totalCount}
+        description="Manage B2B and customer billing documents, due dates, balances, and status transitions."
+        noPadding
+        actions={
+          <Button
+            size="sm"
+            icon={RefreshCw}
+            loading={loading}
+            onClick={fetchInvoices}
+          >
+            Refresh
+          </Button>
+        }
+        footer={
+          <div className="flex items-center justify-between text-[12px] text-[#5F6B7A]">
+            <span>
+              Showing {invoices.length} of {totalCount} invoices
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                icon={ChevronLeft}
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </Button>
+              <span className="px-2 font-medium text-[#16191F]">
+                Page {page}
+              </span>
+              <Button
+                size="sm"
+                icon={ChevronRight}
+                disabled={invoices.length < 25 || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="px-4 py-2.5 border-b border-[#E9EBED] bg-white flex flex-wrap items-center justify-between gap-2">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setPage(1);
+              fetchInvoices();
+            }}
+            className="relative flex-1 min-w-[220px] max-w-md"
+          >
+            <Search className="w-3.5 h-3.5 text-[#5F6B7A] absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Tafuta ankara au jina la mteja..."
+              placeholder="Filter by invoice number or customer name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-8 pr-3 py-1 text-[13px] border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
             />
+          </form>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-[#5F6B7A]">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="px-2.5 py-1 text-[12px] border border-[#879596] rounded-[4px] bg-white text-[#16191F]"
+            >
+              <option value="">All statuses</option>
+              <option value="Draft">Draft</option>
+              <option value="Issued">Issued</option>
+              <option value="PartiallyPaid">Partially paid</option>
+              <option value="Paid">Paid</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
           </div>
-          <button
-            onClick={() => { setPage(1); fetchInvoices(); }}
-            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition"
-          >
-            Tafuta
-          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Hali Zote</option>
-            <option value="Draft">Rasimu (Draft)</option>
-            <option value="Paid">Imelipwa (Paid)</option>
-            <option value="PartiallyPaid">Imelipwa Sehemu</option>
-            <option value="Cancelled">Imefutwa (Cancelled)</option>
-          </select>
-
-          <button
-            onClick={fetchInvoices}
-            disabled={loading}
-            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-            title="Sasisha Orodha"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Invoices Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Namba ya Ankara</th>
-                <th className="py-3 px-4">Mteja</th>
-                <th className="py-3 px-4">Tarehe</th>
-                <th className="py-3 px-4">Tarehe ya Mwisho</th>
-                <th className="py-3 px-4 text-right">Jumla (TZS)</th>
-                <th className="py-3 px-4 text-right">Baki ya Kulipwa</th>
-                <th className="py-3 px-4 text-center">Hali</th>
-                <th className="py-3 px-4 text-right">Badili Hali</th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase tracking-wider text-[#5F6B7A]">
+                <th className="py-2.5 px-4">Invoice #</th>
+                <th className="py-2.5 px-4">Customer</th>
+                <th className="py-2.5 px-4">Issue date</th>
+                <th className="py-2.5 px-4">Due date</th>
+                <th className="py-2.5 px-4 text-right">Total amount</th>
+                <th className="py-2.5 px-4 text-right">Amount paid</th>
+                <th className="py-2.5 px-4">Status</th>
+                <th className="py-2.5 px-4 text-right">Change status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && invoices.length === 0 ? (
+            <tbody className="divide-y divide-[#E9EBED] text-[13px]">
+              {loading ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia ankara za mteja kutoka seva...
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan="8" className="py-12 text-center text-rose-500">
-                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
-                    <div className="font-semibold">{error}</div>
-                    <button
-                      onClick={fetchInvoices}
-                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
-                    >
-                      Jaribu Tena
-                    </button>
+                  <td colSpan={8} className="py-10 text-center text-[#5F6B7A]">
+                    <RefreshCw className="w-4 h-4 animate-spin inline mr-2 text-[#0972D3]" />
+                    Loading invoices...
                   </td>
                 </tr>
               ) : invoices.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
-                    <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    Hakuna ankara (invoices) zilizopatikana kwenye duka hili.
+                  <td colSpan={8} className="py-10 text-center text-[#5F6B7A]">
+                    No customer invoices found for this tenant.
                   </td>
                 </tr>
               ) : (
                 invoices.map((inv) => {
-                  const balance = (inv.totalAmount || 0) - (inv.amountPaid || 0);
+                  const total = inv.totalAmount ?? inv.grandTotal ?? 0;
+                  const paid = inv.amountPaid ?? 0;
                   return (
-                    <tr key={inv.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                        {inv.invoiceNumber || inv.number || inv.id.slice(0, 8)}
+                    <tr
+                      key={inv.id}
+                      className="hover:bg-[#F1F8FF]/50 transition-colors"
+                    >
+                      <td className="py-2 px-4 font-mono text-[12px] font-semibold text-[#16191F]">
+                        {inv.invoiceNumber ||
+                          inv.number ||
+                          (inv.id ? inv.id.slice(0, 8) : '—')}
                       </td>
-                      <td className="py-3 px-4">
-                        <span className="font-semibold text-slate-800">{inv.customerName || 'Mteja'}</span>
+                      <td className="py-2 px-4 font-medium text-[#16191F]">
+                        {inv.customerName || 'Customer'}
                       </td>
-                      <td className="py-3 px-4 text-xs text-slate-500">
-                        {inv.issueDate ? new Date(inv.issueDate).toLocaleDateString() : '—'}
+                      <td className="py-2 px-4 text-[#5F6B7A]">
+                        {inv.issueDate || inv.createdAt
+                          ? new Date(
+                              inv.issueDate || inv.createdAt
+                            ).toLocaleDateString()
+                          : '—'}
                       </td>
-                      <td className="py-3 px-4 text-xs text-slate-500">
-                        {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—'}
+                      <td className="py-2 px-4 text-[#5F6B7A]">
+                        {inv.dueDate
+                          ? new Date(inv.dueDate).toLocaleDateString()
+                          : '—'}
                       </td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-900">
-                        TZS {Number(inv.totalAmount || 0).toLocaleString()}
+                      <td className="py-2 px-4 text-right tabular-nums font-semibold text-[#16191F]">
+                        {Number(total).toLocaleString()} {inv.currency || 'TZS'}
                       </td>
-                      <td className="py-3 px-4 text-right font-medium text-slate-600">
-                        TZS {Number(balance > 0 ? balance : 0).toLocaleString()}
+                      <td className="py-2 px-4 text-right tabular-nums text-[#037F0C]">
+                        {Number(paid).toLocaleString()} {inv.currency || 'TZS'}
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        {getStatusBadge(inv.status)}
-                      </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-2 px-4">{renderStatus(inv.status)}</td>
+                      <td className="py-2 px-4 text-right">
                         <select
-                          value={inv.status}
-                          onChange={(e) => handleStatusChange(inv, e.target.value)}
-                          className="px-2 py-1 text-xs border border-slate-300 rounded bg-white text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          value={inv.status || 'Issued'}
+                          onChange={(e) =>
+                            handleStatusChange(inv, e.target.value)
+                          }
+                          className="px-2 py-1 text-[12px] border border-[#879596] rounded-[4px] bg-white text-[#16191F]"
                         >
                           <option value="Draft">Draft</option>
+                          <option value="Issued">Issued</option>
+                          <option value="PartiallyPaid">PartiallyPaid</option>
                           <option value="Paid">Paid</option>
                           <option value="Cancelled">Cancelled</option>
                         </select>
@@ -214,7 +276,7 @@ export default function OmniInvoicesTable({ tenantId, tenantName, onNotification
             </tbody>
           </table>
         </div>
-      </div>
+      </Container>
     </div>
   );
 }

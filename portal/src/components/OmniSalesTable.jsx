@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search,
-  Receipt,
-  Eye,
-  Trash2,
   RefreshCw,
-  Calendar,
-  AlertCircle,
-  CreditCard,
-  User,
-  X,
-  FileText
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   listTenantSales,
   getTenantSaleDetail,
-  voidTenantSale
+  voidTenantSale,
 } from '../services/api';
+import {
+  Container,
+  Button,
+  StatusIndicator,
+  Badge,
+  Modal,
+  Alert,
+  KeyValueGrid,
+} from '../ui/primitives';
 
-export default function OmniSalesTable({ tenantId, tenantName, onNotification }) {
+export default function OmniSalesTable({ tenantId, onNotification }) {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,21 +30,29 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Receipt Modal
+  // Sale Detail Modal
   const [selectedSaleDetail, setSelectedSaleDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Void Modal
-  const [voidSaleTarget, setVoidSaleTarget] = useState(null);
-  const [voidReason, setVoidReason] = useState('Platform Admin Cancellation');
-  const [voidSubmitting, setVoidSubmitting] = useState(false);
+  // Void Sale Confirmation Modal
+  const [voidTargetSale, setVoidTargetSale] = useState(null);
+  const [voidReason, setVoidReason] = useState(
+    'Platform Operator Sale Correction'
+  );
+  const [voiding, setVoiding] = useState(false);
 
   const fetchSales = async () => {
     if (!tenantId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await listTenantSales(tenantId, { search, startDate, endDate, page, pageSize: 20 });
+      const res = await listTenantSales(tenantId, {
+        search,
+        startDate,
+        endDate,
+        page,
+        pageSize: 20,
+      });
       if (res && res.items) {
         setSales(res.items);
         setTotalCount(res.totalCount || res.items.length);
@@ -54,8 +64,7 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
         setTotalCount(0);
       }
     } catch (err) {
-      console.error('Could not fetch sales:', err);
-      setError(err.message || 'Hitilafu ya kupakia mauzo kutoka seva.');
+      setError(err.message || 'Failed to load sales from server.');
       setSales([]);
       setTotalCount(0);
     } finally {
@@ -78,166 +87,232 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
     try {
       const detail = await getTenantSaleDetail(tenantId, sale.id);
       setSelectedSaleDetail(detail || sale);
-    } catch (err) {
-      console.error('Failed to get sale detail:', err);
+    } catch {
       setSelectedSaleDetail(sale);
     } finally {
       setDetailLoading(false);
     }
   };
 
-  const handleConfirmVoid = async () => {
-    if (!voidSaleTarget) return;
-    setVoidSubmitting(true);
+  const handleConfirmVoid = async (e) => {
+    if (e) e.preventDefault();
+    if (!voidTargetSale) return;
+    setVoiding(true);
     try {
-      await voidTenantSale(tenantId, voidSaleTarget.id, voidReason);
-      setSales(sales.map(s => s.id === voidSaleTarget.id ? { ...s, status: 'Voided' } : s));
-      onNotification?.(`Mauzo ${voidSaleTarget.receiptNumber || voidSaleTarget.id} yamefutwa (Voided)!`);
-      setVoidSaleTarget(null);
+      await voidTenantSale(tenantId, voidTargetSale.id, voidReason);
+      setSales(
+        sales.map((s) =>
+          s.id === voidTargetSale.id ? { ...s, status: 'Voided' } : s
+        )
+      );
+      setVoidTargetSale(null);
+      onNotification?.(
+        `Voided sale receipt ${voidTargetSale.receiptNumber || voidTargetSale.id}.`
+      );
     } catch (err) {
-      onNotification?.(`Hitilafu kufuta mauzo: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Failed to void sale: ${err.message || 'Please try again'}`
+      );
     } finally {
-      setVoidSubmitting(false);
+      setVoiding(false);
     }
   };
 
   return (
     <div className="space-y-4">
-      {/* Search & Filter Header */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex-1 flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+      {error && (
+        <Alert
+          type="error"
+          title="Could not load sales transactions"
+          action={
+            <Button size="sm" onClick={fetchSales}>
+              Retry
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      )}
+
+      <Container
+        title="Sales & POS transactions"
+        count={totalCount}
+        description="Complete ledger of point-of-sale checkouts, payment methods, cashier attributions, and void controls."
+        noPadding
+        actions={
+          <Button
+            size="sm"
+            icon={RefreshCw}
+            loading={loading}
+            onClick={fetchSales}
+          >
+            Refresh
+          </Button>
+        }
+        footer={
+          <div className="flex items-center justify-between text-[12px] text-[#5F6B7A]">
+            <span>
+              Showing {sales.length} of {totalCount} records
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                icon={ChevronLeft}
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </Button>
+              <span className="px-2 font-medium text-[#16191F]">
+                Page {page}
+              </span>
+              <Button
+                size="sm"
+                icon={ChevronRight}
+                disabled={sales.length < 20 || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        {/* Filter Bar */}
+        <form
+          onSubmit={handleSearchSubmit}
+          className="px-4 py-2.5 border-b border-[#E9EBED] bg-white flex flex-wrap items-center gap-2"
+        >
+          <div className="relative flex-1 min-w-[220px] max-w-md">
+            <Search className="w-3.5 h-3.5 text-[#5F6B7A] absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Tafuta risiti, jina la mteja au cashier..."
+              placeholder="Filter by receipt number, customer, or cashier..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-8 pr-3 py-1 text-[13px] border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
             />
           </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition"
-          >
-            Tafuta
-          </button>
+          <div className="flex items-center gap-1.5 text-[12px] text-[#5F6B7A]">
+            <span>From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-2 py-1 text-[12px] border border-[#879596] rounded-[4px] text-[#16191F]"
+            />
+            <span>To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-2 py-1 text-[12px] border border-[#879596] rounded-[4px] text-[#16191F]"
+            />
+            <Button size="sm" type="submit">
+              Apply filter
+            </Button>
+          </div>
         </form>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchSales}
-            disabled={loading}
-            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-            title="Sasisha Orodha"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Sales Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Risiti</th>
-                <th className="py-3 px-4">Mteja</th>
-                <th className="py-3 px-4">Tarehe & Muda</th>
-                <th className="py-3 px-4">Mhudumu (Cashier)</th>
-                <th className="py-3 px-4 text-right">Jumla (TZS)</th>
-                <th className="py-3 px-4 text-center">Njia ya Malipo</th>
-                <th className="py-3 px-4 text-center">Hali</th>
-                <th className="py-3 px-4 text-right">Vitendo</th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase tracking-wider text-[#5F6B7A]">
+                <th className="py-2.5 px-4">Receipt #</th>
+                <th className="py-2.5 px-4">Date & time</th>
+                <th className="py-2.5 px-4">Customer</th>
+                <th className="py-2.5 px-4">Cashier</th>
+                <th className="py-2.5 px-4">Payment</th>
+                <th className="py-2.5 px-4 text-right">Total amount</th>
+                <th className="py-2.5 px-4">Status</th>
+                <th className="py-2.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && sales.length === 0 ? (
+            <tbody className="divide-y divide-[#E9EBED] text-[13px]">
+              {loading ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia orodha ya mauzo kutoka seva...
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan="8" className="py-12 text-center text-rose-500">
-                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
-                    <div className="font-semibold">{error}</div>
-                    <button
-                      onClick={fetchSales}
-                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
-                    >
-                      Jaribu Tena
-                    </button>
+                  <td colSpan={8} className="py-10 text-center text-[#5F6B7A]">
+                    <RefreshCw className="w-4 h-4 animate-spin inline mr-2 text-[#0972D3]" />
+                    Loading sales records...
                   </td>
                 </tr>
               ) : sales.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
-                    <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    Hakuna rekodi za mauzo zilizopatikana kwenye duka hili.
+                  <td colSpan={8} className="py-10 text-center text-[#5F6B7A]">
+                    No sales records found for this tenant.
                   </td>
                 </tr>
               ) : (
-                sales.map((s) => {
-                  const isVoided = (s.status || '').toLowerCase() === 'voided' || (s.status || '').toLowerCase() === 'cancelled';
-                  const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleString('sw-TZ', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+                sales.map((sale) => {
+                  const isVoided =
+                    (sale.status || '').toLowerCase() === 'voided' ||
+                    (sale.status || '').toLowerCase() === 'cancelled';
+                  const total = sale.totalAmount ?? sale.grandTotal ?? 0;
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                        {s.receiptNumber || s.number || s.id.slice(0, 8)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="font-medium text-slate-800">{s.customerName || 'Mteja wa Kawaida'}</span>
-                      </td>
-                      <td className="py-3 px-4 text-xs text-slate-500">
-                        {dateStr}
-                      </td>
-                      <td className="py-3 px-4 text-xs text-slate-700">
-                        {s.cashierName || 'Cashier'}
-                      </td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-900">
-                        TZS {Number(s.totalAmount || 0).toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">
-                          {s.paymentMethod || 'Pesa Taslimu'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            isVoided
-                              ? 'bg-rose-100 text-rose-700'
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}
-                        >
-                          {isVoided ? 'Imefutwa' : 'Imekamilika'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right space-x-2">
+                    <tr
+                      key={sale.id}
+                      className="hover:bg-[#F1F8FF]/50 transition-colors"
+                    >
+                      <td className="py-2 px-4 font-mono text-[12px] font-semibold text-[#0972D3]">
                         <button
-                          onClick={() => handleOpenReceipt(s)}
-                          className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium hover:bg-indigo-100 transition inline-flex items-center gap-1"
-                          title="Tazama Risiti"
+                          type="button"
+                          onClick={() => handleOpenReceipt(sale)}
+                          className="hover:underline"
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Risiti</span>
+                          {sale.receiptNumber ||
+                            sale.number ||
+                            (sale.id ? sale.id.slice(0, 8) : '—')}
                         </button>
+                      </td>
+                      <td className="py-2 px-4 text-[#5F6B7A] whitespace-nowrap">
+                        {sale.createdAt
+                          ? new Date(sale.createdAt).toLocaleString()
+                          : '—'}
+                      </td>
+                      <td className="py-2 px-4 text-[#16191F]">
+                        {sale.customerName || 'Walk-in Customer'}
+                      </td>
+                      <td className="py-2 px-4 text-[#5F6B7A]">
+                        {sale.cashierName || sale.createdBy || 'POS Cashier'}
+                      </td>
+                      <td className="py-2 px-4">
+                        <Badge color="blue">
+                          {sale.paymentMethod || 'Cash'}
+                        </Badge>
+                      </td>
+                      <td className="py-2 px-4 text-right tabular-nums font-semibold text-[#16191F]">
+                        {Number(total).toLocaleString()}{' '}
+                        {sale.currency || 'TZS'}
+                      </td>
+                      <td className="py-2 px-4">
+                        {isVoided ? (
+                          <StatusIndicator type="error">Voided</StatusIndicator>
+                        ) : (
+                          <StatusIndicator type="success">
+                            Completed
+                          </StatusIndicator>
+                        )}
+                      </td>
+                      <td className="py-2 px-4 text-right whitespace-nowrap space-x-2">
+                        <Button
+                          variant="link"
+                          size="sm"
+                          loading={detailLoading && selectedSaleDetail?.id === sale.id}
+                          onClick={() => handleOpenReceipt(sale)}
+                        >
+                          View receipt
+                        </Button>
                         {!isVoided && (
-                          <button
-                            onClick={() => {
-                              setVoidSaleTarget(s);
-                              setVoidReason('Platform Admin Cancellation');
-                            }}
-                            className="px-2 py-1 bg-rose-50 text-rose-700 rounded-md text-xs font-medium hover:bg-rose-100 transition"
-                            title="Futa Mauzo (Void)"
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="text-[#D91515]"
+                            onClick={() => setVoidTargetSale(sale)}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                            Void
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -247,121 +322,137 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
             </tbody>
           </table>
         </div>
-      </div>
+      </Container>
 
       {/* Receipt Detail Modal */}
-      {selectedSaleDetail && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-lg text-slate-900">
-                  Risiti {selectedSaleDetail.receiptNumber || selectedSaleDetail.number || selectedSaleDetail.id}
-                </h3>
-              </div>
-              <button onClick={() => setSelectedSaleDetail(null)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Modal
+        open={Boolean(selectedSaleDetail)}
+        onClose={() => setSelectedSaleDetail(null)}
+        title={`Sale receipt — ${
+          selectedSaleDetail?.receiptNumber ||
+          selectedSaleDetail?.number ||
+          selectedSaleDetail?.id ||
+          ''
+        }`}
+        size="md"
+        footer={
+          <Button onClick={() => setSelectedSaleDetail(null)}>Close</Button>
+        }
+      >
+        {selectedSaleDetail && (
+          <div className="space-y-4">
+            <KeyValueGrid
+              columns={3}
+              items={[
+                {
+                  label: 'Customer',
+                  value: selectedSaleDetail.customerName || 'Walk-in Customer',
+                },
+                {
+                  label: 'Payment method',
+                  value: selectedSaleDetail.paymentMethod || 'Cash',
+                },
+                {
+                  label: 'Total amount',
+                  value: `${Number(
+                    selectedSaleDetail.totalAmount ??
+                      selectedSaleDetail.grandTotal ??
+                      0
+                  ).toLocaleString()} ${selectedSaleDetail.currency || 'TZS'}`,
+                },
+              ]}
+            />
 
-            <div className="text-xs text-slate-500 space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
-              <div className="flex justify-between">
-                <span>Mteja:</span>
-                <strong className="text-slate-800">{selectedSaleDetail.customerName || 'Mteja wa Kawaida'}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Mhudumu (Cashier):</span>
-                <span className="text-slate-800">{selectedSaleDetail.cashierName || 'Cashier'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tarehe:</span>
-                <span className="text-slate-800">
-                  {selectedSaleDetail.createdAt ? new Date(selectedSaleDetail.createdAt).toLocaleString() : '—'}
-                </span>
-              </div>
-            </div>
-
-            {/* Line Items */}
-            <div className="max-h-60 overflow-y-auto space-y-2 divide-y divide-slate-100">
-              <div className="text-xs font-bold uppercase text-slate-400 pt-1">Bidhaa Zilizouzwa</div>
-              {(selectedSaleDetail.lines || []).map((line, idx) => (
-                <div key={idx} className="flex justify-between items-center text-sm pt-2">
-                  <div>
-                    <div className="font-semibold text-slate-800">{line.productName || 'Bidhaa'}</div>
-                    <div className="text-xs text-slate-400">
-                      {line.quantity} x TZS {Number(line.unitPrice || 0).toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="font-bold text-slate-900">
-                    TZS {Number(line.totalPrice || (line.quantity * line.unitPrice) || 0).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Total Footer */}
-            <div className="border-t pt-3 flex justify-between items-center">
-              <span className="font-bold text-slate-700">Jumla Kuu:</span>
-              <span className="text-xl font-extrabold text-indigo-600">
-                TZS {Number(selectedSaleDetail.totalAmount || 0).toLocaleString()}
-              </span>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setSelectedSaleDetail(null)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800"
-              >
-                Funga
-              </button>
+            <div className="border border-[#E9EBED] rounded-[4px] overflow-hidden">
+              <table className="w-full text-left border-collapse text-[12px]">
+                <thead>
+                  <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[#5F6B7A] uppercase text-[11px]">
+                    <th className="py-2 px-3">Item</th>
+                    <th className="py-2 px-3 text-right">Qty</th>
+                    <th className="py-2 px-3 text-right">Unit price</th>
+                    <th className="py-2 px-3 text-right">Line total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E9EBED]">
+                  {(selectedSaleDetail.lines || selectedSaleDetail.items || [])
+                    .length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="py-4 text-center text-[#5F6B7A]"
+                      >
+                        No individual line items returned for this receipt.
+                      </td>
+                    </tr>
+                  ) : (
+                    (
+                      selectedSaleDetail.lines ||
+                      selectedSaleDetail.items ||
+                      []
+                    ).map((line, i) => (
+                      <tr key={i}>
+                        <td className="py-2 px-3 font-medium text-[#16191F]">
+                          {line.productName || line.name || 'Item'}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {line.quantity}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {Number(line.unitPrice || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums font-semibold">
+                          {Number(
+                            line.lineTotal ??
+                              (line.quantity || 1) * (line.unitPrice || 0)
+                          ).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {/* Confirm Void Modal */}
-      {voidSaleTarget && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4">
-            <div className="flex items-center gap-3 text-rose-600">
-              <AlertCircle className="w-6 h-6" />
-              <h3 className="font-bold text-lg text-slate-900">Thibitisha Kufuta Mauzo (Void)</h3>
-            </div>
-            <p className="text-sm text-slate-600">
-              Una uhakika unataka kufuta mauzo haya ya <strong className="text-slate-900">{voidSaleTarget.receiptNumber}</strong> ya thamani ya{' '}
-              <strong className="text-rose-600">TZS {Number(voidSaleTarget.totalAmount || 0).toLocaleString()}</strong>?
-              Bidhaa zitarudishwa stoo moja kwa moja.
-            </p>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Sababu ya Kufuta</label>
-              <input
-                type="text"
-                value={voidReason}
-                onChange={(e) => setVoidReason(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-rose-500"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setVoidSaleTarget(null)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                Ghairi
-              </button>
-              <button
-                disabled={voidSubmitting}
-                onClick={handleConfirmVoid}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold shadow-md transition"
-              >
-                {voidSubmitting ? 'Inafuta...' : 'Ndiyo, Futa Mauzo'}
-              </button>
-            </div>
+      {/* Void Sale Modal */}
+      <Modal
+        open={Boolean(voidTargetSale)}
+        onClose={() => setVoidTargetSale(null)}
+        title="Void sale transaction"
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setVoidTargetSale(null)}>Cancel</Button>
+            <Button
+              variant="dangerPrimary"
+              loading={voiding}
+              onClick={handleConfirmVoid}
+            >
+              Confirm void
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleConfirmVoid} className="space-y-3">
+          <Alert type="warning" title="Reversal warning">
+            Voiding this receipt will reverse inventory deductions and mark the transaction as voided in the tenant ledger.
+          </Alert>
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Reason for voiding (recorded in audit log)
+            </label>
+            <input
+              type="text"
+              required
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+              className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+            />
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 }

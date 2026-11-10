@@ -2,7 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --aws-chrome: #232F3E;
+  --aws-canvas: #F2F3F3;
+  --aws-surface: #FFFFFF;
+  --aws-border: #E9EBED;
+  --aws-input-border: #879596;
+  --aws-ink: #16191F;
+  --aws-muted: #5F6B7A;
+  --aws-primary: #0972D3;
+  --aws-primary-hover: #033160;
+}
+
 body {
   margin: 0;
+  background-color: #F2F3F3;
+  color: #16191F;
+  font-size: 14px;
+  line-height: 20px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom subtle scrollbars for enterprise tables */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F2F3F3;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #BCC3C8;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #879596;
 }

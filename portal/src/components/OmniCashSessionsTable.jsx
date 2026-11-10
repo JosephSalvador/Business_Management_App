@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Wallet,
-  RefreshCw,
-  Clock,
-  CheckCircle,
-  AlertCircle
-} from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { listTenantCashSessions } from '../services/api';
+import {
+  Container,
+  Button,
+  StatusIndicator,
+  Alert,
+} from '../ui/primitives';
 
-export default function OmniCashSessionsTable({ tenantId, tenantName, onNotification }) {
+export default function OmniCashSessionsTable({ tenantId }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,7 +19,10 @@ export default function OmniCashSessionsTable({ tenantId, tenantName, onNotifica
     setLoading(true);
     setError(null);
     try {
-      const res = await listTenantCashSessions(tenantId, { page, pageSize: 20 });
+      const res = await listTenantCashSessions(tenantId, {
+        page,
+        pageSize: 20,
+      });
       if (res && res.items) {
         setSessions(res.items);
       } else if (Array.isArray(res)) {
@@ -28,8 +31,7 @@ export default function OmniCashSessionsTable({ tenantId, tenantName, onNotifica
         setSessions([]);
       }
     } catch (err) {
-      console.error('Could not fetch cash sessions:', err);
-      setError(err.message || 'Hitilafu ya kupakia sajili za sanduku kutoka seva.');
+      setError(err.message || 'Failed to load cash drawer sessions.');
       setSessions([]);
     } finally {
       setLoading(false);
@@ -42,119 +44,151 @@ export default function OmniCashSessionsTable({ tenantId, tenantName, onNotifica
 
   return (
     <div className="space-y-4">
-      {/* Table Header Ribbon */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-slate-900 text-sm">Sajili za Sanduku la Pesa (POS Cash Drawers)</h3>
-          <p className="text-xs text-slate-500">Mizania ya masanduku ya pesa na ulinganifu wa mahesabu ya makashia.</p>
-        </div>
-        <button
-          onClick={fetchSessions}
-          disabled={loading}
-          className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-          title="Sasisha Orodha"
+      {error && (
+        <Alert
+          type="error"
+          title="Could not load cash sessions"
+          action={
+            <Button size="sm" onClick={fetchSessions}>
+              Retry
+            </Button>
+          }
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
+          {error}
+        </Alert>
+      )}
 
-      {/* Cash Sessions Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <Container
+        title="POS cash drawer sessions"
+        count={sessions.length}
+        description="Reconciliation of cashier shifts, opening float, cash sales, declared closing balances, and variances."
+        noPadding
+        actions={
+          <Button
+            size="sm"
+            icon={RefreshCw}
+            loading={loading}
+            onClick={fetchSessions}
+          >
+            Refresh
+          </Button>
+        }
+        footer={
+          <div className="flex items-center justify-between text-[12px] text-[#5F6B7A]">
+            <span>Showing {sessions.length} sessions</span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                icon={ChevronLeft}
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </Button>
+              <span className="px-2 font-medium text-[#16191F]">
+                Page {page}
+              </span>
+              <Button
+                size="sm"
+                icon={ChevronRight}
+                disabled={sessions.length < 20 || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        }
+      >
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Sanduku</th>
-                <th className="py-3 px-4">Keshia</th>
-                <th className="py-3 px-4">Kufunguliwa</th>
-                <th className="py-3 px-4">Kufungwa</th>
-                <th className="py-3 px-4 text-right">Pesa ya Kuanza</th>
-                <th className="py-3 px-4 text-right">Mauzo ya Cash</th>
-                <th className="py-3 px-4 text-right">Pesa Iliyokabidhiwa</th>
-                <th className="py-3 px-4 text-center">Tofauti (Variance)</th>
-                <th className="py-3 px-4 text-center">Hali</th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase tracking-wider text-[#5F6B7A]">
+                <th className="py-2.5 px-4">Register</th>
+                <th className="py-2.5 px-4">Cashier</th>
+                <th className="py-2.5 px-4">Opened at</th>
+                <th className="py-2.5 px-4">Closed at</th>
+                <th className="py-2.5 px-4 text-right">Opening float</th>
+                <th className="py-2.5 px-4 text-right">Cash sales</th>
+                <th className="py-2.5 px-4 text-right">Declared closing</th>
+                <th className="py-2.5 px-4 text-right">Variance</th>
+                <th className="py-2.5 px-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && sessions.length === 0 ? (
+            <tbody className="divide-y divide-[#E9EBED] text-[13px]">
+              {loading ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia sajili za sanduku kutoka seva...
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan="9" className="py-12 text-center text-rose-500">
-                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
-                    <div className="font-semibold">{error}</div>
-                    <button
-                      onClick={fetchSessions}
-                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
-                    >
-                      Jaribu Tena
-                    </button>
+                  <td colSpan={9} className="py-10 text-center text-[#5F6B7A]">
+                    <RefreshCw className="w-4 h-4 animate-spin inline mr-2 text-[#0972D3]" />
+                    Loading cash drawer sessions...
                   </td>
                 </tr>
               ) : sessions.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400">
-                    <Wallet className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    Hakuna sajili za sanduku la pesa zilizopatikana.
+                  <td colSpan={9} className="py-10 text-center text-[#5F6B7A]">
+                    No POS cash drawer sessions recorded for this tenant.
                   </td>
                 </tr>
               ) : (
-                sessions.map((cs) => {
-                  const openedDate = cs.openedAt ? new Date(cs.openedAt).toLocaleString('sw-TZ', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-                  const closedDate = cs.closedAt ? new Date(cs.closedAt).toLocaleString('sw-TZ', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-                  const disc = cs.discrepancy || 0;
+                sessions.map((s) => {
+                  const isOpen =
+                    (s.status || '').toLowerCase() === 'open' || !s.closedAt;
+                  const variance = Number(s.variance ?? 0);
 
                   return (
-                    <tr key={cs.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3 px-4 font-semibold text-slate-900">
-                        {cs.tillName || 'Sanduku Kuu'}
+                    <tr
+                      key={s.id}
+                      className="hover:bg-[#F1F8FF]/50 transition-colors"
+                    >
+                      <td className="py-2 px-4 font-medium text-[#16191F]">
+                        {s.registerName || s.accountName || 'Main Register'}
                       </td>
-                      <td className="py-3 px-4 text-xs font-medium text-slate-700">
-                        {cs.cashierName || 'Cashier'}
+                      <td className="py-2 px-4 text-[#5F6B7A]">
+                        {s.cashierName || s.openedBy || 'Cashier'}
                       </td>
-                      <td className="py-3 px-4 text-xs text-slate-500">{openedDate}</td>
-                      <td className="py-3 px-4 text-xs text-slate-500">{closedDate}</td>
-                      <td className="py-3 px-4 text-right font-medium">
-                        TZS {Number(cs.openingBalance || 0).toLocaleString()}
+                      <td className="py-2 px-4 text-[#5F6B7A] whitespace-nowrap">
+                        {s.openedAt
+                          ? new Date(s.openedAt).toLocaleString()
+                          : '—'}
                       </td>
-                      <td className="py-3 px-4 text-right font-medium text-emerald-700">
-                        TZS {Number(cs.cashSales || 0).toLocaleString()}
+                      <td className="py-2 px-4 text-[#5F6B7A] whitespace-nowrap">
+                        {s.closedAt
+                          ? new Date(s.closedAt).toLocaleString()
+                          : '—'}
                       </td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-900">
-                        {cs.closingBalance != null ? `TZS ${Number(cs.closingBalance).toLocaleString()}` : 'Bado Wazi'}
+                      <td className="py-2 px-4 text-right tabular-nums text-[#5F6B7A]">
+                        {Number(s.openingBalance ?? 0).toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        {cs.isOpen ? (
-                          <span className="text-xs text-slate-400">—</span>
-                        ) : disc === 0 ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
-                            Sawa (0)
-                          </span>
-                        ) : disc < 0 ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-800">
-                            Pungufu: TZS {Math.abs(disc).toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
-                            Ziada: TZS {disc.toLocaleString()}
-                          </span>
-                        )}
+                      <td className="py-2 px-4 text-right tabular-nums font-medium text-[#16191F]">
+                        {Number(s.cashSales ?? 0).toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-2 px-4 text-right tabular-nums font-semibold text-[#16191F]">
+                        {s.closingBalance !== undefined &&
+                        s.closingBalance !== null
+                          ? Number(s.closingBalance).toLocaleString()
+                          : '—'}
+                      </td>
+                      <td className="py-2 px-4 text-right tabular-nums font-semibold">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            cs.isOpen
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
+                          className={
+                            variance < 0
+                              ? 'text-[#D91515]'
+                              : variance > 0
+                              ? 'text-[#8D6605]'
+                              : 'text-[#037F0C]'
+                          }
                         >
-                          {cs.isOpen ? 'Sanduku Liko Wazi' : 'Imefungwa'}
+                          {variance > 0 ? `+${variance.toLocaleString()}` : variance.toLocaleString()}
                         </span>
+                      </td>
+                      <td className="py-2 px-4">
+                        {isOpen ? (
+                          <StatusIndicator type="info">Open</StatusIndicator>
+                        ) : (
+                          <StatusIndicator type="success">
+                            Closed
+                          </StatusIndicator>
+                        )}
                       </td>
                     </tr>
                   );
@@ -163,7 +197,7 @@ export default function OmniCashSessionsTable({ tenantId, tenantName, onNotifica
             </tbody>
           </table>
         </div>
-      </div>
+      </Container>
     </div>
   );
 }

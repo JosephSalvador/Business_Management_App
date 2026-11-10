@@ -1,24 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ArrowLeft,
-  Store,
-  Phone,
-  MessageCircle,
   ExternalLink,
-  ShieldCheck,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  Package,
-  Receipt,
-  FileText,
-  Wallet,
-  Settings,
-  Sparkles,
-  Calendar,
-  Layers,
+  RefreshCw,
   Copy,
-  Check
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 import OmniProductsTable from './OmniProductsTable';
 import OmniSalesTable from './OmniSalesTable';
@@ -29,534 +15,836 @@ import {
   impersonateTenant,
   extendTenantTrial,
   directActivateTenant,
-  updateTenantFeatures
+  updateTenantFeatures,
 } from '../services/api';
+import {
+  Container,
+  PageHeader,
+  Button,
+  StatusIndicator,
+  Badge,
+  Tabs,
+  Modal,
+  KeyValueGrid,
+  KpiStrip,
+} from '../ui/primitives';
 
 const ALL_FEATURES_LIST = [
-  { key: 'pos.enabled', name: 'Point of Sale (POS)', desc: 'Mauzo ya cashier na kutoa risiti' },
-  { key: 'inventory.enabled', name: 'Inventory & Stoo', desc: 'Usimamizi wa stoo na rekodi za bidhaa' },
-  { key: 'invoicing.enabled', name: 'Invoicing & Ankara', desc: 'Kutoa ankara (invoices) na delivery notes' },
-  { key: 'credit.enabled', name: 'Daftari la Madeni (Credit)', desc: 'Kukopesha wateja na vikumbusho' },
-  { key: 'purchasing.enabled', name: 'Manunuzi & Wasambazaji', desc: 'LPO na ankara za wasambazaji' },
-  { key: 'finance.enabled', name: 'Sajili za Pesa (Cashbook)', desc: 'Kusimamia sanduku la pesa na droo' },
-  { key: 'crm.enabled', name: 'Wateja (CRM)', desc: 'Orodha ya wateja na mawasiliano' },
-  { key: 'reports.enabled', name: 'Ripoti & Export', desc: 'Ripoti za mauzo, faida na stoo' },
-  { key: 'multi-branch.enabled', name: 'Matawi Mengi (Branches)', desc: 'Kusimamia maduka zaidi ya moja' },
+  {
+    key: 'pos.enabled',
+    name: 'Point of Sale (POS)',
+    desc: 'Cashier checkout, barcode scanning, and thermal receipts.',
+  },
+  {
+    key: 'inventory.enabled',
+    name: 'Inventory & Stock Control',
+    desc: 'Stock ledger, warehouse balances, and low-stock alerts.',
+  },
+  {
+    key: 'invoicing.enabled',
+    name: 'Invoicing & Delivery Notes',
+    desc: 'Proforma invoices, B2B billing, and PDF generation.',
+  },
+  {
+    key: 'credit.enabled',
+    name: 'Customer Credit & Debt Book',
+    desc: 'Credit sales, customer balances, and repayment tracking.',
+  },
+  {
+    key: 'purchasing.enabled',
+    name: 'Purchasing & Suppliers',
+    desc: 'Purchase orders, supplier directory, and stock receiving.',
+  },
+  {
+    key: 'finance.enabled',
+    name: 'Cashbook & Money Accounts',
+    desc: 'Cash drawer shifts, bank/mobile money accounts, and expenses.',
+  },
+  {
+    key: 'crm.enabled',
+    name: 'Customer Directory (CRM)',
+    desc: 'Customer profiles, purchase history, and contact management.',
+  },
+  {
+    key: 'reports.enabled',
+    name: 'Analytics & Reports',
+    desc: 'Sales summaries, profit margins, and CSV/PDF exports.',
+  },
+  {
+    key: 'multi-branch.enabled',
+    name: 'Multi-Branch Operations',
+    desc: 'Manage multiple shops, warehouses, and inter-branch transfers.',
+  },
 ];
 
-export default function TenantDetailConsole({ tenant, onBack, onNotification }) {
-  const [activeSubTab, setActiveSubTab] = useState('overview'); // overview | sales | products | invoices | cash | settings
+export default function TenantDetailConsole({
+  tenant,
+  supportReason,
+  initialSubTab = 'overview',
+  onSubTabChange,
+  onBack,
+  onNotification,
+}) {
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
   const [detail, setDetail] = useState(tenant);
   const [loading, setLoading] = useState(false);
 
-  // Impersonation Support Mode State
+  // Impersonation Support Mode Modal
   const [supportTokenModal, setSupportTokenModal] = useState(null);
   const [copiedToken, setCopiedToken] = useState(false);
+  const [launchingSupport, setLaunchingSupport] = useState(false);
 
-  // Extend Trial & Direct Activate State
+  // Quick Trial & Activation Modal
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [extendDays, setExtendDays] = useState(14);
+  const [extending, setExtending] = useState(false);
+
+  const [activateModalOpen, setActivateModalOpen] = useState(false);
   const [activateMonths, setActivateMonths] = useState(1);
-  const [activatePlan, setActivatePlan] = useState('Pro');
+  const [activatePlan, setActivatePlan] = useState(tenant?.planCode || 'Pro');
+  const [activating, setActivating] = useState(false);
+
+  // Feature Overrides
+  const [featureOverrides, setFeatureOverrides] = useState({
+    'pos.enabled': true,
+    'inventory.enabled': true,
+    'invoicing.enabled': true,
+    'credit.enabled': true,
+    'purchasing.enabled': true,
+    'finance.enabled': true,
+    'crm.enabled': true,
+    'reports.enabled': true,
+    'multi-branch.enabled': false,
+  });
+  const [savingFeatures, setSavingFeatures] = useState(false);
+
+  useEffect(() => {
+    setActiveSubTab(initialSubTab || 'overview');
+  }, [initialSubTab]);
+
+  const handleTabSwitch = (tabId) => {
+    setActiveSubTab(tabId);
+    onSubTabChange?.(tabId);
+  };
 
   const fetchDetail = async () => {
-    if (!tenant || !tenant.tenantId) return;
+    if (!tenant?.tenantId) return;
     setLoading(true);
     try {
       const res = await getTenantAdminDetail(tenant.tenantId);
       if (res) {
-        setDetail(res);
+        setDetail((prev) => ({ ...prev, ...res }));
+        if (res.features && typeof res.features === 'object') {
+          setFeatureOverrides((prev) => ({ ...prev, ...res.features }));
+        }
       }
     } catch {
-      // Keep initial tenant prop
+      // Keep initial tenant summary
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setDetail(tenant);
     fetchDetail();
-  }, [tenant.tenantId]);
+  }, [tenant?.tenantId]);
 
   const handleLaunchSupportSession = async () => {
+    setLaunchingSupport(true);
     try {
-      const res = await impersonateTenant(tenant.tenantId, 'Support assistance from backoffice portal');
+      const res = await impersonateTenant(
+        tenant.tenantId,
+        supportReason || 'Platform Admin Support Session'
+      );
       const token = res?.accessToken || res?.token;
       if (token) {
         setSupportTokenModal({
           token,
           tenantId: res.tenantId || tenant.tenantId,
-          tenantName: res.tenantName || tenant.name,
-          clientAppUrl: res.launchUrl || 'https://jolinx.co.tz/app'
+          tenantName: res.tenantName || detail.name,
+          clientAppUrl: res.launchUrl || 'https://app.jolinx.co.tz',
         });
-        onNotification?.(`Support session imetengenezwa kwa ${tenant.name}!`);
+        onNotification?.(`Generated audited support token for ${detail.name}.`);
       } else {
-        throw new Error('Haikupokea token ya support kutoka seva.');
+        throw new Error('Server did not return a support access token.');
       }
     } catch (err) {
-      onNotification?.(`Hitilafu ya Support Session: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Support session failed: ${err.message || 'Please try again'}`
+      );
+    } finally {
+      setLaunchingSupport(false);
     }
   };
 
-  const handleExtendTrial = async () => {
+  const handleExtendTrial = async (e) => {
+    if (e) e.preventDefault();
+    setExtending(true);
     try {
       await extendTenantTrial(tenant.tenantId, Number(extendDays));
-      setDetail(prev => ({
+      setDetail((prev) => ({
         ...prev,
         trialDaysLeft: (prev.trialDaysLeft || 0) + Number(extendDays),
-        status: 'Trial'
+        status: 'Trial',
       }));
-      onNotification?.(`Umeongeza siku ${extendDays} za majaribio bure kwa ${tenant.name}!`);
+      setExtendModalOpen(false);
+      onNotification?.(
+        `Extended trial by ${extendDays} days for ${detail.name}.`
+      );
     } catch (err) {
-      onNotification?.(`Hitilafu kuongeza siku: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Failed to extend trial: ${err.message || 'Please try again'}`
+      );
+    } finally {
+      setExtending(false);
     }
   };
 
-  const handleDirectActivate = async () => {
+  const handleDirectActivate = async (e) => {
+    if (e) e.preventDefault();
+    setActivating(true);
     try {
-      await directActivateTenant(tenant.tenantId, Number(activateMonths), activatePlan);
-      const today = new Date();
-      today.setDate(today.getDate() + activateMonths * 30);
-      const dateStr = today.toISOString().split('T')[0];
+      await directActivateTenant(
+        tenant.tenantId,
+        Number(activateMonths),
+        activatePlan
+      );
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + Number(activateMonths) * 30);
+      const dateStr = expiry.toISOString().split('T')[0];
 
-      setDetail(prev => ({
+      setDetail((prev) => ({
         ...prev,
         status: 'Active',
         planCode: activatePlan,
         trialDaysLeft: 0,
-        paidUntil: dateStr
+        paidUntilUtc: expiry.toISOString(),
+        paidUntil: dateStr,
       }));
-      onNotification?.(`Duka limewashwa kwa miezi ${activateMonths} (${activatePlan})!`);
+      setActivateModalOpen(false);
+      onNotification?.(
+        `Activated ${activatePlan} plan for ${activateMonths} month(s) until ${dateStr}.`
+      );
     } catch (err) {
-      onNotification?.(`Hitilafu kuwasha akaunti: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Activation failed: ${err.message || 'Please try again'}`
+      );
+    } finally {
+      setActivating(false);
     }
   };
 
-  const handleToggleFeature = async (featureKey) => {
-    const currentFeatures = detail.features || {};
-    const newFeatures = {
-      ...currentFeatures,
-      [featureKey]: !currentFeatures[featureKey]
-    };
+  const handleSaveFeatures = async () => {
+    setSavingFeatures(true);
     try {
-      await updateTenantFeatures(tenant.tenantId, newFeatures);
-      setDetail(prev => ({ ...prev, features: newFeatures }));
-      onNotification?.(`Feature "${featureKey}" imebadilishwa!`);
+      await updateTenantFeatures(tenant.tenantId, featureOverrides);
+      onNotification?.(`Saved module entitlements for ${detail.name}.`);
     } catch (err) {
-      onNotification?.(`Hitilafu kubadili feature: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Failed to update features: ${err.message || 'Please try again'}`
+      );
+    } finally {
+      setSavingFeatures(false);
     }
   };
 
-  const cleanPhone = (detail.phone || '').replace(/[^0-9]/g, '');
+  const renderStatusBadge = () => {
+    const st = (detail?.status || '').toLowerCase();
+    if (st === 'active' || st === 'paid') {
+      return <StatusIndicator type="success">Active</StatusIndicator>;
+    }
+    if (st === 'trial') {
+      return (
+        <StatusIndicator type="info">
+          Trial · {detail?.trialDaysLeft ?? 0}d left
+        </StatusIndicator>
+      );
+    }
+    if (st === 'debt' || st === 'overdue' || st === 'expired') {
+      return <StatusIndicator type="error">Overdue</StatusIndicator>;
+    }
+    return <StatusIndicator type="pending">{detail?.status || 'Unknown'}</StatusIndicator>;
+  };
+
+  const subTabs = [
+    { id: 'overview', label: 'Overview' },
+    {
+      id: 'products',
+      label: 'Products',
+      count: detail?.productCount ?? detail?.totalProducts,
+    },
+    {
+      id: 'sales',
+      label: 'Sales',
+      count: detail?.salesCount30d ?? detail?.totalSales,
+    },
+    { id: 'invoices', label: 'Invoices' },
+    { id: 'cash', label: 'Cash sessions' },
+    { id: 'subscription', label: 'Subscription & quotas' },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Top Navigation & Workspace Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center justify-center"
-            title="Rudi kwenye Orodha ya Maduka"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+    <div className="space-y-4">
+      {/* Persistent Audited Support Mode Banner (AWS Switch Role / Stripe Act As style) */}
+      <div className="bg-[#FFF4CC] border border-[#E0CA5C] rounded-[4px] px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[#16191F]">
+        <div className="flex items-center gap-2 text-[13px]">
+          <AlertTriangle className="w-4 h-4 text-[#8D6605] shrink-0" />
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                {detail.name || 'Duka la Mteja'}
-              </h1>
-              <span className="text-xs uppercase px-2.5 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
-                {detail.planCode || 'Pro'}
+            <span className="font-bold">Support mode:</span> You are inspecting tenant{' '}
+            <span className="font-bold">{detail?.name}</span>. All actions are recorded in the platform audit log.
+            {supportReason && (
+              <span className="ml-2 text-[#533B04]">
+                · <span className="font-semibold">Reason:</span> {supportReason}
               </span>
-              <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-                  detail.status === 'Active'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : detail.status === 'Trial'
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-rose-100 text-rose-800'
-                }`}
-              >
-                {detail.status || 'Active'}
-              </span>
-            </div>
-            <div className="text-xs text-slate-400 mt-1 font-mono flex items-center gap-2">
-              <span>ID: {detail.tenantId}</span>
-              {detail.category && <span>• {detail.category}</span>}
-              {detail.phone && <span>• {detail.phone}</span>}
-            </div>
+            )}
           </div>
         </div>
-
-        {/* Top Direct Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap self-end md:self-auto">
-          {detail.phone && (
-            <a
-              href={`https://wa.me/${cleanPhone}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 transition shadow-sm"
-            >
-              <MessageCircle className="w-4 h-4 text-emerald-600" />
-              <span>WhatsApp</span>
-            </a>
-          )}
-
-          {detail.phone && (
-            <a
-              href={`tel:${detail.phone}`}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition"
-            >
-              <Phone className="w-4 h-4" />
-              <span>Piga Simu</span>
-            </a>
-          )}
-
-          <button
-            onClick={handleLaunchSupportSession}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition"
-          >
-            <ExternalLink className="w-4 h-4" />
-            <span>🚀 Fungua Kwenye App (Support Login)</span>
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button size="sm" onClick={onBack}>
+            Exit tenant
+          </Button>
         </div>
       </div>
 
-      {/* Onboarding Milestones Tracker & Health Banner */}
-      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg border border-slate-800 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      {/* Tenant Resource Header */}
+      <PageHeader
+        title={detail?.name || 'Tenant workspace'}
+        badge={
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-400" />
-            <h3 className="font-bold text-sm tracking-wide">
-              Hatua za Ukuaji wa Duka (Onboarding Milestones)
-            </h3>
+            {renderStatusBadge()}
+            <Badge color="blue">{detail?.planCode || 'Pro'} plan</Badge>
+            {detail?.paidUntil && (
+              <span className="text-[12px] text-[#5F6B7A]">
+                Paid until {detail.paidUntil}
+              </span>
+            )}
           </div>
-          <div className="text-xs text-slate-300">
-            Kiwango cha Afya: <strong className="text-emerald-400">{detail.healthStatus || 'Nzuri Sana (Good)'}</strong>
-          </div>
-        </div>
-
-        {/* 5-Step Milestones Pipeline */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
-          {[
-            { step: '1. Usajili', done: true, desc: 'Akaunti imefunguliwa' },
-            { step: '2. Bidhaa', done: (detail.totalProducts || 0) > 0, desc: `${detail.totalProducts || 0} Bidhaa stoo` },
-            { step: '3. Mauzo POS', done: (detail.salesCount30Days || 0) > 0, desc: `${detail.salesCount30Days || 0} Risiti` },
-            { step: '4. Ankara/Invoices', done: (detail.invoicesCount || 0) > 0, desc: `${detail.invoicesCount || 0} Ankara` },
-            { step: '5. Kifurushi', done: detail.status === 'Active', desc: detail.status === 'Active' ? 'Amelipia' : 'Bado Trial' }
-          ].map((m, idx) => (
-            <div
-              key={idx}
-              className={`p-3 rounded-xl border transition ${
-                m.done
-                  ? 'bg-slate-800/90 border-emerald-500/40 text-emerald-300'
-                  : 'bg-slate-800/40 border-slate-700 text-slate-400'
-              }`}
+        }
+        subtitle={`Tenant ID: ${detail?.tenantId || '—'} · Owner: ${
+          detail?.ownerName || detail?.ownerEmail || '—'
+        } (${detail?.ownerPhone || detail?.phone || 'No phone'})`}
+        actions={
+          <>
+            <Button
+              size="md"
+              icon={RefreshCw}
+              loading={loading}
+              onClick={fetchDetail}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">{m.step}</span>
-                {m.done ? (
-                  <CheckCircle className="w-4 h-4 text-emerald-400" />
-                ) : (
-                  <Clock className="w-4 h-4 text-slate-500" />
-                )}
+              Refresh
+            </Button>
+            <Button size="md" onClick={() => setExtendModalOpen(true)}>
+              Extend trial
+            </Button>
+            <Button size="md" onClick={() => setActivateModalOpen(true)}>
+              Activate plan
+            </Button>
+            <Button
+              size="md"
+              variant="primary"
+              icon={ExternalLink}
+              loading={launchingSupport}
+              onClick={handleLaunchSupportSession}
+            >
+              Open in POS app
+            </Button>
+          </>
+        }
+      />
+
+      {/* Horizontal Cloudscape Tabs */}
+      <div className="bg-white border border-[#D5DBDB] rounded-[8px] shadow-sm overflow-hidden">
+        <Tabs
+          tabs={subTabs}
+          activeId={activeSubTab}
+          onChange={handleTabSwitch}
+        />
+
+        <div className="p-5 bg-[#F2F3F3]">
+          {/* TAB: OVERVIEW */}
+          {activeSubTab === 'overview' && (
+            <div className="space-y-4">
+              <KpiStrip
+                metrics={[
+                  {
+                    label: 'Sales volume (30d)',
+                    value: `TZS ${Number(
+                      detail?.salesVolume30d ?? detail?.gmv30d ?? 0
+                    ).toLocaleString()}`,
+                    sub: `${detail?.salesCount30d ?? detail?.totalSales ?? 0} transactions`,
+                  },
+                  {
+                    label: 'Catalog products',
+                    value: Number(
+                      detail?.productCount ?? detail?.totalProducts ?? 0
+                    ).toLocaleString(),
+                    sub: 'Active SKU records',
+                  },
+                  {
+                    label: 'Branches & stores',
+                    value: Number(
+                      detail?.branchCount ?? detail?.branches?.length ?? 1
+                    ).toLocaleString(),
+                    sub: 'Configured locations',
+                  },
+                  {
+                    label: 'Staff accounts',
+                    value: Number(
+                      detail?.userCount ?? detail?.users?.length ?? 1
+                    ).toLocaleString(),
+                    sub: 'Active operators',
+                  },
+                ]}
+              />
+
+              <Container title="Tenant details">
+                <KeyValueGrid
+                  columns={4}
+                  items={[
+                    {
+                      label: 'Organization name',
+                      value: detail?.name || '—',
+                    },
+                    {
+                      label: 'Tenant ID',
+                      value: (
+                        <span className="font-mono text-[12px]">
+                          {detail?.tenantId || '—'}
+                        </span>
+                      ),
+                    },
+                    {
+                      label: 'Owner contact',
+                      value: detail?.ownerPhone || detail?.phone || '—',
+                      sub: detail?.ownerEmail || '',
+                    },
+                    {
+                      label: 'Created date',
+                      value: detail?.createdAt
+                        ? new Date(detail.createdAt).toLocaleDateString()
+                        : '—',
+                    },
+                    {
+                      label: 'Subscription status',
+                      value: renderStatusBadge(),
+                    },
+                    {
+                      label: 'Current plan',
+                      value: detail?.planCode || 'Pro',
+                    },
+                    {
+                      label: 'Last activity',
+                      value: detail?.lastActivityAt
+                        ? new Date(detail.lastActivityAt).toLocaleString()
+                        : detail?.lastActive || '—',
+                    },
+                    {
+                      label: 'Health status',
+                      value: detail?.health || 'Healthy',
+                    },
+                  ]}
+                />
+              </Container>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Container
+                  title="Branches"
+                  count={(detail?.branches || []).length}
+                  noPadding
+                >
+                  <table className="w-full text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase text-[#5F6B7A]">
+                        <th className="py-2 px-4">Branch name</th>
+                        <th className="py-2 px-4">Location</th>
+                        <th className="py-2 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E9EBED]">
+                      {(detail?.branches || []).length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="py-6 text-center text-[#5F6B7A]">
+                            Main branch active.
+                          </td>
+                        </tr>
+                      ) : (
+                        detail.branches.map((b, i) => (
+                          <tr key={b.id || i}>
+                            <td className="py-2 px-4 font-medium text-[#16191F]">
+                              {b.name}
+                            </td>
+                            <td className="py-2 px-4 text-[#5F6B7A]">
+                              {b.address || b.city || '—'}
+                            </td>
+                            <td className="py-2 px-4">
+                              <StatusIndicator type="success">Active</StatusIndicator>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </Container>
+
+                <Container
+                  title="Tenant users"
+                  count={(detail?.users || []).length}
+                  noPadding
+                >
+                  <table className="w-full text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase text-[#5F6B7A]">
+                        <th className="py-2 px-4">Name</th>
+                        <th className="py-2 px-4">Email / Phone</th>
+                        <th className="py-2 px-4">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E9EBED]">
+                      {(detail?.users || []).length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="py-6 text-center text-[#5F6B7A]">
+                            {detail?.ownerEmail || detail?.ownerPhone || 'Owner account active'}
+                          </td>
+                        </tr>
+                      ) : (
+                        detail.users.map((u, i) => (
+                          <tr key={u.id || i}>
+                            <td className="py-2 px-4 font-medium text-[#16191F]">
+                              {u.fullName || u.name || 'User'}
+                            </td>
+                            <td className="py-2 px-4 font-mono text-[12px] text-[#5F6B7A]">
+                              {u.email || u.phone || '—'}
+                            </td>
+                            <td className="py-2 px-4">
+                              <Badge>{u.role || 'Staff'}</Badge>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </Container>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">{m.desc}</p>
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      {/* Sub Tabs Navigation */}
-      <div className="border-b border-slate-200">
-        <nav className="flex space-x-2 sm:space-x-4 overflow-x-auto pb-1">
-          {[
-            { id: 'overview', label: 'Muhtasari', icon: Store },
-            { id: 'sales', label: 'Mauzo ya POS', icon: Receipt },
-            { id: 'products', label: 'Bidhaa & Stoo', icon: Package },
-            { id: 'invoices', label: 'Ankara (Invoices)', icon: FileText },
-            { id: 'cash', label: 'Sajili za Pesa', icon: Wallet },
-            { id: 'settings', label: 'Vifurushi & Mipangilio', icon: Settings },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const active = activeSubTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSubTab(tab.id)}
-                className={`flex items-center space-x-2 py-3 px-3.5 border-b-2 font-semibold text-sm transition whitespace-nowrap ${
-                  active
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+          {/* TAB: PRODUCTS */}
+          {activeSubTab === 'products' && (
+            <OmniProductsTable
+              tenantId={detail?.tenantId}
+              tenantName={detail?.name}
+              onNotification={onNotification}
+            />
+          )}
 
-      {/* TAB CONTENT: OVERVIEW */}
-      {activeSubTab === 'overview' && (
-        <div className="space-y-6">
-          {/* Quick Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase text-slate-400">Mauzo ya Leo</span>
-              <div className="text-xl font-extrabold text-slate-900 mt-1">
-                {detail.todaySales || 'TZS 0'}
-              </div>
-              <span className="text-xs text-emerald-600 font-medium">Katika duka hili</span>
-            </div>
+          {/* TAB: SALES */}
+          {activeSubTab === 'sales' && (
+            <OmniSalesTable
+              tenantId={detail?.tenantId}
+              onNotification={onNotification}
+            />
+          )}
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase text-slate-400">Mauzo Siku 30 Zilizopita</span>
-              <div className="text-xl font-extrabold text-indigo-600 mt-1">
-                TZS {Number(detail.totalGmv30Days || 0).toLocaleString()}
-              </div>
-              <span className="text-xs text-slate-400 font-medium">{detail.salesCount30Days || 0} jumla ya risiti</span>
-            </div>
+          {/* TAB: INVOICES */}
+          {activeSubTab === 'invoices' && (
+            <OmniInvoicesTable
+              tenantId={detail?.tenantId}
+              onNotification={onNotification}
+            />
+          )}
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase text-slate-400">Bidhaa Stoo</span>
-              <div className="text-xl font-extrabold text-slate-900 mt-1">
-                {detail.totalProducts || 0} Aina
-              </div>
-              <span className="text-xs text-amber-600 font-medium">
-                {detail.lowStockProducts || 0} zenye stoo ndogo
-              </span>
-            </div>
+          {/* TAB: CASH SESSIONS */}
+          {activeSubTab === 'cash' && (
+            <OmniCashSessionsTable tenantId={detail?.tenantId} />
+          )}
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase text-slate-400">Hali ya Malipo</span>
-              <div className="text-xl font-extrabold text-slate-900 mt-1">
-                {detail.status === 'Active' ? 'Amelipia' : `Siku ${detail.trialDaysLeft || 0} zimebaki`}
-              </div>
-              <span className="text-xs text-slate-400 font-medium">
-                {detail.paidUntil ? `Mpaka ${detail.paidUntil}` : 'Majaribio (Trial)'}
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Support & Subscription Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Direct Activation Card */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 text-indigo-700">
-                <ShieldCheck className="w-5 h-5" />
-                <h3 className="font-bold text-base text-slate-900">Washa Akaunti Moja kwa Moja (1-Click Activate)</h3>
-              </div>
-              <p className="text-xs text-slate-500">
-                Mteja akilipa kwa Cash, Benki au M-Pesa kwako, washa akaunti yake papo hapo bila kumuomba kuingiza vocha:
-              </p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Muda wa Kufungua</label>
-                  <select
-                    value={activateMonths}
-                    onChange={(e) => setActivateMonths(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                  >
-                    <option value={1}>Mwezi 1</option>
-                    <option value={3}>Miezi 3</option>
-                    <option value={6}>Miezi 6</option>
-                    <option value={12}>Mwaka 1 (Miezi 12)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Kifurushi (Plan)</label>
-                  <select
-                    value={activatePlan}
-                    onChange={(e) => setActivatePlan(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                  >
-                    <option value="Starter">Starter Plan</option>
-                    <option value="Pro">Growth Pro</option>
-                    <option value="Scale">Scale Multi-Store</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                onClick={handleDirectActivate}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-600/20 transition"
-              >
-                Washa Akaunti Sasa
-              </button>
-            </div>
-
-            {/* Extend Free Trial Card */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 text-blue-700">
-                <Clock className="w-5 h-5" />
-                <h3 className="font-bold text-base text-slate-900">Ongeza Siku za Bure za Majaribio (Extend Trial)</h3>
-              </div>
-              <p className="text-xs text-slate-500">
-                Mpe mteja siku za ziada za kujaribu app ili kumsaidia kuanzisha duka lake vizuri:
-              </p>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Idadi ya Siku za Bure</label>
-                <div className="flex gap-2">
-                  {[7, 14, 30].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setExtendDays(d)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${
-                        extendDays === d
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
+          {/* TAB: SUBSCRIPTION & QUOTAS */}
+          {activeSubTab === 'subscription' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Container
+                  title="Extend trial period"
+                  description="Grant complimentary trial days without requiring a voucher or payment."
+                >
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                        Additional days
+                      </label>
+                      <select
+                        value={extendDays}
+                        onChange={(e) => setExtendDays(Number(e.target.value))}
+                        className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] bg-white"
+                      >
+                        <option value={7}>7 days</option>
+                        <option value={14}>14 days</option>
+                        <option value={30}>30 days</option>
+                        <option value={60}>60 days</option>
+                      </select>
+                    </div>
+                    <Button
+                      variant="primary"
+                      loading={extending}
+                      onClick={handleExtendTrial}
                     >
-                      +{d} Siku
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={handleExtendTrial}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-600/20 transition"
-              >
-                Ongeza Siku {extendDays} za Majaribio
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT: SALES TABLE */}
-      {activeSubTab === 'sales' && (
-        <OmniSalesTable
-          tenantId={tenant.tenantId}
-          tenantName={tenant.name}
-          onNotification={onNotification}
-        />
-      )}
-
-      {/* TAB CONTENT: PRODUCTS TABLE */}
-      {activeSubTab === 'products' && (
-        <OmniProductsTable
-          tenantId={tenant.tenantId}
-          tenantName={tenant.name}
-          onNotification={onNotification}
-        />
-      )}
-
-      {/* TAB CONTENT: INVOICES TABLE */}
-      {activeSubTab === 'invoices' && (
-        <OmniInvoicesTable
-          tenantId={tenant.tenantId}
-          tenantName={tenant.name}
-          onNotification={onNotification}
-        />
-      )}
-
-      {/* TAB CONTENT: CASH SESSIONS TABLE */}
-      {activeSubTab === 'cash' && (
-        <OmniCashSessionsTable
-          tenantId={tenant.tenantId}
-          tenantName={tenant.name}
-          onNotification={onNotification}
-        />
-      )}
-
-      {/* TAB CONTENT: SETTINGS & FEATURES */}
-      {activeSubTab === 'settings' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-          <div>
-            <h3 className="font-bold text-lg text-slate-900">Usimamizi wa Features za Duka Hili</h3>
-            <p className="text-xs text-slate-500">
-              Unaweza kuwasha au kuzima moduli mahususi kwa mteja huyu bila kujali kifurushi chake cha msingi:
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {ALL_FEATURES_LIST.map((feat) => {
-              const isEnabled = detail.features ? !!detail.features[feat.key] : true;
-              return (
-                <div
-                  key={feat.key}
-                  className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 flex items-start justify-between gap-3 bg-slate-50/50"
-                >
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{feat.name}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">{feat.desc}</p>
-                    <span className="text-[10px] font-mono text-slate-400 mt-1 block">{feat.key}</span>
+                      Grant trial days
+                    </Button>
                   </div>
+                </Container>
 
-                  <button
-                    onClick={() => handleToggleFeature(feat.key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm ${
-                      isEnabled
-                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                    }`}
+                <Container
+                  title="Direct subscription activation"
+                  description="Immediately activate paid access after confirming bank or mobile money receipt."
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                        Plan
+                      </label>
+                      <select
+                        value={activatePlan}
+                        onChange={(e) => setActivatePlan(e.target.value)}
+                        className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] bg-white"
+                      >
+                        <option value="Starter">Starter</option>
+                        <option value="Pro">Pro</option>
+                        <option value="Scale">Scale</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                        Duration
+                      </label>
+                      <select
+                        value={activateMonths}
+                        onChange={(e) => setActivateMonths(Number(e.target.value))}
+                        className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] bg-white"
+                      >
+                        <option value={1}>1 month (30d)</option>
+                        <option value={3}>3 months (90d)</option>
+                        <option value={6}>6 months (180d)</option>
+                        <option value={12}>12 months (365d)</option>
+                      </select>
+                    </div>
+                    <Button
+                      variant="primary"
+                      loading={activating}
+                      onClick={handleDirectActivate}
+                    >
+                      Activate now
+                    </Button>
+                  </div>
+                </Container>
+              </div>
+
+              <Container
+                title="Module & feature entitlements"
+                description="Enable or disable specific functional modules for this tenant workspace."
+                actions={
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={savingFeatures}
+                    onClick={handleSaveFeatures}
                   >
-                    {isEnabled ? 'Imewashwa' : 'Imezimwa'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Support Mode Impersonation Modal */}
-      {supportTokenModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-indigo-200 space-y-4">
-            <div className="flex items-center gap-2 text-indigo-600">
-              <ShieldCheck className="w-6 h-6" />
-              <h3 className="font-bold text-lg text-slate-900">Kipindi cha Msaada (Support Session)</h3>
-            </div>
-            <p className="text-sm text-slate-600">
-              Ufunguo huu wa muda mfupi (Support Token - 45 min) unakuwezesha kuingia moja kwa moja kwenye app ya mteja <strong className="text-slate-900">{supportTokenModal.tenantName}</strong> ili kumsaidia:
-            </p>
-
-            <div className="bg-slate-900 text-slate-100 p-3 rounded-xl font-mono text-xs break-all select-all border border-slate-800">
-              {supportTokenModal.token}
-            </div>
-
-            <div className="flex items-center justify-between pt-2">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(supportTokenModal.token);
-                  setCopiedToken(true);
-                  setTimeout(() => setCopiedToken(false), 3000);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition"
+                    Save entitlements
+                  </Button>
+                }
               >
-                {copiedToken ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedToken ? 'Imenakiliwa!' : 'Nakili Token'}</span>
-              </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {ALL_FEATURES_LIST.map((feat) => {
+                    const enabled = Boolean(featureOverrides[feat.key]);
+                    return (
+                      <label
+                        key={feat.key}
+                        className={`border rounded-[6px] p-3 flex items-start gap-2.5 cursor-pointer transition-colors ${
+                          enabled
+                            ? 'bg-[#F1F8FF] border-[#0972D3]'
+                            : 'bg-white border-[#D5DBDB] hover:bg-[#FAFAFA]'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={(e) =>
+                            setFeatureOverrides({
+                              ...featureOverrides,
+                              [feat.key]: e.target.checked,
+                            })
+                          }
+                          className="mt-0.5 rounded-[2px] border-[#879596] text-[#0972D3] focus:ring-[#0972D3]"
+                        />
+                        <div>
+                          <div className="text-[13px] font-semibold text-[#16191F]">
+                            {feat.name}
+                          </div>
+                          <div className="text-[11px] text-[#5F6B7A] mt-0.5">
+                            {feat.desc}
+                          </div>
+                          <div className="text-[10px] font-mono text-[#5F6B7A] mt-1">
+                            {feat.key}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </Container>
+            </div>
+          )}
+        </div>
+      </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSupportTokenModal(null)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
+      {/* Extend Trial Modal */}
+      <Modal
+        open={extendModalOpen}
+        onClose={() => setExtendModalOpen(false)}
+        title={`Extend trial — ${detail?.name || ''}`}
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setExtendModalOpen(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              loading={extending}
+              onClick={handleExtendTrial}
+            >
+              Extend trial
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleExtendTrial} className="space-y-3">
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Number of trial days to add
+            </label>
+            <select
+              value={extendDays}
+              onChange={(e) => setExtendDays(Number(e.target.value))}
+              className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] bg-white"
+            >
+              <option value={7}>7 days</option>
+              <option value={14}>14 days</option>
+              <option value={30}>30 days</option>
+              <option value={60}>60 days</option>
+            </select>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Direct Activate Modal */}
+      <Modal
+        open={activateModalOpen}
+        onClose={() => setActivateModalOpen(false)}
+        title={`Activate subscription — ${detail?.name || ''}`}
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setActivateModalOpen(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              loading={activating}
+              onClick={handleDirectActivate}
+            >
+              Activate subscription
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleDirectActivate} className="space-y-3">
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Subscription plan
+            </label>
+            <select
+              value={activatePlan}
+              onChange={(e) => setActivatePlan(e.target.value)}
+              className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] bg-white"
+            >
+              <option value="Starter">Starter</option>
+              <option value="Pro">Pro</option>
+              <option value="Scale">Scale</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Paid duration (months)
+            </label>
+            <select
+              value={activateMonths}
+              onChange={(e) => setActivateMonths(Number(e.target.value))}
+              className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] bg-white"
+            >
+              <option value={1}>1 month (30 days)</option>
+              <option value={3}>3 months (90 days)</option>
+              <option value={6}>6 months (180 days)</option>
+              <option value={12}>12 months (365 days)</option>
+            </select>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Support Session Token Modal */}
+      <Modal
+        open={Boolean(supportTokenModal)}
+        onClose={() => setSupportTokenModal(null)}
+        title={`POS support session — ${supportTokenModal?.tenantName || ''}`}
+        size="md"
+        footer={
+          <Button onClick={() => setSupportTokenModal(null)}>Close</Button>
+        }
+      >
+        {supportTokenModal && (
+          <div className="space-y-3.5">
+            <p className="text-[13px] text-[#5F6B7A]">
+              An audited, time-limited support token has been issued for{' '}
+              <span className="font-semibold text-[#16191F]">
+                {supportTokenModal.tenantName}
+              </span>
+              . Use this token or launch link to troubleshoot their POS environment.
+            </p>
+            <div>
+              <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                Ephemeral support token
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={supportTokenModal.token}
+                  className="flex-1 px-3 py-1.5 text-[12px] font-mono bg-[#FAFAFA] border border-[#879596] rounded-[4px]"
+                />
+                <Button
+                  size="sm"
+                  icon={copiedToken ? Check : Copy}
+                  onClick={() => {
+                    navigator.clipboard.writeText(supportTokenModal.token);
+                    setCopiedToken(true);
+                    setTimeout(() => setCopiedToken(false), 2000);
+                  }}
                 >
-                  Funga
-                </button>
-                <a
-                  href={`${supportTokenModal.clientAppUrl || 'https://jolinx.co.tz/app'}?support_token=${supportTokenModal.token}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md transition"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Fungua App Kwenye Tab Mpya</span>
-                </a>
+                  {copiedToken ? 'Copied' : 'Copy'}
+                </Button>
               </div>
             </div>
+            <div className="pt-2">
+              <a
+                href={`${supportTokenModal.clientAppUrl}?impersonate_token=${encodeURIComponent(
+                  supportTokenModal.token
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-[#0972D3] hover:bg-[#033160] text-white text-[13px] font-semibold"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Launch tenant POS in new tab</span>
+              </a>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

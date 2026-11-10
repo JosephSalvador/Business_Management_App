@@ -1,27 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search,
-  Package,
-  AlertTriangle,
-  CheckCircle2,
-  Edit2,
   RefreshCw,
-  PlusCircle,
-  SlidersHorizontal,
-  Barcode,
-  Layers,
-  ArrowUpDown,
-  X,
-  Check
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   listTenantProducts,
   updateTenantProduct,
   adjustTenantStock,
-  seedStarterCatalog
+  seedStarterCatalog,
 } from '../services/api';
+import {
+  Container,
+  Button,
+  StatusIndicator,
+  Badge,
+  Modal,
+  Alert,
+} from '../ui/primitives';
 
-export default function OmniProductsTable({ tenantId, tenantName, onNotification }) {
+export default function OmniProductsTable({
+  tenantId,
+  tenantName,
+  onNotification,
+}) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,11 +33,15 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Modals state
+  // Stock adjustment modal
   const [stockModalProduct, setStockModalProduct] = useState(null);
   const [newStockQty, setNewStockQty] = useState('');
-  const [stockReason, setStockReason] = useState('Platform Admin Stock Adjustment');
+  const [stockReason, setStockReason] = useState(
+    'Platform Admin Stock Adjustment'
+  );
+  const [savingStock, setSavingStock] = useState(false);
 
+  // Edit product modal
   const [editModalProduct, setEditModalProduct] = useState(null);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -42,9 +49,11 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
     buyingPrice: 0,
     sellingPrice: 0,
     category: '',
-    isActive: true
+    isActive: true,
   });
+  const [savingEdit, setSavingEdit] = useState(false);
 
+  // Starter catalog seed modal
   const [starterPackModal, setStarterPackModal] = useState(false);
   const [seedingLoading, setSeedingLoading] = useState(false);
 
@@ -53,7 +62,12 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
     setLoading(true);
     setError(null);
     try {
-      const res = await listTenantProducts(tenantId, { search, lowStockOnly, page, pageSize: 25 });
+      const res = await listTenantProducts(tenantId, {
+        search,
+        lowStockOnly,
+        page,
+        pageSize: 25,
+      });
       if (res && res.items) {
         setProducts(res.items);
         setTotalCount(res.totalCount || res.items.length);
@@ -65,8 +79,7 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
         setTotalCount(0);
       }
     } catch (err) {
-      console.error('Could not fetch real products:', err);
-      setError(err.message || 'Hitilafu ya kupakia bidhaa kutoka seva.');
+      setError(err.message || 'Failed to load products from server.');
       setProducts([]);
       setTotalCount(0);
     } finally {
@@ -84,45 +97,82 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
     fetchProducts();
   };
 
-  const openStockModal = (product) => {
-    setStockModalProduct(product);
-    setNewStockQty(product.currentStock != null ? product.currentStock.toString() : '0');
-    setStockReason('Marekebisho ya stoo kupitia Back-Office');
-  };
-
-  const handleSaveStock = async () => {
-    if (!stockModalProduct) return;
-    try {
-      await adjustTenantStock(tenantId, stockModalProduct.id, Number(newStockQty), stockReason);
-      setProducts(products.map(p => p.id === stockModalProduct.id ? { ...p, currentStock: Number(newStockQty) } : p));
-      onNotification?.(`Stoo ya bidhaa "${stockModalProduct.name}" imesasishwa kuwa ${newStockQty}!`);
-      setStockModalProduct(null);
-    } catch (err) {
-      onNotification?.(`Hitilafu kusasisha stoo: ${err.message || 'Jaribu tena'}`);
-    }
-  };
-
   const openEditModal = (product) => {
     setEditModalProduct(product);
     setEditForm({
       name: product.name || '',
-      barcode: product.barcode || '',
-      buyingPrice: product.buyingPrice || 0,
-      sellingPrice: product.sellingPrice || 0,
-      category: product.category || '',
-      isActive: product.isActive !== false
+      barcode: product.barcode || product.sku || '',
+      buyingPrice: product.buyingPrice ?? product.costPrice ?? 0,
+      sellingPrice: product.sellingPrice ?? product.price ?? 0,
+      category: product.category || product.categoryName || 'General',
+      isActive: product.isActive !== false,
     });
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (e) => {
+    if (e) e.preventDefault();
     if (!editModalProduct) return;
+    setSavingEdit(true);
     try {
-      await updateTenantProduct(tenantId, editModalProduct.id, editForm);
-      setProducts(products.map(p => p.id === editModalProduct.id ? { ...p, ...editForm } : p));
-      onNotification?.(`Bidhaa "${editForm.name}" imesasishwa kikamilifu!`);
+      await updateTenantProduct(tenantId, editModalProduct.id, {
+        ...editForm,
+        buyingPrice: Number(editForm.buyingPrice),
+        sellingPrice: Number(editForm.sellingPrice),
+      });
+      setProducts(
+        products.map((p) =>
+          p.id === editModalProduct.id ? { ...p, ...editForm } : p
+        )
+      );
       setEditModalProduct(null);
+      onNotification?.(`Updated product "${editForm.name}".`);
     } catch (err) {
-      onNotification?.(`Hitilafu kuhifadhi: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Failed to update product: ${err.message || 'Please try again'}`
+      );
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const openStockModal = (product) => {
+    setStockModalProduct(product);
+    setNewStockQty(String(product.stockQuantity ?? product.onHand ?? 0));
+    setStockReason('Platform Operator Inventory Correction');
+  };
+
+  const handleSaveStock = async (e) => {
+    if (e) e.preventDefault();
+    if (!stockModalProduct) return;
+    setSavingStock(true);
+    try {
+      await adjustTenantStock(
+        tenantId,
+        stockModalProduct.id,
+        Number(newStockQty),
+        stockReason
+      );
+      setProducts(
+        products.map((p) =>
+          p.id === stockModalProduct.id
+            ? {
+                ...p,
+                stockQuantity: Number(newStockQty),
+                onHand: Number(newStockQty),
+              }
+            : p
+        )
+      );
+      setStockModalProduct(null);
+      onNotification?.(
+        `Adjusted stock for "${stockModalProduct.name}" to ${newStockQty}.`
+      );
+    } catch (err) {
+      onNotification?.(
+        `Failed to adjust stock: ${err.message || 'Please try again'}`
+      );
+    } finally {
+      setSavingStock(false);
     }
   };
 
@@ -130,11 +180,15 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
     setSeedingLoading(true);
     try {
       await seedStarterCatalog(tenantId, templateType);
-      onNotification?.(`Starter Pack ya "${templateType}" imewekwa kwenye duka la mteja!`);
       setStarterPackModal(false);
+      onNotification?.(
+        `Seeded ${templateType} starter catalog into ${tenantName || 'tenant'}.`
+      );
       fetchProducts();
     } catch (err) {
-      onNotification?.(`Hitilafu ya kuweka starter pack: ${err.message || 'Jaribu tena'}`);
+      onNotification?.(
+        `Failed to seed starter catalog: ${err.message || 'Please try again'}`
+      );
     } finally {
       setSeedingLoading(false);
     }
@@ -142,172 +196,193 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
 
   return (
     <div className="space-y-4">
-      {/* Top Filter and Actions Ribbon */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+      {error && (
+        <Alert
+          type="error"
+          title="Could not load product catalog"
+          action={
+            <Button size="sm" onClick={fetchProducts}>
+              Retry
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      )}
+
+      <Container
+        title="Products"
+        count={totalCount}
+        description="Inspect and update tenant product catalog, pricing, barcodes, and on-hand stock quantities."
+        noPadding
+        actions={
+          <>
+            <Button
+              size="sm"
+              onClick={() => setStarterPackModal(true)}
+            >
+              Seed starter catalog
+            </Button>
+            <Button
+              size="sm"
+              icon={RefreshCw}
+              loading={loading}
+              onClick={fetchProducts}
+            >
+              Refresh
+            </Button>
+          </>
+        }
+        footer={
+          <div className="flex items-center justify-between text-[12px] text-[#5F6B7A]">
+            <span>
+              Showing {products.length} of {totalCount} items
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                icon={ChevronLeft}
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </Button>
+              <span className="px-2 font-medium text-[#16191F]">
+                Page {page}
+              </span>
+              <Button
+                size="sm"
+                icon={ChevronRight}
+                disabled={products.length < 25 || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        {/* Filter Bar */}
+        <div className="px-4 py-2.5 border-b border-[#E9EBED] bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="relative flex-1 max-w-md"
+          >
+            <Search className="w-3.5 h-3.5 text-[#5F6B7A] absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Tafuta kwa jina la bidhaa au barcode..."
+              placeholder="Filter products by name, SKU, or barcode..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-8 pr-3 py-1 text-[13px] border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3] focus:ring-1 focus:ring-[#0972D3]"
             />
+          </form>
+
+          <div className="flex items-center gap-2">
+            <label className="inline-flex items-center gap-1.5 text-[12px] text-[#16191F] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={lowStockOnly}
+                onChange={(e) => {
+                  setLowStockOnly(e.target.checked);
+                  setPage(1);
+                }}
+                className="rounded-[2px] border-[#879596] text-[#0972D3] focus:ring-[#0972D3]"
+              />
+              <span>Low stock only</span>
+            </label>
           </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition"
-          >
-            Tafuta
-          </button>
-        </form>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setLowStockOnly(!lowStockOnly)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition ${
-              lowStockOnly
-                ? 'bg-amber-500 text-white border-amber-600'
-                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Stoo Ndogo Tu</span>
-          </button>
-
-          <button
-            onClick={() => setStarterPackModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition shadow-sm"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>+ Weka Starter Pack</span>
-          </button>
-
-          <button
-            onClick={fetchProducts}
-            disabled={loading}
-            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-            title="Sasisha Orodha"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
-      </div>
 
-      {/* Products Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Dense Cloudscape Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Bidhaa</th>
-                <th className="py-3 px-4">Barcode / SKU</th>
-                <th className="py-3 px-4 text-right">Bei ya Kununua</th>
-                <th className="py-3 px-4 text-right">Bei ya Kuuza</th>
-                <th className="py-3 px-4 text-center">Stoo Ilipo</th>
-                <th className="py-3 px-4 text-center">Hali</th>
-                <th className="py-3 px-4 text-right">Vitendo</th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase tracking-wider text-[#5F6B7A]">
+                <th className="py-2.5 px-4">SKU / Barcode</th>
+                <th className="py-2.5 px-4">Product name</th>
+                <th className="py-2.5 px-4">Category</th>
+                <th className="py-2.5 px-4 text-right">Cost price</th>
+                <th className="py-2.5 px-4 text-right">Selling price</th>
+                <th className="py-2.5 px-4 text-right">On hand</th>
+                <th className="py-2.5 px-4">Status</th>
+                <th className="py-2.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && products.length === 0 ? (
+            <tbody className="divide-y divide-[#E9EBED] text-[13px]">
+              {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia orodha ya bidhaa kutoka seva...
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan="7" className="py-12 text-center text-rose-500">
-                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
-                    <div className="font-semibold">{error}</div>
-                    <button
-                      onClick={fetchProducts}
-                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
-                    >
-                      Jaribu Tena
-                    </button>
+                  <td colSpan={8} className="py-10 text-center text-[#5F6B7A]">
+                    <RefreshCw className="w-4 h-4 animate-spin inline mr-2 text-[#0972D3]" />
+                    Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-slate-400">
-                    <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    Duka hili halina bidhaa zozote bado.{' '}
-                    <button
-                      onClick={() => setStarterPackModal(true)}
-                      className="text-indigo-600 font-semibold underline hover:text-indigo-800 ml-1"
-                    >
-                      Bofya hapa kuweka Starter Pack
-                    </button>
+                  <td colSpan={8} className="py-10 text-center text-[#5F6B7A]">
+                    No products found matching the current filter.
                   </td>
                 </tr>
               ) : (
-                products.map((p) => {
-                  const stock = p.currentStock != null ? p.currentStock : 0;
-                  const threshold = p.lowStockThreshold || 5;
-                  const isOut = stock <= 0;
-                  const isLow = !isOut && stock <= threshold;
+                products.map((product) => {
+                  const qty = product.stockQuantity ?? product.onHand ?? 0;
+                  const reorder = product.reorderLevel ?? 5;
+                  const isLow = qty <= reorder;
+                  const buying = product.buyingPrice ?? product.costPrice ?? 0;
+                  const selling = product.sellingPrice ?? product.price ?? 0;
 
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900">{p.name}</div>
-                        {p.category && (
-                          <span className="text-xs text-slate-400">{p.category}</span>
-                        )}
+                    <tr
+                      key={product.id}
+                      className="hover:bg-[#F1F8FF]/50 transition-colors"
+                    >
+                      <td className="py-2 px-4 font-mono text-[12px] text-[#5F6B7A]">
+                        {product.barcode || product.sku || '—'}
                       </td>
-                      <td className="py-3 px-4 font-mono text-xs text-slate-600">
-                        {p.barcode ? (
-                          <span className="flex items-center gap-1">
-                            <Barcode className="w-3.5 h-3.5 text-slate-400" />
-                            {p.barcode}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 italic">Bila Barcode</span>
-                        )}
+                      <td className="py-2 px-4 font-medium text-[#16191F]">
+                        {product.name}
                       </td>
-                      <td className="py-3 px-4 text-right font-medium">
-                        TZS {Number(p.buyingPrice || 0).toLocaleString()}
+                      <td className="py-2 px-4 text-[#5F6B7A]">
+                        <Badge>{product.category || product.categoryName || 'General'}</Badge>
                       </td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-900">
-                        TZS {Number(p.sellingPrice || 0).toLocaleString()}
+                      <td className="py-2 px-4 text-right tabular-nums text-[#5F6B7A]">
+                        {Number(buying).toLocaleString()} {product.currency || 'TZS'}
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            isOut
-                              ? 'bg-rose-100 text-rose-700'
-                              : isLow
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}
-                        >
-                          {stock} {p.unit || 'pcs'}
+                      <td className="py-2 px-4 text-right tabular-nums font-semibold text-[#16191F]">
+                        {Number(selling).toLocaleString()} {product.currency || 'TZS'}
+                      </td>
+                      <td className="py-2 px-4 text-right tabular-nums font-semibold">
+                        <span className={isLow ? 'text-[#D91515]' : 'text-[#16191F]'}>
+                          {qty}
+                        </span>{' '}
+                        <span className="text-[11px] font-normal text-[#5F6B7A]">
+                          {product.unit || 'pcs'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        {p.isActive !== false ? (
-                          <span className="text-xs text-emerald-600 font-medium">Inatumika</span>
+                      <td className="py-2 px-4">
+                        {isLow ? (
+                          <StatusIndicator type="warning">Low stock</StatusIndicator>
+                        ) : product.isActive === false ? (
+                          <StatusIndicator type="pending">Inactive</StatusIndicator>
                         ) : (
-                          <span className="text-xs text-slate-400">Imesitishwa</span>
+                          <StatusIndicator type="success">In stock</StatusIndicator>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right space-x-2">
-                        <button
-                          onClick={() => openStockModal(p)}
-                          className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium hover:bg-indigo-100 transition"
+                      <td className="py-2 px-4 text-right whitespace-nowrap space-x-2">
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => openStockModal(product)}
                         >
-                          Stoo
-                        </button>
-                        <button
-                          onClick={() => openEditModal(p)}
-                          className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium hover:bg-slate-200 transition"
+                          Adjust stock
+                        </Button>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => openEditModal(product)}
                         >
-                          Hariri
-                        </button>
+                          Edit
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -316,187 +391,204 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Adjust Stock Modal */}
-      {stockModalProduct && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-lg text-slate-900">Badilisha Idadi ya Stoo</h3>
-              <button onClick={() => setStockModalProduct(null)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-sm text-slate-500">
-              Rekebisha stoo ya <strong className="text-slate-800">{stockModalProduct.name}</strong> kwenye duka la mteja.
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Idadi Mpya ya Stoo (Physical Count)</label>
-                <input
-                  type="number"
-                  value={newStockQty}
-                  onChange={(e) => setNewStockQty(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Sababu ya Marekebisho (Audit Reason)</label>
-                <input
-                  type="text"
-                  value={stockReason}
-                  onChange={(e) => setStockReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setStockModalProduct(null)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                Ghairi
-              </button>
-              <button
-                onClick={handleSaveStock}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold shadow-md transition"
-              >
-                Hifadhi Marekebisho
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Container>
 
       {/* Edit Product Modal */}
-      {editModalProduct && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-lg text-slate-900">Hariri Maelezo ya Bidhaa</h3>
-              <button onClick={() => setEditModalProduct(null)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
+      <Modal
+        open={Boolean(editModalProduct)}
+        onClose={() => setEditModalProduct(null)}
+        title={`Edit product — ${editModalProduct?.name || ''}`}
+        footer={
+          <>
+            <Button onClick={() => setEditModalProduct(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              loading={savingEdit}
+              onClick={handleSaveEdit}
+            >
+              Save changes
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveEdit} className="space-y-3.5">
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Product name
+            </label>
+            <input
+              type="text"
+              required
+              value={editForm.name}
+              onChange={(e) =>
+                setEditForm({ ...editForm, name: e.target.value })
+              }
+              className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                Barcode / SKU
+              </label>
+              <input
+                type="text"
+                value={editForm.barcode}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, barcode: e.target.value })
+                }
+                className="w-full px-3 py-1.5 text-[13px] font-mono border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+              />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Jina la Bidhaa</label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Barcode / SKU</label>
-                <input
-                  type="text"
-                  value={editForm.barcode}
-                  onChange={(e) => setEditForm({ ...editForm, barcode: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Kundi / Category</label>
-                <input
-                  type="text"
-                  value={editForm.category}
-                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Bei ya Kununua (TZS)</label>
-                <input
-                  type="number"
-                  value={editForm.buyingPrice}
-                  onChange={(e) => setEditForm({ ...editForm, buyingPrice: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Bei ya Kuuza (TZS)</label>
-                <input
-                  type="number"
-                  value={editForm.sellingPrice}
-                  onChange={(e) => setEditForm({ ...editForm, sellingPrice: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setEditModalProduct(null)}
-                className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                Ghairi
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold shadow-md transition"
-              >
-                Hifadhi Mabadiliko
-              </button>
+            <div>
+              <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                Category
+              </label>
+              <input
+                type="text"
+                value={editForm.category}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, category: e.target.value })
+                }
+                className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+              />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Starter Pack Modal */}
-      {starterPackModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-lg text-slate-900">Weka Starter Pack ya Bidhaa</h3>
-              </div>
-              <button onClick={() => setStarterPackModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                Cost price (TZS)
+              </label>
+              <input
+                type="number"
+                value={editForm.buyingPrice}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, buyingPrice: e.target.value })
+                }
+                className="w-full px-3 py-1.5 text-[13px] tabular-nums border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+              />
             </div>
-            <p className="text-sm text-slate-500">
-              Msaidie mteja kuanza mara moja kwa kuweka orodha tayari ya bidhaa maarufu zenye bei na barcodes kulingana na aina ya biashara yake:
-            </p>
+            <div>
+              <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                Selling price (TZS)
+              </label>
+              <input
+                type="number"
+                value={editForm.sellingPrice}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, sellingPrice: e.target.value })
+                }
+                className="w-full px-3 py-1.5 text-[13px] tabular-nums border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
 
-            <div className="space-y-2 pt-1">
-              {[
-                { type: 'Grocery', title: 'Duka la Vyakula & Vinywaji (Minimarket)', desc: 'Unga, Mafuta, Mchele, Sukari, Maji na Vinywaji' },
-                { type: 'Pharmacy', title: 'Duka la Dawa (Pharmacy / Dispensary)', desc: 'Paracetamol, Amoxicillin, Cold caps, Bandages, n.k.' },
-                { type: 'Hardware', title: 'Vifaa vya Ujenzi (Hardware & Electrical)', desc: 'Misumari, Rangi, Mabomba, Soketi, Swichi, n.k.' }
-              ].map((tpl) => (
-                <button
-                  key={tpl.type}
-                  disabled={seedingLoading}
-                  onClick={() => handleSeedStarterPack(tpl.type)}
-                  className="w-full text-left p-3.5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/50 transition group flex flex-col"
-                >
-                  <span className="font-bold text-slate-900 group-hover:text-indigo-600 text-sm">
+      {/* Adjust Stock Modal */}
+      <Modal
+        open={Boolean(stockModalProduct)}
+        onClose={() => setStockModalProduct(null)}
+        title={`Adjust stock — ${stockModalProduct?.name || ''}`}
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setStockModalProduct(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              loading={savingStock}
+              onClick={handleSaveStock}
+            >
+              Apply adjustment
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveStock} className="space-y-3.5">
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              New on-hand quantity ({stockModalProduct?.unit || 'pcs'})
+            </label>
+            <input
+              type="number"
+              required
+              value={newStockQty}
+              onChange={(e) => setNewStockQty(e.target.value)}
+              className="w-full px-3 py-1.5 text-[14px] font-semibold tabular-nums border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+            />
+          </div>
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Audit reason
+            </label>
+            <input
+              type="text"
+              required
+              value={stockReason}
+              onChange={(e) => setStockReason(e.target.value)}
+              className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* Seed Starter Catalog Modal */}
+      <Modal
+        open={starterPackModal}
+        onClose={() => setStarterPackModal(false)}
+        title="Seed starter catalog"
+        size="md"
+        footer={
+          <Button onClick={() => setStarterPackModal(false)}>Close</Button>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-[13px] text-[#5F6B7A]">
+            Populate this tenant workspace with a pre-configured industry product catalog to accelerate onboarding.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            {[
+              {
+                id: 'duka',
+                title: 'Retail & Grocery',
+                desc: 'Staple consumer goods, beverages, and household items.',
+              },
+              {
+                id: 'pharmacy',
+                title: 'Pharmacy & Medical',
+                desc: 'Essential over-the-counter medicines and supplies.',
+              },
+              {
+                id: 'hardware',
+                title: 'Hardware & Building',
+                desc: 'Cement, tools, fasteners, paint, and plumbing.',
+              },
+            ].map((tpl) => (
+              <div
+                key={tpl.id}
+                className="border border-[#D5DBDB] rounded-[6px] p-3.5 flex flex-col justify-between bg-[#FAFAFA]"
+              >
+                <div>
+                  <div className="font-bold text-[13px] text-[#16191F]">
                     {tpl.title}
-                  </span>
-                  <span className="text-xs text-slate-500 mt-0.5">{tpl.desc}</span>
-                </button>
-              ))}
-            </div>
-
-            {seedingLoading && (
-              <div className="text-center text-xs text-indigo-600 font-semibold py-2">
-                Inapakia na kuweka bidhaa kwenye stoo...
+                  </div>
+                  <p className="text-[12px] text-[#5F6B7A] mt-1">{tpl.desc}</p>
+                </div>
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={seedingLoading}
+                    onClick={() => handleSeedStarterPack(tpl.id)}
+                  >
+                    Seed {tpl.title}
+                  </Button>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
