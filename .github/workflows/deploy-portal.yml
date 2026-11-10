@@ -60,9 +60,10 @@ jobs:
           echo "::notice title=Portal Deployment::Environment: $TARGET | Cloudflare Branch: $CF_BRANCH"
 
       - name: Install Dependencies & Build Portal
+        env:
+          VITE_API_BASE_URL: ${{ steps.env.outputs.target == 'production' && 'https://api.joberthix.xyz' || 'https://jolinx-api-staging.kindsky-ea584b9f.centralindia.azurecontainerapps.io' }}
         run: |
           cd portal
-          rm -f node_modules
           npm install
           npm run build
 

@@ -20,6 +20,7 @@ import {
 export default function PlatformTeamManager({ currentOperator, onNotification }) {
   const [operators, setOperators] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Invite Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -32,40 +33,20 @@ export default function PlatformTeamManager({ currentOperator, onNotification })
 
   const fetchTeam = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await listPlatformTeam();
       if (Array.isArray(res)) {
         setOperators(res);
       } else if (res && res.items) {
         setOperators(res.items);
+      } else {
+        setOperators([]);
       }
     } catch (err) {
-      console.warn('Could not fetch platform team, fallback mock if empty', err);
-      if (operators.length === 0) {
-        setOperators([
-          {
-            id: 'op1',
-            email: 'joberthix@gmail.com',
-            role: 'PlatformSuperAdmin',
-            isActive: true,
-            createdAt: '2026-10-14'
-          },
-          {
-            id: 'op2',
-            email: 'admin@acme.local',
-            role: 'PlatformSuperAdmin',
-            isActive: true,
-            createdAt: '2026-10-15'
-          },
-          {
-            id: 'op3',
-            email: 'support1@jolinx.co.tz',
-            role: 'PlatformStaff',
-            isActive: true,
-            createdAt: '2026-11-01'
-          }
-        ]);
-      }
+      console.error('Could not fetch platform team:', err);
+      setError(err.message || 'Hitilafu ya kupakia timu ya platform kutoka seva.');
+      setOperators([]);
     } finally {
       setLoading(false);
     }
@@ -162,7 +143,27 @@ export default function PlatformTeamManager({ currentOperator, onNotification })
                 <tr>
                   <td colSpan="5" className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia orodha ya timu...
+                    Inapakia orodha ya timu kutoka seva...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="5" className="py-12 text-center text-rose-500">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
+                    <div className="font-semibold">{error}</div>
+                    <button
+                      onClick={fetchTeam}
+                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
+                    >
+                      Jaribu Tena
+                    </button>
+                  </td>
+                </tr>
+              ) : operators.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="py-12 text-center text-slate-400">
+                    <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    Hakuna wasimamizi wengine waliosajiliwa kwenye jukwaa.
                   </td>
                 </tr>
               ) : (

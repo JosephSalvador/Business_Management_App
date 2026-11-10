@@ -80,17 +80,17 @@ export default function TenantDetailConsole({ tenant, onBack, onNotification }) 
   const handleLaunchSupportSession = async () => {
     try {
       const res = await impersonateTenant(tenant.tenantId, 'Support assistance from backoffice portal');
-      if (res && res.token) {
-        setSupportTokenModal(res);
+      const token = res?.accessToken || res?.token;
+      if (token) {
+        setSupportTokenModal({
+          token,
+          tenantId: res.tenantId || tenant.tenantId,
+          tenantName: res.tenantName || tenant.name,
+          clientAppUrl: res.launchUrl || 'https://jolinx.co.tz/app'
+        });
         onNotification?.(`Support session imetengenezwa kwa ${tenant.name}!`);
       } else {
-        // Fallback demo support token
-        setSupportTokenModal({
-          token: `support_demo_jwt_token_${tenant.tenantId}_${Date.now()}`,
-          tenantId: tenant.tenantId,
-          tenantName: tenant.name,
-          clientAppUrl: 'https://jolinx.co.tz/app'
-        });
+        throw new Error('Haikupokea token ya support kutoka seva.');
       }
     } catch (err) {
       onNotification?.(`Hitilafu ya Support Session: ${err.message || 'Jaribu tena'}`);

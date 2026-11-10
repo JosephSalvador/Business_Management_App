@@ -72,8 +72,11 @@ async function request(endpoint, options = {}) {
     });
 
     if (res.status === 401) {
-      // Token expired or invalid
       console.warn('Unauthorized admin request to:', endpoint);
+      clearAuthSession();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('jlx:unauthorized'));
+      }
     }
 
     const contentType = res.headers.get('content-type') || '';
@@ -103,17 +106,22 @@ async function request(endpoint, options = {}) {
 // AUTH & PLATFORM IDENTITY
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function loginOperator(email, password) {
+export async function loginOperator(identifier, password) {
   const data = await request('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier: (identifier || '').trim(), password }),
   });
 
-  const token = data.accessToken || data.token;
-  const user = data.user || {
-    email,
-    platformRole: data.platformRole || (email.toLowerCase().includes('admin') || email.toLowerCase().includes('joberthix') ? 'PlatformSuperAdmin' : 'PlatformStaff')
+  const authResponse = data.tokens || data;
+  const token = authResponse.accessToken || authResponse.token;
+  const user = authResponse.user || data.user || {
+    email: data.email || identifier,
+    platformRole: data.platformRole || (identifier.toLowerCase().includes('admin') || identifier.toLowerCase().includes('joberthix') ? 'PlatformSuperAdmin' : 'PlatformStaff')
   };
+
+  if (!token) {
+    throw new Error(data.message || 'Haikupokea token ya uthibitisho kutoka kwa seva.');
+  }
 
   setAuthSession(token, user);
   return { token, user };
@@ -121,12 +129,19 @@ export async function loginOperator(email, password) {
 
 export async function getCurrentOperator() {
   try {
-    const data = await request('/api/v1/auth/me');
+    const token = getAuthToken();
+    if (!token) return null;
+
+    const data = await request('/api/v1/users/me');
     if (data) {
-      setAuthSession(getAuthToken(), data);
+      setAuthSession(token, data);
     }
     return data;
   } catch (err) {
+    if (err.status === 401) {
+      clearAuthSession();
+      return null;
+    }
     return getStoredUser();
   }
 }
@@ -196,8 +211,8 @@ export async function seedStarterCatalog(tenantId, templateType) {
 export async function listTenantSales(tenantId, { search = '', startDate = '', endDate = '', page = 1, pageSize = 25 } = {}) {
   const params = new URLSearchParams();
   if (search) params.append('search', search);
-  if (startDate) params.append('startDate', startDate);
-  if (endDate) params.append('endDate', endDate);
+  if (startDate) params.append('from', startDate);
+  if (endDate) params.append('to', endDate);
   params.append('page', page);
   params.append('pageSize', pageSize);
 

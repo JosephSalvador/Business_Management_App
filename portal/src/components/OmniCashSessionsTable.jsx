@@ -11,48 +11,26 @@ import { listTenantCashSessions } from '../services/api';
 export default function OmniCashSessionsTable({ tenantId, tenantName, onNotification }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
 
   const fetchSessions = async () => {
     if (!tenantId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await listTenantCashSessions(tenantId, { page, pageSize: 20 });
       if (res && res.items) {
         setSessions(res.items);
       } else if (Array.isArray(res)) {
         setSessions(res);
+      } else {
+        setSessions([]);
       }
     } catch (err) {
-      console.warn('Could not fetch cash sessions, fallback mock if empty', err);
-      if (sessions.length === 0) {
-        setSessions([
-          {
-            id: 'cs1',
-            tillName: 'Sanduku Kuu (Main Till)',
-            cashierName: 'Mussa Juma',
-            openedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-            closedAt: null,
-            openingBalance: 50000,
-            cashSales: 340000,
-            closingBalance: null,
-            discrepancy: 0,
-            isOpen: true
-          },
-          {
-            id: 'cs2',
-            tillName: 'Sanduku Kuu (Main Till)',
-            cashierName: 'Asha Bakari',
-            openedAt: new Date(Date.now() - 86400000).toISOString(),
-            closedAt: new Date(Date.now() - 86400000 + 3600000 * 9).toISOString(),
-            openingBalance: 50000,
-            cashSales: 580000,
-            closingBalance: 630000,
-            discrepancy: 0,
-            isOpen: false
-          }
-        ]);
-      }
+      console.error('Could not fetch cash sessions:', err);
+      setError(err.message || 'Hitilafu ya kupakia sajili za sanduku kutoka seva.');
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -102,7 +80,20 @@ export default function OmniCashSessionsTable({ tenantId, tenantName, onNotifica
                 <tr>
                   <td colSpan="9" className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia sajili za sanduku...
+                    Inapakia sajili za sanduku kutoka seva...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="9" className="py-12 text-center text-rose-500">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
+                    <div className="font-semibold">{error}</div>
+                    <button
+                      onClick={fetchSessions}
+                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
+                    >
+                      Jaribu Tena
+                    </button>
                   </td>
                 </tr>
               ) : sessions.length === 0 ? (

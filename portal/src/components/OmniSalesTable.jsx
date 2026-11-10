@@ -21,6 +21,7 @@ import {
 export default function OmniSalesTable({ tenantId, tenantName, onNotification }) {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -39,6 +40,7 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
   const fetchSales = async () => {
     if (!tenantId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await listTenantSales(tenantId, { search, startDate, endDate, page, pageSize: 20 });
       if (res && res.items) {
@@ -47,44 +49,15 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
       } else if (Array.isArray(res)) {
         setSales(res);
         setTotalCount(res.length);
+      } else {
+        setSales([]);
+        setTotalCount(0);
       }
     } catch (err) {
-      console.warn('Could not fetch sales, fallback mock sales if empty', err);
-      if (sales.length === 0) {
-        setSales([
-          {
-            id: 's1',
-            receiptNumber: 'REC-202611-001',
-            createdAt: new Date().toISOString(),
-            totalAmount: 48500,
-            customerName: 'Amina Rashid',
-            cashierName: 'Mussa Juma',
-            status: 'Completed',
-            paymentMethod: 'Cash'
-          },
-          {
-            id: 's2',
-            receiptNumber: 'REC-202611-002',
-            createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-            totalAmount: 125000,
-            customerName: 'Mzee Ramadhani',
-            cashierName: 'Mussa Juma',
-            status: 'Completed',
-            paymentMethod: 'M-Pesa'
-          },
-          {
-            id: 's3',
-            receiptNumber: 'REC-202611-003',
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            totalAmount: 18000,
-            customerName: 'Walk-in Customer',
-            cashierName: 'Asha Bakari',
-            status: 'Voided',
-            paymentMethod: 'Cash'
-          }
-        ]);
-        setTotalCount(3);
-      }
+      console.error('Could not fetch sales:', err);
+      setError(err.message || 'Hitilafu ya kupakia mauzo kutoka seva.');
+      setSales([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
@@ -105,16 +78,9 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
     try {
       const detail = await getTenantSaleDetail(tenantId, sale.id);
       setSelectedSaleDetail(detail || sale);
-    } catch {
-      // Mock detail fallback
-      setSelectedSaleDetail({
-        ...sale,
-        lines: [
-          { productName: 'Azam Wheat Flour 1kg', quantity: 2, unitPrice: 2200, totalPrice: 4400 },
-          { productName: 'Kilombero Pure Rice 5kg', quantity: 3, unitPrice: 14500, totalPrice: 43500 },
-          { productName: 'Maji ya Uhai 500ml', quantity: 1, unitPrice: 600, totalPrice: 600 }
-        ]
-      });
+    } catch (err) {
+      console.error('Failed to get sale detail:', err);
+      setSelectedSaleDetail(sale);
     } finally {
       setDetailLoading(false);
     }
@@ -191,7 +157,20 @@ export default function OmniSalesTable({ tenantId, tenantName, onNotification })
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia orodha ya mauzo...
+                    Inapakia orodha ya mauzo kutoka seva...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="8" className="py-12 text-center text-rose-500">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
+                    <div className="font-semibold">{error}</div>
+                    <button
+                      onClick={fetchSales}
+                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
+                    >
+                      Jaribu Tena
+                    </button>
                   </td>
                 </tr>
               ) : sales.length === 0 ? (

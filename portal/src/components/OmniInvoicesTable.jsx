@@ -17,6 +17,7 @@ import {
 export default function OmniInvoicesTable({ tenantId, tenantName, onNotification }) {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -25,6 +26,7 @@ export default function OmniInvoicesTable({ tenantId, tenantName, onNotification
   const fetchInvoices = async () => {
     if (!tenantId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await listTenantInvoices(tenantId, { search, status: statusFilter, page, pageSize: 25 });
       if (res && res.items) {
@@ -33,44 +35,15 @@ export default function OmniInvoicesTable({ tenantId, tenantName, onNotification
       } else if (Array.isArray(res)) {
         setInvoices(res);
         setTotalCount(res.length);
+      } else {
+        setInvoices([]);
+        setTotalCount(0);
       }
     } catch (err) {
-      console.warn('Could not fetch invoices, fallback mock if empty', err);
-      if (invoices.length === 0) {
-        setInvoices([
-          {
-            id: 'inv1',
-            invoiceNumber: 'INV-2026-0012',
-            customerName: 'Bahari Beach Hotel Ltd',
-            issueDate: '2026-11-01',
-            dueDate: '2026-11-15',
-            totalAmount: 1850000,
-            amountPaid: 1000000,
-            status: 'PartiallyPaid'
-          },
-          {
-            id: 'inv2',
-            invoiceNumber: 'INV-2026-0013',
-            customerName: 'Kariakoo Wholesale Depo',
-            issueDate: '2026-11-05',
-            dueDate: '2026-11-20',
-            totalAmount: 450000,
-            amountPaid: 450000,
-            status: 'Paid'
-          },
-          {
-            id: 'inv3',
-            invoiceNumber: 'INV-2026-0014',
-            customerName: 'Kilimanjaro Traders',
-            issueDate: '2026-11-08',
-            dueDate: '2026-11-22',
-            totalAmount: 920000,
-            amountPaid: 0,
-            status: 'Draft'
-          }
-        ]);
-        setTotalCount(3);
-      }
+      console.error('Could not fetch invoices:', err);
+      setError(err.message || 'Hitilafu ya kupakia ankara kutoka seva.');
+      setInvoices([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
@@ -174,7 +147,20 @@ export default function OmniInvoicesTable({ tenantId, tenantName, onNotification
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia ankara za mteja...
+                    Inapakia ankara za mteja kutoka seva...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="8" className="py-12 text-center text-rose-500">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
+                    <div className="font-semibold">{error}</div>
+                    <button
+                      onClick={fetchInvoices}
+                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
+                    >
+                      Jaribu Tena
+                    </button>
                   </td>
                 </tr>
               ) : invoices.length === 0 ? (

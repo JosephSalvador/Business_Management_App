@@ -24,6 +24,7 @@ import {
 export default function OmniProductsTable({ tenantId, tenantName, onNotification }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [page, setPage] = useState(1);
@@ -50,6 +51,7 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
   const fetchProducts = async () => {
     if (!tenantId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await listTenantProducts(tenantId, { search, lowStockOnly, page, pageSize: 25 });
       if (res && res.items) {
@@ -58,50 +60,15 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
       } else if (Array.isArray(res)) {
         setProducts(res);
         setTotalCount(res.length);
+      } else {
+        setProducts([]);
+        setTotalCount(0);
       }
     } catch (err) {
-      console.warn('Could not fetch real products, fallback mock products if empty', err);
-      if (products.length === 0) {
-        setProducts([
-          {
-            id: 'p1',
-            name: 'Azam Wheat Flour 1kg',
-            category: 'Flour & Grains',
-            barcode: '6161101234567',
-            buyingPrice: 1800,
-            sellingPrice: 2200,
-            currentStock: 45,
-            lowStockThreshold: 10,
-            stockStatus: 'Normal',
-            isActive: true
-          },
-          {
-            id: 'p2',
-            name: 'Kilombero Pure Rice 5kg',
-            category: 'Grains & Pulses',
-            barcode: '6161109876543',
-            buyingPrice: 12000,
-            sellingPrice: 14500,
-            currentStock: 4,
-            lowStockThreshold: 10,
-            stockStatus: 'LowStock',
-            isActive: true
-          },
-          {
-            id: 'p3',
-            name: 'Panadol Extra Tablets (Pack)',
-            category: 'Pharmaceuticals',
-            barcode: '8901030456123',
-            buyingPrice: 3500,
-            sellingPrice: 5000,
-            currentStock: 0,
-            lowStockThreshold: 5,
-            stockStatus: 'OutOfStock',
-            isActive: true
-          }
-        ]);
-        setTotalCount(3);
-      }
+      console.error('Could not fetch real products:', err);
+      setError(err.message || 'Hitilafu ya kupakia bidhaa kutoka seva.');
+      setProducts([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
@@ -248,7 +215,20 @@ export default function OmniProductsTable({ tenantId, tenantName, onNotification
                 <tr>
                   <td colSpan="7" className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                    Inapakia orodha ya bidhaa...
+                    Inapakia orodha ya bidhaa kutoka seva...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="7" className="py-12 text-center text-rose-500">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-500" />
+                    <div className="font-semibold">{error}</div>
+                    <button
+                      onClick={fetchProducts}
+                      className="mt-3 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold"
+                    >
+                      Jaribu Tena
+                    </button>
                   </td>
                 </tr>
               ) : products.length === 0 ? (

@@ -28,7 +28,8 @@ import {
   LogIn,
   LogOut,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Store
 } from 'lucide-react';
 
 import TenantDetailConsole from './components/TenantDetailConsole';
@@ -41,7 +42,9 @@ import {
   loginOperator,
   getCurrentOperator,
   clearAuthSession,
-  getStoredUser
+  getStoredUser,
+  getAuthToken,
+  getApiBaseUrl
 } from './services/api';
 
 const ALL_AVAILABLE_FEATURES = [
@@ -64,17 +67,13 @@ export default function App() {
   const [selectedTenant, setSelectedTenant] = useState(null);
 
   // ── Operator Identity & Auth ──────────────────────────────────────
-  const [currentOperator, setCurrentOperator] = useState(() => {
-    return getStoredUser() || {
-      email: 'joberthix@gmail.com',
-      platformRole: 'PlatformSuperAdmin',
-      fullName: 'Joseph Salvador (Founder)'
-    };
-  });
+  const [currentOperator, setCurrentOperator] = useState(() => getStoredUser());
+  const [authToken, setAuthToken] = useState(() => getAuthToken());
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
 
   // ── Notification Banner ───────────────────────────────────────────
   const [bannerNotice, setBannerNotice] = useState(null);
@@ -83,115 +82,102 @@ export default function App() {
     setTimeout(() => setBannerNotice(null), 4500);
   };
 
-  // ── Fleet Summary & Tenants State ─────────────────────────────────
-  const [fleetSummary, setFleetSummary] = useState({
-    totalTenants: 3,
-    activeSubscriptions: 1,
-    trials: 2,
-    atRiskTenants: 1,
-    totalGmv30Days: 4850000,
-    totalSalesCount30Days: 142,
-    totalProductsCount: 185
-  });
-
-  const [clients, setClients] = useState([
-    {
-      tenantId: '101',
-      name: 'Mussa Electronics & Hardware',
-      phone: '+255 754 123 456',
-      planCode: 'Pro',
-      status: 'Trial',
-      trialDaysLeft: 6,
-      paidUntil: null,
-      activePackages: ['invoice-manager'],
-      todaySales: 'TZS 340,000',
-      totalProducts: 42,
-      salesCount30Days: 28,
-      invoicesCount: 6,
-      healthStatus: 'Good'
-    },
-    {
-      tenantId: '102',
-      name: 'Kariakoo Wholesalers Hub',
-      phone: '+255 712 987 654',
-      planCode: 'Scale',
-      status: 'Active',
-      trialDaysLeft: 0,
-      paidUntil: '2026-11-20',
-      activePackages: ['invoice-manager', 'credit-manager'],
-      todaySales: 'TZS 2,150,000',
-      totalProducts: 120,
-      salesCount30Days: 95,
-      invoicesCount: 14,
-      healthStatus: 'Excellent'
-    },
-    {
-      tenantId: '103',
-      name: 'Baraka Pharmacy',
-      phone: '+255 784 555 111',
-      planCode: 'Starter',
-      status: 'Debt',
-      trialDaysLeft: 0,
-      paidUntil: '2026-10-10',
-      activePackages: [],
-      todaySales: 'TZS 95,000',
-      totalProducts: 23,
-      salesCount30Days: 19,
-      invoicesCount: 0,
-      healthStatus: 'AtRisk'
-    },
-  ]);
-
+  // ── Fleet Summary & Tenants State (Real Live Data) ────────────────
+  const [fleetSummary, setFleetSummary] = useState(null);
+  const [clients, setClients] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(false);
+  const [fleetError, setFleetError] = useState(null);
   const [clientSearch, setClientSearch] = useState('');
   const [healthFilter, setHealthFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
   const fetchFleet = async () => {
+    if (!getAuthToken()) {
+      return;
+    }
     setFleetLoading(true);
+    setFleetError(null);
     try {
-      const summary = await getFleetSummary();
+      const [summary, tenantsRes] = await Promise.all([
+        getFleetSummary().catch((e) => {
+          console.warn('Failed to load fleet summary:', e);
+          return null;
+        }),
+        listFleetTenants({
+          search: clientSearch,
+          status: statusFilter,
+          health: healthFilter,
+          pageSize: 50
+        })
+      ]);
+
       if (summary) {
         setFleetSummary(summary);
       }
-      const tenantsRes = await listFleetTenants({
-        search: clientSearch,
-        status: statusFilter,
-        health: healthFilter,
-        pageSize: 50
-      });
-      if (tenantsRes && tenantsRes.items && tenantsRes.items.length > 0) {
+      if (tenantsRes && Array.isArray(tenantsRes.items)) {
         setClients(tenantsRes.items);
+      } else if (Array.isArray(tenantsRes)) {
+        setClients(tenantsRes);
+      } else {
+        setClients([]);
       }
-    } catch {
-      // Use existing state seamlessly
+    } catch (err) {
+      console.error('Failed to fetch fleet:', err);
+      setFleetError(err.message || 'Hitilafu ya kupakia maduka kutoka seva ya API.');
     } finally {
       setFleetLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchFleet();
-  }, [clientSearch, statusFilter, healthFilter]);
+    if (authToken) {
+      fetchFleet();
+    }
+  }, [authToken, clientSearch, statusFilter, healthFilter]);
 
-  // Check operator on mount
+  // Global 401 interceptor listener
   useEffect(() => {
-    getCurrentOperator().then((user) => {
-      if (user) setCurrentOperator(user);
-    });
+    const handleUnauthorized = () => {
+      clearAuthSession();
+      setCurrentOperator(null);
+      setAuthToken('');
+      showNotification('Kipindi chako kimeisha au token imebatilishwa. Tafadhali ingia tena.');
+    };
+    window.addEventListener('jlx:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('jlx:unauthorized', handleUnauthorized);
+  }, []);
+
+  // Validate session on mount
+  useEffect(() => {
+    const token = getAuthToken();
+    if (token) {
+      getCurrentOperator().then((user) => {
+        if (user) {
+          setCurrentOperator(user);
+          setAuthToken(token);
+        } else {
+          setCurrentOperator(null);
+          setAuthToken('');
+        }
+      });
+    }
   }, []);
 
   const handleLoginSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setLoginLoading(true);
+    setLoginError(null);
     try {
       const res = await loginOperator(loginEmail, loginPassword);
       setCurrentOperator(res.user);
+      setAuthToken(res.token);
       setShowLoginModal(false);
-      showNotification(`Umeingia kama ${res.user.email} (${res.user.platformRole})`);
+      showNotification(`Umeingia kama ${res.user.email} (${res.user.platformRole || 'PlatformSuperAdmin'})`);
       fetchFleet();
     } catch (err) {
-      showNotification(`Hitilafu ya kuingia: ${err.message || 'Angalia taarifa zako'}`);
+      const msg = err.message || 'Nenosiri au barua pepe sio sahihi.';
+      setLoginError(msg);
+      showNotification(`Hitilafu ya kuingia: ${msg}`);
     } finally {
       setLoginLoading(false);
     }
@@ -200,6 +186,10 @@ export default function App() {
   const handleLogout = () => {
     clearAuthSession();
     setCurrentOperator(null);
+    setAuthToken('');
+    setClients([]);
+    setFleetSummary(null);
+    setSelectedTenant(null);
     showNotification('Umetoka kwenye mfumo.');
   };
 
@@ -453,6 +443,11 @@ export default function App() {
 
             {/* Operator Identity Ribbon */}
             <div className="hidden lg:flex items-center space-x-3">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-[11px] font-mono text-slate-300 border border-slate-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Staging API</span>
+              </div>
+
               {currentOperator ? (
                 <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
                   <div className="text-right">
@@ -464,11 +459,11 @@ export default function App() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setShowLoginModal(true)}
-                    className="p-1 text-slate-400 hover:text-white transition"
-                    title="Badili Akaunti"
+                    onClick={handleLogout}
+                    className="p-1.5 text-slate-400 hover:text-rose-400 transition rounded-lg hover:bg-slate-700 ml-1"
+                    title="Toka (Logout)"
                   >
-                    <LogIn className="w-4 h-4" />
+                    <LogOut className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
@@ -541,106 +536,237 @@ export default function App() {
 
       {/* Main Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {/* ── TAB 1: FLEET DIRECTORY & MANAGEMENT ── */}
-        {activeTab === 'clients' && (
-          <div className="space-y-6">
-            {/* Top KPI Fleet Overview Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase text-slate-400">Jumla ya Maduka</span>
-                  <Building2 className="w-4 h-4 text-indigo-600" />
+        {!authToken || !currentOperator ? (
+          <div className="min-h-[75vh] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xl max-w-md w-full p-8 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-500" />
+
+              <div className="text-center space-y-2">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 shadow-inner">
+                  <Crown className="w-7 h-7 text-indigo-600" />
                 </div>
-                <div className="text-2xl font-black text-slate-900 mt-2">
-                  {fleetSummary.totalTenants || clients.length}
-                </div>
-                <span className="text-xs text-slate-500 font-medium">Maduka yaliyopo jukwaani</span>
+                <h1 className="text-2xl font-black text-slate-900 tracking-tight">Jolinx Back-Office Portal</h1>
+                <p className="text-xs text-slate-500">
+                  Lango Kuu la Platform SuperAdmin & Support Staff kwa usimamizi wa maduka na data halisi.
+                </p>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase text-slate-400">Mauzo Mwezi Huu (GMV)</span>
-                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+              {/* Live Connected Server Badge */}
+              <div className="mt-5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-left flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-slate-500 shrink-0">Seva ya API:</span>
+                  <span className="font-mono text-slate-800 font-semibold truncate" title={getApiBaseUrl()}>
+                    {getApiBaseUrl().replace('https://', '')}
+                  </span>
                 </div>
-                <div className="text-2xl font-black text-emerald-600 mt-2">
-                  TZS {Number(fleetSummary.totalGmv30Days || 0).toLocaleString()}
-                </div>
-                <span className="text-xs text-slate-500 font-medium">{fleetSummary.totalSalesCount30Days || 0} jumla ya mauzo</span>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase text-slate-400">Kwenye Majaribio (Trials)</span>
-                  <Clock className="w-4 h-4 text-blue-600" />
+              {loginError && (
+                <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{loginError}</span>
                 </div>
-                <div className="text-2xl font-black text-blue-600 mt-2">
-                  {fleetSummary.trials || 2}
+              )}
+
+              <form onSubmit={handleLoginSubmit} className="mt-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Barua Pepe au Namba ya Simu
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="admin@acme.local au barua pepe yako"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
                 </div>
-                <span className="text-xs text-slate-500 font-medium">Bure (Kufuatilia)</span>
-              </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase text-slate-400">Hatari ya Kuacha (At-Risk)</span>
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nenosiri (Password)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
                 </div>
-                <div className="text-2xl font-black text-rose-600 mt-2">
-                  {fleetSummary.atRiskTenants || 1}
-                </div>
-                <span className="text-xs text-rose-600 font-medium">Wanahitaji msaada sasa</span>
-              </div>
-            </div>
-
-            {/* Filter and Search Ribbon */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-                <input
-                  type="text"
-                  placeholder="Tafuta duka kwa jina au namba ya simu..."
-                  value={clientSearch}
-                  onChange={(e) => setClientSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  value={healthFilter}
-                  onChange={(e) => setHealthFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium bg-white text-slate-700"
-                >
-                  <option value="">Afya Zote</option>
-                  <option value="Excellent">Nzuri Sana (Excellent)</option>
-                  <option value="Good">Nzuri (Good)</option>
-                  <option value="AtRisk">Hatari ya Kuacha (At Risk)</option>
-                </select>
-
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium bg-white text-slate-700"
-                >
-                  <option value="">Hali Zote</option>
-                  <option value="Active">Walio Lipia (Active)</option>
-                  <option value="Trial">Majaribio (Trial)</option>
-                  <option value="Debt">Madeni / Expired</option>
-                </select>
 
                 <button
-                  onClick={fetchFleet}
-                  disabled={fleetLoading}
-                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-                  title="Sasisha Orodha"
+                  type="submit"
+                  disabled={loginLoading}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  <RefreshCw className={`w-4 h-4 ${fleetLoading ? 'animate-spin' : ''}`} />
+                  {loginLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Inathibitisha...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4" />
+                      <span>Ingia Kwenye Portal</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Quick Staging Helper */}
+              <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginEmail('admin@acme.local');
+                    setLoginPassword('Admin@12345');
+                  }}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold hover:underline flex items-center justify-center gap-1 mx-auto"
+                >
+                  <span>Mazingira ya Staging: admin@acme.local / Admin@12345</span>
                 </button>
               </div>
             </div>
+          </div>
+        ) : (
+          <>
+            {/* ── TAB 1: FLEET DIRECTORY & MANAGEMENT ── */}
+            {activeTab === 'clients' && (
+              <div className="space-y-6">
+                {/* Top KPI Fleet Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase text-slate-400">Jumla ya Maduka</span>
+                      <Building2 className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 mt-2">
+                      {fleetSummary?.totalTenants ?? clients.length}
+                    </div>
+                    <span className="text-xs text-slate-500 font-medium">Maduka yaliyopo jukwaani</span>
+                  </div>
 
-            {/* Fleet Cards Table */}
-            <div className="grid grid-cols-1 gap-4">
-              {clients.map((client) => {
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase text-slate-400">Mauzo Mwezi Huu (GMV)</span>
+                      <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div className="text-2xl font-black text-emerald-600 mt-2">
+                      TZS {Number(fleetSummary?.totalGmv30Days ?? 0).toLocaleString()}
+                    </div>
+                    <span className="text-xs text-slate-500 font-medium">{fleetSummary?.totalSalesCount30Days ?? 0} jumla ya mauzo</span>
+                  </div>
+
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase text-slate-400">Kwenye Majaribio (Trials)</span>
+                      <Clock className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="text-2xl font-black text-blue-600 mt-2">
+                      {fleetSummary?.trials ?? 0}
+                    </div>
+                    <span className="text-xs text-slate-500 font-medium">Bure (Kufuatilia)</span>
+                  </div>
+
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase text-slate-400">Hatari ya Kuacha (At-Risk)</span>
+                      <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    </div>
+                    <div className="text-2xl font-black text-rose-600 mt-2">
+                      {fleetSummary?.atRiskTenants ?? 0}
+                    </div>
+                    <span className="text-xs text-rose-600 font-medium">Wanahitaji msaada sasa</span>
+                  </div>
+                </div>
+
+                {/* Filter and Search Ribbon */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                    <input
+                      type="text"
+                      placeholder="Tafuta duka kwa jina au namba ya simu..."
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={healthFilter}
+                      onChange={(e) => setHealthFilter(e.target.value)}
+                      className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium bg-white text-slate-700"
+                    >
+                      <option value="">Afya Zote</option>
+                      <option value="Excellent">Nzuri Sana (Excellent)</option>
+                      <option value="Good">Nzuri (Good)</option>
+                      <option value="AtRisk">Hatari ya Kuacha (At Risk)</option>
+                    </select>
+
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium bg-white text-slate-700"
+                    >
+                      <option value="">Hali Zote</option>
+                      <option value="Active">Walio Lipia (Active)</option>
+                      <option value="Trial">Majaribio (Trial)</option>
+                      <option value="Debt">Madeni / Expired</option>
+                    </select>
+
+                    <button
+                      onClick={fetchFleet}
+                      disabled={fleetLoading}
+                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                      title="Sasisha Orodha"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${fleetLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fleet Cards Table */}
+                <div className="grid grid-cols-1 gap-4">
+                  {fleetLoading && clients.length === 0 ? (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-600 shadow-sm">
+                      <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
+                      <p className="text-sm font-medium text-slate-700">Inapakia taarifa halisi za maduka kutoka seva ya staging...</p>
+                    </div>
+                  ) : fleetError ? (
+                    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center text-rose-800">
+                      <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto mb-3" />
+                      <h3 className="font-bold text-base">Hitilafu ya Kupakia Maduka</h3>
+                      <p className="text-sm mt-1 text-rose-700">{fleetError}</p>
+                      <button
+                        onClick={fetchFleet}
+                        className="mt-4 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow"
+                      >
+                        Jaribu Tena
+                      </button>
+                    </div>
+                  ) : clients.length === 0 ? (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-600 shadow-sm">
+                      <Store className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <h3 className="font-bold text-lg text-slate-800">Hakuna Maduka Yaliyopatikana</h3>
+                      <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+                        Bado hakuna duka lililosajiliwa kwenye hifadhidata ya mfumo (staging) au hakuna duka linalolingana na utafutaji wako.
+                      </p>
+                      <button
+                        onClick={fetchFleet}
+                        className="mt-4 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow flex items-center gap-2 mx-auto"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Pakia Upya Takwimu</span>
+                      </button>
+                    </div>
+                  ) : (
+                    clients.map((client) => {
                 const isRisk = (client.healthStatus || '').toLowerCase() === 'atrisk';
                 const isGood = (client.healthStatus || '').toLowerCase() === 'good';
                 const isExcellent = (client.healthStatus || '').toLowerCase() === 'excellent';
@@ -736,7 +862,8 @@ export default function App() {
                     </div>
                   </div>
                 );
-              })}
+              })
+            )}
             </div>
           </div>
         )}
@@ -1076,7 +1203,9 @@ export default function App() {
             </div>
           </div>
         )}
-      </main>
+      </>
+    )}
+  </main>
 
       {/* ── MODAL: OPERATOR LOGIN ── */}
       {showLoginModal && (
