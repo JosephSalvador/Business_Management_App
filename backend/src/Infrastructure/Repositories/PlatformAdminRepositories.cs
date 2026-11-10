@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BusinessOS.Application.Features.Common;
 using BusinessOS.Application.Ports;
 using BusinessOS.Domain.Catalog;
 using BusinessOS.Domain.Identity;
@@ -123,7 +124,7 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
                 t.CreatedAt));
         }
 
-        return new PagedResult<TenantAdminSummaryDto>(items, total, page, pageSize);
+        return new PagedResult<TenantAdminSummaryDto>(items, page, pageSize, total);
     }
 
     public async Task<TenantAdminDetailDto?> GetTenantDetailAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -249,7 +250,7 @@ public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
                 p.IsActive));
         }
 
-        return new PagedResult<OmniProductDto>(items, total, page, pageSize);
+        return new PagedResult<OmniProductDto>(items, page, pageSize, total);
     }
 
     public Task<Product?> GetProductByIdAsync(Guid tenantId, Guid productId, CancellationToken cancellationToken = default)
@@ -441,7 +442,7 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
                 paymentMethod));
         }
 
-        return new PagedResult<OmniSaleSummaryDto>(items, total, page, pageSize);
+        return new PagedResult<OmniSaleSummaryDto>(items, page, pageSize, total);
     }
 
     public async Task<OmniSaleDetailDto?> GetTenantSaleDetailAsync(Guid tenantId, Guid saleId, CancellationToken cancellationToken = default)
@@ -548,7 +549,7 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
                 cs.IsOpen));
         }
 
-        return new PagedResult<OmniCashSessionDto>(items, total, page, pageSize);
+        return new PagedResult<OmniCashSessionDto>(items, page, pageSize, total);
     }
 }
 
@@ -592,7 +593,7 @@ public sealed class OmniTenantInvoicesRepository : IOmniTenantInvoicesRepository
             inv.AmountPaid,
             inv.Status.ToString())).ToList();
 
-        return new PagedResult<OmniInvoiceSummaryDto>(items, total, page, pageSize);
+        return new PagedResult<OmniInvoiceSummaryDto>(items, page, pageSize, total);
     }
 
     public Task<CustomerInvoice?> GetInvoiceByIdAsync(Guid tenantId, Guid invoiceId, CancellationToken cancellationToken = default)

@@ -1,3 +1,4 @@
+using BusinessOS.Application.Features.Common;
 using BusinessOS.Domain.Accounting;
 using BusinessOS.Domain.Audit;
 using BusinessOS.Domain.Billing;
