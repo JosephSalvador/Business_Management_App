@@ -15,7 +15,6 @@ import '../../../settings/data/organization_repository.dart';
 import '../../application/delivery_notes_controller.dart';
 import '../../application/document_template_controller.dart';
 import '../../application/invoices_controller.dart';
-import '../../domain/delivery_note.dart';
 import '../../domain/document_template.dart';
 import '../../domain/invoice.dart';
 import '../services/customer_invoice_pdf_service.dart';
