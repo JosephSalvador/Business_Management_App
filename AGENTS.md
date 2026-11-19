@@ -334,4 +334,13 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Unit Tests — Add comprehensive tests in `test/features/invoices/offline_invoicing_test.dart` for prefix configuration and retroactive formatting.
 - [x] Task 7: Version Bump & Remote Build — Bump version code to `1.0.0+89` in `pubspec.yaml` & `app_update_service.dart`, commit, push to `feature/invoice-delivery`, and trigger remote CI/CD build.
 
+## Implementation Plan — Seamless Invoice Navigation & Persistent Prefix Configuration (Build 90)
+- [x] Task 1: Persistent Invoice Prefix in Organization Repository — Update `OrganizationRepository.update()` to include `invoicePrefix` in optimistic model, payload, and `_mergeWithLocalFallback` so saving never erases the user's custom prefix.
+- [x] Task 2: Tenant Document Configuration Prefix Integration — Add `invoicePrefix` to `TenantDocumentConfiguration` domain model, serialization, and update payload; add `updateInvoicePrefix()` in `DocumentTemplateController` and bind it to backend `/api/v1/tenant-document-configurations/{documentType}`.
+- [x] Task 3: Stage 5 Prefix Persistence in Invoice Branding Sheet — Update `InvoiceBrandingSheet.initState` to read existing prefix from both `Organization` and `TenantDocumentConfiguration`, and persist across both stores in `_save()`.
+- [x] Task 4: Seamless Return to Invoices List — Add explicit `AppBar` leading back button, `PopScope` hardware back handler, and full-width "Rudi kwenye Orodha ya Ankara" action button on `InvoiceDetailPage`.
+- [x] Task 5: Safe Navigation on Invoice Creation & Preview — Replace stack-destroying `context.go()` with `context.pushReplacement()` in `CreateInvoicePage._save()` so `InvoicesPage` remains in history; add `PopScope` and leading back navigation in `CreateInvoicePage` and `InvoicePreviewScreen`.
+- [x] Task 6: Unit Tests & Verification — Add tests in `test/features/invoices/document_template_test.dart` verifying `invoicePrefix` serialization and update request formatting.
+- [x] Task 7: Version Bump & Remote CI/CD Build — Bump version code strictly to `1.0.0+90` in `pubspec.yaml` and `app_update_service.dart`, commit, push to `feature/invoice-delivery`, and trigger GitHub Actions build.
+
 

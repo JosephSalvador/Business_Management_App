@@ -241,6 +241,7 @@ class TenantDocumentConfiguration {
     this.logoUrl,
     this.showLogo = true,
     this.footerNotes,
+    this.invoicePrefix,
   });
 
   final String id;
@@ -254,6 +255,7 @@ class TenantDocumentConfiguration {
   final String? logoUrl;
   final bool showLogo;
   final String? footerNotes;
+  final String? invoicePrefix;
 
   InvoiceLayoutStyle get layoutStyle => InvoiceLayoutStyle.resolve(
         templateId: activeTemplateId,
@@ -278,6 +280,7 @@ class TenantDocumentConfiguration {
       logoUrl: json['logoUrl']?.toString(),
       showLogo: json['showLogo'] as bool? ?? true,
       footerNotes: json['footerNotes']?.toString(),
+      invoicePrefix: json['invoicePrefix'] as String?,
     );
   }
 
@@ -293,6 +296,7 @@ class TenantDocumentConfiguration {
         'logoUrl': logoUrl,
         'showLogo': showLogo,
         'footerNotes': footerNotes,
+        'invoicePrefix': invoicePrefix,
       };
 
   Map<String, dynamic> toUpdateRequestJson() => {
@@ -310,6 +314,9 @@ class TenantDocumentConfiguration {
         'showLogo': showLogo,
         'footerNotes':
             footerNotes?.trim().isEmpty ?? true ? null : footerNotes!.trim(),
+        'invoicePrefix': invoicePrefix?.trim().isEmpty ?? true
+            ? null
+            : invoicePrefix!.trim().toUpperCase(),
       };
 
   TenantDocumentConfiguration copyWith({
@@ -324,6 +331,7 @@ class TenantDocumentConfiguration {
     String? logoUrl,
     bool? showLogo,
     String? footerNotes,
+    String? invoicePrefix,
   }) {
     return TenantDocumentConfiguration(
       id: id ?? this.id,
@@ -337,6 +345,7 @@ class TenantDocumentConfiguration {
       logoUrl: logoUrl ?? this.logoUrl,
       showLogo: showLogo ?? this.showLogo,
       footerNotes: footerNotes ?? this.footerNotes,
+      invoicePrefix: invoicePrefix ?? this.invoicePrefix,
     );
   }
 }

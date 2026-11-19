@@ -128,7 +128,17 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
     );
     _monogramInitialsController = TextEditingController();
 
-    final initialPrefix = (org.invoicePrefix ?? '').trim().toUpperCase();
+    final savedOrgPrefix = (org.invoicePrefix ?? '').trim().toUpperCase();
+    final savedCfgPrefix = (ref
+                .read(documentTemplateControllerProvider)
+                .currentInvoiceConfiguration
+                .invoicePrefix ??
+            '')
+        .trim()
+        .toUpperCase();
+    final initialPrefix =
+        savedOrgPrefix.isNotEmpty ? savedOrgPrefix : savedCfgPrefix;
+
     if (initialPrefix == 'CINV') {
       _selectedPrefix = 'CINV';
       _customPrefixController = TextEditingController();
@@ -149,6 +159,16 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
         _selectedLayoutStyle = cfg.layoutStyle;
         _primaryHex = cfg.themePrimaryHex ?? _primaryHex;
         _secondaryHex = cfg.themeSecondaryHex ?? _secondaryHex;
+        final cfgPrefix = (cfg.invoicePrefix ?? '').trim().toUpperCase();
+        if (cfgPrefix.isNotEmpty &&
+            (org.invoicePrefix == null || org.invoicePrefix!.trim().isEmpty)) {
+          if (cfgPrefix == 'CINV') {
+            _selectedPrefix = 'CINV';
+          } else if (cfgPrefix != 'INV') {
+            _selectedPrefix = 'CUSTOM';
+            _customPrefixController.text = cfgPrefix;
+          }
+        }
       });
     });
   }
@@ -293,6 +313,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
       await tplNotifier.selectTemplate(_selectedLayoutStyle.templateId);
       tplNotifier.updatePrimaryHex(_primaryHex);
       tplNotifier.updateSecondaryHex(_secondaryHex);
+      tplNotifier.updateInvoicePrefix(_effectivePrefix);
       await tplNotifier.saveConfiguration();
 
       if (!mounted) return;

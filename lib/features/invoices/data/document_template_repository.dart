@@ -222,6 +222,7 @@ class DocumentTemplateRepository {
           themeSecondaryHex: optimistic.themeSecondaryHex,
           showLogo: optimistic.showLogo,
           footerNotes: optimistic.footerNotes,
+          invoicePrefix: optimistic.invoicePrefix ?? serverCfg.invoicePrefix,
         );
         map[documentType] = merged;
         await _saveCachedConfigs(map.values.toList(growable: false));

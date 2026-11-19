@@ -18,6 +18,7 @@ class DocumentTemplateState {
     this.customLiquidOverride = '',
     this.showLogo = true,
     this.footerNotes = '',
+    this.invoicePrefix,
     this.previewHtml,
     this.isLoading = false,
     this.isPreviewLoading = false,
@@ -36,6 +37,7 @@ class DocumentTemplateState {
   final String customLiquidOverride;
   final bool showLogo;
   final String footerNotes;
+  final String? invoicePrefix;
   final String? previewHtml;
   final bool isLoading;
   final bool isPreviewLoading;
@@ -80,6 +82,8 @@ class DocumentTemplateState {
         themeSecondaryHex: themeSecondaryHex,
         showLogo: showLogo,
         footerNotes: footerNotes,
+        invoicePrefix: invoicePrefix ??
+            configurations[DocumentType.invoice]?.invoicePrefix,
       );
     }
     return configurations[DocumentType.invoice] ??
@@ -94,6 +98,7 @@ class DocumentTemplateState {
           themeSecondaryHex: themeSecondaryHex,
           showLogo: showLogo,
           footerNotes: footerNotes,
+          invoicePrefix: invoicePrefix,
         );
   }
 
@@ -108,6 +113,7 @@ class DocumentTemplateState {
     String? customLiquidOverride,
     bool? showLogo,
     String? footerNotes,
+    String? invoicePrefix,
     String? previewHtml,
     bool? isLoading,
     bool? isPreviewLoading,
@@ -130,6 +136,7 @@ class DocumentTemplateState {
           customLiquidOverride ?? this.customLiquidOverride,
       showLogo: showLogo ?? this.showLogo,
       footerNotes: footerNotes ?? this.footerNotes,
+      invoicePrefix: invoicePrefix ?? this.invoicePrefix,
       previewHtml: previewHtml ?? this.previewHtml,
       isLoading: isLoading ?? this.isLoading,
       isPreviewLoading: isPreviewLoading ?? this.isPreviewLoading,
@@ -194,6 +201,7 @@ class DocumentTemplateController extends Notifier<DocumentTemplateState> {
         customLiquidOverride: currentConfig?.customLiquidOverride ?? '',
         showLogo: currentConfig?.showLogo ?? true,
         footerNotes: currentConfig?.footerNotes ?? '',
+        invoicePrefix: currentConfig?.invoicePrefix,
         isLoading: false,
       );
 
@@ -293,6 +301,10 @@ class DocumentTemplateController extends Notifier<DocumentTemplateState> {
     _schedulePreview();
   }
 
+  void updateInvoicePrefix(String? prefix) {
+    state = state.copyWith(invoicePrefix: prefix?.trim().toUpperCase());
+  }
+
   void _schedulePreview() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -374,6 +386,7 @@ class DocumentTemplateController extends Notifier<DocumentTemplateState> {
         themeSecondaryHex: state.themeSecondaryHex,
         showLogo: state.showLogo,
         footerNotes: state.footerNotes,
+        invoicePrefix: state.invoicePrefix ?? existing?.invoicePrefix,
       );
 
       final saved = await _repository.updateTenantConfiguration(

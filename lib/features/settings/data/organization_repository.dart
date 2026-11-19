@@ -517,6 +517,9 @@ class OrganizationRepository {
                   PaymentAccount.fromJson(Map<String, dynamic>.from(item)))
               .toList()
           : current.paymentAccounts,
+      invoicePrefix: body.containsKey('invoicePrefix')
+          ? body['invoicePrefix'] as String?
+          : current.invoicePrefix,
     );
 
     if (_cache != null) {
@@ -548,6 +551,7 @@ class OrganizationRepository {
         'invoiceTerms': optimistic.invoiceTerms,
         'authorizedSignatoryName': optimistic.authorizedSignatoryName,
         'authorizedSignatoryTitle': optimistic.authorizedSignatoryTitle,
+        'invoicePrefix': optimistic.invoicePrefix,
         'paymentAccountsJson': jsonEncode(
             optimistic.paymentAccounts.map((a) => a.toJson()).toList()),
       };
@@ -610,6 +614,10 @@ class OrganizationRepository {
       paymentAccounts: primary.paymentAccounts.isNotEmpty
           ? primary.paymentAccounts
           : fallback.paymentAccounts,
+      invoicePrefix: (primary.invoicePrefix != null &&
+              primary.invoicePrefix!.trim().isNotEmpty)
+          ? primary.invoicePrefix
+          : fallback.invoicePrefix,
     );
   }
 }

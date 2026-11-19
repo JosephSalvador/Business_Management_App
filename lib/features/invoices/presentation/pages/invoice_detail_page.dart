@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/providers.dart';
+import '../../../../app/router.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
@@ -74,12 +76,21 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
 
   Organization _resolveOrganization() {
     final settingsState = ref.watch(settingsControllerProvider);
+    final tplConfig =
+        ref.watch(documentTemplateControllerProvider).currentInvoiceConfiguration;
     if (settingsState is SettingsLoaded) {
+      if ((settingsState.organization.invoicePrefix == null ||
+              settingsState.organization.invoicePrefix!.trim().isEmpty) &&
+          tplConfig.invoicePrefix?.trim().isNotEmpty == true) {
+        return settingsState.organization
+            .copyWith(invoicePrefix: tplConfig.invoicePrefix);
+      }
       return settingsState.organization;
     }
-    return const Organization(
+    return Organization(
       name: 'Your Business',
       currency: 'TZS',
+      invoicePrefix: tplConfig.invoicePrefix,
     );
   }
 
@@ -106,6 +117,14 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     }
   }
 
+  void _navigateBackToInvoices(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(Routes.invoices);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
@@ -113,52 +132,79 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     final invoice = _invoice;
     final organization = _resolveOrganization();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          invoice == null
-              ? loc.invoiceDetailTitle
-              : '${invoice.documentTitle} ${invoice.displayNumber(organization.invoicePrefix)}',
-        ),
-        actions: [
-          if (invoice != null) ...[
-            IconButton(
-              tooltip: isSw
-                  ? 'Hariri Nembo & Maelezo ya Benki'
-                  : 'Edit Logo & Bank Info',
-              icon: const Icon(Icons.palette_outlined),
-              onPressed: () => showInvoiceBrandingSheet(context),
-            ),
-            IconButton(
-              tooltip:
-                  isSw ? 'Pakua / Shiriki A4 PDF' : 'Share / Download A4 PDF',
-              icon: _sharingPdf
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.picture_as_pdf_outlined),
-              onPressed: _sharingPdf
-                  ? null
-                  : () => _shareA4Pdf(invoice, organization, isSw),
-            ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _navigateBackToInvoices(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: isSw ? 'Rudi kwenye Orodha ya Ankara' : 'Back to Invoices',
+            onPressed: () => _navigateBackToInvoices(context),
+          ),
+          title: Text(
+            invoice == null
+                ? loc.invoiceDetailTitle
+                : '${invoice.documentTitle} ${invoice.displayNumber(organization.invoicePrefix)}',
+          ),
+          actions: [
+            if (invoice != null) ...[
+              IconButton(
+                tooltip: isSw
+                    ? 'Hariri Nembo & Maelezo ya Benki'
+                    : 'Edit Logo & Bank Info',
+                icon: const Icon(Icons.palette_outlined),
+                onPressed: () => showInvoiceBrandingSheet(context),
+              ),
+              IconButton(
+                tooltip:
+                    isSw ? 'Pakua / Shiriki A4 PDF' : 'Share / Download A4 PDF',
+                icon: _sharingPdf
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined),
+                onPressed: _sharingPdf
+                    ? null
+                    : () => _shareA4Pdf(invoice, organization, isSw),
+              ),
+            ],
           ],
-        ],
-      ),
-      body: WaveBackground(
-        child: invoice == null
-            ? Center(
-                child: _error == null
-                    ? const CircularProgressIndicator()
-                    : Text(
-                        _error!,
-                        style: TextStyle(
-                          color: AppColors.resolveTextSecondary(context),
+        ),
+        body: WaveBackground(
+          child: invoice == null
+              ? Center(
+                  child: _error == null
+                      ? const CircularProgressIndicator()
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _error!,
+                              style: TextStyle(
+                                color: AppColors.resolveTextSecondary(context),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            OutlinedButton.icon(
+                              onPressed: () => _navigateBackToInvoices(context),
+                              icon: const Icon(Icons.arrow_back),
+                              label: Text(
+                                isSw
+                                    ? 'Rudi kwenye Orodha ya Ankara'
+                                    : 'Back to Invoices List',
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-              )
-            : _buildInvoice(context, invoice, organization, loc, isSw),
+                )
+              : _buildInvoice(context, invoice, organization, loc, isSw),
+        ),
       ),
     );
   }
@@ -457,6 +503,23 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                 ),
               ),
           ],
+        ),
+
+        const SizedBox(height: 14),
+
+        // Return to Invoices List Action Button
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onPressed: () => _navigateBackToInvoices(context),
+          icon: const Icon(Icons.receipt_long_outlined),
+          label: Text(
+            isSwahili ? 'Rudi kwenye Orodha ya Ankara' : 'Back to Invoices List',
+          ),
         ),
       ],
     );

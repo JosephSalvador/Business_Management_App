@@ -385,22 +385,45 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
     final borderColor = AppColors.resolveBorder(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(loc.invoiceNewTitle),
-        actions: [
-          TextButton.icon(
-            onPressed: () async {
-              await showInvoiceBrandingSheet(context);
-              if (mounted) {
-                setState(() => _prefilledFromOrg = false);
-              }
-            },
-            icon: const Icon(Icons.palette_outlined, size: 18),
-            label: Text(isSw ? 'Nembo & Benki' : 'Logo & Bank'),
+    void navigateBack() {
+      if (_step > 0) {
+        setState(() => _step--);
+      } else {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go(Routes.invoices);
+        }
+      }
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        navigateBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: isSw ? 'Rudi' : 'Back',
+            onPressed: navigateBack,
           ),
-        ],
-      ),
+          title: Text(loc.invoiceNewTitle),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                await showInvoiceBrandingSheet(context);
+                if (mounted) {
+                  setState(() => _prefilledFromOrg = false);
+                }
+              },
+              icon: const Icon(Icons.palette_outlined, size: 18),
+              label: Text(isSw ? 'Nembo & Benki' : 'Logo & Bank'),
+            ),
+          ],
+        ),
       body: WaveBackground(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
@@ -1308,8 +1331,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _pickIssueDate() async {
     final now = DateTime.now();
@@ -1440,8 +1464,13 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
     }
 
     final orgState = ref.read(settingsControllerProvider);
-    final prefix =
+    final tplConfig =
+        ref.read(documentTemplateControllerProvider).currentInvoiceConfiguration;
+    final orgPrefix =
         orgState is SettingsLoaded ? orgState.organization.invoicePrefix : null;
+    final prefix = (orgPrefix != null && orgPrefix.trim().isNotEmpty)
+        ? orgPrefix
+        : tplConfig.invoicePrefix;
 
     final invoice = await ref.read(invoicesControllerProvider.notifier).create(
           id: _invoiceId,
@@ -1489,7 +1518,11 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       );
       return;
     }
-    context.go(Routes.invoiceDetail(invoice.id));
+    if (context.canPop()) {
+      context.pushReplacement(Routes.invoiceDetail(invoice.id));
+    } else {
+      context.go(Routes.invoiceDetail(invoice.id));
+    }
   }
 
   static String _isoDate(DateTime value) =>

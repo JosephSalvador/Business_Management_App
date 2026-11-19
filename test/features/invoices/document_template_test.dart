@@ -68,6 +68,7 @@ void main() {
         themeSecondaryHex: '#0D9488',
         showLogo: true,
         footerNotes: 'Thank you for your business.',
+        invoicePrefix: 'cinv',
       );
 
       final req = config.toUpdateRequestJson();
@@ -77,6 +78,7 @@ void main() {
       expect(req['themeSecondaryHex'], '#0D9488');
       expect(req['showLogo'], isTrue);
       expect(req['footerNotes'], 'Thank you for your business.');
+      expect(req['invoicePrefix'], 'CINV');
     });
   });
 

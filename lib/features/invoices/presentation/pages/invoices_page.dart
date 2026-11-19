@@ -12,6 +12,7 @@ import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/app_search_bar.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../application/document_template_controller.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
 import '../widgets/invoice_branding_sheet.dart';
@@ -57,8 +58,13 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(invoicesControllerProvider);
     final orgState = ref.watch(settingsControllerProvider);
-    final invoicePrefix =
+    final tplState = ref.watch(documentTemplateControllerProvider);
+    final orgPrefix =
         orgState is SettingsLoaded ? orgState.organization.invoicePrefix : null;
+    final tplPrefix = tplState.currentInvoiceConfiguration.invoicePrefix;
+    final invoicePrefix = (orgPrefix != null && orgPrefix.trim().isNotEmpty)
+        ? orgPrefix
+        : tplPrefix;
     final loc = context.loc;
     final isSw = Localizations.localeOf(context).languageCode == 'sw';
 

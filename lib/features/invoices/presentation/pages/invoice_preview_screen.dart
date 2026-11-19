@@ -3,9 +3,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pdf/pdf.dart' hide PdfDocument;
 import 'package:pdfx/pdfx.dart';
 import 'package:printing/printing.dart';
+
+import '../../../../app/router.dart';
 
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/responsive_layout_builder.dart';
@@ -232,8 +235,13 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
   String _effectiveDocNumber(BuildContext context) {
     if (widget.initialInvoice != null) {
       final org = ref.watch(settingsControllerProvider);
-      final prefix =
+      final tplConfig =
+          ref.watch(documentTemplateControllerProvider).currentInvoiceConfiguration;
+      final orgPrefix =
           org is SettingsLoaded ? org.organization.invoicePrefix : null;
+      final prefix = (orgPrefix != null && orgPrefix.trim().isNotEmpty)
+          ? orgPrefix
+          : tplConfig.invoicePrefix;
       return widget.initialInvoice!.displayNumber(prefix);
     }
     return widget.documentNumber;
@@ -279,9 +287,28 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         : (isSw ? 'Hakiki ya Delivery' : 'Delivery Note Preview');
     final effectiveNumber = _effectiveDocNumber(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
+    void navigateBack() {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(Routes.invoices);
+      }
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        navigateBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: isSw ? 'Rudi' : 'Back',
+            onPressed: navigateBack,
+          ),
+          title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -338,8 +365,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           },
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ──────────────────────────────────────────────────────────────────────────
   // 1. SMALL SCREENS (< 768px): TabBar Single Pane Switcher
