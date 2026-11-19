@@ -67,10 +67,11 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Pages & Bind Custom Domain
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'f30c28de87437abbe6b487082c163cc0' }}
+          PRIMARY_ZONE_ID: '5437d5518f6a7c86d595e9d77e91d76c'
         run: |
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
             echo "Ensuring Cloudflare Pages project 'jolinx-portal' exists..."
@@ -81,7 +82,52 @@ jobs:
               --project-name=jolinx-portal \
               --branch="${{ steps.env.outputs.cf_branch }}" \
               --commit-dirty=true
+
+            if [ "${{ steps.env.outputs.cf_branch }}" = "staging" ]; then
+              echo "Also syncing staging portal build to main branch of jolinx-portal so custom domains resolve immediately..."
+              npx wrangler pages deploy portal/dist \
+                --project-name=jolinx-portal \
+                --branch="main" \
+                --commit-dirty=true
+            fi
+
+            echo "Attaching custom domains portal-staging.joberthix.xyz and portal.joberthix.xyz to jolinx-portal..."
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/jolinx-portal/domains" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"name": "portal-staging.joberthix.xyz"}' || true
+
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/jolinx-portal/domains" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"name": "portal.joberthix.xyz"}' || true
+
+            echo "Ensuring proxied CNAME DNS records exist in zone joberthix.xyz..."
+            DNS_RES=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/dns_records?per_page=100" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json")
+
+            for SUB in "portal-staging:staging.jolinx-portal.pages.dev" "portal:jolinx-portal.pages.dev"; do
+              SUB_NAME="${SUB%%:*}"
+              SUB_TARGET="${SUB#*:}"
+              FULL_DOMAIN="${SUB_NAME}.joberthix.xyz"
+              EXISTING_ID=$(echo "$DNS_RES" | jq -r --arg d "$FULL_DOMAIN" '.result[]? | select(.name == $d) | .id' | head -n 1)
+              if [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "null" ]; then
+                echo "Updating CNAME $FULL_DOMAIN -> $SUB_TARGET (ID: $EXISTING_ID)..."
+                curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/dns_records/${EXISTING_ID}" \
+                  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"type\":\"CNAME\",\"name\":\"${SUB_NAME}\",\"content\":\"${SUB_TARGET}\",\"ttl\":1,\"proxied\":true}" || true
+              else
+                echo "Creating CNAME $FULL_DOMAIN -> $SUB_TARGET..."
+                curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/dns_records" \
+                  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"type\":\"CNAME\",\"name\":\"${SUB_NAME}\",\"content\":\"${SUB_TARGET}\",\"ttl\":1,\"proxied\":true}" || true
+              fi
+            done
           else
             echo "::error::CLOUDFLARE_API_TOKEN secret is missing. Add it in GitHub repository secrets."
             exit 1
           fi
+
