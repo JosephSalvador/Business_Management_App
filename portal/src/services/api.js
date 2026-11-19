@@ -5,15 +5,27 @@ const STORAGE_KEY_REFRESH_TOKEN = 'jlx_admin_refresh_token';
 const STORAGE_KEY_USER = 'jlx_admin_user';
 const STORAGE_KEY_API_URL = 'jlx_admin_api_url';
 
-const DEFAULT_API_URL =
-  (typeof window !== 'undefined' &&
-    (window.location.hostname.includes('azurecontainerapps.io') ||
-     window.location.hostname === 'api.joberthix.xyz'))
-    ? window.location.origin
-    : (import.meta.env.VITE_API_BASE_URL ||
-       (typeof window !== 'undefined' && window.location.hostname.includes('localhost')
-         ? 'http://localhost:5000'
-         : 'https://jolinx-api-staging.kindsky-ea584b9f.centralindia.azurecontainerapps.io'));
+const resolveDefaultApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.includes('azurecontainerapps.io') || host === 'api.joberthix.xyz') {
+      return window.location.origin;
+    }
+    if (host === 'portal-staging.joberthix.xyz' || host.startsWith('staging.')) {
+      return 'https://jolinx-api-staging.kindsky-ea584b9f.centralindia.azurecontainerapps.io';
+    }
+    if (host === 'portal.joberthix.xyz') {
+      return 'https://api.joberthix.xyz';
+    }
+    if (host.includes('localhost')) {
+      return 'http://localhost:5000';
+    }
+  }
+  return import.meta.env.VITE_API_BASE_URL ||
+    'https://jolinx-api-staging.kindsky-ea584b9f.centralindia.azurecontainerapps.io';
+};
+
+const DEFAULT_API_URL = resolveDefaultApiUrl();
 
 export const getApiBaseUrl = () => {
   return localStorage.getItem(STORAGE_KEY_API_URL) || DEFAULT_API_URL;
