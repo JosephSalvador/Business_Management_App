@@ -572,6 +572,8 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
         var total = await query.CountAsync(cancellationToken);
 
         var sales = await query
+            .AsSplitQuery()
+            .Include(s => s.Payments)
             .OrderByDescending(s => s.SaleDate)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -600,7 +602,12 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
 
     public async Task<OmniSaleDetailDto?> GetTenantSaleDetailAsync(Guid tenantId, Guid saleId, CancellationToken cancellationToken = default)
     {
-        var s = await _db.Sales.AsNoTracking().FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == saleId, cancellationToken);
+        var s = await _db.Sales
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(x => x.Lines)
+            .Include(x => x.Payments)
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == saleId, cancellationToken);
         if (s is null) return null;
 
         var cashier = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == s.CashierId, cancellationToken);
@@ -668,7 +675,11 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
     }
 
     public Task<Sale?> GetSaleByIdAsync(Guid tenantId, Guid saleId, CancellationToken cancellationToken = default)
-        => _db.Sales.FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Id == saleId, cancellationToken);
+        => _db.Sales
+            .AsSplitQuery()
+            .Include(s => s.Lines)
+            .Include(s => s.Payments)
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Id == saleId, cancellationToken);
 
     public async Task VoidSaleAsync(Sale sale, string reason, Guid? operatorUserId, CancellationToken cancellationToken = default)
     {
