@@ -26,7 +26,15 @@ public sealed class InvoiceTemplateRenderService : IDocumentTemplateRenderServic
         Options = new TemplateOptions();
         var strategy = Options.MemberAccessStrategy;
 
-        // Whitelist isolated flat data properties from CustomerInvoiceDto, DeliveryNoteDto, and TenantOrganizationDto
+        // Whitelist isolated flat data properties in both PascalCase and snake_case
+        strategy.Register<CustomerInvoiceDto>();
+        strategy.Register<CustomerInvoiceLineDto>();
+        strategy.Register<DeliveryNoteDto>();
+        strategy.Register<DeliveryNoteItemDto>();
+        strategy.Register<TenantOrganizationDto>();
+        strategy.Register<TemplateThemeContext>();
+
+        strategy.MemberNameStrategy = MemberNameStrategies.SnakeCase;
         strategy.Register<CustomerInvoiceDto>();
         strategy.Register<CustomerInvoiceLineDto>();
         strategy.Register<DeliveryNoteDto>();

@@ -13,6 +13,7 @@ import {
   getTenantInvoicePreview,
   updateTenantInvoiceStatus,
 } from '../services/api';
+import PhoneInvoicePreviewCanvas from './PhoneInvoicePreviewCanvas';
 import {
   Container,
   Button,
@@ -35,8 +36,8 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewMode, setPreviewMode] = useState('a4'); // 'a4' | '80mm'
-  const iframeRef = useRef(null);
+  const [previewLayout, setPreviewLayout] = useState('executive'); // 'executive' | 'ribbon' | '80mm'
+  const printContainerRef = useRef(null);
 
   const fetchInvoices = async () => {
     if (!tenantId) return;
@@ -79,7 +80,14 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
     try {
       const res = await getTenantInvoicePreview(tenantId, inv.id);
       setPreviewData(res);
-      setPreviewMode(res?.isThermal80mm ? '80mm' : 'a4');
+      const tplName = (res?.templateName || '').toLowerCase();
+      if (res?.isThermal80mm || tplName.includes('80mm') || tplName.includes('thermal')) {
+        setPreviewLayout('80mm');
+      } else if (tplName.includes('ribbon') || tplName.includes('minimal')) {
+        setPreviewLayout('executive');
+      } else {
+        setPreviewLayout('executive');
+      }
     } catch (err) {
       onNotification?.(
         `Could not load invoice preview: ${err.message || 'Please try again'}`
@@ -90,10 +98,44 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
   };
 
   const handlePrintPreview = () => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.focus();
-      iframeRef.current.contentWindow.print();
-    }
+    if (!printContainerRef.current) return;
+    const invNum =
+      previewData?.invoice?.number ||
+      previewInvoice?.invoiceNumber ||
+      previewInvoice?.number ||
+      'Invoice';
+
+    const printWin = window.open('', '_blank', 'width=920,height=800');
+    if (!printWin) return;
+
+    const styles = Array.from(
+      document.querySelectorAll('link[rel="stylesheet"], style')
+    )
+      .map((el) => el.outerHTML)
+      .join('\n');
+
+    printWin.document.open();
+    printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Invoice ${invNum}</title>
+  ${styles}
+  <style>
+    @page { margin: 12mm; }
+    body { background: #fff !important; margin: 0; padding: 16px; display: flex; justify-content: center; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  </style>
+</head>
+<body>
+  ${printContainerRef.current.outerHTML}
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 250);
+    };
+  </script>
+</body>
+</html>`);
+    printWin.document.close();
   };
 
   const handleStatusChange = async (invoice, newStatus) => {
@@ -339,6 +381,7 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
           setPreviewData(null);
         }}
         title={`Invoice Preview — ${
+          previewData?.invoice?.number ||
           previewInvoice?.invoiceNumber ||
           previewInvoice?.number ||
           previewInvoice?.id ||
@@ -351,7 +394,7 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
               Rendered using tenant’s saved mobile app settings (template, logo, colors & payment accounts).
             </div>
             <div className="flex items-center gap-2">
-              {previewData?.renderedHtml && (
+              {previewData?.invoice && (
                 <Button
                   variant="primary"
                   icon={Printer}
@@ -377,7 +420,7 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
             <RefreshCw className="w-5 h-5 animate-spin inline mr-2 text-[#0972D3]" />
             Compiling invoice with tenant’s saved phone template & branding...
           </div>
-        ) : previewData ? (
+        ) : previewData?.invoice ? (
           <div className="space-y-3">
             {/* Tenant Phone Settings Metadata Bar */}
             <div className="px-3.5 py-2.5 bg-[#F8F9FA] border border-[#D5DBDB] rounded-[4px] flex flex-wrap items-center justify-between gap-3 text-[12px]">
@@ -399,7 +442,7 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
                 <div>
                   <span className="text-[#5F6B7A] mr-1">Phone Template:</span>
                   <Badge color="blue">
-                    {previewData.templateName || 'Modern Minimalist Invoice'}
+                    {previewData.templateName || 'Executive Corporate Invoice'}
                   </Badge>
                 </div>
                 <div className="inline-flex items-center gap-1.5">
@@ -416,24 +459,35 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
                 </div>
               </div>
 
-              {/* Paper Profile Toggle */}
+              {/* Phone Layout Style Switcher */}
               <div className="inline-flex rounded-[4px] border border-[#879596] overflow-hidden bg-white">
                 <button
                   type="button"
-                  onClick={() => setPreviewMode('a4')}
+                  onClick={() => setPreviewLayout('executive')}
                   className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                    previewMode === 'a4'
+                    previewLayout === 'executive'
                       ? 'bg-[#0972D3] text-white'
                       : 'text-[#16191F] hover:bg-[#F2F3F3]'
                   }`}
                 >
-                  A4 Standard
+                  Executive A4
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPreviewMode('80mm')}
+                  onClick={() => setPreviewLayout('ribbon')}
                   className={`px-2.5 py-1 text-[11px] font-semibold transition-colors border-l border-[#879596] ${
-                    previewMode === '80mm'
+                    previewLayout === 'ribbon'
+                      ? 'bg-[#0972D3] text-white'
+                      : 'text-[#16191F] hover:bg-[#F2F3F3]'
+                  }`}
+                >
+                  Modern Ribbon A4
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewLayout('80mm')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold transition-colors border-l border-[#879596] ${
+                    previewLayout === '80mm'
                       ? 'bg-[#0972D3] text-white'
                       : 'text-[#16191F] hover:bg-[#F2F3F3]'
                   }`}
@@ -443,22 +497,16 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
               </div>
             </div>
 
-            {/* Isolated Document Canvas */}
-            <div className="bg-[#EAEDED] border border-[#D5DBDB] rounded-[4px] p-4 flex justify-center overflow-auto max-h-[70vh]">
-              <div
-                className={`bg-white shadow-md transition-all duration-200 ${
-                  previewMode === '80mm'
-                    ? 'w-[340px] min-h-[480px]'
-                    : 'w-full max-w-[820px] min-h-[680px]'
-                }`}
-              >
-                <iframe
-                  ref={iframeRef}
-                  title="Tenant Invoice Preview"
-                  srcDoc={previewData.renderedHtml}
-                  className="w-full h-[660px] border-0"
-                />
-              </div>
+            {/* Live Phone-Matching Document Canvas */}
+            <div className="bg-[#EAEDED] border border-[#D5DBDB] rounded-[4px] p-5 flex justify-center overflow-auto max-h-[72vh]">
+              <PhoneInvoicePreviewCanvas
+                invoice={previewData.invoice}
+                organization={previewData.organization}
+                themePrimaryHex={previewData.themePrimaryHex}
+                themeSecondaryHex={previewData.themeSecondaryHex}
+                layoutStyle={previewLayout}
+                printContainerRef={printContainerRef}
+              />
             </div>
           </div>
         ) : (
