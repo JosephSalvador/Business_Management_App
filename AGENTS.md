@@ -352,6 +352,6 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Invoice Detail Page Delivery Notes Section (`invoice_detail_page.dart`) — Show existing delivery notes issued for the invoice under the "Toa Waraka wa Usafirishaji" card, with quick view/print launcher.
 - [x] Task 7: Unit Testing & Verification — Update/add unit tests in `test/features/invoices/offline_invoicing_test.dart` and `test/features/invoices/document_template_test.dart` verifying delivery note state, serialization, and preview resilience.
 - [x] Task 8: Version Bump — Bump version code to `1.0.0+91` in `pubspec.yaml` and `app_update_service.dart`.
-- [ ] Task 9: Commit, Push & Remote CI/CD Staging Build — Commit and push to `feature/invoice-delivery`, and trigger GitHub Actions `build-clients.yml` for staging APK release.
+- [x] Task 9: Commit, Push & Remote CI/CD Staging Build — Commit and push to `feature/invoice-delivery`, and trigger GitHub Actions `build-clients.yml` for staging APK release (Run 44487179116 — APK published to `staging-latest`).
 
 
