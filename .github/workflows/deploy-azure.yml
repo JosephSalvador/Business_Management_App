@@ -9,6 +9,7 @@ on:
       - 'feature/**'
     paths:
       - 'backend/**'
+      - 'portal/**'
       - '.github/workflows/deploy-azure.yml'
   workflow_dispatch:
     inputs:

@@ -1,3 +1,10 @@
+FROM node:20-alpine AS portal-build
+WORKDIR /portal
+COPY portal/package*.json ./
+RUN npm install
+COPY portal/ ./
+RUN npm run build
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
@@ -26,6 +33,7 @@ WORKDIR /app
 RUN mkdir -p /app/storage && chmod -R 777 /app/storage
 
 COPY --from=build /app/api /app/api
+COPY --from=portal-build /portal/dist /app/api/wwwroot
 COPY --from=build /app/workers /app/workers
 COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh

@@ -235,6 +235,8 @@ app.UseSerilogRequestLogging(options =>
 app.UseRateLimiter();
 app.UseCors();
 app.UseHttpsRedirection();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseMiddleware<UserContextMiddleware>();
@@ -278,6 +280,29 @@ app.MapTenantProvisioningEndpoints();
 app.MapPlatformAdminEndpoints();
 app.MapAppVersionEndpoints();
 app.MapPublicInvoiceVerificationEndpoints();
+
+app.MapFallback(async context =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+    if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/v/", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+    var indexFile = Path.Combine(webRoot, "index.html");
+    if (File.Exists(indexFile))
+    {
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(indexFile);
+        return;
+    }
+
+    context.Response.StatusCode = StatusCodes.Status404NotFound;
+});
 
 var schemaSelfHealingStatements = new (string sql, string description)[]
 {
