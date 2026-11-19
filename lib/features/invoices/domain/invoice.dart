@@ -254,6 +254,8 @@ class CustomerInvoice {
       );
 
   CustomerInvoice copyWith({
+    String? number,
+    String? invoiceNumber,
     InvoiceStatus? status,
     double? amountPaid,
     double? balanceDue,
@@ -266,7 +268,7 @@ class CustomerInvoice {
   }) =>
       CustomerInvoice(
         id: id,
-        number: number,
+        number: number ?? invoiceNumber ?? this.number,
         documentTitle: documentTitle,
         referenceNumber: referenceNumber,
         paymentTerms: paymentTerms,

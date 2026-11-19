@@ -16,6 +16,7 @@ import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
 import '../widgets/invoice_branding_sheet.dart';
 import '../../../settings/application/settings_controller.dart';
+import '../../../settings/data/organization_providers.dart';
 
 class InvoicesPage extends ConsumerStatefulWidget {
   const InvoicesPage({super.key});

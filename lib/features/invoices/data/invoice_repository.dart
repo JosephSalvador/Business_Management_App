@@ -273,6 +273,7 @@ class InvoiceRepository {
     String? notes,
     String? authorizedSignatoryName,
     String? authorizedSignatoryTitle,
+    String? invoicePrefix,
   }) {
     final clientId = id ?? _uuid.v4();
     final existing = _inFlightCreates[clientId];
@@ -302,6 +303,7 @@ class InvoiceRepository {
       notes: notes,
       authorizedSignatoryName: authorizedSignatoryName,
       authorizedSignatoryTitle: authorizedSignatoryTitle,
+      invoicePrefix: invoicePrefix,
     );
     _inFlightCreates[clientId] = future;
     return future.whenComplete(() => _inFlightCreates.remove(clientId));
