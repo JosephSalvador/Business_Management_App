@@ -93,13 +93,17 @@ public sealed class GetTenantInvoicePreviewAdminQueryHandler
         var html = await _renderService.RenderInvoiceHtmlAsync(
             request.TenantId, invoiceDto, orgDto, cancellationToken);
 
+        var isThermal = template is not null &&
+            (template.Name.Contains("80mm", StringComparison.OrdinalIgnoreCase) ||
+             template.Name.Contains("Thermal", StringComparison.OrdinalIgnoreCase));
+
         return Result<OmniInvoicePreviewDto>.Success(new OmniInvoicePreviewDto(
             Invoice: invoiceDto,
             Organization: orgDto,
             ThemePrimaryHex: config?.ThemePrimaryHex ?? "#0F172A",
             ThemeSecondaryHex: config?.ThemeSecondaryHex ?? "#64748B",
             TemplateName: template?.Name ?? "Modern Minimalist Invoice",
-            IsThermal80mm: template?.IsThermal80mm ?? false,
+            IsThermal80mm: isThermal,
             RenderedHtml: html));
     }
 }
