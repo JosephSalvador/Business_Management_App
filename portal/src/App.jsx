@@ -480,7 +480,104 @@ export default function App() {
   const [newVoucherDays, setNewVoucherDays] = useState(30);
   const [newVoucherPlan, setNewVoucherPlan] = useState('Pro');
   const [newVoucherTarget, setNewVoucherTarget] = useState('');
+  const [voucherTenantSearch, setVoucherTenantSearch] = useState('');
+  const [voucherDropdownOpen, setVoucherDropdownOpen] = useState(false);
+  const [includeTrainingFeeInQuote, setIncludeTrainingFeeInQuote] = useState(true);
   const [lastGeneratedVoucher, setLastGeneratedVoucher] = useState(null);
+  const voucherDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        voucherDropdownRef.current &&
+        !voucherDropdownRef.current.contains(e.target)
+      ) {
+        setVoucherDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const resolveTenantName = (tenantId) => {
+    if (!tenantId) return null;
+    const found = tenants.find(
+      (t) =>
+        (t.tenantId || t.id || '').toLowerCase() ===
+        String(tenantId).toLowerCase()
+    );
+    return found ? found.name : null;
+  };
+
+  const selectedVoucherTenant = tenants.find(
+    (t) => (t.tenantId || t.id) === newVoucherTarget
+  );
+
+  const filteredVoucherTenants = tenants.filter((t) => {
+    if (!voucherTenantSearch.trim()) return true;
+    const q = voucherTenantSearch.toLowerCase();
+    return (
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.ownerEmail || '').toLowerCase().includes(q) ||
+      (t.ownerPhone || '').toLowerCase().includes(q) ||
+      String(t.tenantId || t.id || '')
+        .toLowerCase()
+        .includes(q)
+    );
+  });
+
+  const handleEnsureTrainingPackage = async () => {
+    setCreatingPackage(true);
+    try {
+      const existing = packages.find(
+        (p) =>
+          p.code?.toLowerCase() === 'training-installation' ||
+          p.name?.toLowerCase().includes('training')
+      );
+      if (existing) {
+        await updatePlanAdmin(existing.code, {
+          name: 'Training & Installation (Onboarding)',
+          monthlyPrice: 35000,
+          currency: 'TZS',
+          featureKeys: existing.featureKeys?.length
+            ? existing.featureKeys
+            : ['pos.enabled', 'inventory.enabled'],
+          maxBranches: existing.maxBranches || null,
+          maxUsers: existing.maxUsers || null,
+          maxProducts: existing.maxProducts || null,
+          isPackage: true,
+          isActive: true,
+        });
+        showNotification(
+          'Updated "Training & Installation" package to 35,000 TZS.'
+        );
+      } else {
+        await createPlanAdmin({
+          code: 'training-installation',
+          name: 'Training & Installation (Onboarding)',
+          monthlyPrice: 35000,
+          currency: 'TZS',
+          featureKeys: ['pos.enabled', 'inventory.enabled'],
+          maxBranches: null,
+          maxUsers: null,
+          maxProducts: null,
+          isPackage: true,
+        });
+        showNotification(
+          'Added "Training & Installation (35,000 TZS)" package to catalog.'
+        );
+      }
+      fetchPackages();
+    } catch (err) {
+      showNotification(
+        `Failed to save Training & Installation package: ${
+          err.message || 'Retry'
+        }`
+      );
+    } finally {
+      setCreatingPackage(false);
+    }
+  };
 
   const fetchVouchers = async () => {
     if (!getAuthToken()) return;
@@ -504,13 +601,27 @@ export default function App() {
   };
 
   const handleGenerateVoucher = async () => {
+    if (!newVoucherTarget) {
+      showNotification(
+        'Please select a specific tenant from the searchable dropdown before issuing a voucher.'
+      );
+      setVoucherDropdownOpen(true);
+      return;
+    }
     setGeneratingVoucher(true);
     try {
+      const targetId =
+        newVoucherTarget === '__ANY__' ? null : newVoucherTarget.trim();
+      const targetName =
+        newVoucherTarget === '__ANY__'
+          ? 'Unrestricted (Any tenant)'
+          : resolveTenantName(targetId) || targetId;
+
       const res = await issueVouchersAdmin({
         count: 1,
         valueDays: Number(newVoucherDays),
         planCode: newVoucherPlan,
-        targetTenantId: newVoucherTarget?.trim() || null,
+        targetTenantId: targetId,
       });
 
       const generatedCode = Array.isArray(res)
@@ -522,11 +633,13 @@ export default function App() {
           valueDays: Number(newVoucherDays),
           status: 'Issued',
           planCode: newVoucherPlan,
-          targetTenant: newVoucherTarget?.trim() || 'Unrestricted (Any tenant)',
+          targetTenantId: targetId,
+          targetTenant: targetName,
+          includeTrainingFee: includeTrainingFeeInQuote,
           createdAt: new Date().toISOString(),
         };
         setLastGeneratedVoucher(newVoucher);
-        showNotification(`Issued voucher ${generatedCode}.`);
+        showNotification(`Issued voucher ${generatedCode} for ${targetName}.`);
         fetchVouchers();
       } else {
         showNotification('Voucher issued on server.');
@@ -540,13 +653,33 @@ export default function App() {
   };
 
   const handleCopyWhatsAppMessage = (voucher) => {
+    const tenantLabel =
+      resolveTenantName(voucher.targetTenantId) ||
+      (voucher.targetTenant &&
+      voucher.targetTenant !== 'Unrestricted (Any tenant)'
+        ? voucher.targetTenant
+        : null);
+    const planObj = packages.find((p) => p.code === voucher.planCode);
+    const planPrice = Number(planObj?.monthlyPrice || 0);
+    const trainingLine =
+      voucher.includeTrainingFee ?? includeTrainingFeeInQuote
+        ? `\nTraining & Installation: *35,000 TZS*` +
+          (planPrice > 0
+            ? `\nTotal Package: *${(planPrice + 35000).toLocaleString()} TZS*`
+            : '')
+        : '';
+
     const msg =
-      `Hello! Your Jolinx Business OS subscription voucher is ready.\n\n` +
+      `Hello${tenantLabel ? ` *${tenantLabel}*` : ''}! Your Jolinx Business OS subscription voucher is ready.\n\n` +
       `Voucher Code: *${voucher.code}*\n` +
-      `Duration: *${voucher.valueDays} days (${voucher.planCode || 'Pro'})*\n\n` +
-      `Open the Jolinx app and enter this code under Billing & Subscription to activate your workspace immediately.`;
+      `Duration: *${voucher.valueDays} days (${voucher.planCode || 'Pro'})*` +
+      (planPrice > 0
+        ? `\nSubscription: *${planPrice.toLocaleString()} TZS*`
+        : '') +
+      trainingLine +
+      `\n\nOpen the Jolinx app and enter this code under Billing & Subscription to activate your workspace immediately.`;
     navigator.clipboard.writeText(msg);
-    showNotification('Copied voucher message to clipboard.');
+    showNotification('Copied voucher WhatsApp message to clipboard.');
   };
 
   // ── Payment Accounts State (Live Database Data) ───────────────────
@@ -1527,7 +1660,7 @@ export default function App() {
               <PageHeader
                 title="Plans & modular packages"
                 count={packages.length}
-                subtitle="Configure subscription tiers, monthly pricing, resource quotas, and feature flags. Changes propagate to client apps immediately."
+                subtitle="Configure subscription tiers, monthly pricing, resource quotas, feature flags, and the 35,000 TZS Training & Installation package."
                 actions={
                   <>
                     <Button
@@ -1536,6 +1669,13 @@ export default function App() {
                       onClick={fetchPackages}
                     >
                       Refresh
+                    </Button>
+                    <Button
+                      icon={Plus}
+                      loading={creatingPackage}
+                      onClick={handleEnsureTrainingPackage}
+                    >
+                      Add / Sync 35,000 TZS Training & Installation
                     </Button>
                     <Button
                       variant="primary"
@@ -1574,7 +1714,10 @@ export default function App() {
                         <th className="py-2.5 px-4">Plan code</th>
                         <th className="py-2.5 px-4">Display name</th>
                         <th className="py-2.5 px-4">Type</th>
-                        <th className="py-2.5 px-4 text-right">Monthly price</th>
+                        <th className="py-2.5 px-4 text-right">Monthly / Package price</th>
+                        <th className="py-2.5 px-4">
+                          With Training & Installation (+35,000)
+                        </th>
                         <th className="py-2.5 px-4">Enabled features</th>
                         <th className="py-2.5 px-4">Status</th>
                         <th className="py-2.5 px-4 text-right">Actions</th>
@@ -1584,7 +1727,7 @@ export default function App() {
                       {packagesLoading ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             className="py-10 text-center text-[#5F6B7A]"
                           >
                             <RefreshCw className="w-4 h-4 animate-spin inline mr-2 text-[#0972D3]" />
@@ -1594,7 +1737,7 @@ export default function App() {
                       ) : packages.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             className="py-10 text-center text-[#5F6B7A]"
                           >
                             No subscription plans configured yet. Click "Create plan" to add one.
@@ -1603,6 +1746,10 @@ export default function App() {
                       ) : (
                         packages.map((pkg) => {
                           const featureKeys = pkg.featureKeys || [];
+                          const basePrice = Number(pkg.monthlyPrice || 0);
+                          const isTrainingPkg =
+                            pkg.code?.toLowerCase() === 'training-installation' ||
+                            pkg.name?.toLowerCase().includes('training');
                           return (
                             <tr
                               key={pkg.code}
@@ -1620,8 +1767,15 @@ export default function App() {
                                 </Badge>
                               </td>
                               <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-[#16191F]">
-                                {Number(pkg.monthlyPrice || 0).toLocaleString()}{' '}
+                                {basePrice.toLocaleString()}{' '}
                                 {pkg.currency || 'TZS'}
+                              </td>
+                              <td className="py-2.5 px-4 tabular-nums text-[12px] text-[#037F0C] font-semibold">
+                                {isTrainingPkg
+                                  ? '35,000 TZS (One-time setup)'
+                                  : `${(basePrice + 35000).toLocaleString()} ${
+                                      pkg.currency || 'TZS'
+                                    } (1st month + setup)`}
                               </td>
                               <td className="py-2.5 px-4">
                                 <div className="flex flex-wrap gap-1 max-w-md">
@@ -1672,7 +1826,7 @@ export default function App() {
               <PageHeader
                 title="Subscription vouchers"
                 count={vouchers.length}
-                subtitle="Generate CSPRNG Luhn-32 validated prepaid activation codes and inspect redemption history."
+                subtitle="Generate CSPRNG Luhn-32 validated prepaid activation codes locked to a specific tenant and inspect redemption history."
                 actions={
                   <Button
                     icon={RefreshCw}
@@ -1685,11 +1839,124 @@ export default function App() {
               />
 
               <Container
-                title="Issue new voucher"
-                description="Codes are cryptographically generated and stored on the server."
+                title="Issue new voucher for a tenant"
+                description="Search and choose the specific tenant who will redeem this voucher."
               >
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  {/* Searchable Tenant Dropdown */}
+                  <div className="sm:col-span-5 relative" ref={voucherDropdownRef}>
+                    <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+                      Select specific tenant <span className="text-[#D91515]">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setVoucherDropdownOpen((o) => !o)}
+                      className="w-full px-3 py-1.5 text-left text-[13px] border border-[#879596] rounded-[4px] bg-white hover:border-[#0972D3] focus:outline-none focus:border-[#0972D3] flex items-center justify-between gap-2"
+                    >
+                      <span className="truncate">
+                        {selectedVoucherTenant ? (
+                          <span>
+                            <strong className="text-[#16191F]">
+                              {selectedVoucherTenant.name}
+                            </strong>{' '}
+                            <span className="text-[#5F6B7A] text-[11px]">
+                              ({selectedVoucherTenant.ownerEmail ||
+                                selectedVoucherTenant.ownerPhone ||
+                                (
+                                  selectedVoucherTenant.tenantId ||
+                                  selectedVoucherTenant.id ||
+                                  ''
+                                ).slice(0, 8)})
+                            </span>
+                          </span>
+                        ) : newVoucherTarget === '__ANY__' ? (
+                          <span className="text-[#5F6B7A]">
+                            Unrestricted — Any tenant
+                          </span>
+                        ) : (
+                          <span className="text-[#5F6B7A]">
+                            Search and select a tenant...
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[11px] text-[#5F6B7A] shrink-0">
+                        ▾
+                      </span>
+                    </button>
+
+                    {voucherDropdownOpen && (
+                      <div className="absolute z-40 mt-1 w-full bg-white border border-[#879596] rounded-[4px] shadow-xl max-h-72 flex flex-col">
+                        <div className="p-2 border-b border-[#E9EBED] bg-[#FAFAFA]">
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-[#5F6B7A] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Type tenant name, email, or phone..."
+                              value={voucherTenantSearch}
+                              onChange={(e) =>
+                                setVoucherTenantSearch(e.target.value)
+                              }
+                              className="w-full pl-8 pr-2.5 py-1 text-[12px] border border-[#879596] rounded-[4px] bg-white focus:outline-none focus:border-[#0972D3]"
+                            />
+                          </div>
+                        </div>
+                        <div className="overflow-y-auto divide-y divide-[#F2F3F3]">
+                          {filteredVoucherTenants.length === 0 ? (
+                            <div className="py-4 px-3 text-center text-[12px] text-[#5F6B7A]">
+                              No matching tenants found for "{voucherTenantSearch}".
+                            </div>
+                          ) : (
+                            filteredVoucherTenants.map((t) => {
+                              const tId = t.tenantId || t.id;
+                              const isSelected = newVoucherTarget === tId;
+                              return (
+                                <button
+                                  key={tId}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewVoucherTarget(tId);
+                                    setVoucherDropdownOpen(false);
+                                  }}
+                                  className={`w-full px-3 py-2 text-left text-[12px] hover:bg-[#F1F8FF] flex items-center justify-between gap-2 ${
+                                    isSelected ? 'bg-[#F1F8FF] font-semibold' : ''
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#16191F] truncate">
+                                      {t.name}
+                                    </div>
+                                    <div className="text-[11px] text-[#5F6B7A] truncate">
+                                      {t.ownerEmail || t.ownerPhone || tId}
+                                    </div>
+                                  </div>
+                                  <Badge
+                                    color={
+                                      t.status === 'Active' ? 'green' : 'amber'
+                                    }
+                                  >
+                                    {t.planCode || t.status || 'Trial'}
+                                  </Badge>
+                                </button>
+                              );
+                            })
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewVoucherTarget('__ANY__');
+                              setVoucherDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-[11px] text-[#5F6B7A] hover:bg-[#F2F3F3] bg-[#FAFAFA]"
+                          >
+                            Allow any tenant (Unrestricted voucher)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="sm:col-span-2">
                     <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
                       Validity duration
                     </label>
@@ -1705,7 +1972,7 @@ export default function App() {
                     </select>
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-3">
                     <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
                       Target plan
                     </label>
@@ -1734,20 +2001,7 @@ export default function App() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
-                      Restrict to tenant ID (optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Leave blank for any tenant"
-                      value={newVoucherTarget}
-                      onChange={(e) => setNewVoucherTarget(e.target.value)}
-                      className="w-full px-3 py-1.5 text-[13px] font-mono border border-[#879596] rounded-[4px]"
-                    />
-                  </div>
-
-                  <div>
+                  <div className="sm:col-span-2">
                     <Button
                       variant="primary"
                       loading={generatingVoucher}
@@ -1757,6 +2011,28 @@ export default function App() {
                       Issue voucher
                     </Button>
                   </div>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-[#F2F3F3] flex items-center justify-between flex-wrap gap-2">
+                  <label className="inline-flex items-center gap-2 text-[12px] text-[#16191F] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeTrainingFeeInQuote}
+                      onChange={(e) =>
+                        setIncludeTrainingFeeInQuote(e.target.checked)
+                      }
+                      className="text-[#0972D3]"
+                    />
+                    <span>
+                      Include <strong>35,000 TZS Training & Installation</strong>{' '}
+                      in WhatsApp voucher message
+                    </span>
+                  </label>
+                  {selectedVoucherTenant && (
+                    <span className="text-[12px] text-[#037F0C] font-medium">
+                      Locked exclusively to: {selectedVoucherTenant.name}
+                    </span>
+                  )}
                 </div>
 
                 {lastGeneratedVoucher && (
@@ -1770,8 +2046,10 @@ export default function App() {
                       </div>
                       <div className="text-[12px] text-[#5F6B7A]">
                         {lastGeneratedVoucher.valueDays} days · Plan:{' '}
-                        {lastGeneratedVoucher.planCode} · Target:{' '}
-                        {lastGeneratedVoucher.targetTenant}
+                        {lastGeneratedVoucher.planCode} · Tenant:{' '}
+                        <strong className="text-[#16191F]">
+                          {lastGeneratedVoucher.targetTenant}
+                        </strong>
                       </div>
                     </div>
                     <Button
@@ -1812,7 +2090,7 @@ export default function App() {
                         <th className="py-2.5 px-4">Voucher code</th>
                         <th className="py-2.5 px-4">Plan</th>
                         <th className="py-2.5 px-4 text-right">Value (days)</th>
-                        <th className="py-2.5 px-4">Target / Redeemed by</th>
+                        <th className="py-2.5 px-4">Assigned tenant / Redeemed by</th>
                         <th className="py-2.5 px-4">Created at</th>
                         <th className="py-2.5 px-4">Status</th>
                         <th className="py-2.5 px-4 text-right">Actions</th>
@@ -1844,6 +2122,12 @@ export default function App() {
                             v.status === 'Issued' || v.status === 0;
                           const isRedeemed =
                             v.status === 'Redeemed' || v.status === 1;
+                          const redeemedName = resolveTenantName(
+                            v.redeemedByTenantId
+                          );
+                          const targetName = resolveTenantName(
+                            v.targetTenantId
+                          );
                           return (
                             <tr
                               key={v.id || v.code}
@@ -1860,15 +2144,28 @@ export default function App() {
                               <td className="py-2 px-4 text-right tabular-nums font-medium">
                                 {v.valueDays}d
                               </td>
-                              <td className="py-2 px-4 font-mono text-[12px] text-[#5F6B7A]">
-                                {v.redeemedByTenantId
-                                  ? `Redeemed: ${v.redeemedByTenantId.slice(
-                                      0,
-                                      8
-                                    )}...`
-                                  : v.targetTenantId
-                                  ? `Locked: ${v.targetTenantId.slice(0, 8)}...`
-                                  : 'Unrestricted'}
+                              <td className="py-2 px-4 text-[12px] text-[#16191F]">
+                                {v.redeemedByTenantId ? (
+                                  <span>
+                                    <span className="text-[#037F0C] font-semibold">
+                                      Redeemed:
+                                    </span>{' '}
+                                    {redeemedName ||
+                                      `${v.redeemedByTenantId.slice(0, 8)}...`}
+                                  </span>
+                                ) : v.targetTenantId ? (
+                                  <span>
+                                    <span className="text-[#0972D3] font-semibold">
+                                      Tenant:
+                                    </span>{' '}
+                                    {targetName ||
+                                      `${v.targetTenantId.slice(0, 8)}...`}
+                                  </span>
+                                ) : (
+                                  <span className="text-[#5F6B7A]">
+                                    Unrestricted
+                                  </span>
+                                )}
                               </td>
                               <td className="py-2 px-4 text-[#5F6B7A]">
                                 {v.createdAt
@@ -2179,7 +2476,7 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
-                  Monthly price (TZS)
+                  Monthly / Package price (TZS)
                 </label>
                 <input
                   type="number"
@@ -2192,6 +2489,33 @@ export default function App() {
                   }
                   className="w-full px-3 py-1.5 text-[13px] tabular-nums border border-[#879596] rounded-[4px]"
                 />
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingPackage({
+                        ...editingPackage,
+                        monthlyPrice:
+                          Number(editingPackage.monthlyPrice || 0) + 35000,
+                      })
+                    }
+                    className="px-2 py-0.5 text-[11px] font-semibold rounded-[4px] bg-[#F1F8FF] text-[#0972D3] border border-[#99CBE4] hover:bg-[#E1F0FF]"
+                  >
+                    + Add 35,000 TZS (Training & Installation)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingPackage({
+                        ...editingPackage,
+                        monthlyPrice: 35000,
+                      })
+                    }
+                    className="px-2 py-0.5 text-[11px] font-medium rounded-[4px] bg-[#F2F3F3] text-[#16191F] border border-[#D5DBDB] hover:bg-[#E9EBED]"
+                  >
+                    Set to 35,000 TZS
+                  </button>
+                </div>
               </div>
             </div>
 
