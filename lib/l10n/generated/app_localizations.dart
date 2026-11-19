@@ -5956,6 +5956,12 @@ abstract class AppLocalizations {
   String get deliveryNoteConfirmCreate;
   String get deliveryNoteSuccess;
   String get deliveryNoteQuantity;
+  String get invoicePrefix;
+  String get invoicePrefixHint;
+  String get invoicePrefixSubtitle;
+  String get invoicePrefixStandard;
+  String get invoicePrefixCustomer;
+  String get invoicePrefixCustom;
 }
 
 class _AppLocalizationsDelegate

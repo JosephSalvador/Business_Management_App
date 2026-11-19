@@ -1226,5 +1226,11 @@
   "deliveryNoteItemsToDeliver": "Items to Deliver",
   "deliveryNoteConfirmCreate": "Generate & Print Delivery Note",
   "deliveryNoteSuccess": "Delivery Note generated successfully",
-  "deliveryNoteQuantity": "Qty"
+  "deliveryNoteQuantity": "Qty",
+  "invoicePrefix": "Invoice Number Prefix",
+  "invoicePrefixHint": "e.g. INV or your business code",
+  "invoicePrefixSubtitle": "Customize the prefix code before invoice numbers (e.g. INV-2026-0001)",
+  "invoicePrefixStandard": "Standard (INV)",
+  "invoicePrefixCustomer": "Customer Invoice (CINV)",
+  "invoicePrefixCustom": "Custom Code"
 }

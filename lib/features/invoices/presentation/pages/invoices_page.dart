@@ -15,6 +15,7 @@ import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
 import '../widgets/invoice_branding_sheet.dart';
+import '../../../settings/application/settings_controller.dart';
 
 class InvoicesPage extends ConsumerStatefulWidget {
   const InvoicesPage({super.key});
@@ -54,6 +55,9 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(invoicesControllerProvider);
+    final orgState = ref.watch(settingsControllerProvider);
+    final invoicePrefix =
+        orgState is SettingsLoaded ? orgState.organization.invoicePrefix : null;
     final loc = context.loc;
     final isSw = Localizations.localeOf(context).languageCode == 'sw';
 
@@ -96,14 +100,15 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               ),
             ),
             _StatusFilters(state: state),
-            Expanded(child: _buildBody(state, isSw)),
+            Expanded(child: _buildBody(state, isSw, invoicePrefix)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody(InvoicesState state, bool isSwahili) {
+  Widget _buildBody(
+      InvoicesState state, bool isSwahili, String? invoicePrefix) {
     final loc = context.loc;
     return switch (state) {
       InvoicesLoading() => const Center(child: CircularProgressIndicator()),
@@ -117,11 +122,13 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
           final filtered = _filter.isEmpty
               ? items
               : items.where((inv) {
-                  final num = inv.number.toLowerCase();
+                  final num = inv.displayNumber(invoicePrefix).toLowerCase();
+                  final origNum = inv.number.toLowerCase();
                   final name = (inv.customerName ?? '').toLowerCase();
                   final refNo = (inv.referenceNumber ?? '').toLowerCase();
                   final amount = inv.totalAmount.toString();
                   return num.contains(_filter) ||
+                      origNum.contains(_filter) ||
                       name.contains(_filter) ||
                       refNo.contains(_filter) ||
                       amount.contains(_filter);
@@ -173,6 +180,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                 return _InvoiceTile(
                   invoice: filtered[index - 1],
                   isSwahili: isSwahili,
+                  invoicePrefix: invoicePrefix,
                 );
               },
             ),
@@ -353,10 +361,12 @@ class _InvoiceTile extends StatelessWidget {
   const _InvoiceTile({
     required this.invoice,
     required this.isSwahili,
+    this.invoicePrefix,
   });
 
   final CustomerInvoiceSummary invoice;
   final bool isSwahili;
+  final String? invoicePrefix;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +414,7 @@ class _InvoiceTile extends StatelessWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      invoice.number,
+                      invoice.displayNumber(invoicePrefix),
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,

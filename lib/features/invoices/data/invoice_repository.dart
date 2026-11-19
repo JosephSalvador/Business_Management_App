@@ -332,6 +332,7 @@ class InvoiceRepository {
     String? notes,
     String? authorizedSignatoryName,
     String? authorizedSignatoryTitle,
+    String? invoicePrefix,
   }) async {
     final now = DateTime.now();
     final issued = issueDate ?? now;
@@ -381,8 +382,11 @@ class InvoiceRepository {
         ? InvoiceStatus.paid
         : (paid > 0 ? InvoiceStatus.partiallyPaid : InvoiceStatus.unpaid);
 
+    final prefix = (invoicePrefix != null && invoicePrefix.trim().isNotEmpty)
+        ? invoicePrefix.trim().toUpperCase()
+        : 'INV';
     final localNumberSeq =
-        'CINV-${issued.year}${issued.month.toString().padLeft(2, '0')}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+        '$prefix-${issued.year}${issued.month.toString().padLeft(2, '0')}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
 
     // 1. Immediately instantiate local invoice stamped with isSynced = false
     final localInvoice = CustomerInvoice(

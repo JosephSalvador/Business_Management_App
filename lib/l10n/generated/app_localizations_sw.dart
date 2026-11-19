@@ -3203,4 +3203,23 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get deliveryNoteQuantity => 'Idadi';
+
+  @override
+  String get invoicePrefix => 'Kiambishi cha Namba ya Ankara';
+
+  @override
+  String get invoicePrefixHint => 'mf. INV au herufi za biashara yako';
+
+  @override
+  String get invoicePrefixSubtitle =>
+      'Badilisha herufi zinazotangulia namba ya ankara (mf. INV-2026-0001)';
+
+  @override
+  String get invoicePrefixStandard => 'Kawaida (INV)';
+
+  @override
+  String get invoicePrefixCustomer => 'Ankara ya Mteja (CINV)';
+
+  @override
+  String get invoicePrefixCustom => 'Herufi Maalum';
 }

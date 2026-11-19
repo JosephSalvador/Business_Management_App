@@ -42,16 +42,17 @@ class CustomerInvoicePdfService {
       isSwahili: isSwahili,
       templateConfig: templateConfig,
     );
+    final displayNumber = invoice.displayNumber(organization.invoicePrefix);
     final safeNumber =
-        invoice.invoiceNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+        displayNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
     final docPrefix = invoice.documentTitle
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
     await SharePlus.instance.share(
       ShareParams(
         text:
-            '${invoice.documentTitle} ${invoice.invoiceNumber} - ${organization.name}',
-        subject: '${invoice.documentTitle} ${invoice.invoiceNumber}',
+            '${invoice.documentTitle} $displayNumber - ${organization.name}',
+        subject: '${invoice.documentTitle} $displayNumber',
         files: [
           XFile.fromData(
             bytes,

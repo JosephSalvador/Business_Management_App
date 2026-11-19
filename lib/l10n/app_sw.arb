@@ -1226,5 +1226,11 @@
   "deliveryNoteItemsToDeliver": "Bidhaa za Kusafirisha",
   "deliveryNoteConfirmCreate": "Tengeneza & Chapisha Delivery Note",
   "deliveryNoteSuccess": "Delivery Note imetengenezwa kikamilifu",
-  "deliveryNoteQuantity": "Idadi"
+  "deliveryNoteQuantity": "Idadi",
+  "invoicePrefix": "Kiambishi cha Namba ya Ankara",
+  "invoicePrefixHint": "mf. INV au herufi za biashara yako",
+  "invoicePrefixSubtitle": "Badilisha herufi zinazotangulia namba ya ankara (mf. INV-2026-0001)",
+  "invoicePrefixStandard": "Kawaida (INV)",
+  "invoicePrefixCustomer": "Ankara ya Mteja (CINV)",
+  "invoicePrefixCustom": "Herufi Maalum"
 }

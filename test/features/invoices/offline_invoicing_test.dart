@@ -542,5 +542,108 @@ void main() {
       expect(dnThermalBytes[0], 0x25);
     });
   });
+
+  group('Configurable Invoice Prefix & Retroactive Past Invoices Display', () {
+    test('displayNumber formats past invoices dynamically based on merchant prefix', () {
+      final pastInvoice = CustomerInvoice(
+        id: 'inv-past-1',
+        number: 'CINV-2026-000042',
+        issueDate: DateTime.utc(2026, 11, 1),
+        status: InvoiceStatus.paid,
+        subtotal: 50000,
+        totalAmount: 50000,
+      );
+
+      // When no prefix configured, returns original CINV number
+      expect(pastInvoice.displayNumber(null), 'CINV-2026-000042');
+      expect(pastInvoice.displayNumber(''), 'CINV-2026-000042');
+
+      // Standard INV prefix replaces CINV
+      expect(pastInvoice.displayNumber('INV'), 'INV-2026-000042');
+
+      // Custom business initial prefix replaces CINV retroactively
+      expect(pastInvoice.displayNumber('ABC'), 'ABC-2026-000042');
+      expect(pastInvoice.displayNumber('KTL'), 'KTL-2026-000042');
+      expect(pastInvoice.displayNumber('ktl'), 'KTL-2026-000042');
+
+      // Works identically on summary model
+      final summary = pastInvoice.toSummary();
+      expect(summary.displayNumber('INV'), 'INV-2026-000042');
+      expect(summary.displayNumber('ABC'), 'ABC-2026-000042');
+
+      // Works if original number started with INV-
+      final invInvoice = pastInvoice.copyWith(number: 'INV-202611-0005');
+      expect(invInvoice.displayNumber('KTL'), 'KTL-202611-0005');
+      expect(invInvoice.displayNumber('CINV'), 'CINV-202611-0005');
+    });
+
+    test('Organization serializes and deserializes invoicePrefix correctly', () {
+      const defaultOrg = Organization(name: 'Default Org');
+      expect(defaultOrg.invoicePrefix, isNull);
+      expect(defaultOrg.effectiveInvoicePrefix, 'INV');
+
+      const customOrg = Organization(
+        name: 'Custom Prefix Org',
+        invoicePrefix: 'KTL',
+      );
+      expect(customOrg.invoicePrefix, 'KTL');
+      expect(customOrg.effectiveInvoicePrefix, 'KTL');
+
+      final json = customOrg.toJson();
+      expect(json['invoicePrefix'], 'KTL');
+
+      final restored = Organization.fromJson(json);
+      expect(restored.invoicePrefix, 'KTL');
+      expect(restored.effectiveInvoicePrefix, 'KTL');
+
+      final updated = restored.copyWith(invoicePrefix: 'BIZ');
+      expect(updated.invoicePrefix, 'BIZ');
+      expect(updated.effectiveInvoicePrefix, 'BIZ');
+    });
+
+    test('LocalPdfDocumentGenerator renders with custom invoicePrefix in A4 and 80mm', () async {
+      final generator = LocalPdfDocumentGenerator();
+      final invoice = CustomerInvoice(
+        id: 'inv-pdf-1',
+        number: 'CINV-2026-000099',
+        issueDate: DateTime.utc(2026, 11, 19, 12, 0),
+        status: InvoiceStatus.unpaid,
+        subtotal: 100000,
+        totalAmount: 100000,
+        customerName: 'Mega Wholesaler Ltd',
+        lines: const [
+          InvoiceLine(
+            id: 'line-1',
+            description: 'Printing Paper A4 Ream',
+            quantity: 10,
+            unitPrice: 10000,
+            lineTotal: 100000,
+            taxAmount: 0,
+          ),
+        ],
+      );
+
+      const customOrg = Organization(
+        name: 'Kilimanjaro Traders',
+        invoicePrefix: 'KTL',
+      );
+
+      final a4Bytes = await generator.generateInvoiceA4(
+        invoice: invoice,
+        organization: customOrg,
+        isSwahili: true,
+      );
+      expect(a4Bytes, isNotEmpty);
+      expect(a4Bytes.sublist(0, 4), [0x25, 0x50, 0x44, 0x46]); // %PDF
+
+      final thermalBytes = await generator.generateInvoiceThermal80mm(
+        invoice: invoice,
+        organization: customOrg,
+        isSwahili: false,
+      );
+      expect(thermalBytes, isNotEmpty);
+      expect(thermalBytes.sublist(0, 4), [0x25, 0x50, 0x44, 0x46]);
+    });
+  });
 }
 

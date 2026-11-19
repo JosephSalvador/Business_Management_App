@@ -10,6 +10,7 @@ import 'package:printing/printing.dart';
 import '../../../../shared/design_system/app_colors.dart';
 import '../../../../shared/widgets/responsive_layout_builder.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../application/document_template_controller.dart';
@@ -228,6 +229,16 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     }
   }
 
+  String _effectiveDocNumber(BuildContext context) {
+    if (widget.initialInvoice != null) {
+      final org = ref.watch(settingsControllerProvider);
+      final prefix =
+          org is SettingsLoaded ? org.organization.invoicePrefix : null;
+      return widget.initialInvoice!.displayNumber(prefix);
+    }
+    return widget.documentNumber;
+  }
+
   Future<void> _spoolToHardwarePrinter() async {
     final bytes = _rawPdfBytes;
     if (bytes == null || bytes.isEmpty || _isPrinting) return;
@@ -238,8 +249,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       // Hardware POS Terminal Print Spooling:
       // Direct raw binary byte binding without HTML conversions.
       // If Thermal Receipt (80mm) profile is active, hardcodes PdfPageFormat.roll80.
+      final docNum = _effectiveDocNumber(context);
       await Printing.layoutPdf(
-        name: '${widget.documentType.name}-${widget.documentNumber}',
+        name: '${widget.documentType.name}-$docNum',
         format: _isThermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
         onLayout: (PdfPageFormat format) async => bytes,
       );
@@ -265,6 +277,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     final docTitle = widget.documentType == DocumentType.invoice
         ? (isSw ? 'Hakiki ya Ankara' : 'Customer Invoice Preview')
         : (isSw ? 'Hakiki ya Delivery' : 'Delivery Note Preview');
+    final effectiveNumber = _effectiveDocNumber(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -279,9 +292,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                 fontWeight: FontWeight.w700,
               ),
             ),
-            if (widget.documentNumber.isNotEmpty)
+            if (effectiveNumber.isNotEmpty)
               Text(
-                widget.documentNumber,
+                effectiveNumber,
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 11,
@@ -305,7 +318,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                     await Printing.sharePdf(
                       bytes: _rawPdfBytes!,
                       filename:
-                          '${widget.documentType.name}-${widget.documentNumber}.pdf',
+                          '${widget.documentType.name}-$effectiveNumber.pdf',
                     );
                   },
           ),

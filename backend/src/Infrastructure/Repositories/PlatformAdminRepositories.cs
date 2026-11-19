@@ -606,7 +606,7 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
         var cashier = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == s.CashierId, cancellationToken);
         var tenant = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
         var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == s.BranchId, cancellationToken);
-        var metadata = await _db.ReceiptMetadata.AsNoTracking().FirstOrDefaultAsync(m => m.SaleId == s.Id, cancellationToken);
+        var metadata = await _db.ReceiptMetadataSet.AsNoTracking().FirstOrDefaultAsync(m => m.SaleId == s.Id, cancellationToken);
         var docConfig = await _db.TenantDocumentConfigurations
             .IgnoreQueryFilters()
             .AsNoTracking()

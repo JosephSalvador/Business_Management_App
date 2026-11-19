@@ -1439,6 +1439,10 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       }
     }
 
+    final orgState = ref.read(settingsControllerProvider);
+    final prefix =
+        orgState is SettingsLoaded ? orgState.organization.invoicePrefix : null;
+
     final invoice = await ref.read(invoicesControllerProvider.notifier).create(
           id: _invoiceId,
           lines: drafts,
@@ -1471,6 +1475,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
           paymentInstructions: _paymentInstructionsController.text,
           authorizedSignatoryName: _signatoryNameController.text,
           authorizedSignatoryTitle: _signatoryTitleController.text,
+          invoicePrefix: prefix,
         );
 
     if (!mounted) return;

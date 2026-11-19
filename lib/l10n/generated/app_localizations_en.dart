@@ -3193,4 +3193,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deliveryNoteQuantity => 'Qty';
+
+  @override
+  String get invoicePrefix => 'Invoice Number Prefix';
+
+  @override
+  String get invoicePrefixHint => 'e.g. INV or your business code';
+
+  @override
+  String get invoicePrefixSubtitle =>
+      'Customize the prefix code before invoice numbers (e.g. INV-2026-0001)';
+
+  @override
+  String get invoicePrefixStandard => 'Standard (INV)';
+
+  @override
+  String get invoicePrefixCustomer => 'Customer Invoice (CINV)';
+
+  @override
+  String get invoicePrefixCustom => 'Custom Code';
 }

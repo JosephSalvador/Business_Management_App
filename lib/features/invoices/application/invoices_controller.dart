@@ -140,6 +140,7 @@ class InvoicesController extends Notifier<InvoicesState> {
     String? notes,
     String? authorizedSignatoryName,
     String? authorizedSignatoryTitle,
+    String? invoicePrefix,
   }) async {
     try {
       final invoice = await _repository.create(
@@ -167,6 +168,7 @@ class InvoicesController extends Notifier<InvoicesState> {
         notes: notes,
         authorizedSignatoryName: authorizedSignatoryName,
         authorizedSignatoryTitle: authorizedSignatoryTitle,
+        invoicePrefix: invoicePrefix,
       );
       await load();
       return invoice;

@@ -139,8 +139,11 @@ class Organization {
     this.invoiceTerms,
     this.authorizedSignatoryName,
     this.authorizedSignatoryTitle,
+    this.invoicePrefix,
     this.paymentAccounts = const [],
   });
+
+  static const String defaultInvoicePrefix = 'INV';
 
   final String? name;
   final String? address;
@@ -163,7 +166,13 @@ class Organization {
   final String? invoiceTerms;
   final String? authorizedSignatoryName;
   final String? authorizedSignatoryTitle;
+  final String? invoicePrefix;
   final List<PaymentAccount> paymentAccounts;
+
+  String get effectiveInvoicePrefix =>
+      (invoicePrefix != null && invoicePrefix!.trim().isNotEmpty)
+          ? invoicePrefix!.trim().toUpperCase()
+          : defaultInvoicePrefix;
 
   bool get hasLogo => logoBase64 != null && logoBase64!.trim().isNotEmpty;
   bool get hasSignature =>
@@ -232,6 +241,7 @@ class Organization {
       'invoiceTerms': invoiceTerms,
       'authorizedSignatoryName': authorizedSignatoryName,
       'authorizedSignatoryTitle': authorizedSignatoryTitle,
+      'invoicePrefix': invoicePrefix,
       'paymentAccounts': paymentAccounts.map((a) => a.toJson()).toList(),
       'paymentAccountsJson': jsonEncode(paymentAccounts.map((a) => a.toJson()).toList()),
     };
@@ -317,6 +327,7 @@ class Organization {
       invoiceTerms: json['invoiceTerms'] as String?,
       authorizedSignatoryName: json['authorizedSignatoryName'] as String?,
       authorizedSignatoryTitle: json['authorizedSignatoryTitle'] as String?,
+      invoicePrefix: json['invoicePrefix'] as String?,
       paymentAccounts: accounts,
     );
   }
@@ -343,6 +354,7 @@ class Organization {
     String? invoiceTerms,
     String? authorizedSignatoryName,
     String? authorizedSignatoryTitle,
+    String? invoicePrefix,
     List<PaymentAccount>? paymentAccounts,
   }) =>
       Organization(
@@ -372,6 +384,7 @@ class Organization {
             authorizedSignatoryName ?? this.authorizedSignatoryName,
         authorizedSignatoryTitle:
             authorizedSignatoryTitle ?? this.authorizedSignatoryTitle,
+        invoicePrefix: invoicePrefix ?? this.invoicePrefix,
         paymentAccounts: paymentAccounts ?? this.paymentAccounts,
       );
 }

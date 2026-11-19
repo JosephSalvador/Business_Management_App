@@ -325,4 +325,13 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 6: Version Bump — Bump client version code to `1.0.0+88` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 7: Verification & Testing — Added Delivery Note unit tests in `test/features/invoices/offline_invoicing_test.dart`, commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml`.
 
+## Implementation Plan — Configurable Invoice Prefix & Retroactive Past Invoices Display (Build 89)
+- [x] Task 1: Domain & Organization Model Extension — Add `invoicePrefix` to `Organization`, and add `displayNumber([String? customPrefix])` to `CustomerInvoice` & `CustomerInvoiceSummary` with smart retroactive prefix resolution.
+- [x] Task 2: UI Configuration in Invoice Branding Sheet & Settings — Add Invoice Prefix selector (`INV`, `CINV`, Custom) to `InvoiceBrandingSheet` and `SettingsPage`.
+- [x] Task 3: Retroactive Invoice Number Display Across All Screens — Update `InvoicesPage`, `InvoiceDetailPage`, `InvoiceA4PreviewCard`, `LocalPdfDocumentGenerator`, and `InvoicePreviewScreen` to render `invoice.displayNumber(org?.invoicePrefix)`.
+- [x] Task 4: New Invoice Creation & Local Persistence — Update local sequence allocator in `InvoiceRepository.create` to respect `invoicePrefix`.
+- [x] Task 5: Localization — Add Swahili and English translation keys in `app_en.arb`, `app_sw.arb`, and generated localizations.
+- [x] Task 6: Unit Tests — Add comprehensive tests in `test/features/invoices/offline_invoicing_test.dart` for prefix configuration and retroactive formatting.
+- [x] Task 7: Version Bump & Remote Build — Bump version code to `1.0.0+89` in `pubspec.yaml` & `app_update_service.dart`, commit, push to `feature/invoice-delivery`, and trigger remote CI/CD build.
+
 

@@ -149,8 +149,9 @@ class LocalPdfDocumentGenerator {
             ? organization.currency!.trim()
             : 'TZS');
 
+    final invNumber = invoice.displayNumber(organization?.invoicePrefix);
     final document = pw.Document(
-      title: '${invoice.documentTitle} ${invoice.number}',
+      title: '${invoice.documentTitle} $invNumber',
       author: orgName,
       creator: 'Jolinx Business OS',
     );
@@ -230,7 +231,7 @@ class LocalPdfDocumentGenerator {
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     pw.Text(
-                      '$orgName  |  ${invoice.documentTitle} #${invoice.number}',
+                      '$orgName  |  ${invoice.documentTitle} #$invNumber',
                       style: const pw.TextStyle(color: _slate500, fontSize: 8),
                     ),
                     pw.Text(
@@ -357,6 +358,7 @@ class LocalPdfDocumentGenerator {
   }) {
     final isPrimaryLight = primaryColor.luminance > 0.55;
     final ribbonFg = isPrimaryLight ? _defaultPrimary : PdfColors.white;
+    final invNumber = invoice.displayNumber(organization?.invoicePrefix);
 
     return [
       // Top Row: Stacked Logo + Business Name (Left) | "Invoice #2022435" (Right)
@@ -421,7 +423,7 @@ class LocalPdfDocumentGenerator {
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
               pw.Text(
-                'Invoice ${invoice.number}',
+                'Invoice $invNumber',
                 style: const pw.TextStyle(
                   color: _defaultPrimary,
                   fontSize: 16,
@@ -524,7 +526,7 @@ class LocalPdfDocumentGenerator {
                   (invoice.referenceNumber != null &&
                           invoice.referenceNumber!.trim().isNotEmpty)
                       ? invoice.referenceNumber!.trim()
-                      : invoice.number,
+                      : invNumber,
                   isBold: true,
                 ),
               ],
@@ -556,7 +558,7 @@ class LocalPdfDocumentGenerator {
                   ),
                   pw.SizedBox(height: 2),
                   pw.Text(
-                    invoice.number,
+                    invNumber,
                     style: pw.TextStyle(
                       color: ribbonFg,
                       fontSize: 11.5,
@@ -931,6 +933,7 @@ class LocalPdfDocumentGenerator {
     required String signatoryTitle,
     required bool isSwahili,
   }) {
+    final invNumber = invoice.displayNumber(organization?.invoicePrefix);
     return [
       pw.Container(
         padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -947,7 +950,7 @@ class LocalPdfDocumentGenerator {
               ),
             ),
             pw.Text(
-              'NO: ${invoice.number}',
+              'NO: $invNumber',
               style: pw.TextStyle(
                 color: PdfColors.white,
                 fontSize: 11.5,
@@ -1270,6 +1273,7 @@ class LocalPdfDocumentGenerator {
     required bool isSwahili,
     bool omitSellerHeader = false,
   }) {
+    final invNumber = invoice.displayNumber(organization?.invoicePrefix);
     return [
       if (!omitSellerHeader) ...[
         // Header Accent Ribbon
@@ -1415,7 +1419,7 @@ class LocalPdfDocumentGenerator {
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
-                  '#${invoice.number}',
+                  '#$invNumber',
                   style: pw.TextStyle(
                     color: _slate700,
                     fontSize: 11.5,
@@ -1709,8 +1713,8 @@ class LocalPdfDocumentGenerator {
                   pw.SizedBox(height: 4),
                   pw.Text(
                     isSwahili
-                        ? 'Taja namba ya ankara #${invoice.number} unapofanya malipo.'
-                        : 'Please quote Invoice #${invoice.number} when making payment.',
+                        ? 'Taja namba ya ankara #$invNumber unapofanya malipo.'
+                        : 'Please quote Invoice #$invNumber when making payment.',
                     style: pw.TextStyle(
                       color: secondaryColor,
                       fontSize: 8,
@@ -1928,9 +1932,10 @@ class LocalPdfDocumentGenerator {
             ? organization.name!.trim()
             : 'Biashara Yetu';
     final currency = invoice.currency.isNotEmpty ? invoice.currency : 'TZS';
+    final invNumber = invoice.displayNumber(organization?.invoicePrefix);
 
     final document = pw.Document(
-      title: '${invoice.documentTitle} ${invoice.number}',
+      title: '${invoice.documentTitle} $invNumber',
       author: orgName,
       creator: 'Jolinx Business OS',
     );
@@ -1984,7 +1989,7 @@ class LocalPdfDocumentGenerator {
 
             // Document Title & Number
             pw.Text(
-              '${invoice.documentTitle} #${invoice.number}',
+              '${invoice.documentTitle} #$invNumber',
               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
             ),
             pw.Text(

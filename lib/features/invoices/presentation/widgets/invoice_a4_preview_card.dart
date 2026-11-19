@@ -43,6 +43,9 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
   static const Color _slate200 = Color(0xFFE2E8F0);
   static const Color _slate50 = Color(0xFFF8FAFC);
 
+  String get _displayInvoiceNumber =>
+      invoice.displayNumber(organization.invoicePrefix);
+
   Color _parseHex(String? hex, Color fallback) {
     if (hex == null || hex.trim().isEmpty) return fallback;
     final clean = hex.replaceAll('#', '').trim();
@@ -277,7 +280,7 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'Invoice ${invoice.invoiceNumber}',
+                      'Invoice $_displayInvoiceNumber',
                       textAlign: TextAlign.right,
                       style: const TextStyle(
                         fontSize: 17,
@@ -389,7 +392,7 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                       (invoice.referenceNumber != null &&
                               invoice.referenceNumber!.trim().isNotEmpty)
                           ? invoice.referenceNumber!.trim()
-                          : invoice.invoiceNumber,
+                          : _displayInvoiceNumber,
                     ),
                   ],
                 ),
@@ -426,7 +429,7 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          invoice.invoiceNumber,
+                          _displayInvoiceNumber,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
@@ -959,7 +962,7 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  'NO: ${invoice.invoiceNumber}',
+                  'NO: $_displayInvoiceNumber',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -1439,7 +1442,7 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          '#${invoice.invoiceNumber}',
+                          '#$_displayInvoiceNumber',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -1624,7 +1627,7 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '#${invoice.invoiceNumber}',
+                          '#$_displayInvoiceNumber',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -1855,8 +1858,8 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                       const SizedBox(height: 6),
                       Text(
                         isSwahili
-                            ? 'Taja namba ya ankara #${invoice.invoiceNumber} unapofanya malipo.'
-                            : 'Please quote Invoice #${invoice.invoiceNumber} when making payment.',
+                            ? 'Taja namba ya ankara #$_displayInvoiceNumber unapofanya malipo.'
+                            : 'Please quote Invoice #$_displayInvoiceNumber when making payment.',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,

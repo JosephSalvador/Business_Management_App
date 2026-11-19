@@ -205,6 +205,22 @@ class CustomerInvoice {
 
   String get invoiceNumber => number;
 
+  String displayNumber([String? customPrefix]) {
+    if (customPrefix == null || customPrefix.trim().isEmpty) {
+      return number;
+    }
+    final prefix = customPrefix.trim().toUpperCase();
+    final dashIndex = number.indexOf('-');
+    if (dashIndex > 0) {
+      final firstSegment = number.substring(0, dashIndex).toUpperCase();
+      if (firstSegment == prefix) return number;
+      if (firstSegment == 'CINV' || firstSegment == 'INV') {
+        return '$prefix-${number.substring(dashIndex + 1)}';
+      }
+    }
+    return number;
+  }
+
   String get customerLabel =>
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
 
@@ -440,6 +456,22 @@ class CustomerInvoiceSummary {
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
 
   String get invoiceNumber => number;
+
+  String displayNumber([String? customPrefix]) {
+    if (customPrefix == null || customPrefix.trim().isEmpty) {
+      return number;
+    }
+    final prefix = customPrefix.trim().toUpperCase();
+    final dashIndex = number.indexOf('-');
+    if (dashIndex > 0) {
+      final firstSegment = number.substring(0, dashIndex).toUpperCase();
+      if (firstSegment == prefix) return number;
+      if (firstSegment == 'CINV' || firstSegment == 'INV') {
+        return '$prefix-${number.substring(dashIndex + 1)}';
+      }
+    }
+    return number;
+  }
 
   bool get isOverdue {
     final due = dueDate;

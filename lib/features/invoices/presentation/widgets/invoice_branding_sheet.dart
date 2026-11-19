@@ -60,6 +60,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
   late final TextEditingController _signatoryNameController;
   late final TextEditingController _signatoryTitleController;
   late final TextEditingController _monogramInitialsController;
+  late final TextEditingController _customPrefixController;
 
   String? _logoBase64;
   String? _signatureBase64;
@@ -67,6 +68,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
   bool _hideHeaderForPrePrinted = false;
   double _prePrintedTopMarginMm = 45.0;
   List<PaymentAccount> _paymentAccounts = [];
+  String _selectedPrefix = 'INV';
 
   InvoiceLayoutStyle _selectedLayoutStyle = InvoiceLayoutStyle.modernRibbon;
   String _primaryHex = '#D97706';
@@ -126,6 +128,18 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
     );
     _monogramInitialsController = TextEditingController();
 
+    final initialPrefix = (org.invoicePrefix ?? '').trim().toUpperCase();
+    if (initialPrefix == 'CINV') {
+      _selectedPrefix = 'CINV';
+      _customPrefixController = TextEditingController();
+    } else if (initialPrefix.isNotEmpty && initialPrefix != 'INV') {
+      _selectedPrefix = 'CUSTOM';
+      _customPrefixController = TextEditingController(text: initialPrefix);
+    } else {
+      _selectedPrefix = 'INV';
+      _customPrefixController = TextEditingController();
+    }
+
     Future.microtask(() async {
       await ref.read(documentTemplateControllerProvider.notifier).ensureLoaded();
       if (!mounted) return;
@@ -137,6 +151,17 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
         _secondaryHex = cfg.themeSecondaryHex ?? _secondaryHex;
       });
     });
+  }
+
+  String get _effectivePrefix {
+    if (_selectedPrefix == 'CUSTOM') {
+      final custom = _customPrefixController.text
+          .trim()
+          .toUpperCase()
+          .replaceAll(RegExp(r'[^A-Z0-9]'), '');
+      return custom.isNotEmpty ? custom : 'INV';
+    }
+    return _selectedPrefix;
   }
 
   @override
@@ -157,6 +182,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
       _signatoryNameController,
       _signatoryTitleController,
       _monogramInitialsController,
+      _customPrefixController,
     ]) {
       c.dispose();
     }
@@ -259,6 +285,7 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
         'invoiceTerms': _termsController.text.trim(),
         'authorizedSignatoryName': _signatoryNameController.text.trim(),
         'authorizedSignatoryTitle': _signatoryTitleController.text.trim(),
+        'invoicePrefix': _effectivePrefix,
       });
 
       final tplNotifier = ref.read(documentTemplateControllerProvider.notifier);
@@ -1454,6 +1481,104 @@ class _InvoiceBrandingSheetState extends ConsumerState<InvoiceBrandingSheet> {
                         labelText: isSw
                             ? 'Masharti ya Malipo (Default Terms & Conditions)'
                             : 'Default Terms & Conditions',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 5. INVOICE NUMBER PREFIX & NUMBERING
+                    _SectionHeader(
+                      icon: Icons.tag,
+                      title: isSw
+                          ? '5. Mtindo wa Namba ya Ankara (Invoice Prefix)'
+                          : '5. Invoice Number Prefix & Numbering',
+                      subtitle: isSw
+                          ? 'Chagua kifupisho cha ankara (INV, CINV, au chako). Mabadiliko yataonekana pia kwa ankara zote zilizopita!'
+                          : 'Set prefix code for invoice numbers (e.g. INV, CINV, or custom). Retroactively applies to all past invoices!',
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: Text(isSw ? 'Kawaida (INV)' : 'Standard (INV)'),
+                          selected: _selectedPrefix == 'INV',
+                          onSelected: (selected) {
+                            if (selected) setState(() => _selectedPrefix = 'INV');
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('CINV'),
+                          selected: _selectedPrefix == 'CINV',
+                          onSelected: (selected) {
+                            if (selected) setState(() => _selectedPrefix = 'CINV');
+                          },
+                        ),
+                        ChoiceChip(
+                          label: Text(isSw ? 'Maalum (Custom)' : 'Custom Code'),
+                          selected: _selectedPrefix == 'CUSTOM',
+                          onSelected: (selected) {
+                            if (selected) setState(() => _selectedPrefix = 'CUSTOM');
+                          },
+                        ),
+                      ],
+                    ),
+                    if (_selectedPrefix == 'CUSTOM') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _customPrefixController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          labelText: isSw
+                              ? 'Kifupisho Maalum cha Ankara'
+                              : 'Custom Prefix Code',
+                          hintText: 'e.g. ABC, KTL, BIZ',
+                          helperText: isSw
+                              ? 'Herufi 2 hadi 8 (mfano: ABC itatoa ABC-2026-000001)'
+                              : '2 to 8 characters (e.g. ABC produces ABC-2026-000001)',
+                          prefixIcon: const Icon(Icons.edit_note_outlined),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.resolveSurfaceSecondary(context),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.resolveBorder(context)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility_outlined, size: 18, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isSw ? 'Muonekano wa Namba kwenye Ankara:' : 'Sample Invoice Number Display:',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.resolveTextSecondary(context),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$_effectivePrefix-2026-000001',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),

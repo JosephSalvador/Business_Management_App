@@ -118,7 +118,7 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
         title: Text(
           invoice == null
               ? loc.invoiceDetailTitle
-              : '${invoice.documentTitle} ${invoice.number}',
+              : '${invoice.documentTitle} ${invoice.displayNumber(organization.invoicePrefix)}',
         ),
         actions: [
           if (invoice != null) ...[
@@ -328,7 +328,8 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                         MaterialPageRoute<void>(
                           builder: (_) => InvoicePreviewScreen(
                             documentId: invoice.id,
-                            documentNumber: invoice.invoiceNumber,
+                            documentNumber:
+                                invoice.displayNumber(organization.invoicePrefix),
                             initialInvoice: invoice,
                           ),
                         ),

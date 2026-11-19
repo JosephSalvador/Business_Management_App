@@ -144,6 +144,15 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
             _SettingsTile(
+              icon: Icons.tag,
+              title: isSw ? 'Mtindo wa Namba ya Ankara' : 'Invoice Number Prefix',
+              subtitle: '${organization.effectiveInvoicePrefix}-... (${isSw ? "Gusa kubadilisha" : "Tap to customize"})',
+              onTap: () => showInvoiceBrandingSheet(
+                context,
+                organization: organization,
+              ),
+            ),
+            _SettingsTile(
               icon: Icons.design_services_outlined,
               title: isSw ? 'Violezo vya Ankara na Delivery' : 'Invoice & Delivery Templates',
               subtitle: isSw
@@ -347,6 +356,7 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
   late final TextEditingController _phoneController;
   late final TextEditingController _emailController;
   late final TextEditingController _taxIdController;
+  late final TextEditingController _invoicePrefixController;
   bool _saving = false;
 
   @override
@@ -362,6 +372,8 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
         TextEditingController(text: widget.organization.email ?? '');
     _taxIdController =
         TextEditingController(text: widget.organization.taxId ?? '');
+    _invoicePrefixController =
+        TextEditingController(text: widget.organization.effectiveInvoicePrefix);
   }
 
   @override
@@ -371,7 +383,8 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
       _addressController,
       _phoneController,
       _emailController,
-      _taxIdController
+      _taxIdController,
+      _invoicePrefixController,
     ]) {
       c.dispose();
     }
@@ -423,6 +436,16 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
             TextFormField(
                 controller: _taxIdController,
                 decoration: InputDecoration(labelText: loc.settingsTIN)),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _invoicePrefixController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: loc.invoicePrefix,
+                hintText: 'INV, CINV, etc.',
+                helperText: loc.invoicePrefixSubtitle,
+              ),
+            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -457,6 +480,7 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
         'phone': _phoneController.text,
         'email': _emailController.text,
         'taxId': _taxIdController.text,
+        'invoicePrefix': _invoicePrefixController.text.trim().toUpperCase(),
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
