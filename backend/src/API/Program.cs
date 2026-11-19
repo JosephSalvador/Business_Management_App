@@ -292,13 +292,25 @@ app.MapFallback(async context =>
         return;
     }
 
-    var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
-    var indexFile = Path.Combine(webRoot, "index.html");
-    if (File.Exists(indexFile))
+    var candidates = new[]
     {
-        context.Response.ContentType = "text/html; charset=utf-8";
-        await context.Response.SendFileAsync(indexFile);
-        return;
+        app.Environment.WebRootPath,
+        Path.Combine(app.Environment.ContentRootPath, "wwwroot"),
+        Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+        "/app/api/wwwroot",
+        "/app/wwwroot"
+    };
+
+    foreach (var dir in candidates)
+    {
+        if (string.IsNullOrWhiteSpace(dir)) continue;
+        var indexFile = Path.Combine(dir, "index.html");
+        if (File.Exists(indexFile))
+        {
+            context.Response.ContentType = "text/html; charset=utf-8";
+            await context.Response.SendFileAsync(indexFile);
+            return;
+        }
     }
 
     context.Response.StatusCode = StatusCodes.Status404NotFound;

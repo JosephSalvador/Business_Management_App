@@ -33,6 +33,7 @@ WORKDIR /app
 RUN mkdir -p /app/storage && chmod -R 777 /app/storage
 
 COPY --from=build /app/api /app/api
+COPY --from=portal-build /portal/dist /app/wwwroot
 COPY --from=portal-build /portal/dist /app/api/wwwroot
 COPY --from=build /app/workers /app/workers
 COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh

@@ -17,4 +17,5 @@ WORKER_PID=$!
 trap 'kill "$WORKER_PID" 2>/dev/null || true' EXIT INT TERM
 
 echo "Starting BusinessOS.API on ${ASPNETCORE_URLS} (${ASPNETCORE_ENVIRONMENT})..."
+cd /app/api
 exec dotnet /app/api/BusinessOS.API.dll
