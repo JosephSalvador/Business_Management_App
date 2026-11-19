@@ -118,7 +118,12 @@ class _CreateDeliveryNoteSheetState
 
     try {
       final productsState = ref.read(productsControllerProvider);
-      final productMap = {for (final p in productsState.products) p.id: p};
+      final productMap = <String, dynamic>{};
+      if (productsState is ProductsLoaded) {
+        for (final p in productsState.items) {
+          productMap[p.id] = p;
+        }
+      }
 
       final deliveryItems = <DeliveryNoteItem>[];
       for (final line in widget.invoice.lines) {
