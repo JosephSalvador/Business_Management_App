@@ -3166,4 +3166,41 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String barcodeItemAdded(String name) => '$name imeongezwa kwenye kikapu';
+
+  @override
+  String get invoiceGenerateDeliveryNote => 'Toa Delivery Note';
+
+  @override
+  String get invoiceDeliveryNoteSubtitle =>
+      'Tengeneza waraka rasmi wa kusafirisha bidhaa kwa mteja';
+
+  @override
+  String get deliveryNoteDriver => 'Jina la Dereva / Msafirishaji';
+
+  @override
+  String get deliveryNoteDriverHint => 'mf. John Mwita';
+
+  @override
+  String get deliveryNoteVehicle => 'Namba ya Gari / Chombo';
+
+  @override
+  String get deliveryNoteVehicleHint => 'mf. T 123 ABC';
+
+  @override
+  String get deliveryNoteDestination => 'Eneo la Kushusha / Kufikisha';
+
+  @override
+  String get deliveryNoteDestinationHint => 'mf. Soko la Kariakoo, Mtaa wa 4';
+
+  @override
+  String get deliveryNoteItemsToDeliver => 'Bidhaa za Kusafirisha';
+
+  @override
+  String get deliveryNoteConfirmCreate => 'Tengeneza & Chapisha Delivery Note';
+
+  @override
+  String get deliveryNoteSuccess => 'Delivery Note imetengenezwa kikamilifu';
+
+  @override
+  String get deliveryNoteQuantity => 'Idadi';
 }

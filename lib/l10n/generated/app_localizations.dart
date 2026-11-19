@@ -5944,6 +5944,18 @@ abstract class AppLocalizations {
   String get barcodeScanProduct;
   String barcodeNotFound(String code);
   String barcodeItemAdded(String name);
+  String get invoiceGenerateDeliveryNote;
+  String get invoiceDeliveryNoteSubtitle;
+  String get deliveryNoteDriver;
+  String get deliveryNoteDriverHint;
+  String get deliveryNoteVehicle;
+  String get deliveryNoteVehicleHint;
+  String get deliveryNoteDestination;
+  String get deliveryNoteDestinationHint;
+  String get deliveryNoteItemsToDeliver;
+  String get deliveryNoteConfirmCreate;
+  String get deliveryNoteSuccess;
+  String get deliveryNoteQuantity;
 }
 
 class _AppLocalizationsDelegate

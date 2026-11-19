@@ -233,7 +233,12 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (showLogo) ...[
-                        _buildLogoAvatar(logoBytes, primaryColor, size: 62),
+                        _buildLogoAvatar(
+                          logoBytes,
+                          primaryColor,
+                          maxWidth: 150,
+                          maxHeight: 70,
+                        ),
                         const SizedBox(height: 8),
                       ],
                       Text(
@@ -989,6 +994,8 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                               _buildLogoAvatar(
                                 logoBytes,
                                 primaryColor,
+                                maxWidth: 70,
+                                maxHeight: 38,
                                 size: 38,
                               ),
                               const SizedBox(width: 8),
@@ -1525,7 +1532,12 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                     if (showLogo) ...[
                       GestureDetector(
                         onTap: onConfigureBranding,
-                        child: _buildLogoAvatar(logoBytes, primaryColor),
+                        child: _buildLogoAvatar(
+                          logoBytes,
+                          primaryColor,
+                          maxWidth: 140,
+                          maxHeight: 65,
+                        ),
                       ),
                       const SizedBox(width: 12),
                     ],
@@ -2273,15 +2285,18 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
   Widget _buildLogoAvatar(
     Uint8List? logoBytes,
     Color primaryColor, {
+    double? maxWidth,
+    double? maxHeight,
     double size = 56,
   }) {
     if (logoBytes != null) {
       return Container(
-        width: size,
-        height: size,
+        constraints: BoxConstraints(
+          maxWidth: maxWidth ?? 150,
+          maxHeight: maxHeight ?? 70,
+        ),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _slate200),
+          borderRadius: BorderRadius.circular(8),
         ),
         clipBehavior: Clip.antiAlias,
         child: Image.memory(logoBytes, fit: BoxFit.contain),

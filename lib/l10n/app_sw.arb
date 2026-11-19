@@ -1214,5 +1214,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "invoiceGenerateDeliveryNote": "Toa Delivery Note",
+  "invoiceDeliveryNoteSubtitle": "Tengeneza waraka rasmi wa kusafirisha bidhaa kwa mteja",
+  "deliveryNoteDriver": "Jina la Dereva / Msafirishaji",
+  "deliveryNoteDriverHint": "mf. John Mwita",
+  "deliveryNoteVehicle": "Namba ya Gari / Chombo",
+  "deliveryNoteVehicleHint": "mf. T 123 ABC",
+  "deliveryNoteDestination": "Eneo la Kushusha / Kufikisha",
+  "deliveryNoteDestinationHint": "mf. Soko la Kariakoo, Mtaa wa 4",
+  "deliveryNoteItemsToDeliver": "Bidhaa za Kusafirisha",
+  "deliveryNoteConfirmCreate": "Tengeneza & Chapisha Delivery Note",
+  "deliveryNoteSuccess": "Delivery Note imetengenezwa kikamilifu",
+  "deliveryNoteQuantity": "Idadi"
 }

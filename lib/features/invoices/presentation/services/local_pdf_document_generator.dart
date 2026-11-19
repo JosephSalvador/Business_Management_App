@@ -372,14 +372,16 @@ class LocalPdfDocumentGenerator {
                 if (showLogo) ...[
                   if (logoImage != null)
                     pw.Container(
-                      width: 60,
-                      height: 60,
+                      constraints: const pw.BoxConstraints(
+                        maxWidth: 150,
+                        maxHeight: 70,
+                      ),
                       child: pw.Image(logoImage, fit: pw.BoxFit.contain),
                     )
                   else
                     pw.Container(
-                      width: 48,
-                      height: 48,
+                      width: 52,
+                      height: 52,
                       alignment: pw.Alignment.center,
                       decoration: pw.BoxDecoration(
                         color: primaryColor,
@@ -1293,8 +1295,10 @@ class LocalPdfDocumentGenerator {
                   if (showLogo) ...[
                     if (logoImage != null)
                       pw.Container(
-                        width: 48,
-                        height: 48,
+                        constraints: const pw.BoxConstraints(
+                          maxWidth: 140,
+                          maxHeight: 65,
+                        ),
                         margin: const pw.EdgeInsets.only(right: 12),
                         padding: const pw.EdgeInsets.all(3),
                         decoration: pw.BoxDecoration(
@@ -2180,6 +2184,20 @@ class LocalPdfDocumentGenerator {
         ? organization.name!
         : 'Biashara Yetu';
 
+    final logoImage = _decodeLogo(organization?.logoBase64);
+
+    final words = orgName
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    final initials = words.isEmpty
+        ? 'JB'
+        : words.length == 1
+            ? (words.first.length >= 2
+                ? words.first.substring(0, 2).toUpperCase()
+                : words.first.toUpperCase())
+            : '${words[0][0]}${words[1][0]}'.toUpperCase();
+
     final document = pw.Document(
       title: 'DELIVERY NOTE ${note.number}',
       author: orgName,
@@ -2209,27 +2227,72 @@ class LocalPdfDocumentGenerator {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    orgName,
-                    style: pw.TextStyle(
-                      color: primaryColor,
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
+              pw.Expanded(
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    if (logoImage != null)
+                      pw.Container(
+                        constraints: const pw.BoxConstraints(
+                          maxWidth: 140,
+                          maxHeight: 65,
+                        ),
+                        margin: const pw.EdgeInsets.only(right: 12),
+                        child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                      )
+                    else
+                      pw.Container(
+                        width: 44,
+                        height: 44,
+                        margin: const pw.EdgeInsets.only(right: 12),
+                        alignment: pw.Alignment.center,
+                        decoration: pw.BoxDecoration(
+                          color: primaryColor,
+                          borderRadius:
+                              const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        ),
+                        child: pw.Text(
+                          initials,
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 14,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            orgName,
+                            style: pw.TextStyle(
+                              color: primaryColor,
+                              fontSize: 16,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          if (organization?.address?.isNotEmpty == true)
+                            pw.Text(organization!.address!,
+                                style: const pw.TextStyle(
+                                    color: _slate500, fontSize: 9)),
+                          if (organization?.phone?.isNotEmpty == true)
+                            pw.Text('Tel: ${organization!.phone!}',
+                                style: const pw.TextStyle(
+                                    color: _slate500, fontSize: 9)),
+                          if (organization?.taxId?.isNotEmpty == true)
+                            pw.Text('TIN: ${organization!.taxId!}',
+                                style: pw.TextStyle(
+                                    color: _slate700,
+                                    fontSize: 8.5,
+                                    fontWeight: pw.FontWeight.bold)),
+                        ],
+                      ),
                     ),
-                  ),
-                  if (organization?.address?.isNotEmpty == true)
-                    pw.Text(organization!.address!,
-                        style: const pw.TextStyle(
-                            color: _slate500, fontSize: 9)),
-                  if (organization?.phone?.isNotEmpty == true)
-                    pw.Text('Tel: ${organization!.phone!}',
-                        style: const pw.TextStyle(
-                            color: _slate500, fontSize: 9)),
-                ],
+                  ],
+                ),
               ),
+              pw.SizedBox(width: 16),
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [

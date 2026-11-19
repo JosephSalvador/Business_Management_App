@@ -1214,5 +1214,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "invoiceGenerateDeliveryNote": "Generate Delivery Note",
+  "invoiceDeliveryNoteSubtitle": "Create official dispatch note for items in transit",
+  "deliveryNoteDriver": "Driver / Transporter Name",
+  "deliveryNoteDriverHint": "e.g. John Mwita",
+  "deliveryNoteVehicle": "Vehicle / Plate No.",
+  "deliveryNoteVehicleHint": "e.g. T 123 ABC",
+  "deliveryNoteDestination": "Destination / Delivery Address",
+  "deliveryNoteDestinationHint": "e.g. Kariakoo Market, St. 4",
+  "deliveryNoteItemsToDeliver": "Items to Deliver",
+  "deliveryNoteConfirmCreate": "Generate & Print Delivery Note",
+  "deliveryNoteSuccess": "Delivery Note generated successfully",
+  "deliveryNoteQuantity": "Qty"
 }

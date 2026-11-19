@@ -13,6 +13,7 @@ import '../../application/document_template_controller.dart';
 import '../../application/invoices_controller.dart';
 import '../../domain/invoice.dart';
 import '../services/customer_invoice_pdf_service.dart';
+import '../widgets/create_delivery_note_sheet.dart';
 import '../widgets/invoice_a4_preview_card.dart';
 import '../widgets/invoice_branding_sheet.dart';
 import 'invoice_preview_screen.dart';
@@ -340,6 +341,80 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Delivery Note Action Card
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF1E293B)
+                : const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF334155)
+                  : const Color(0xFFBBF7D0),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.local_shipping_outlined,
+                  color: Color(0xFF0D9488),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.invoiceGenerateDeliveryNote,
+                      style: TextStyle(
+                        color: AppColors.resolveTextPrimary(context),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      loc.invoiceDeliveryNoteSubtitle,
+                      style: TextStyle(
+                        color: AppColors.resolveTextSecondary(context),
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                onPressed: () => showCreateDeliveryNoteSheet(
+                  context,
+                  invoice: invoice,
+                  organization: organization,
+                ),
+                icon: const Icon(Icons.add_task_outlined, size: 16),
+                label: Text(isSwahili ? 'Toa Waraka' : 'Dispatch'),
               ),
             ],
           ),

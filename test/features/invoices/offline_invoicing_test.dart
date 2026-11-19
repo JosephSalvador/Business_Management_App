@@ -490,6 +490,57 @@ void main() {
       expect(thermalBytes, isNotEmpty);
       expect(thermalBytes[0], 0x25); // %PDF-
     });
+
+    test('generates Delivery Note A4 with official organization branding and items list', () async {
+      final note = DeliveryNote(
+        id: 'dn-001',
+        number: 'DN-202611-0001',
+        customerName: 'Azam Bakeries Ltd',
+        customerPhone: '+255 754 112 233',
+        customerAddress: 'Kariakoo Market, St. 4',
+        deliveryAddress: 'Warehouse B, Nyerere Rd',
+        driverName: 'John Mwita',
+        vehicleNumber: 'T 123 ABC',
+        issueDate: DateTime.utc(2026, 11, 19, 10, 0),
+        status: DeliveryNoteStatus.dispatched,
+        notes: 'Handle with care',
+        items: const [
+          DeliveryNoteItem(
+            id: 'item-1',
+            productName: 'Wheat Flour 50kg',
+            quantityOrdered: 5.0,
+            quantityToDeliver: 3.0,
+            unitOfMeasure: 'Bags',
+          ),
+          DeliveryNoteItem(
+            id: 'item-2',
+            productName: 'Refined Sugar 25kg',
+            quantityOrdered: 2.0,
+            quantityToDeliver: 2.0,
+            unitOfMeasure: 'Bags',
+          ),
+        ],
+      );
+
+      final dnA4Bytes = await generator.generateDeliveryNoteA4(
+        note: note,
+        organization: sampleOrg,
+        isSwahili: true,
+      );
+      expect(dnA4Bytes, isNotEmpty);
+      expect(dnA4Bytes[0], 0x25); // %PDF-
+      expect(dnA4Bytes[1], 0x50);
+      expect(dnA4Bytes[2], 0x44);
+      expect(dnA4Bytes[3], 0x46);
+
+      final dnThermalBytes = await generator.generateDeliveryNoteThermal80mm(
+        note: note,
+        organization: sampleOrg,
+        isSwahili: true,
+      );
+      expect(dnThermalBytes, isNotEmpty);
+      expect(dnThermalBytes[0], 0x25);
+    });
   });
 }
 

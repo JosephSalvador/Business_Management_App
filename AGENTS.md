@@ -316,3 +316,13 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 11: Client App Support Banner — Update `AuthUser` in `session.dart` and add top amber Support Mode banner in `dashboard_page.dart`.
 - [ ] Task 12: Commit, push to `feature/invoice-delivery`, and verify GitHub Actions deployment to staging (`deploy-azure.yml` -> `jolinx-api-staging`, `deploy-portal.yml` -> Cloudflare Pages `jolinx-portal` staging branch).
 
+## Implementation Plan — Logo Auto-Fitting & End-to-End Delivery Note Workflow (Build 88)
+- [x] Task 1: Logo Scaling & Responsive Auto-Fitting — Expand logo constraints in `local_pdf_document_generator.dart` and `invoice_a4_preview_card.dart` to `maxWidth: 150`, `maxHeight: 70` with `BoxFit.contain` so landscape & square logos render crisply without squishing.
+- [x] Task 2: Official Branding on A4 Delivery Note — Integrate organization logo and company header info into `generateDeliveryNoteA4` alongside the Delivery Note badge.
+- [x] Task 3: Localization — Add Swahili and English translation keys in `app_en.arb`, `app_sw.arb`, and generated localizations (`app_localizations.dart`, `app_localizations_en.dart`, `app_localizations_sw.dart`) for the delivery note creation flow.
+- [x] Task 4: Delivery Note Launcher Modal — Create `CreateDeliveryNoteSheet` widget allowing the merchant to input driver/vehicle, adjust dispatch quantities for partial fulfillment, and generate the note.
+- [x] Task 5: Invoice Detail Page Integration — Add prominent "Toa Delivery Note" action card and button in `InvoiceDetailPage`.
+- [x] Task 6: Version Bump — Bump client version code to `1.0.0+88` in `pubspec.yaml` and `app_update_service.dart`.
+- [x] Task 7: Verification & Testing — Added Delivery Note unit tests in `test/features/invoices/offline_invoicing_test.dart`, commit, push to `feature/invoice-delivery`, and trigger remote CI/CD workflow `build-clients.yml`.
+
+

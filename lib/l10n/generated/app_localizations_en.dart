@@ -3156,4 +3156,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String barcodeItemAdded(String name) => '$name added to cart';
+
+  @override
+  String get invoiceGenerateDeliveryNote => 'Generate Delivery Note';
+
+  @override
+  String get invoiceDeliveryNoteSubtitle =>
+      'Create official dispatch note for items in transit';
+
+  @override
+  String get deliveryNoteDriver => 'Driver / Transporter Name';
+
+  @override
+  String get deliveryNoteDriverHint => 'e.g. John Mwita';
+
+  @override
+  String get deliveryNoteVehicle => 'Vehicle / Plate No.';
+
+  @override
+  String get deliveryNoteVehicleHint => 'e.g. T 123 ABC';
+
+  @override
+  String get deliveryNoteDestination => 'Destination / Delivery Address';
+
+  @override
+  String get deliveryNoteDestinationHint => 'e.g. Kariakoo Market, St. 4';
+
+  @override
+  String get deliveryNoteItemsToDeliver => 'Items to Deliver';
+
+  @override
+  String get deliveryNoteConfirmCreate => 'Generate & Print Delivery Note';
+
+  @override
+  String get deliveryNoteSuccess => 'Delivery Note generated successfully';
+
+  @override
+  String get deliveryNoteQuantity => 'Qty';
 }
