@@ -102,6 +102,11 @@ jobs:
               -H "Content-Type: application/json" \
               -d '{"name": "portal.joberthix.xyz"}' || true
 
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/jolinx-app/domains" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"name": "app.joberthix.xyz"}' || true
+
             echo "Ensuring proxied CNAME DNS records exist in zone joberthix.xyz..."
             DNS_RES=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${PRIMARY_ZONE_ID}/dns_records?per_page=100" \
               -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
