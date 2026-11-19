@@ -361,7 +361,17 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 4: 80mm Continuous Thermal Delivery Note Profile — Enhanced `generateDeliveryNoteThermal80mm` with linked invoice number, vehicle/driver info, SKU, and recipient signature line.
 - [x] Task 5: Backend Synchronization Compliance & Validation Fix — Added `description`, `productName`, `quantityDelivered`, and `quantityToDeliver` to `DeliveryNoteItem.toJson()` and `_syncSingleDeliveryNote` in `SyncQueueProcessor` and `DeliveryNoteRepository`. Added `_isValidGuid` validation to prevent sending empty/invalid IDs to C# backend `Guid?` parameters, resolving HTTP 400 Bad Request errors.
 - [x] Task 6: Document Template 404 Prevention — Updated `DocumentTemplateRepository.getTemplate(id)` to immediately return built-in template details for `tpl-` client archetype IDs without firing remote HTTP GET calls that 404 on the backend.
-- [x] Task 7: Version Bump — Bumped version code to `1.0.0+92` in `pubspec.yaml` and `app_update_service.dart`.
+## Implementation Plan — Contiguous Document Numbering & Delivery Note Status Lifecycle (Build 93)
+- [x] Task 1: Contiguous Sequential Number Generation — Replaced random epoch milliseconds hash (`now.millisecondsSinceEpoch % 10000`) in `DeliveryNoteRepository` and `InvoiceRepository` with atomic, persistent monthly sequence counters (`dn_seq_YYYYMM` and `inv_seq_PREFIX_YYYYMM`) via `OfflineCacheDao`. Documents are now cleanly, sequentially numbered (`DN-202611-0001`, `DN-202611-0002`... and `INV-202611-0001`, `INV-202611-0002`...).
+- [x] Task 2: Controller Status Transitions — Added `dispatch()`, `deliver()`, and `cancel()` state management methods to `DeliveryNotesController` with silent background state reloading.
+- [x] Task 3: Interactive Status Transition UI on Delivery Notes List — Upgraded `_DeliveryNoteCard` in `invoices_page.dart` into a `ConsumerWidget` with:
+  - Direct "Safirisha / Dispatch" action button (with truck icon) when in `Draft` state.
+  - Direct "Imefika / Delivered" action button (with checkmark icon) when in `Dispatched` state.
+  - 3-dots popup options menu (`PopupMenuButton`) with full action suite including cancellation.
+  - Localized modal dialogs for entering driver/vehicle/carrier details and recipient confirmation.
+- [x] Task 4: Interactive Status Transitions on Preview Screen — Added status actions directly into `InvoicePreviewScreen` AppBar so merchants can dispatch or mark delivered right while reviewing the PDF document, triggering an immediate on-the-fly PDF re-render with updated status badges and timestamps.
+- [x] Task 5: Unit Tests — Added unit tests in `test/features/invoices/offline_invoicing_test.dart` verifying `DeliveryNoteStatus` transitions (Draft -> Dispatched -> Delivered -> Cancelled) and sequential numbering format compliance.
+- [x] Task 6: Version Bump — Bumped version code to `1.0.0+93` in `pubspec.yaml` and `app_update_service.dart`.
 
 
 

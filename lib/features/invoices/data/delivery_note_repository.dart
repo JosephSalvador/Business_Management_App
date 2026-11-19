@@ -147,6 +147,37 @@ class DeliveryNoteRepository {
     return guidRegex.hasMatch(val.trim());
   }
 
+  Future<String> _nextSequentialNumber(DateTime issued) async {
+    final monthKey = '${issued.year}${issued.month.toString().padLeft(2, '0')}';
+    int maxSeq = 0;
+    if (_cache != null) {
+      final cachedCounter = await _cache.load('dn_seq_$monthKey');
+      if (cachedCounter != null && cachedCounter['seq'] is num) {
+        maxSeq = (cachedCounter['seq'] as num).toInt();
+      }
+
+      final listDoc = await _cache.load(_cacheKey);
+      if (listDoc != null && listDoc['items'] is List) {
+        final prefix = 'DN-$monthKey-';
+        for (final raw in (listDoc['items'] as List)) {
+          if (raw is Map && raw['number'] is String) {
+            final numStr = raw['number'] as String;
+            if (numStr.startsWith(prefix)) {
+              final suffix = int.tryParse(numStr.substring(prefix.length)) ?? 0;
+              if (suffix > maxSeq) {
+                maxSeq = suffix;
+              }
+            }
+          }
+        }
+      }
+      final nextSeq = maxSeq + 1;
+      await _cache.save('dn_seq_$monthKey', {'seq': nextSeq});
+      return 'DN-$monthKey-${nextSeq.toString().padLeft(4, '0')}';
+    }
+    return 'DN-$monthKey-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+  }
+
   Future<DeliveryNote> create({
     required String customerName,
     required List<DeliveryNoteItem> items,
@@ -168,8 +199,7 @@ class DeliveryNoteRepository {
     final now = DateTime.now();
     final issued = issueDate ?? now;
 
-    final localNumberSeq =
-        'DN-${issued.year}${issued.month.toString().padLeft(2, '0')}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+    final localNumberSeq = await _nextSequentialNumber(issued);
 
     final localNote = DeliveryNote(
       id: clientId,

@@ -119,6 +119,58 @@ class DeliveryNotesController extends Notifier<DeliveryNotesState> {
     }
   }
 
+  Future<void> dispatch(
+    String id, {
+    String? carrierName,
+    String? trackingNumber,
+    String? vehicleNumber,
+    String? driverName,
+    String? driverPhone,
+  }) async {
+    try {
+      await _repository.dispatch(
+        id,
+        carrierName: carrierName,
+        trackingNumber: trackingNumber,
+        vehicleNumber: vehicleNumber,
+        driverName: driverName,
+        driverPhone: driverPhone,
+      );
+      await load(silent: true);
+    } catch (_) {
+      await load(silent: true);
+      rethrow;
+    }
+  }
+
+  Future<void> deliver(
+    String id, {
+    String? recipientName,
+    String? recipientSignature,
+  }) async {
+    try {
+      await _repository.deliver(
+        id,
+        recipientName: recipientName,
+        recipientSignature: recipientSignature,
+      );
+      await load(silent: true);
+    } catch (_) {
+      await load(silent: true);
+      rethrow;
+    }
+  }
+
+  Future<void> cancel(String id, {required String reason}) async {
+    try {
+      await _repository.cancel(id);
+      await load(silent: true);
+    } catch (_) {
+      await load(silent: true);
+      rethrow;
+    }
+  }
+
   Future<void> _run(
     Future<DeliveryNotePage> Function() fetch, {
     bool silent = false,

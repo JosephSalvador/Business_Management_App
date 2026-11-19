@@ -760,6 +760,52 @@ void main() {
       expect(restored.items.first.productName, 'Cement 50kg');
       expect(restored.items.first.quantityToDeliver, 45.0);
     });
+
+    test('DeliveryNoteStatus transitions correctly from draft to dispatched to delivered', () {
+      final draft = DeliveryNote(
+        id: 'dn-seq-1',
+        number: 'DN-202611-0001',
+        customerName: 'Bakhresa Group',
+        issueDate: DateTime(2026, 11, 19),
+        status: DeliveryNoteStatus.draft,
+        items: const [
+          DeliveryNoteItem(
+            id: 'item-1',
+            productName: 'Wheat Flour 50kg',
+            sku: 'SKU-FLOUR-50',
+            quantityOrdered: 10,
+            quantityToDeliver: 10,
+            unitOfMeasure: 'Bags',
+          ),
+        ],
+      );
+      expect(draft.status, DeliveryNoteStatus.draft);
+      expect(draft.number, matches(r'^DN-\d{6}-\d{4}$'));
+
+      final dispatched = draft.copyWith(
+        status: DeliveryNoteStatus.dispatched,
+        dispatchedAt: DateTime(2026, 11, 19, 14, 30),
+        driverName: 'John Mwangi',
+        driverPhone: '+255 712 345 678',
+        vehicleNumber: 'T 123 ABC',
+      );
+      expect(dispatched.status, DeliveryNoteStatus.dispatched);
+      expect(dispatched.driverName, 'John Mwangi');
+      expect(dispatched.vehicleNumber, 'T 123 ABC');
+
+      final delivered = dispatched.copyWith(
+        status: DeliveryNoteStatus.delivered,
+        deliveredAt: DateTime(2026, 11, 19, 16, 45),
+        recipientName: 'Ali Hassan - Store Manager',
+      );
+      expect(delivered.status, DeliveryNoteStatus.delivered);
+      expect(delivered.recipientName, 'Ali Hassan - Store Manager');
+
+      final cancelled = draft.copyWith(
+        status: DeliveryNoteStatus.cancelled,
+      );
+      expect(cancelled.status, DeliveryNoteStatus.cancelled);
+    });
   });
 }
 

@@ -15,6 +15,7 @@ import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
+import '../../application/delivery_notes_controller.dart';
 import '../../application/document_template_controller.dart';
 import '../../data/invoice_providers.dart';
 import '../../domain/delivery_note.dart';
@@ -69,6 +70,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
   bool _showLogo = true;
   String? _customFooterNotes;
   bool? _isSynced;
+  DeliveryNote? _currentDeliveryNote;
 
   Timer? _debounceTimer;
 
@@ -225,6 +227,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         _rawPdfBytes = pdfBytes;
         _isLoading = false;
         _isSynced = isDocSynced;
+        if (widget.documentType == DocumentType.deliveryNote) {
+          _currentDeliveryNote = note;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -286,6 +291,249 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         setState(() => _isPrinting = false);
       }
     }
+  Future<void> _showDispatchDialog() async {
+    final note = _currentDeliveryNote;
+    if (note == null) return;
+    final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
+    final driverController = TextEditingController(text: note.driverName ?? '');
+    final phoneController = TextEditingController(text: note.driverPhone ?? '');
+    final vehicleController = TextEditingController(text: note.vehicleNumber ?? '');
+    final carrierController = TextEditingController(text: note.carrierName ?? '');
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF0D9488), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isSwahili ? 'Safirisha Mzigo' : 'Dispatch Delivery Note',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    note.number,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.resolveTextSecondary(context),
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: driverController,
+                decoration: InputDecoration(
+                  labelText: isSwahili ? 'Jina la Dereva' : 'Driver Name',
+                  prefixIcon: const Icon(Icons.person_outline, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: isSwahili ? 'Namba ya Simu ya Dereva' : 'Driver Phone Number',
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: vehicleController,
+                decoration: InputDecoration(
+                  labelText: isSwahili ? 'Namba ya Chombo / Gari' : 'Vehicle Plate / Reg No',
+                  prefixIcon: const Icon(Icons.directions_car_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: carrierController,
+                decoration: InputDecoration(
+                  labelText: isSwahili ? 'Kampuni ya Usafirishaji (Si lazima)' : 'Carrier / Transporter (Optional)',
+                  prefixIcon: const Icon(Icons.business_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text(isSwahili ? 'Ghairi' : 'Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              try {
+                await ref.read(deliveryNotesControllerProvider.notifier).dispatch(
+                  note.id,
+                  driverName: driverController.text.trim().isEmpty ? null : driverController.text.trim(),
+                  driverPhone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+                  vehicleNumber: vehicleController.text.trim().isEmpty ? null : vehicleController.text.trim(),
+                  carrierName: carrierController.text.trim().isEmpty ? null : carrierController.text.trim(),
+                );
+                _fetchAndRenderPdf();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isSwahili
+                            ? 'Mzigo umethibitishwa kusafirishwa!'
+                            : 'Delivery note marked as dispatched!',
+                      ),
+                      backgroundColor: const Color(0xFF0D9488),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Hitilafu: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.local_shipping_outlined, size: 16),
+            label: Text(isSwahili ? 'Thibitisha Kusafirisha' : 'Confirm Dispatch'),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDeliverDialog() async {
+    final note = _currentDeliveryNote;
+    if (note == null) return;
+    final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
+    final recipientController = TextEditingController(text: note.customerName);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF059669).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.check_circle_outline, color: Color(0xFF059669), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isSwahili ? 'Thibitisha Kupokelewa' : 'Confirm Delivery',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    note.number,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.resolveTextSecondary(context),
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isSwahili
+                  ? 'Mzigo huu umewasilishwa kwa mteja salama? Weka jina la aliyepokea mzigo.'
+                  : 'Has this consignment been successfully handed over? Enter recipient name.',
+              style: TextStyle(fontSize: 13, color: AppColors.resolveTextSecondary(context)),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: recipientController,
+              decoration: InputDecoration(
+                labelText: isSwahili ? 'Jina la Mpokeaji' : 'Recipient Name',
+                prefixIcon: const Icon(Icons.badge_outlined, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text(isSwahili ? 'Ghairi' : 'Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              try {
+                await ref.read(deliveryNotesControllerProvider.notifier).deliver(
+                  note.id,
+                  recipientName: recipientController.text.trim().isEmpty ? null : recipientController.text.trim(),
+                );
+                _fetchAndRenderPdf();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isSwahili
+                            ? 'Mzigo umethibitishwa kupokelewa kikamilifu!'
+                            : 'Delivery completed successfully!',
+                      ),
+                      backgroundColor: const Color(0xFF059669),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Hitilafu: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.check, size: 16),
+            label: Text(isSwahili ? 'Thibitisha Kupokea' : 'Confirm Received'),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -340,6 +588,38 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
           ],
         ),
         actions: [
+          if (widget.documentType == DocumentType.deliveryNote &&
+              _currentDeliveryNote != null) ...[
+            if (_currentDeliveryNote!.status == DeliveryNoteStatus.draft)
+              FilledButton.icon(
+                onPressed: _showDispatchDialog,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.local_shipping_outlined, size: 14),
+                label: Text(
+                  isSw ? 'Safirisha' : 'Dispatch',
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+              )
+            else if (_currentDeliveryNote!.status == DeliveryNoteStatus.dispatched)
+              FilledButton.icon(
+                onPressed: _showDeliverDialog,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.check_circle_outline, size: 14),
+                label: Text(
+                  isSw ? 'Imefika' : 'Delivered',
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+            const SizedBox(width: 4),
+          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: isSw ? 'Pakia upya' : 'Refresh',

@@ -304,9 +304,41 @@ class InvoiceRepository {
       authorizedSignatoryName: authorizedSignatoryName,
       authorizedSignatoryTitle: authorizedSignatoryTitle,
       invoicePrefix: invoicePrefix,
-    );
     _inFlightCreates[clientId] = future;
     return future.whenComplete(() => _inFlightCreates.remove(clientId));
+  }
+
+  Future<String> _nextSequentialNumber(String prefix, DateTime issued) async {
+    final cleanPrefix = prefix.trim().toUpperCase();
+    final monthKey = '${issued.year}${issued.month.toString().padLeft(2, '0')}';
+    int maxSeq = 0;
+    if (_cache != null) {
+      final cachedCounter = await _cache.load('inv_seq_${cleanPrefix}_$monthKey');
+      if (cachedCounter != null && cachedCounter['seq'] is num) {
+        maxSeq = (cachedCounter['seq'] as num).toInt();
+      }
+
+      final listDoc = await _cache.load(_cacheKey);
+      if (listDoc != null && listDoc['items'] is List) {
+        final prefixMatch = '$cleanPrefix-$monthKey-';
+        for (final raw in (listDoc['items'] as List)) {
+          if (raw is Map && raw['number'] is String) {
+            final numStr = raw['number'] as String;
+            if (numStr.startsWith(prefixMatch)) {
+              final suffix =
+                  int.tryParse(numStr.substring(prefixMatch.length)) ?? 0;
+              if (suffix > maxSeq) {
+                maxSeq = suffix;
+              }
+            }
+          }
+        }
+      }
+      final nextSeq = maxSeq + 1;
+      await _cache.save('inv_seq_${cleanPrefix}_$monthKey', {'seq': nextSeq});
+      return '$cleanPrefix-$monthKey-${nextSeq.toString().padLeft(4, '0')}';
+    }
+    return '$cleanPrefix-$monthKey-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
   }
 
   Future<CustomerInvoice> _createOnce({
@@ -387,8 +419,7 @@ class InvoiceRepository {
     final prefix = (invoicePrefix != null && invoicePrefix.trim().isNotEmpty)
         ? invoicePrefix.trim().toUpperCase()
         : 'INV';
-    final localNumberSeq =
-        '$prefix-${issued.year}${issued.month.toString().padLeft(2, '0')}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+    final localNumberSeq = await _nextSequentialNumber(prefix, issued);
 
     // 1. Immediately instantiate local invoice stamped with isSynced = false
     final localInvoice = CustomerInvoice(
