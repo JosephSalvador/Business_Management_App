@@ -7,4 +7,6 @@ import 'generated/app_localizations.dart';
 extension LocX on BuildContext {
   AppLocalizations get loc =>
       AppLocalizations.of(this) ?? lookupAppLocalizations(const Locale('sw'));
+
+  bool get isSwahili => Localizations.localeOf(this).languageCode == 'sw';
 }

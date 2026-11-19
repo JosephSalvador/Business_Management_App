@@ -96,13 +96,14 @@ class _CreateDeliveryNoteSheetState
 
   Future<void> _submit() async {
     final loc = context.loc;
+    final isSwahili = context.isSwahili;
     final totalQty = _quantities.values.fold<double>(0, (sum, q) => sum + q);
 
     if (totalQty <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            loc.isSwahili
+            isSwahili
                 ? 'Tafadhali weka idadi ya bidhaa za kusafirisha.'
                 : 'Please specify items to dispatch.',
           ),
@@ -185,6 +186,7 @@ class _CreateDeliveryNoteSheetState
   @override
   Widget build(BuildContext context) {
     final loc = context.loc;
+    final isSwahili = context.isSwahili;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -272,7 +274,7 @@ class _CreateDeliveryNoteSheetState
                 children: [
                   // Section: Carrier / Logistics
                   Text(
-                    loc.isSwahili ? 'TAARIFA ZA USAFIRISHAJI' : 'DISPATCH & LOGISTICS',
+                    isSwahili ? 'TAARIFA ZA USAFIRISHAJI' : 'DISPATCH & LOGISTICS',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -350,7 +352,7 @@ class _CreateDeliveryNoteSheetState
                         ),
                       ),
                       Text(
-                        '${widget.invoice.lines.length} ${loc.isSwahili ? "Aina" : "Items"}',
+                        '${widget.invoice.lines.length} ${isSwahili ? "Aina" : "Items"}',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.resolveTextSecondary(context),
@@ -410,7 +412,7 @@ class _CreateDeliveryNoteSheetState
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      '${loc.isSwahili ? "Imeagizwa" : "Ordered"}: ${line.quantity % 1 == 0 ? line.quantity.toInt() : line.quantity} ${line.unitOfMeasure}',
+                                      '${isSwahili ? "Imeagizwa" : "Ordered"}: ${line.quantity % 1 == 0 ? line.quantity.toInt() : line.quantity} ${line.unitOfMeasure}',
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         color:
@@ -512,8 +514,8 @@ class _CreateDeliveryNoteSheetState
                     maxLines: 2,
                     decoration: InputDecoration(
                       labelText:
-                          loc.isSwahili ? 'Maelekezo Maalum' : 'Special Notes',
-                      hintText: loc.isSwahili
+                          isSwahili ? 'Maelekezo Maalum' : 'Special Notes',
+                      hintText: isSwahili
                           ? 'mf. Mzigo unahitaji umakini, usiloweshwe maji'
                           : 'e.g. Fragile, keep dry during transit',
                       prefixIcon: const Icon(Icons.notes_outlined, size: 20),
@@ -552,7 +554,7 @@ class _CreateDeliveryNoteSheetState
                           : const Icon(Icons.print_outlined),
                       label: Text(
                         _isCreating
-                            ? (loc.isSwahili
+                            ? (isSwahili
                                 ? 'Inatengeneza...'
                                 : 'Generating...')
                             : loc.deliveryNoteConfirmCreate,
