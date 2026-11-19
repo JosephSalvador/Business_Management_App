@@ -55,19 +55,21 @@ class DeliveryNoteItem {
         sku: json['sku']?.toString(),
         quantityOrdered: (json['quantityOrdered'] as num?)?.toDouble() ?? 0,
         quantityToDeliver:
-            (json['quantityToDeliver'] ?? json['quantity'] as num?)?.toDouble() ?? 1,
+            (json['quantityDelivered'] ?? json['quantityToDeliver'] ?? json['quantity'] as num?)?.toDouble() ?? 1,
         unitOfMeasure: (json['unitOfMeasure'] ?? 'Pcs').toString(),
         notes: json['notes']?.toString(),
       );
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        if (productId != null) 'productId': productId,
+        if (productId != null && productId!.isNotEmpty) 'productId': productId,
+        'description': productName,
         'productName': productName,
-        if (sku != null) 'sku': sku,
+        if (sku != null && sku!.isNotEmpty) 'sku': sku,
         'quantityOrdered': quantityOrdered,
+        'quantityDelivered': quantityToDeliver,
         'quantityToDeliver': quantityToDeliver,
-        'unitOfMeasure': unitOfMeasure,
+        'unitOfMeasure': unitOfMeasure.isNotEmpty ? unitOfMeasure : 'Pcs',
         if (notes != null) 'notes': notes,
       };
 }
@@ -82,6 +84,7 @@ class DeliveryNote {
     required this.items,
     this.tenantId,
     this.invoiceId,
+    this.invoiceNumber,
     this.customerId,
     this.customerPhone,
     this.customerAddress,
@@ -103,6 +106,7 @@ class DeliveryNote {
   final String number;
   final String? tenantId;
   final String? invoiceId;
+  final String? invoiceNumber;
   final String? customerId;
   final String customerName;
   final String? customerPhone;
@@ -137,6 +141,7 @@ class DeliveryNote {
         carrierName: carrierName,
         vehicleNumber: vehicleNumber,
         invoiceId: invoiceId,
+        invoiceNumber: invoiceNumber,
         isSynced: isSynced,
       );
 
@@ -147,12 +152,14 @@ class DeliveryNote {
     String? recipientName,
     String? recipientSignature,
     bool? isSynced,
+    String? invoiceNumber,
   }) =>
       DeliveryNote(
         id: id,
         number: number,
         tenantId: tenantId,
         invoiceId: invoiceId,
+        invoiceNumber: invoiceNumber ?? this.invoiceNumber,
         customerId: customerId,
         customerName: customerName,
         customerPhone: customerPhone,
@@ -179,6 +186,7 @@ class DeliveryNote {
         'number': number,
         if (tenantId != null) 'tenantId': tenantId,
         if (invoiceId != null) 'invoiceId': invoiceId,
+        if (invoiceNumber != null) 'invoiceNumber': invoiceNumber,
         if (customerId != null) 'customerId': customerId,
         'customerName': customerName,
         if (customerPhone != null) 'customerPhone': customerPhone,
@@ -207,8 +215,9 @@ class DeliveryNote {
       number: (json['number'] ?? '').toString(),
       tenantId: json['tenantId']?.toString(),
       invoiceId: json['invoiceId']?.toString(),
+      invoiceNumber: json['invoiceNumber']?.toString(),
       customerId: json['customerId']?.toString(),
-      customerName: (json['customerName'] ?? '—').toString(),
+      customerName: (json['customerName'] ?? '-').toString(),
       customerPhone: json['customerPhone']?.toString(),
       customerAddress: json['customerAddress']?.toString(),
       deliveryAddress: json['deliveryAddress']?.toString(),
@@ -254,6 +263,7 @@ class DeliveryNoteSummary {
     this.carrierName,
     this.vehicleNumber,
     this.invoiceId,
+    this.invoiceNumber,
     this.isSynced = true,
   });
 
@@ -267,13 +277,14 @@ class DeliveryNoteSummary {
   final String? carrierName;
   final String? vehicleNumber;
   final String? invoiceId;
+  final String? invoiceNumber;
   final bool isSynced;
 
   factory DeliveryNoteSummary.fromJson(Map<String, dynamic> json) =>
       DeliveryNoteSummary(
         id: (json['id'] ?? '').toString(),
         number: (json['number'] ?? '').toString(),
-        customerName: (json['customerName'] ?? '—').toString(),
+        customerName: (json['customerName'] ?? '-').toString(),
         status: DeliveryNoteStatus.fromCode(json['status']),
         issueDate: json['issueDate'] != null
             ? DateTime.parse(json['issueDate'].toString())
@@ -283,6 +294,7 @@ class DeliveryNoteSummary {
         carrierName: json['carrierName']?.toString(),
         vehicleNumber: json['vehicleNumber']?.toString(),
         invoiceId: json['invoiceId']?.toString(),
+        invoiceNumber: json['invoiceNumber']?.toString(),
         isSynced: (json['isSynced'] as bool?) ?? true,
       );
 
@@ -297,6 +309,7 @@ class DeliveryNoteSummary {
         if (carrierName != null) 'carrierName': carrierName,
         if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
         if (invoiceId != null) 'invoiceId': invoiceId,
+        if (invoiceNumber != null) 'invoiceNumber': invoiceNumber,
         'isSynced': isSynced,
       };
 }

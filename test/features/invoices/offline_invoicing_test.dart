@@ -722,6 +722,44 @@ void main() {
       expect(thermalBytes, isNotEmpty);
       expect(thermalBytes.sublist(0, 4), [0x25, 0x50, 0x44, 0x46]);
     });
+
+    test('DeliveryNote and DeliveryNoteItem serialize and restore SKU, invoiceNumber and compliant item fields', () {
+      const itemWithSku = DeliveryNoteItem(
+        id: 'dn-item-sku-1',
+        productId: '00000000-0000-0000-0000-000000000001',
+        productName: 'Cement 50kg',
+        sku: 'SKU-CEM-50',
+        quantityOrdered: 50,
+        quantityToDeliver: 45,
+        unitOfMeasure: 'Bags',
+      );
+
+      final itemJson = itemWithSku.toJson();
+      expect(itemJson['sku'], 'SKU-CEM-50');
+      expect(itemJson['description'], 'Cement 50kg');
+      expect(itemJson['quantityDelivered'], 45.0);
+      expect(itemJson['quantityToDeliver'], 45.0);
+
+      final note = DeliveryNote(
+        id: 'dn-101',
+        number: 'DN-2026-101',
+        customerName: 'Mega Hardware',
+        invoiceId: 'inv-404',
+        invoiceNumber: 'INV-2026-0042',
+        issueDate: DateTime(2026, 11, 19),
+        status: DeliveryNoteStatus.dispatched,
+        items: [itemWithSku],
+      );
+
+      final noteJson = note.toJson();
+      expect(noteJson['invoiceNumber'], 'INV-2026-0042');
+
+      final restored = DeliveryNote.fromJson(noteJson);
+      expect(restored.invoiceNumber, 'INV-2026-0042');
+      expect(restored.items.first.sku, 'SKU-CEM-50');
+      expect(restored.items.first.productName, 'Cement 50kg');
+      expect(restored.items.first.quantityToDeliver, 45.0);
+    });
   });
 }
 

@@ -851,6 +851,7 @@ td { border-bottom: 1px solid #e2e8f0; padding: 10px; }
     <tr>
         <th>#</th>
         <th>Item Description</th>
+        <th>SKU</th>
         <th class=""text-right"">Qty Ordered</th>
         <th class=""text-right"">Qty Delivered</th>
     </tr>
@@ -860,6 +861,7 @@ td { border-bottom: 1px solid #e2e8f0; padding: 10px; }
     <tr>
         <td>{{ forloop.index }}</td>
         <td>{{ item.description }}</td>
+        <td>{{ item.sku | default: '-' }}</td>
         <td class=""text-right"">{{ item.quantity_ordered }} {{ item.unit_of_measure }}</td>
         <td class=""text-right"" style=""font-weight: bold;"">{{ item.quantity_delivered }} {{ item.unit_of_measure }}</td>
     </tr>

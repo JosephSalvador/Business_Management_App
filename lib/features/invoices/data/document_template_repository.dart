@@ -122,6 +122,27 @@ class DocumentTemplateRepository {
   /// Gets full template details including LiquidLayout.
   Future<DocumentTemplateDetail?> getTemplate(String id) async {
     final builtIn = builtInTemplates.where((t) => t.id == id).firstOrNull;
+    if (builtIn != null || id.startsWith('tpl-')) {
+      final matched = builtIn ??
+          DocumentTemplateSummary(
+            id: id,
+            name: 'Template',
+            description: '',
+            documentType: DocumentType.invoice,
+          );
+      return DocumentTemplateDetail(
+        id: matched.id,
+        name: matched.name,
+        description: matched.description,
+        documentType: matched.documentType,
+        liquidLayout: '<div>{{ invoice.number }}</div>',
+        engineVersion: 'Native-v3.0',
+        isActive: true,
+        isDefault: matched.isDefault,
+        displayOrder: matched.displayOrder,
+      );
+    }
+
     try {
       final response = await _apiClient.get<dynamic>(
         ApiRoutes.v1('/document-templates/$id'),
@@ -134,19 +155,6 @@ class DocumentTemplateRepository {
       }
     } catch (_) {}
 
-    if (builtIn != null) {
-      return DocumentTemplateDetail(
-        id: builtIn.id,
-        name: builtIn.name,
-        description: builtIn.description,
-        documentType: builtIn.documentType,
-        liquidLayout: '<div>{{ invoice.number }}</div>',
-        engineVersion: 'Native-v3.0',
-        isActive: true,
-        isDefault: builtIn.isDefault,
-        displayOrder: builtIn.displayOrder,
-      );
-    }
     return null;
   }
 

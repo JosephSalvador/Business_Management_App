@@ -2227,7 +2227,7 @@ class LocalPdfDocumentGenerator {
           ),
           pw.SizedBox(height: 16),
 
-          // Header
+          // Header: Company Logo & Details (Left) + Document Metadata Badge (Right)
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -2239,8 +2239,8 @@ class LocalPdfDocumentGenerator {
                     if (logoImage != null)
                       pw.Container(
                         constraints: const pw.BoxConstraints(
-                          maxWidth: 140,
-                          maxHeight: 65,
+                          maxWidth: 130,
+                          maxHeight: 60,
                         ),
                         margin: const pw.EdgeInsets.only(right: 12),
                         child: pw.Image(logoImage, fit: pw.BoxFit.contain),
@@ -2280,11 +2280,11 @@ class LocalPdfDocumentGenerator {
                           if (organization?.address?.isNotEmpty == true)
                             pw.Text(organization!.address!,
                                 style: const pw.TextStyle(
-                                    color: _slate500, fontSize: 9)),
+                                    color: _slate500, fontSize: 8.5)),
                           if (organization?.phone?.isNotEmpty == true)
                             pw.Text('Tel: ${organization!.phone!}',
                                 style: const pw.TextStyle(
-                                    color: _slate500, fontSize: 9)),
+                                    color: _slate500, fontSize: 8.5)),
                           if (organization?.taxId?.isNotEmpty == true)
                             pw.Text('TIN: ${organization!.taxId!}',
                                 style: pw.TextStyle(
@@ -2310,11 +2310,12 @@ class LocalPdfDocumentGenerator {
                           const pw.BorderRadius.all(pw.Radius.circular(4)),
                     ),
                     child: pw.Text(
-                      isSwahili ? 'WARAKA WA MZIGO' : 'DELIVERY NOTE',
+                      isSwahili ? 'HATI YA MZIGO' : 'DELIVERY NOTE',
                       style: pw.TextStyle(
                         color: PdfColors.white,
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: pw.FontWeight.bold,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -2323,41 +2324,64 @@ class LocalPdfDocumentGenerator {
                     note.number,
                     style: pw.TextStyle(
                       color: _slate700,
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                   pw.Text(
                     '${isSwahili ? "Tarehe" : "Date"}: ${dateFmt.format(note.issueDate.toLocal())}',
-                    style: const pw.TextStyle(color: _slate500, fontSize: 9),
+                    style: const pw.TextStyle(color: _slate500, fontSize: 8.5),
                   ),
+                  if (note.invoiceNumber != null &&
+                      note.invoiceNumber!.isNotEmpty)
+                    pw.Container(
+                      margin: const pw.EdgeInsets.only(top: 3),
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1.5),
+                      decoration: const pw.BoxDecoration(
+                        color: _slate100,
+                        borderRadius:
+                            pw.BorderRadius.all(pw.Radius.circular(3)),
+                      ),
+                      child: pw.Text(
+                        '${isSwahili ? "Ankara" : "Invoice"}: #${note.invoiceNumber}',
+                        style: pw.TextStyle(
+                          color: primaryColor,
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ],
           ),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 14),
 
-          // Logistics & Recipient Card
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: _slate50,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              border: pw.Border.all(color: _slate200, width: 0.5),
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Expanded(
+          // Dual Side-by-Side Logistics Panels
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Consignee / Deliver To
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    color: _slate50,
+                    borderRadius:
+                        const pw.BorderRadius.all(pw.Radius.circular(6)),
+                    border: pw.Border.all(color: _slate200, width: 0.5),
+                  ),
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        isSwahili ? 'MPOKEA MZIGO / CONSIGNEE:' : 'DELIVER TO:',
+                        isSwahili
+                            ? 'MPOKEA MZIGO / RECIPIENT'
+                            : 'DELIVER TO / CONSIGNEE',
                         style: pw.TextStyle(
                           color: _slate500,
-                          fontSize: 8,
+                          fontSize: 7.5,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
@@ -2366,7 +2390,7 @@ class LocalPdfDocumentGenerator {
                         note.customerName,
                         style: pw.TextStyle(
                           color: primaryColor,
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
@@ -2374,86 +2398,135 @@ class LocalPdfDocumentGenerator {
                           note.customerPhone!.isNotEmpty)
                         pw.Text('Tel: ${note.customerPhone}',
                             style: const pw.TextStyle(
-                                color: _slate700, fontSize: 9)),
+                                color: _slate700, fontSize: 8.5)),
                       if (note.deliveryAddress != null &&
                           note.deliveryAddress!.isNotEmpty)
-                        pw.Text('Destination: ${note.deliveryAddress}',
-                            style: const pw.TextStyle(
-                                color: _slate500, fontSize: 9)),
+                        pw.Text(
+                          'Destination: ${note.deliveryAddress}',
+                          style: const pw.TextStyle(
+                              color: _slate500, fontSize: 8.5),
+                        ),
                     ],
                   ),
                 ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    if (note.carrierName != null)
-                      pw.Text('Carrier: ${note.carrierName}',
-                          style: const pw.TextStyle(
-                              color: _slate700, fontSize: 9)),
-                    if (note.vehicleNumber != null)
-                      pw.Text('Vehicle: ${note.vehicleNumber}',
-                          style: const pw.TextStyle(
-                              color: _slate700, fontSize: 9)),
-                    if (note.driverName != null)
-                      pw.Text('Driver: ${note.driverName}',
-                          style: const pw.TextStyle(
-                              color: _slate500, fontSize: 9)),
-                    pw.SizedBox(height: 4),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: const pw.BoxDecoration(
-                        color: _slate100,
-                        borderRadius:
-                            pw.BorderRadius.all(pw.Radius.circular(4)),
+              ),
+              pw.SizedBox(width: 12),
+              // Transport & Dispatch Logistics
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    color: _slate50,
+                    borderRadius:
+                        const pw.BorderRadius.all(pw.Radius.circular(6)),
+                    border: pw.Border.all(color: _slate200, width: 0.5),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text(
+                            isSwahili
+                                ? 'USAFIRISHAJI / LOGISTICS'
+                                : 'TRANSPORT & DISPATCH',
+                            style: pw.TextStyle(
+                              color: _slate500,
+                              fontSize: 7.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1.5),
+                            decoration: const pw.BoxDecoration(
+                              color: _slate100,
+                              borderRadius:
+                                  pw.BorderRadius.all(pw.Radius.circular(3)),
+                            ),
+                            child: pw.Text(
+                              note.status.name.toUpperCase(),
+                              style: pw.TextStyle(
+                                fontSize: 7.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: pw.Text(
-                        note.status.name.toUpperCase(),
-                        style: pw.TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: pw.FontWeight.bold,
-                          color: primaryColor,
+                      pw.SizedBox(height: 3),
+                      if (note.vehicleNumber != null &&
+                          note.vehicleNumber!.isNotEmpty)
+                        pw.Text(
+                          'Vehicle Reg: ${note.vehicleNumber}',
+                          style: pw.TextStyle(
+                            color: _slate700,
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      if (note.driverName != null &&
+                          note.driverName!.isNotEmpty)
+                        pw.Text(
+                          'Driver: ${note.driverName}${note.driverPhone != null && note.driverPhone!.isNotEmpty ? " (${note.driverPhone})" : ""}',
+                          style: const pw.TextStyle(
+                              color: _slate700, fontSize: 8.5),
+                        ),
+                      if (note.carrierName != null &&
+                          note.carrierName!.isNotEmpty)
+                        pw.Text('Carrier: ${note.carrierName}',
+                            style: const pw.TextStyle(
+                                color: _slate500, fontSize: 8.5)),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 14),
 
-          // Items Table
+          // Items Dispatch & Verification Table
           pw.TableHelper.fromTextArray(
             headers: [
               isSwahili ? 'Na.' : 'No.',
               isSwahili ? 'Maelezo ya Bidhaa' : 'Item Description',
-              isSwahili ? 'SKU' : 'SKU',
+              isSwahili ? 'SKU / Msimbo' : 'SKU / Code',
               isSwahili ? 'Kipimo' : 'UoM',
-              isSwahili ? 'Iliyoagizwa' : 'Ordered',
-              isSwahili ? 'Inayosafirishwa' : 'Delivered',
+              isSwahili ? 'Iliyoagizwa' : 'Qty Ordered',
+              isSwahili ? 'Inayosafirishwa' : 'Qty Delivered',
+              isSwahili ? 'Hali' : 'Status',
             ],
             data: [
               for (var i = 0; i < note.items.length; i++)
                 [
                   '${i + 1}',
                   note.items[i].productName,
-                  note.items[i].sku ?? '—',
+                  (note.items[i].sku != null &&
+                          note.items[i].sku!.trim().isNotEmpty)
+                      ? note.items[i].sku!.trim()
+                      : '-',
                   note.items[i].unitOfMeasure,
                   numFmt.format(note.items[i].quantityOrdered),
                   numFmt.format(note.items[i].quantityToDeliver),
+                  note.items[i].quantityToDeliver >=
+                              note.items[i].quantityOrdered &&
+                          note.items[i].quantityOrdered > 0
+                      ? (isSwahili ? 'Kamilifu' : 'Complete')
+                      : (isSwahili ? 'Sehemu' : 'Partial'),
                 ],
             ],
             border: null,
             headerStyle: pw.TextStyle(
               color: PdfColors.white,
-              fontSize: 8.5,
+              fontSize: 8,
               fontWeight: pw.FontWeight.bold,
             ),
             headerDecoration: pw.BoxDecoration(color: primaryColor),
             headerHeight: 22,
             cellHeight: 22,
-            cellStyle: const pw.TextStyle(color: _slate700, fontSize: 8.5),
+            cellStyle: const pw.TextStyle(color: _slate700, fontSize: 8),
             cellAlignments: {
               0: pw.Alignment.center,
               1: pw.Alignment.centerLeft,
@@ -2461,53 +2534,198 @@ class LocalPdfDocumentGenerator {
               3: pw.Alignment.center,
               4: pw.Alignment.centerRight,
               5: pw.Alignment.centerRight,
+              6: pw.Alignment.center,
             },
             rowDecoration: const pw.BoxDecoration(
               border: pw.Border(
                   bottom: pw.BorderSide(color: _slate200, width: 0.5)),
             ),
           ),
-          pw.SizedBox(height: 24),
+          pw.SizedBox(height: 8),
 
-          // Signatures & Acknowledgement
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Column(
+          // Table Summary Strip (Total Items & Total Units)
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: const pw.BoxDecoration(
+              color: _slate50,
+              borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  '${isSwahili ? "Jumla ya Bidhaa" : "Total Line Items"}: ${note.items.length}',
+                  style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                ),
+                pw.Text(
+                  '${isSwahili ? "Jumla Iliyosafirishwa" : "Total Units Delivered"}: ${numFmt.format(note.totalQuantity)}',
+                  style: pw.TextStyle(
+                    color: primaryColor,
+                    fontSize: 8.5,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 12),
+
+          // Special Instructions / Notes (if present)
+          if (note.notes != null && note.notes!.trim().isNotEmpty) ...[
+            pw.Container(
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: pw.BoxDecoration(
+                color: _slate50,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                border: pw.Border.all(color: _slate200, width: 0.5),
+              ),
+              child: pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    isSwahili
-                        ? 'Alieandaa (Jina na Sahihi):'
-                        : 'Dispatched By (Sign & Date):',
-                    style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                    '${isSwahili ? "Maelekezo" : "Notes"}: ',
+                    style: pw.TextStyle(
+                      color: _slate700,
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
-                  pw.SizedBox(height: 24),
-                  pw.Container(
-                    width: 160,
-                    height: 1,
-                    color: _slate700,
+                  pw.Expanded(
+                    child: pw.Text(
+                      note.notes!.trim(),
+                      style: const pw.TextStyle(color: _slate500, fontSize: 8),
+                    ),
                   ),
                 ],
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    isSwahili
-                        ? 'Mpokeaji (Jina na Sahihi):'
-                        : 'Received By (Sign & Date):',
-                    style: const pw.TextStyle(color: _slate500, fontSize: 8),
+            ),
+            pw.SizedBox(height: 14),
+          ],
+
+          // Dual Formal Sign-off & Legal Acceptance Columns
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Dispatched By Box
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: _slate200, width: 0.5),
+                    borderRadius:
+                        const pw.BorderRadius.all(pw.Radius.circular(6)),
                   ),
-                  pw.SizedBox(height: 24),
-                  pw.Container(
-                    width: 160,
-                    height: 1,
-                    color: _slate700,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        isSwahili
+                            ? 'ALIEANDAA / ALIESAFIRISHA'
+                            : 'DISPATCHED BY (WAREHOUSE / DRIVER)',
+                        style: pw.TextStyle(
+                          color: _slate500,
+                          fontSize: 7.5,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        'Name: ${note.driverName ?? "________________"}',
+                        style:
+                            const pw.TextStyle(color: _slate700, fontSize: 8),
+                      ),
+                      pw.SizedBox(height: 16),
+                      pw.Row(
+                        children: [
+                          pw.Text('Sign: ____________',
+                              style: const pw.TextStyle(
+                                  color: _slate500, fontSize: 8)),
+                          pw.Spacer(),
+                          pw.Text('Date: ____________',
+                              style: const pw.TextStyle(
+                                  color: _slate500, fontSize: 8)),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ),
+              pw.SizedBox(width: 14),
+              // Received In Good Condition By Box
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: _slate200, width: 0.5),
+                    borderRadius:
+                        const pw.BorderRadius.all(pw.Radius.circular(6)),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        isSwahili
+                            ? 'MPOKEA MZIGO / CONSIGNEE'
+                            : 'RECEIVED IN GOOD CONDITION',
+                        style: pw.TextStyle(
+                          color: _slate500,
+                          fontSize: 7.5,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        isSwahili
+                            ? 'Nathibitisha kupokea bidhaa hapo juu zikiwa salama.'
+                            : 'I confirm receipt of above goods in sound order.',
+                        style:
+                            const pw.TextStyle(color: _slate500, fontSize: 7),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Receiver: ${note.recipientName ?? "________________"}',
+                        style:
+                            const pw.TextStyle(color: _slate700, fontSize: 8),
+                      ),
+                      pw.SizedBox(height: 8),
+                      pw.Row(
+                        children: [
+                          pw.Text('Sign: ____________',
+                              style: const pw.TextStyle(
+                                  color: _slate500, fontSize: 8)),
+                          pw.Spacer(),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: pw.BoxDecoration(
+                              border:
+                                  pw.Border.all(color: _slate200, width: 0.5),
+                              borderRadius: const pw.BorderRadius.all(
+                                  pw.Radius.circular(4)),
+                            ),
+                            child: pw.Text(
+                              isSwahili ? 'Muhuri wa Kampuni' : 'Official Stamp',
+                              style: const pw.TextStyle(
+                                  color: _slate500, fontSize: 6.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
+          ),
+          pw.SizedBox(height: 12),
+
+          // Document Verification Footer
+          pw.Center(
+            child: pw.Text(
+              'Jolinx Business OS • ${note.number} • ${isSwahili ? "Hati hii ni ushahidi halali wa makabidhiano ya mzigo." : "This delivery note serves as formal proof of goods dispatch & receipt."}',
+              style: const pw.TextStyle(color: _slate500, fontSize: 6.5),
+            ),
           ),
         ],
       ),
@@ -2556,17 +2774,32 @@ class LocalPdfDocumentGenerator {
             pw.SizedBox(height: 4),
 
             pw.Text(
-              '${isSwahili ? "WARAKA WA MZIGO" : "DELIVERY NOTE"} ${note.number}',
+              '${isSwahili ? "HATI YA MZIGO" : "DELIVERY NOTE"} ${note.number}',
               style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold),
             ),
             pw.Text(
               dateFmt.format(note.issueDate.toLocal()),
               style: const pw.TextStyle(fontSize: 8),
             ),
+            if (note.invoiceNumber != null && note.invoiceNumber!.isNotEmpty)
+              pw.Text(
+                '${isSwahili ? "Ankara" : "Invoice"}: #${note.invoiceNumber}',
+                style: const pw.TextStyle(fontSize: 8),
+              ),
             pw.Text(
               '${isSwahili ? "Mteja" : "Client"}: ${note.customerName}',
               style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
             ),
+            if (note.vehicleNumber != null && note.vehicleNumber!.isNotEmpty)
+              pw.Text(
+                'Vehicle: ${note.vehicleNumber}',
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
+            if (note.driverName != null && note.driverName!.isNotEmpty)
+              pw.Text(
+                'Driver: ${note.driverName}',
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
 
             pw.SizedBox(height: 4),
             _buildThermalDashedLine(),
@@ -2577,10 +2810,20 @@ class LocalPdfDocumentGenerator {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Expanded(
-                    child: pw.Text(
-                      item.productName,
-                      style: pw.TextStyle(
-                          fontSize: 8, fontWeight: pw.FontWeight.bold),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          item.productName,
+                          style: pw.TextStyle(
+                              fontSize: 8, fontWeight: pw.FontWeight.bold),
+                        ),
+                        if (item.sku != null && item.sku!.isNotEmpty)
+                          pw.Text(
+                            'SKU: ${item.sku}',
+                            style: const pw.TextStyle(fontSize: 7),
+                          ),
+                      ],
                     ),
                   ),
                   pw.Text(
@@ -2590,7 +2833,7 @@ class LocalPdfDocumentGenerator {
                   ),
                 ],
               ),
-              pw.SizedBox(height: 2),
+              pw.SizedBox(height: 3),
             ],
 
             pw.SizedBox(height: 4),

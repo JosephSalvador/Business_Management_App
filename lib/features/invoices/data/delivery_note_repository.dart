@@ -140,10 +140,18 @@ class DeliveryNoteRepository {
     } catch (_) {}
   }
 
+  static bool _isValidGuid(String val) {
+    final guidRegex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
+    return guidRegex.hasMatch(val.trim());
+  }
+
   Future<DeliveryNote> create({
     required String customerName,
     required List<DeliveryNoteItem> items,
     String? invoiceId,
+    String? invoiceNumber,
     String? customerId,
     String? customerPhone,
     String? customerAddress,
@@ -171,6 +179,7 @@ class DeliveryNoteRepository {
       status: DeliveryNoteStatus.draft,
       items: items,
       invoiceId: invoiceId,
+      invoiceNumber: invoiceNumber,
       customerId: customerId,
       customerPhone: customerPhone?.trim(),
       customerAddress: customerAddress?.trim(),
@@ -192,8 +201,12 @@ class DeliveryNoteRepository {
       'id': clientId,
       'customerName': customerName.trim(),
       'issueDate': issued.toUtc().toIso8601String(),
-      if (invoiceId != null && invoiceId.isNotEmpty) 'invoiceId': invoiceId,
-      if (customerId != null && customerId.isNotEmpty) 'customerId': customerId,
+      if (invoiceId != null && invoiceId.isNotEmpty && _isValidGuid(invoiceId))
+        'invoiceId': invoiceId,
+      if (invoiceNumber != null && invoiceNumber.isNotEmpty)
+        'invoiceNumber': invoiceNumber,
+      if (customerId != null && customerId.isNotEmpty && _isValidGuid(customerId))
+        'customerId': customerId,
       if (customerPhone != null && customerPhone.trim().isNotEmpty)
         'customerPhone': customerPhone.trim(),
       if (customerAddress != null && customerAddress.trim().isNotEmpty)
@@ -211,7 +224,23 @@ class DeliveryNoteRepository {
       if (driverPhone != null && driverPhone.trim().isNotEmpty)
         'driverPhone': driverPhone.trim(),
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-      'items': [for (final item in items) item.toJson()],
+      'items': [
+        for (final item in items)
+          {
+            'description': item.productName,
+            'productName': item.productName,
+            if (item.productId != null &&
+                item.productId!.isNotEmpty &&
+                _isValidGuid(item.productId!))
+              'productId': item.productId,
+            if (item.sku != null && item.sku!.isNotEmpty) 'sku': item.sku,
+            'unitOfMeasure':
+                item.unitOfMeasure.isNotEmpty ? item.unitOfMeasure : 'Pcs',
+            'quantityOrdered': item.quantityOrdered,
+            'quantityDelivered': item.quantityToDeliver,
+            'quantityToDeliver': item.quantityToDeliver,
+          }
+      ],
     };
 
     // 3. Enqueue into persistent SyncQueue

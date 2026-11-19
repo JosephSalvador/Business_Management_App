@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
+import '../../../products/data/product_providers.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../data/invoice_providers.dart';
 import '../../domain/document_template.dart';
@@ -116,15 +117,22 @@ class _CreateDeliveryNoteSheetState
     setState(() => _isCreating = true);
 
     try {
+      final productsState = ref.read(productsControllerProvider);
+      final productMap = {for (final p in productsState.products) p.id: p};
+
       final deliveryItems = <DeliveryNoteItem>[];
       for (final line in widget.invoice.lines) {
         final qty = _quantities[line.id] ?? 0;
         if (qty > 0) {
+          final matchedProduct =
+              line.productId != null ? productMap[line.productId] : null;
+          final resolvedSku = line.sku ?? matchedProduct?.sku;
           deliveryItems.add(
             DeliveryNoteItem(
               id: _uuid.v4(),
               productId: line.productId,
               productName: line.description,
+              sku: resolvedSku,
               quantityOrdered: line.quantity,
               quantityToDeliver: qty,
               unitOfMeasure: line.unitOfMeasure,
@@ -138,6 +146,7 @@ class _CreateDeliveryNoteSheetState
         customerName: widget.invoice.customerLabel,
         items: deliveryItems,
         invoiceId: widget.invoice.id,
+        invoiceNumber: widget.invoice.number,
         customerId: widget.invoice.customerId,
         customerPhone: widget.invoice.customerPhone,
         customerAddress: widget.invoice.customerAddress,

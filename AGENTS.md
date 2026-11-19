@@ -354,4 +354,14 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 8: Version Bump — Bump version code to `1.0.0+91` in `pubspec.yaml` and `app_update_service.dart`.
 - [x] Task 9: Commit, Push & Remote CI/CD Staging Build — Commit and push to `feature/invoice-delivery`, and trigger GitHub Actions `build-clients.yml` for staging APK release (Run 44487179116 — APK published to `staging-latest`).
 
+## Implementation Plan — Executive Delivery Note Template, SKU Glyph Fix & Sync Validation (Build 92)
+- [x] Task 1: Fix SKU Missing Glyph / Broken Icon Bug — Replaced unicode em-dash `\u2014` (`'—'`) in `LocalPdfDocumentGenerator` with clean ASCII hyphen `'-'`. Unicode em-dash was missing from standard PDF WinAnsi font tables, causing the PDF canvas on Web & mobile to render a missing glyph box/icon.
+- [x] Task 2: Populate Product SKU Across Invoices & Delivery Notes — Added `sku` to `InvoiceLine`, `InvoiceDraftLine`, `_LineInputs`, `create_invoice_page.dart`, and `create_delivery_note_sheet.dart` with automatic catalog product lookup fallback so actual SKUs are always passed to `DeliveryNoteItem`.
+- [x] Task 3: World-Class Executive Delivery Note Template — Redesigned `generateDeliveryNoteA4` with company logo/monogram, linked Sales Invoice reference (`#INV-...`), dual side-by-side logistics cards (Consignee & Destination vs Transport & Dispatch), item verification table with SKU column & completion status (`Complete` vs `Partial`), table totals summary strip, handling notes callout, dual formal sign-off boxes (Dispatched By & Received In Good Condition By with Official Rubber Stamp box), and document security footer.
+- [x] Task 4: 80mm Continuous Thermal Delivery Note Profile — Enhanced `generateDeliveryNoteThermal80mm` with linked invoice number, vehicle/driver info, SKU, and recipient signature line.
+- [x] Task 5: Backend Synchronization Compliance & Validation Fix — Added `description`, `productName`, `quantityDelivered`, and `quantityToDeliver` to `DeliveryNoteItem.toJson()` and `_syncSingleDeliveryNote` in `SyncQueueProcessor` and `DeliveryNoteRepository`. Added `_isValidGuid` validation to prevent sending empty/invalid IDs to C# backend `Guid?` parameters, resolving HTTP 400 Bad Request errors.
+- [x] Task 6: Document Template 404 Prevention — Updated `DocumentTemplateRepository.getTemplate(id)` to immediately return built-in template details for `tpl-` client archetype IDs without firing remote HTTP GET calls that 404 on the backend.
+- [x] Task 7: Version Bump — Bumped version code to `1.0.0+92` in `pubspec.yaml` and `app_update_service.dart`.
+
+
 

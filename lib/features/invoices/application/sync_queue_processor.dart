@@ -158,24 +158,67 @@ class SyncQueueProcessor {
     }
   }
 
+  static bool _isValidGuid(String val) {
+    final guidRegex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
+    return guidRegex.hasMatch(val.trim());
+  }
+
   Future<void> _syncSingleDeliveryNote(DeliveryNote note) async {
     try {
       final payload = <String, dynamic>{
         'id': note.id,
         'customerName': note.customerName,
         'issueDate': note.issueDate.toUtc().toIso8601String(),
-        if (note.invoiceId != null) 'invoiceId': note.invoiceId,
-        if (note.customerId != null) 'customerId': note.customerId,
-        if (note.customerPhone != null) 'customerPhone': note.customerPhone,
-        if (note.customerAddress != null) 'customerAddress': note.customerAddress,
-        if (note.deliveryAddress != null) 'deliveryAddress': note.deliveryAddress,
-        if (note.carrierName != null) 'carrierName': note.carrierName,
-        if (note.trackingNumber != null) 'trackingNumber': note.trackingNumber,
-        if (note.vehicleNumber != null) 'vehicleNumber': note.vehicleNumber,
-        if (note.driverName != null) 'driverName': note.driverName,
-        if (note.driverPhone != null) 'driverPhone': note.driverPhone,
-        if (note.notes != null) 'notes': note.notes,
-        'items': [for (final item in note.items) item.toJson()],
+        if (note.invoiceId != null &&
+            note.invoiceId!.isNotEmpty &&
+            _isValidGuid(note.invoiceId!))
+          'invoiceId': note.invoiceId,
+        if (note.invoiceNumber != null && note.invoiceNumber!.isNotEmpty)
+          'invoiceNumber': note.invoiceNumber,
+        if (note.customerId != null &&
+            note.customerId!.isNotEmpty &&
+            _isValidGuid(note.customerId!))
+          'customerId': note.customerId,
+        if (note.customerPhone != null && note.customerPhone!.trim().isNotEmpty)
+          'customerPhone': note.customerPhone!.trim(),
+        if (note.customerAddress != null &&
+            note.customerAddress!.trim().isNotEmpty)
+          'customerAddress': note.customerAddress!.trim(),
+        if (note.deliveryAddress != null &&
+            note.deliveryAddress!.trim().isNotEmpty)
+          'deliveryAddress': note.deliveryAddress!.trim(),
+        if (note.carrierName != null && note.carrierName!.trim().isNotEmpty)
+          'carrierName': note.carrierName!.trim(),
+        if (note.trackingNumber != null &&
+            note.trackingNumber!.trim().isNotEmpty)
+          'trackingNumber': note.trackingNumber!.trim(),
+        if (note.vehicleNumber != null && note.vehicleNumber!.trim().isNotEmpty)
+          'vehicleNumber': note.vehicleNumber!.trim(),
+        if (note.driverName != null && note.driverName!.trim().isNotEmpty)
+          'driverName': note.driverName!.trim(),
+        if (note.driverPhone != null && note.driverPhone!.trim().isNotEmpty)
+          'driverPhone': note.driverPhone!.trim(),
+        if (note.notes != null && note.notes!.trim().isNotEmpty)
+          'notes': note.notes!.trim(),
+        'items': [
+          for (final item in note.items)
+            {
+              'description': item.productName,
+              'productName': item.productName,
+              if (item.productId != null &&
+                  item.productId!.isNotEmpty &&
+                  _isValidGuid(item.productId!))
+                'productId': item.productId,
+              if (item.sku != null && item.sku!.isNotEmpty) 'sku': item.sku,
+              'unitOfMeasure':
+                  item.unitOfMeasure.isNotEmpty ? item.unitOfMeasure : 'Pcs',
+              'quantityOrdered': item.quantityOrdered,
+              'quantityDelivered': item.quantityToDeliver,
+              'quantityToDeliver': item.quantityToDeliver,
+            }
+        ],
       };
 
       final response = await _apiClient.post<dynamic>(

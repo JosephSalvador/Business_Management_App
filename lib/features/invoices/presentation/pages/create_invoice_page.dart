@@ -248,6 +248,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       return InvoiceLine(
         id: 'draft-line-$i',
         productId: line.productId,
+        sku: line.sku,
         description: line.description.text.trim(),
         unitOfMeasure: line.unitOfMeasure,
         quantity: line.parsedQuantity,
@@ -1414,6 +1415,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
           availablePrices[selected.id] ?? selected.costPrice ?? 0;
       setState(() {
         line.productId = selected.id;
+        line.sku = selected.sku;
         line.description.text = selected.name;
         if (price > 0) {
           line.unitPrice.text = price.toStringAsFixed(0);
@@ -1436,6 +1438,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
         .map(
           (line) => InvoiceDraftLine(
             productId: line.productId,
+            sku: line.sku,
             description: line.description.text.trim(),
             unitOfMeasure: line.unitOfMeasure,
             quantity: line.parsedQuantity,
@@ -1558,6 +1561,7 @@ class _SectionHeader extends StatelessWidget {
 
 class _LineInputs {
   String? productId;
+  String? sku;
   String unitOfMeasure = 'Pcs';
   final description = TextEditingController();
   final quantity = TextEditingController(text: '1');

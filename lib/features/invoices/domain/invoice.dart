@@ -33,10 +33,12 @@ class InvoiceLine {
     this.unitOfMeasure = 'Pcs',
     this.discountAmount = 0,
     this.productId,
+    this.sku,
   }) : taxRatePercent = taxRate ?? taxRatePercent;
 
   final String id;
   final String? productId;
+  final String? sku;
   final String description;
   final String unitOfMeasure;
   final double quantity;
@@ -50,6 +52,8 @@ class InvoiceLine {
 
   factory InvoiceLine.fromJson(Map<String, dynamic> json) => InvoiceLine(
         id: _requiredString(json, 'id'),
+        productId: _optionalString(json, 'productId'),
+        sku: _optionalString(json, 'sku'),
         description: _requiredString(json, 'description'),
         unitOfMeasure: _optionalString(json, 'unitOfMeasure') ?? 'Pcs',
         quantity: _requiredDouble(json, 'quantity'),
@@ -62,6 +66,8 @@ class InvoiceLine {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        if (productId != null) 'productId': productId,
+        if (sku != null) 'sku': sku,
         'description': description,
         'unitOfMeasure': unitOfMeasure,
         'quantity': quantity,
@@ -534,6 +540,7 @@ class InvoicePage {
 class InvoiceDraftLine {
   InvoiceDraftLine({
     this.productId,
+    this.sku,
     this.description = '',
     this.unitOfMeasure = 'Pcs',
     this.quantity = 1,
@@ -543,6 +550,7 @@ class InvoiceDraftLine {
   });
 
   String? productId;
+  String? sku;
   String description;
   String unitOfMeasure;
   double quantity;
@@ -561,6 +569,7 @@ class InvoiceDraftLine {
 
   Map<String, dynamic> toJson() => {
         if (productId != null) 'productId': productId,
+        if (sku != null && sku!.isNotEmpty) 'sku': sku,
         'description': description.trim(),
         'unitOfMeasure':
             unitOfMeasure.trim().isEmpty ? 'Pcs' : unitOfMeasure.trim(),
