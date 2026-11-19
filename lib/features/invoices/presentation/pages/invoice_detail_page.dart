@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../app/providers.dart';
 import '../../../../app/router.dart';
@@ -11,8 +12,11 @@ import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_repository.dart';
+import '../../application/delivery_notes_controller.dart';
 import '../../application/document_template_controller.dart';
 import '../../application/invoices_controller.dart';
+import '../../domain/delivery_note.dart';
+import '../../domain/document_template.dart';
 import '../../domain/invoice.dart';
 import '../services/customer_invoice_pdf_service.dart';
 import '../widgets/create_delivery_note_sheet.dart';
@@ -41,6 +45,7 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     Future.microtask(() {
       ref.read(settingsControllerProvider.notifier).load();
       ref.read(documentTemplateControllerProvider.notifier).ensureLoaded();
+      ref.read(deliveryNotesControllerProvider.notifier).load();
       _load();
     });
   }
@@ -455,17 +460,170 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
-                onPressed: () => showCreateDeliveryNoteSheet(
-                  context,
-                  invoice: invoice,
-                  organization: organization,
-                ),
+                onPressed: () async {
+                  final created = await showCreateDeliveryNoteSheet(
+                    context,
+                    invoice: invoice,
+                    organization: organization,
+                  );
+                  if (created != null) {
+                    ref.read(deliveryNotesControllerProvider.notifier).refresh();
+                  }
+                },
                 icon: const Icon(Icons.add_task_outlined, size: 16),
                 label: Text(isSwahili ? 'Toa Waraka' : 'Dispatch'),
               ),
             ],
           ),
         ),
+
+        // Issued Delivery Notes List for this Invoice
+        if (ref.watch(deliveryNotesControllerProvider) is DeliveryNotesLoaded) ...[
+          () {
+            final dnLoaded =
+                ref.watch(deliveryNotesControllerProvider) as DeliveryNotesLoaded;
+            final invoiceNotes =
+                dnLoaded.items.where((n) => n.invoiceId == invoice.id).toList();
+            if (invoiceNotes.isEmpty) return const SizedBox.shrink();
+
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF132220)
+                    : const Color(0xFFF0FDFA),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.local_shipping_outlined,
+                            size: 18,
+                            color: Color(0xFF0D9488),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isSwahili
+                                ? 'Waraka wa Mzigo Uliotolewa (${invoiceNotes.length})'
+                                : 'Issued Delivery Notes (${invoiceNotes.length})',
+                            style: TextStyle(
+                              color: AppColors.resolveTextPrimary(context),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        isSwahili ? 'Mizigo' : 'Dispatches',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0D9488),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  for (final note in invoiceNotes)
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => InvoicePreviewScreen(
+                              documentId: note.id,
+                              documentNumber: note.number,
+                              documentType: DocumentType.deliveryNote,
+                            ),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.resolveBorder(context),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    note.number,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color:
+                                          AppColors.resolveTextPrimary(context),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isSwahili
+                                        ? '${note.itemCount} bidhaa • ${DateFormat('dd/MM/yyyy HH:mm').format(note.issueDate)}'
+                                        : '${note.itemCount} items • ${DateFormat('dd/MM/yyyy HH:mm').format(note.issueDate)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color:
+                                          AppColors.resolveTextSecondary(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => InvoicePreviewScreen(
+                                      documentId: note.id,
+                                      documentNumber: note.number,
+                                      documentType: DocumentType.deliveryNote,
+                                    ),
+                                  ),
+                                );
+                              },
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: const Icon(Icons.print_outlined, size: 14),
+                              label: Text(
+                                isSwahili ? 'Fungua / Print' : 'View / Print',
+                                style: const TextStyle(fontSize: 11.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }(),
+        ],
 
         const SizedBox(height: 14),
 

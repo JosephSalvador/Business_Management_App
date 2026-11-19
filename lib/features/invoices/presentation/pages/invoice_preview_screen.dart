@@ -4,8 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pdf/pdf.dart' hide PdfDocument;
-import 'package:pdfx/pdfx.dart';
+import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 
 import '../../../../app/router.dart';
@@ -18,6 +17,7 @@ import '../../../settings/data/organization_providers.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../application/document_template_controller.dart';
 import '../../data/invoice_providers.dart';
+import '../../domain/delivery_note.dart';
 import '../../domain/document_template.dart';
 import '../../domain/invoice.dart';
 import '../services/local_pdf_document_generator.dart';
@@ -32,6 +32,7 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
     this.documentNumber = '',
     this.documentType = DocumentType.invoice,
     this.initialInvoice,
+    this.initialDeliveryNote,
     this.initialIsThermal = false,
     this.initialThemePrimaryHex = '#0F172A',
     this.initialThemeSecondaryHex = '#0D9488',
@@ -41,6 +42,7 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
   final String documentNumber;
   final DocumentType documentType;
   final CustomerInvoice? initialInvoice;
+  final DeliveryNote? initialDeliveryNote;
   final bool initialIsThermal;
   final String initialThemePrimaryHex;
   final String initialThemeSecondaryHex;
@@ -53,7 +55,6 @@ class InvoicePreviewScreen extends ConsumerStatefulWidget {
 class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     with SingleTickerProviderStateMixin {
   late TabController _phoneTabController;
-  PdfController? _pdfController;
   Uint8List? _rawPdfBytes;
 
   bool _isLoading = false;
@@ -101,7 +102,6 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
   void dispose() {
     _debounceTimer?.cancel();
     _phoneTabController.dispose();
-    _pdfController?.dispose();
     super.dispose();
   }
 
@@ -191,9 +191,18 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                 isSwahili: isSwahili,
               );
       } else {
-        final note = await ref
-            .read(deliveryNoteRepositoryProvider)
-            .getById(widget.documentId);
+        DeliveryNote note;
+        try {
+          note = await ref
+              .read(deliveryNoteRepositoryProvider)
+              .getById(widget.documentId);
+        } catch (_) {
+          if (widget.initialDeliveryNote != null) {
+            note = widget.initialDeliveryNote!;
+          } else {
+            rethrow;
+          }
+        }
         isDocSynced = note.isSynced;
         pdfBytes = _isThermal
             ? await localCompiler.generateDeliveryNoteThermal80mm(
@@ -210,16 +219,10 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
               );
       }
 
-      _pdfController?.dispose();
-      final controller = PdfController(
-        document: PdfDocument.openData(pdfBytes),
-      );
-
       if (!mounted) return;
 
       setState(() {
         _rawPdfBytes = pdfBytes;
-        _pdfController = controller;
         _isLoading = false;
         _isSynced = isDocSynced;
       });
@@ -233,6 +236,12 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
   }
 
   String _effectiveDocNumber(BuildContext context) {
+    if (widget.documentType == DocumentType.deliveryNote) {
+      if (widget.initialDeliveryNote != null) {
+        return widget.initialDeliveryNote!.number;
+      }
+      return widget.documentNumber;
+    }
     if (widget.initialInvoice != null) {
       final org = ref.watch(settingsControllerProvider);
       final tplConfig =
@@ -740,7 +749,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       );
     }
 
-    if (_pdfController == null) {
+    if (_rawPdfBytes == null) {
       return Center(
         child: Text(
           isSw ? 'Hakuna hati iliyopatikana.' : 'No document available.',
@@ -754,79 +763,34 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double maxAvailWidth =
-            (constraints.maxWidth - 24).clamp(240.0, _isThermal ? 340.0 : 680.0);
-        final double aspectRatio = _isThermal ? 0.48 : (1 / 1.4142);
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: maxAvailWidth,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(_isThermal ? 4 : 8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-                border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF475569)
-                      : (_isThermal
-                          ? const Color(0xFFCBD5E1)
-                          : const Color(0xFFE2E8F0)),
-                  width: _isThermal ? 2.0 : 1.0,
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: AspectRatio(
-                aspectRatio: aspectRatio,
-                child: Stack(
-                  children: [
-                    PdfView(
-                      controller: _pdfController!,
-                      pageSnapping: false,
-                    ),
-                    Positioned(
-                      bottom: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: (isDark
-                                  ? const Color(0xFF334155)
-                                  : const Color(0xFF0F172A))
-                              .withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _isThermal ? '80mm Roll' : 'A4 Sheet',
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+    return Container(
+      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+      child: PdfPreview(
+        key: ValueKey('${_rawPdfBytes.hashCode}_$_isThermal'),
+        build: (format) async => _rawPdfBytes!,
+        useActions: false,
+        canChangeOrientation: false,
+        canChangePageFormat: false,
+        canDebug: false,
+        maxPageWidth: _isThermal ? 360 : 720,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        scrollViewDecoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        ),
+        loadingWidget: const Center(
+          child: CircularProgressIndicator(),
+        ),
+        onError: (context, error) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              error.toString(),
+              style: const TextStyle(color: AppColors.error),
+              textAlign: TextAlign.center,
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

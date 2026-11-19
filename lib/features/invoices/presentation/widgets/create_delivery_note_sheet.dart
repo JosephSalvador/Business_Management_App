@@ -168,6 +168,7 @@ class _CreateDeliveryNoteSheetState
             documentId: note.id,
             documentNumber: note.number,
             documentType: DocumentType.deliveryNote,
+            initialDeliveryNote: note,
           ),
         ),
       );

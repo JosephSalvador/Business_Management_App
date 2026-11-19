@@ -114,7 +114,7 @@ class DeliveryNoteRepository {
         await _cache.save('delivery_note_$id', note.toJson());
       }
       return note;
-    } on AppException {
+    } catch (_) {
       if (_cache != null) {
         final cached = await _cache.load('delivery_note_$id');
         if (cached != null) {

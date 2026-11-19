@@ -12,10 +12,14 @@ import '../../../../shared/format/money.dart';
 import '../../../../shared/widgets/app_search_bar.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/wave_background/wave_background.dart';
+import '../../application/delivery_notes_controller.dart';
 import '../../application/document_template_controller.dart';
 import '../../application/invoices_controller.dart';
+import '../../domain/delivery_note.dart';
+import '../../domain/document_template.dart';
 import '../../domain/invoice.dart';
 import '../widgets/invoice_branding_sheet.dart';
+import 'invoice_preview_screen.dart';
 import '../../../settings/application/settings_controller.dart';
 import '../../../settings/data/organization_providers.dart';
 
@@ -26,21 +30,36 @@ class InvoicesPage extends ConsumerStatefulWidget {
   ConsumerState<InvoicesPage> createState() => _InvoicesPageState();
 }
 
-class _InvoicesPageState extends ConsumerState<InvoicesPage> {
+class _InvoicesPageState extends ConsumerState<InvoicesPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final _searchController = TextEditingController();
+  final _dnSearchController = TextEditingController();
   Timer? _debounce;
+  Timer? _dnDebounce;
   String _filter = '';
+  String _dnFilter = '';
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+      if (_tabController.index == 1) {
+        ref.read(deliveryNotesControllerProvider.notifier).load();
+      }
+    });
     ref.read(invoicesControllerProvider.notifier).load();
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _dnDebounce?.cancel();
     _searchController.dispose();
+    _dnSearchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -89,25 +108,48 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
             onPressed: () => context.push(Routes.invoiceNew),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(Routes.invoiceNew),
-        icon: const Icon(Icons.add),
-        label: Text(loc.invoicesAdd),
-      ),
-      body: WaveBackground(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: AppSearchBar(
-                controller: _searchController,
-                hintText: loc.invoicesSearch,
-                onChanged: _onSearchChanged,
-              ),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.receipt_long, size: 18),
+              text: isSw ? 'Ankara za Mauzo' : 'Sales Invoices',
             ),
-            _StatusFilters(state: state),
-            Expanded(child: _buildBody(state, isSw, invoicePrefix)),
+            Tab(
+              icon: const Icon(Icons.local_shipping_outlined, size: 18),
+              text: isSw ? 'Waraka wa Mzigo' : 'Delivery Notes',
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: _tabController.index == 0
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push(Routes.invoiceNew),
+              icon: const Icon(Icons.add),
+              label: Text(loc.invoicesAdd),
+            )
+          : null,
+      body: WaveBackground(
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            // Tab 1: Invoices
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: AppSearchBar(
+                    controller: _searchController,
+                    hintText: loc.invoicesSearch,
+                    onChanged: _onSearchChanged,
+                  ),
+                ),
+                _StatusFilters(state: state),
+                Expanded(child: _buildBody(state, isSw, invoicePrefix)),
+              ],
+            ),
+            // Tab 2: Delivery Notes
+            _buildDeliveryNotesTab(context, isSw),
           ],
         ),
       ),
@@ -194,6 +236,435 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
           );
         }(),
     };
+  }
+
+  Widget _buildDeliveryNotesTab(BuildContext context, bool isSw) {
+    final dnState = ref.watch(deliveryNotesControllerProvider);
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: AppSearchBar(
+            controller: _dnSearchController,
+            hintText: isSw
+                ? 'Tafuta kwa namba, mteja, msafirishaji...'
+                : 'Search note #, customer, carrier...',
+            onChanged: (val) {
+              setState(() => _dnFilter = val.trim().toLowerCase());
+              _dnDebounce?.cancel();
+              _dnDebounce = Timer(const Duration(milliseconds: 350), () {
+                ref
+                    .read(deliveryNotesControllerProvider.notifier)
+                    .load(search: val.trim(), silent: true);
+              });
+            },
+          ),
+        ),
+        _DeliveryNoteStatusFilters(
+          selectedStatus:
+              dnState is DeliveryNotesLoaded ? dnState.status : null,
+          onSelect: (st) => ref
+              .read(deliveryNotesControllerProvider.notifier)
+              .toggleStatus(st),
+          isSwahili: isSw,
+        ),
+        Expanded(
+          child: _buildDeliveryNotesList(context, dnState, isSw),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeliveryNotesList(
+    BuildContext context,
+    DeliveryNotesState state,
+    bool isSw,
+  ) {
+    return switch (state) {
+      DeliveryNotesLoading() =>
+        const Center(child: CircularProgressIndicator()),
+      DeliveryNotesFailure(:final message) => Center(
+          child: Text(
+            message,
+            style: TextStyle(color: AppColors.resolveTextSecondary(context)),
+          ),
+        ),
+      DeliveryNotesLoaded(:final items) => () {
+          final filtered = _dnFilter.isEmpty
+              ? items
+              : items.where((dn) {
+                  final num = dn.number.toLowerCase();
+                  final name = dn.customerName.toLowerCase();
+                  final carrier = (dn.carrierName ?? '').toLowerCase();
+                  final vehicle = (dn.vehicleNumber ?? '').toLowerCase();
+                  return num.contains(_dnFilter) ||
+                      name.contains(_dnFilter) ||
+                      carrier.contains(_dnFilter) ||
+                      vehicle.contains(_dnFilter);
+                }).toList();
+
+          if (filtered.isEmpty) {
+            if (_dnFilter.isNotEmpty) {
+              return Center(
+                child: Text(
+                  isSw
+                      ? 'Hakuna waraka uliopatikana kwa "$_dnFilter"'
+                      : 'No delivery notes found matching "$_dnFilter"',
+                  style: TextStyle(
+                      color: AppColors.resolveTextSecondary(context)),
+                ),
+              );
+            }
+            return EmptyState(
+              icon: Icons.local_shipping_outlined,
+              title: isSw
+                  ? 'Hakuna Waraka wa Usafirishaji'
+                  : 'No Delivery Notes Generated',
+              message: isSw
+                  ? 'Mihuri na nyaraka zote za usafirishaji zitaonekana hapa ukizitoa kwenye ankara.'
+                  : 'All generated delivery notes will appear here once issued from an invoice.',
+              actionLabel: isSw ? 'Tazama Ankara' : 'View Invoices',
+              onAction: () => _tabController.animateTo(0),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () =>
+                ref.read(deliveryNotesControllerProvider.notifier).refresh(),
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+              itemCount: filtered.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isSw
+                              ? 'Jumla ya Waraka: ${filtered.length}'
+                              : 'Total Delivery Notes: ${filtered.length}',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.resolveTextSecondary(context),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D9488)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isSw ? 'USAFIRISHAJI' : 'LOGISTICS DISPATCH',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0D9488),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                final note = filtered[index - 1];
+                return _DeliveryNoteCard(note: note, isSwahili: isSw);
+              },
+            ),
+          );
+        }(),
+    };
+  }
+}
+
+class _DeliveryNoteStatusFilters extends StatelessWidget {
+  const _DeliveryNoteStatusFilters({
+    required this.selectedStatus,
+    required this.onSelect,
+    required this.isSwahili,
+  });
+
+  final DeliveryNoteStatus? selectedStatus;
+  final ValueChanged<DeliveryNoteStatus> onSelect;
+  final bool isSwahili;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: [
+          FilterChip(
+            selected: selectedStatus == null,
+            label: Text(isSwahili ? 'Zote' : 'All'),
+            onSelected: (_) {
+              if (selectedStatus != null) {
+                onSelect(selectedStatus!);
+              }
+            },
+          ),
+          const SizedBox(width: 6),
+          for (final st in DeliveryNoteStatus.values) ...[
+            FilterChip(
+              selected: selectedStatus == st,
+              label: Text(_statusLabel(st, isSwahili)),
+              onSelected: (_) => onSelect(st),
+            ),
+            const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _statusLabel(DeliveryNoteStatus st, bool isSw) {
+    switch (st) {
+      case DeliveryNoteStatus.draft:
+        return isSw ? 'Rasimu' : 'Draft';
+      case DeliveryNoteStatus.dispatched:
+        return isSw ? 'Zilizosafirishwa' : 'Dispatched';
+      case DeliveryNoteStatus.delivered:
+        return isSw ? 'Zilizowasilishwa' : 'Delivered';
+      case DeliveryNoteStatus.cancelled:
+        return isSw ? 'Zilizofutwa' : 'Cancelled';
+    }
+  }
+}
+
+class _DeliveryNoteCard extends StatelessWidget {
+  const _DeliveryNoteCard({
+    required this.note,
+    required this.isSwahili,
+  });
+
+  final DeliveryNoteSummary note;
+  final bool isSwahili;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = DateFormat('dd MMM yyyy, HH:mm').format(note.issueDate);
+
+    Color statusColor;
+    String statusLabel;
+    switch (note.status) {
+      case DeliveryNoteStatus.draft:
+        statusColor = const Color(0xFFD97706);
+        statusLabel = isSwahili ? 'Rasimu' : 'Draft';
+        break;
+      case DeliveryNoteStatus.dispatched:
+        statusColor = const Color(0xFF0D9488);
+        statusLabel = isSwahili ? 'Imesafirishwa' : 'Dispatched';
+        break;
+      case DeliveryNoteStatus.delivered:
+        statusColor = const Color(0xFF059669);
+        statusLabel = isSwahili ? 'Imewasilishwa' : 'Delivered';
+        break;
+      case DeliveryNoteStatus.cancelled:
+        statusColor = const Color(0xFFDC2626);
+        statusLabel = isSwahili ? 'Imefutwa' : 'Cancelled';
+        break;
+    }
+
+    void openPreview() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => InvoicePreviewScreen(
+            documentId: note.id,
+            documentNumber: note.number,
+            documentType: DocumentType.deliveryNote,
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.resolveBorder(context),
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: openPreview,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Number, Status badge, and Sync icon
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.local_shipping_outlined,
+                      size: 20,
+                      color: Color(0xFF0D9488),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note.number,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: AppColors.resolveTextPrimary(context),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dateStr,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.resolveTextSecondary(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    note.isSynced
+                        ? Icons.cloud_done_outlined
+                        : Icons.access_time_rounded,
+                    size: 16,
+                    color: note.isSynced
+                        ? const Color(0xFF059669)
+                        : AppColors.resolveTextSecondary(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Customer Name
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    size: 15,
+                    color: AppColors.resolveTextSecondary(context),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      note.customerName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                        color: AppColors.resolveTextPrimary(context),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              if (note.carrierName != null || note.vehicleNumber != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.directions_car_outlined,
+                      size: 15,
+                      color: AppColors.resolveTextSecondary(context),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      [
+                        if (note.carrierName != null) note.carrierName,
+                        if (note.vehicleNumber != null) note.vehicleNumber,
+                      ].join(' • '),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.resolveTextSecondary(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              // Bottom Row: Items count and View & Print button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 15,
+                        color: AppColors.resolveTextSecondary(context),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isSwahili
+                            ? '${note.itemCount} bidhaa (Jumla: ${note.totalQuantity.toStringAsFixed(note.totalQuantity.truncateToDouble() == note.totalQuantity ? 0 : 1)})'
+                            : '${note.itemCount} items (Qty: ${note.totalQuantity.toStringAsFixed(note.totalQuantity.truncateToDouble() == note.totalQuantity ? 0 : 1)})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.resolveTextSecondary(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: openPreview,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.print_outlined, size: 15),
+                    label: Text(
+                      isSwahili ? 'Tazama / Print' : 'Preview / Print',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

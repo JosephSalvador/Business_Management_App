@@ -67,7 +67,19 @@ class _ReceiptPreviewPageState extends ConsumerState<ReceiptPreviewPage> {
         final sale =
             await ref.read(saleRepositoryProvider).getById(widget.saleId);
         if (mounted) {
-          setState(() => _sale = sale);
+          final printerService = ref.read(receiptPrinterServiceProvider);
+          final workspace = ref.read(workspaceControllerProvider);
+          final businessName = workspace is WorkspaceReady &&
+                  workspace.selected != null
+              ? workspace.selected!.name
+              : 'Business OS';
+          setState(() {
+            _sale = sale;
+            _receipt = printerService.saleToReceipt(
+              sale: sale,
+              businessName: businessName,
+            );
+          });
         }
       } on Exception catch (_) {
         // Fallback: reconstruct from local SQLite sale record if available

@@ -644,6 +644,84 @@ void main() {
       expect(thermalBytes, isNotEmpty);
       expect(thermalBytes.sublist(0, 4), [0x25, 0x50, 0x44, 0x46]);
     });
+
+    test('DeliveryNoteSummary and DeliveryNote round-trip serialization with vehicle and invoiceId', () {
+      final note = DeliveryNote(
+        id: 'dn-uuid-999',
+        number: 'DN-202611-0099',
+        customerName: 'Tanzania Breweries Ltd',
+        status: DeliveryNoteStatus.dispatched,
+        issueDate: DateTime.utc(2026, 11, 19, 10, 0),
+        invoiceId: 'inv-uuid-123',
+        vehicleNumber: 'T 123 ABC',
+        carrierName: 'FastHaul Logistics',
+        items: const [
+          DeliveryNoteItem(
+            id: 'item-1',
+            productName: 'Barley Malt 25kg',
+            quantityOrdered: 50,
+            quantityToDeliver: 50,
+            unitOfMeasure: 'Bags',
+          ),
+        ],
+        isSynced: true,
+      );
+
+      final summary = note.toSummary();
+      expect(summary.id, 'dn-uuid-999');
+      expect(summary.number, 'DN-202611-0099');
+      expect(summary.invoiceId, 'inv-uuid-123');
+      expect(summary.vehicleNumber, 'T 123 ABC');
+      expect(summary.carrierName, 'FastHaul Logistics');
+      expect(summary.itemCount, 1);
+      expect(summary.totalQuantity, 50);
+
+      final summaryJson = summary.toJson();
+      expect(summaryJson['vehicleNumber'], 'T 123 ABC');
+      expect(summaryJson['invoiceId'], 'inv-uuid-123');
+
+      final restored = DeliveryNoteSummary.fromJson(summaryJson);
+      expect(restored.id, 'dn-uuid-999');
+      expect(restored.invoiceId, 'inv-uuid-123');
+      expect(restored.vehicleNumber, 'T 123 ABC');
+      expect(restored.carrierName, 'FastHaul Logistics');
+    });
+
+    test('LocalPdfDocumentGenerator generates valid PDF bytes for Delivery Note A4 and Thermal', () async {
+      final generator = LocalPdfDocumentGenerator();
+      final note = DeliveryNote(
+        id: 'dn-pdf-test',
+        number: 'DN-202611-0055',
+        customerName: 'Bakhresa Group',
+        status: DeliveryNoteStatus.draft,
+        issueDate: DateTime.utc(2026, 11, 19, 14, 0),
+        vehicleNumber: 'T 999 ZZZ',
+        driverName: 'Juma Hamisi',
+        items: const [
+          DeliveryNoteItem(
+            id: 'item-1',
+            productName: 'Industrial Sugar 50kg',
+            quantityOrdered: 20,
+            quantityToDeliver: 20,
+            unitOfMeasure: 'Bags',
+          ),
+        ],
+      );
+
+      final a4Bytes = await generator.generateDeliveryNoteA4(
+        note: note,
+        isSwahili: true,
+      );
+      expect(a4Bytes, isNotEmpty);
+      expect(a4Bytes.sublist(0, 4), [0x25, 0x50, 0x44, 0x46]); // %PDF
+
+      final thermalBytes = await generator.generateDeliveryNoteThermal80mm(
+        note: note,
+        isSwahili: false,
+      );
+      expect(thermalBytes, isNotEmpty);
+      expect(thermalBytes.sublist(0, 4), [0x25, 0x50, 0x44, 0x46]);
+    });
   });
 }
 

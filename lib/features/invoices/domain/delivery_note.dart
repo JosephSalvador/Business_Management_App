@@ -135,6 +135,8 @@ class DeliveryNote {
         itemCount: items.length,
         totalQuantity: totalQuantity,
         carrierName: carrierName,
+        vehicleNumber: vehicleNumber,
+        invoiceId: invoiceId,
         isSynced: isSynced,
       );
 
@@ -250,6 +252,8 @@ class DeliveryNoteSummary {
     required this.itemCount,
     required this.totalQuantity,
     this.carrierName,
+    this.vehicleNumber,
+    this.invoiceId,
     this.isSynced = true,
   });
 
@@ -261,6 +265,8 @@ class DeliveryNoteSummary {
   final int itemCount;
   final double totalQuantity;
   final String? carrierName;
+  final String? vehicleNumber;
+  final String? invoiceId;
   final bool isSynced;
 
   factory DeliveryNoteSummary.fromJson(Map<String, dynamic> json) =>
@@ -275,6 +281,8 @@ class DeliveryNoteSummary {
         itemCount: (json['itemCount'] as num?)?.toInt() ?? 0,
         totalQuantity: (json['totalQuantity'] as num?)?.toDouble() ?? 0,
         carrierName: json['carrierName']?.toString(),
+        vehicleNumber: json['vehicleNumber']?.toString(),
+        invoiceId: json['invoiceId']?.toString(),
         isSynced: (json['isSynced'] as bool?) ?? true,
       );
 
@@ -287,6 +295,8 @@ class DeliveryNoteSummary {
         'itemCount': itemCount,
         'totalQuantity': totalQuantity,
         if (carrierName != null) 'carrierName': carrierName,
+        if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
+        if (invoiceId != null) 'invoiceId': invoiceId,
         'isSynced': isSynced,
       };
 }
