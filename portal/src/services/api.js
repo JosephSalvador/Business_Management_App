@@ -365,6 +365,10 @@ export async function getTenantSaleDetail(tenantId, saleId) {
   return request(`/api/v1/admin/tenants/${tenantId}/sales/${saleId}`);
 }
 
+export async function getTenantSaleReceiptPreview(tenantId, saleId) {
+  return request(`/api/v1/admin/tenants/${tenantId}/sales/${saleId}/receipt-preview`);
+}
+
 export async function voidTenantSale(tenantId, saleId, reason = 'Platform Operator Cancellation') {
   return request(`/api/v1/admin/tenants/${tenantId}/sales/${saleId}/void`, {
     method: 'POST',
@@ -389,6 +393,10 @@ export async function listTenantInvoices(tenantId, { search = '', status = '', p
   params.append('pageSize', pageSize);
 
   return request(`/api/v1/admin/tenants/${tenantId}/invoices?${params.toString()}`);
+}
+
+export async function getTenantInvoicePreview(tenantId, invoiceId) {
+  return request(`/api/v1/admin/tenants/${tenantId}/invoices/${invoiceId}/preview`);
 }
 
 export async function updateTenantInvoiceStatus(tenantId, invoiceId, newStatus) {

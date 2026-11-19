@@ -90,7 +90,27 @@ public sealed record OmniSaleDetailDto(
     string CashierName,
     string Status,
     string PaymentMethod,
-    IReadOnlyList<OmniSaleLineDto> Lines);
+    IReadOnlyList<OmniSaleLineDto> Lines,
+    string? BusinessName = null,
+    string? Tin = null,
+    string? Address = null,
+    string? Phone = null,
+    string? Email = null,
+    string? BranchName = null,
+    string? Currency = "TZS",
+    string? LogoBase64 = null,
+    string? ThemePrimaryHex = "#0F172A",
+    string? FooterNotes = null,
+    string? MobileMoneyDetails = null,
+    string? BankName = null,
+    string? BankAccountName = null,
+    string? BankAccountNumber = null,
+    decimal? Subtotal = null,
+    decimal? DiscountAmount = null,
+    decimal? TaxAmount = null,
+    decimal? AmountPaid = null,
+    decimal? Change = null,
+    string? FiscalHash = null);
 
 public sealed record OmniCashSessionDto(
     Guid Id,
@@ -113,6 +133,15 @@ public sealed record OmniInvoiceSummaryDto(
     decimal TotalAmount,
     decimal AmountPaid,
     string Status);
+
+public sealed record OmniInvoicePreviewDto(
+    BusinessOS.Application.Features.Invoicing.CustomerInvoiceDto Invoice,
+    BusinessOS.Application.Features.Organizations.Dtos.TenantOrganizationDto Organization,
+    string ThemePrimaryHex,
+    string ThemeSecondaryHex,
+    string TemplateName,
+    bool IsThermal80mm,
+    string RenderedHtml);
 
 public sealed record PlatformOperatorDto(
     Guid Id,

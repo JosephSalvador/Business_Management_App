@@ -604,6 +604,27 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
         if (s is null) return null;
 
         var cashier = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == s.CashierId, cancellationToken);
+        var tenant = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == s.BranchId, cancellationToken);
+        var metadata = await _db.ReceiptMetadata.AsNoTracking().FirstOrDefaultAsync(m => m.SaleId == s.Id, cancellationToken);
+        var docConfig = await _db.TenantDocumentConfigurations
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.DocumentType == DocumentType.Invoice, cancellationToken);
+
+        BusinessIdentitySnapshot? identity = null;
+        if (metadata is not null && !string.IsNullOrWhiteSpace(metadata.BusinessIdentitySnapshot))
+        {
+            try
+            {
+                identity = BusinessIdentitySnapshot.FromJson(metadata.BusinessIdentitySnapshot);
+            }
+            catch
+            {
+                // Fallback to tenant profile
+            }
+        }
+
         var customerName = s.CustomerName ?? "Walk-in Customer";
 
         var lines = s.Lines.Select(l => new OmniSaleLineDto(
@@ -623,7 +644,27 @@ public sealed class OmniTenantSalesRepository : IOmniTenantSalesRepository
             cashier?.FullName ?? "Cashier",
             s.Status.ToString(),
             paymentMethod,
-            lines);
+            lines,
+            BusinessName: tenant?.Name ?? identity?.BusinessName ?? "Business",
+            Tin: tenant?.Tin ?? identity?.TIN,
+            Address: tenant?.Address ?? identity?.Address,
+            Phone: tenant?.Phone ?? identity?.Phone,
+            Email: tenant?.Email ?? identity?.Email,
+            BranchName: branch?.Name ?? "Main Branch",
+            Currency: s.Currency ?? tenant?.Currency ?? "TZS",
+            LogoBase64: docConfig?.LogoUrl ?? tenant?.LogoBase64,
+            ThemePrimaryHex: docConfig?.ThemePrimaryHex ?? "#0F172A",
+            FooterNotes: docConfig?.FooterNotes ?? tenant?.InvoiceTerms ?? "Thank you for your business! / Asante kwa kufanya biashara nasi!",
+            MobileMoneyDetails: tenant?.MobileMoneyDetails,
+            BankName: tenant?.BankName,
+            BankAccountName: tenant?.BankAccountName,
+            BankAccountNumber: tenant?.BankAccountNumber,
+            Subtotal: s.Subtotal,
+            DiscountAmount: s.DiscountAmount,
+            TaxAmount: s.TaxAmount,
+            AmountPaid: s.AmountPaid,
+            Change: s.Change,
+            FiscalHash: metadata?.FiscalHash);
     }
 
     public Task<Sale?> GetSaleByIdAsync(Guid tenantId, Guid saleId, CancellationToken cancellationToken = default)
@@ -747,7 +788,10 @@ public sealed class OmniTenantInvoicesRepository : IOmniTenantInvoicesRepository
     }
 
     public Task<CustomerInvoice?> GetInvoiceByIdAsync(Guid tenantId, Guid invoiceId, CancellationToken cancellationToken = default)
-        => _db.CustomerInvoices.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Id == invoiceId, cancellationToken);
+        => _db.CustomerInvoices
+            .IgnoreQueryFilters()
+            .Include(i => i.Lines)
+            .FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Id == invoiceId, cancellationToken);
 
     public async Task UpdateInvoiceStatusAsync(CustomerInvoice invoice, CustomerInvoiceStatus newStatus, CancellationToken cancellationToken = default)
     {

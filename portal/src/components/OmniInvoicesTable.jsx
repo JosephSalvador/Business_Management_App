@@ -1,18 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  Printer,
+  FileText,
 } from 'lucide-react';
 import {
   listTenantInvoices,
+  getTenantInvoicePreview,
   updateTenantInvoiceStatus,
 } from '../services/api';
 import {
   Container,
   Button,
   StatusIndicator,
+  Badge,
+  Modal,
   Alert,
 } from '../ui/primitives';
 
@@ -24,6 +30,13 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Invoice Preview Modal (using tenant's phone settings)
+  const [previewInvoice, setPreviewInvoice] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewMode, setPreviewMode] = useState('a4'); // 'a4' | '80mm'
+  const iframeRef = useRef(null);
 
   const fetchInvoices = async () => {
     if (!tenantId) return;
@@ -59,6 +72,30 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
     fetchInvoices();
   }, [tenantId, page, statusFilter]);
 
+  const handleOpenPreview = async (inv) => {
+    setPreviewInvoice(inv);
+    setPreviewData(null);
+    setPreviewLoading(true);
+    try {
+      const res = await getTenantInvoicePreview(tenantId, inv.id);
+      setPreviewData(res);
+      setPreviewMode(res?.isThermal80mm ? '80mm' : 'a4');
+    } catch (err) {
+      onNotification?.(
+        `Could not load invoice preview: ${err.message || 'Please try again'}`
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handlePrintPreview = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.focus();
+      iframeRef.current.contentWindow.print();
+    }
+  };
+
   const handleStatusChange = async (invoice, newStatus) => {
     try {
       await updateTenantInvoiceStatus(tenantId, invoice.id, newStatus);
@@ -84,7 +121,7 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
       return <StatusIndicator type="info">Partially paid</StatusIndicator>;
     if (s === 'draft')
       return <StatusIndicator type="pending">Draft</StatusIndicator>;
-    if (s === 'cancelled' || s === 'voided')
+    if (s === 'cancelled' || s === 'voided' || s === 'void')
       return <StatusIndicator type="error">Cancelled</StatusIndicator>;
     if (s === 'overdue')
       return <StatusIndicator type="error">Overdue</StatusIndicator>;
@@ -110,7 +147,7 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
       <Container
         title="Customer invoices"
         count={totalCount}
-        description="Manage B2B and customer billing documents, due dates, balances, and status transitions."
+        description="Manage B2B and customer billing documents, preview using the tenant's phone template & branding settings, and update payment status."
         noPadding
         actions={
           <Button
@@ -201,7 +238,7 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
                 <th className="py-2.5 px-4 text-right">Total amount</th>
                 <th className="py-2.5 px-4 text-right">Amount paid</th>
                 <th className="py-2.5 px-4">Status</th>
-                <th className="py-2.5 px-4 text-right">Change status</th>
+                <th className="py-2.5 px-4 text-right">Actions & status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E9EBED] text-[13px]">
@@ -227,10 +264,17 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
                       key={inv.id}
                       className="hover:bg-[#F1F8FF]/50 transition-colors"
                     >
-                      <td className="py-2 px-4 font-mono text-[12px] font-semibold text-[#16191F]">
-                        {inv.invoiceNumber ||
-                          inv.number ||
-                          (inv.id ? inv.id.slice(0, 8) : '—')}
+                      <td className="py-2 px-4 font-mono text-[12px] font-semibold text-[#0972D3]">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPreview(inv)}
+                          className="hover:underline inline-flex items-center gap-1"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          {inv.invoiceNumber ||
+                            inv.number ||
+                            (inv.id ? inv.id.slice(0, 8) : '—')}
+                        </button>
                       </td>
                       <td className="py-2 px-4 font-medium text-[#16191F]">
                         {inv.customerName || 'Customer'}
@@ -254,20 +298,29 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
                         {Number(paid).toLocaleString()} {inv.currency || 'TZS'}
                       </td>
                       <td className="py-2 px-4">{renderStatus(inv.status)}</td>
-                      <td className="py-2 px-4 text-right">
-                        <select
-                          value={inv.status || 'Issued'}
-                          onChange={(e) =>
-                            handleStatusChange(inv, e.target.value)
-                          }
-                          className="px-2 py-1 text-[12px] border border-[#879596] rounded-[4px] bg-white text-[#16191F]"
-                        >
-                          <option value="Draft">Draft</option>
-                          <option value="Issued">Issued</option>
-                          <option value="PartiallyPaid">PartiallyPaid</option>
-                          <option value="Paid">Paid</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
+                      <td className="py-2 px-4 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            icon={Eye}
+                            onClick={() => handleOpenPreview(inv)}
+                          >
+                            Preview
+                          </Button>
+                          <select
+                            value={inv.status || 'Issued'}
+                            onChange={(e) =>
+                              handleStatusChange(inv, e.target.value)
+                            }
+                            className="px-2 py-1 text-[12px] border border-[#879596] rounded-[4px] bg-white text-[#16191F]"
+                          >
+                            <option value="Draft">Draft</option>
+                            <option value="Issued">Issued</option>
+                            <option value="PartiallyPaid">PartiallyPaid</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -277,6 +330,143 @@ export default function OmniInvoicesTable({ tenantId, onNotification }) {
           </table>
         </div>
       </Container>
+
+      {/* Client Invoice Live Preview Modal (Rendered with Tenant's Phone Settings) */}
+      <Modal
+        open={Boolean(previewInvoice)}
+        onClose={() => {
+          setPreviewInvoice(null);
+          setPreviewData(null);
+        }}
+        title={`Invoice Preview — ${
+          previewInvoice?.invoiceNumber ||
+          previewInvoice?.number ||
+          previewInvoice?.id ||
+          ''
+        }`}
+        size="xl"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <div className="text-[12px] text-[#5F6B7A]">
+              Rendered using tenant’s saved mobile app settings (template, logo, colors & payment accounts).
+            </div>
+            <div className="flex items-center gap-2">
+              {previewData?.renderedHtml && (
+                <Button
+                  variant="primary"
+                  icon={Printer}
+                  onClick={handlePrintPreview}
+                >
+                  Print / Save PDF
+                </Button>
+              )}
+              <Button
+                onClick={() => {
+                  setPreviewInvoice(null);
+                  setPreviewData(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        {previewLoading ? (
+          <div className="py-16 text-center text-[#5F6B7A]">
+            <RefreshCw className="w-5 h-5 animate-spin inline mr-2 text-[#0972D3]" />
+            Compiling invoice with tenant’s saved phone template & branding...
+          </div>
+        ) : previewData ? (
+          <div className="space-y-3">
+            {/* Tenant Phone Settings Metadata Bar */}
+            <div className="px-3.5 py-2.5 bg-[#F8F9FA] border border-[#D5DBDB] rounded-[4px] flex flex-wrap items-center justify-between gap-3 text-[12px]">
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <span className="text-[#5F6B7A] mr-1">Business:</span>
+                  <span className="font-semibold text-[#16191F]">
+                    {previewData.organization?.name || 'Tenant Business'}
+                  </span>
+                </div>
+                {previewData.organization?.tin && (
+                  <div>
+                    <span className="text-[#5F6B7A] mr-1">TIN:</span>
+                    <span className="font-mono font-medium text-[#16191F]">
+                      {previewData.organization.tin}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-[#5F6B7A] mr-1">Phone Template:</span>
+                  <Badge color="blue">
+                    {previewData.templateName || 'Modern Minimalist Invoice'}
+                  </Badge>
+                </div>
+                <div className="inline-flex items-center gap-1.5">
+                  <span className="text-[#5F6B7A]">Theme:</span>
+                  <span
+                    className="w-3.5 h-3.5 rounded-full border border-black/20 inline-block"
+                    style={{
+                      backgroundColor: previewData.themePrimaryHex || '#0F172A',
+                    }}
+                  />
+                  <span className="font-mono text-[11px] text-[#16191F]">
+                    {previewData.themePrimaryHex || '#0F172A'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Paper Profile Toggle */}
+              <div className="inline-flex rounded-[4px] border border-[#879596] overflow-hidden bg-white">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('a4')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    previewMode === 'a4'
+                      ? 'bg-[#0972D3] text-white'
+                      : 'text-[#16191F] hover:bg-[#F2F3F3]'
+                  }`}
+                >
+                  A4 Standard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('80mm')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold transition-colors border-l border-[#879596] ${
+                    previewMode === '80mm'
+                      ? 'bg-[#0972D3] text-white'
+                      : 'text-[#16191F] hover:bg-[#F2F3F3]'
+                  }`}
+                >
+                  80mm Thermal Slip
+                </button>
+              </div>
+            </div>
+
+            {/* Isolated Document Canvas */}
+            <div className="bg-[#EAEDED] border border-[#D5DBDB] rounded-[4px] p-4 flex justify-center overflow-auto max-h-[70vh]">
+              <div
+                className={`bg-white shadow-md transition-all duration-200 ${
+                  previewMode === '80mm'
+                    ? 'w-[340px] min-h-[480px]'
+                    : 'w-full max-w-[820px] min-h-[680px]'
+                }`}
+              >
+                <iframe
+                  ref={iframeRef}
+                  title="Tenant Invoice Preview"
+                  srcDoc={previewData.renderedHtml}
+                  className="w-full h-[660px] border-0"
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <Alert type="warning" title="Preview unavailable">
+            Could not render the invoice preview for this document.
+          </Alert>
+        )}
+      </Modal>
     </div>
   );
 }

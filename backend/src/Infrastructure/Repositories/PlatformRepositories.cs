@@ -3038,11 +3038,13 @@ public sealed class TenantDocumentConfigurationRepository : ITenantDocumentConfi
     public Task<TenantDocumentConfiguration?> GetAsync(
         Guid tenantId, DocumentType type, CancellationToken cancellationToken = default)
         => _db.TenantDocumentConfigurations
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.DocumentType == type, cancellationToken);
 
     public async Task<IReadOnlyList<TenantDocumentConfiguration>> ListAsync(
         Guid tenantId, CancellationToken cancellationToken = default)
         => await _db.TenantDocumentConfigurations
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(c => c.TenantId == tenantId)
             .ToListAsync(cancellationToken);

@@ -63,6 +63,10 @@ public static class PlatformAdminEndpoints
             .RequirePlatformStaffOrSuperAdmin()
             .WithName("GetTenantSaleDetailAdmin");
 
+        admin.MapGet("/tenants/{tenantId:guid}/sales/{saleId:guid}/receipt-preview", GetTenantSaleDetailAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("GetTenantSaleReceiptPreviewAdmin");
+
         admin.MapPost("/tenants/{tenantId:guid}/sales/{saleId:guid}/void", VoidTenantSaleAsync)
             .RequirePlatformSuperAdmin()
             .WithName("VoidTenantSaleAdmin");
@@ -75,6 +79,10 @@ public static class PlatformAdminEndpoints
         admin.MapGet("/tenants/{tenantId:guid}/invoices", ListTenantInvoicesAsync)
             .RequirePlatformStaffOrSuperAdmin()
             .WithName("ListTenantInvoicesAdmin");
+
+        admin.MapGet("/tenants/{tenantId:guid}/invoices/{invoiceId:guid}/preview", GetTenantInvoicePreviewAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("GetTenantInvoicePreviewAdmin");
 
         admin.MapPut("/tenants/{tenantId:guid}/invoices/{invoiceId:guid}/status", UpdateTenantInvoiceStatusAsync)
             .RequirePlatformStaffOrSuperAdmin()
@@ -154,6 +162,10 @@ public static class PlatformAdminEndpoints
     private static async Task<IResult> ListTenantInvoicesAsync(
         Guid tenantId, string? search, string? status, int? page, int? pageSize, ISender sender, CancellationToken ct)
         => (await sender.Send(new ListTenantInvoicesAdminQuery(tenantId, search, status, page ?? 1, pageSize ?? 25), ct)).ToApiResult();
+
+    private static async Task<IResult> GetTenantInvoicePreviewAsync(
+        Guid tenantId, Guid invoiceId, ISender sender, CancellationToken ct)
+        => (await sender.Send(new GetTenantInvoicePreviewAdminQuery(tenantId, invoiceId), ct)).ToApiResult();
 
     private static async Task<IResult> UpdateTenantInvoiceStatusAsync(
         Guid tenantId, Guid invoiceId, UpdateInvoiceStatusRequest request, ISender sender, CancellationToken ct)
