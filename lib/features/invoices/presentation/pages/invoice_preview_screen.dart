@@ -297,6 +297,201 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
     final note = _currentDeliveryNote;
     if (note == null) return;
     final isSwahili = Localizations.localeOf(context).languageCode == 'sw';
+
+    final hasAssignedTransport =
+        (note.driverName?.trim().isNotEmpty ?? false) ||
+            (note.vehicleNumber?.trim().isNotEmpty ?? false);
+
+    if (hasAssignedTransport) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.local_shipping_outlined,
+                    color: Color(0xFF0D9488), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isSwahili
+                          ? 'Thibitisha Usafirishaji'
+                          : 'Confirm Dispatch',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      note.number,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.resolveTextSecondary(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isSwahili
+                    ? 'Mzigo uko tayari kusafirishwa na maelezo yafuatayo:'
+                    : 'Dispatch this shipment with existing transport details:',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.resolveBorder(context)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (note.driverName?.trim().isNotEmpty ?? false)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.person,
+                                size: 16, color: Color(0xFF0D9488)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${isSwahili ? "Dereva" : "Driver"}: ${note.driverName}',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (note.driverPhone?.trim().isNotEmpty ?? false)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.phone,
+                                size: 16, color: Color(0xFF0D9488)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${isSwahili ? "Simu" : "Phone"}: ${note.driverPhone}',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (note.vehicleNumber?.trim().isNotEmpty ?? false)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.directions_car,
+                                size: 16, color: Color(0xFF0D9488)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${isSwahili ? "Chombo / Gari" : "Vehicle"}: ${note.vehicleNumber}',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: Text(
+                isSwahili ? 'Badilisha Taarifa' : 'Edit Details',
+                style:
+                    TextStyle(color: AppColors.resolveTextSecondary(context)),
+              ),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              icon: const Icon(Icons.local_shipping, size: 18),
+              label: Text(
+                isSwahili ? 'Safirisha Sasa' : 'Dispatch Now',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        try {
+          await ref.read(deliveryNotesControllerProvider.notifier).dispatch(
+                note.id,
+                carrierName: note.carrierName,
+                trackingNumber: note.trackingNumber,
+                vehicleNumber: note.vehicleNumber,
+                driverName: note.driverName,
+                driverPhone: note.driverPhone,
+              );
+          _fetchAndRenderPdf();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isSwahili
+                      ? 'Mzigo umethibitishwa kusafirishwa!'
+                      : 'Delivery note marked as dispatched!',
+                ),
+                backgroundColor: const Color(0xFF0D9488),
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Hitilafu: $e'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        }
+        return;
+      } else if (confirm == null) {
+        return;
+      }
+    }
+
     final driverController = TextEditingController(text: note.driverName ?? '');
     final phoneController = TextEditingController(text: note.driverPhone ?? '');
     final vehicleController = TextEditingController(text: note.vehicleNumber ?? '');

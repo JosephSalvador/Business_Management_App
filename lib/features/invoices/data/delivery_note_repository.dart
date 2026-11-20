@@ -194,10 +194,19 @@ class DeliveryNoteRepository {
     String? driverPhone,
     String? notes,
     DateTime? issueDate,
+    DeliveryNoteStatus status = DeliveryNoteStatus.draft,
+    DateTime? dispatchedAt,
+    bool directDispatch = false,
   }) async {
     final clientId = _uuid.v4();
     final now = DateTime.now();
     final issued = issueDate ?? now;
+    final effectiveStatus =
+        directDispatch ? DeliveryNoteStatus.dispatched : status;
+    final effectiveDispatchedAt =
+        effectiveStatus == DeliveryNoteStatus.dispatched
+            ? (dispatchedAt ?? now)
+            : dispatchedAt;
 
     final localNumberSeq = await _nextSequentialNumber(issued);
 
@@ -206,7 +215,8 @@ class DeliveryNoteRepository {
       number: localNumberSeq,
       customerName: customerName.trim(),
       issueDate: issued,
-      status: DeliveryNoteStatus.draft,
+      status: effectiveStatus,
+      dispatchedAt: effectiveDispatchedAt,
       items: items,
       invoiceId: invoiceId,
       invoiceNumber: invoiceNumber,
@@ -235,7 +245,9 @@ class DeliveryNoteRepository {
         'invoiceId': invoiceId,
       if (invoiceNumber != null && invoiceNumber.isNotEmpty)
         'invoiceNumber': invoiceNumber,
-      if (customerId != null && customerId.isNotEmpty && _isValidGuid(customerId))
+      if (customerId != null &&
+          customerId.isNotEmpty &&
+          _isValidGuid(customerId))
         'customerId': customerId,
       if (customerPhone != null && customerPhone.trim().isNotEmpty)
         'customerPhone': customerPhone.trim(),
@@ -290,6 +302,31 @@ class DeliveryNoteRepository {
           aggregateId: clientId,
           payload: jsonEncode(payload),
         );
+
+        if (effectiveStatus == DeliveryNoteStatus.dispatched) {
+          await _queue.enqueue(
+            operationId: _uuid.v4(),
+            tenantId: tenantId,
+            branchId: branchId,
+            deviceId: deviceId,
+            operationType: 'delivery_note.dispatch',
+            aggregateType: 'DeliveryNote',
+            aggregateId: clientId,
+            payload: jsonEncode({
+              'deliveryNoteId': clientId,
+              if (carrierName != null && carrierName.trim().isNotEmpty)
+                'carrierName': carrierName.trim(),
+              if (trackingNumber != null && trackingNumber.trim().isNotEmpty)
+                'trackingNumber': trackingNumber.trim(),
+              if (vehicleNumber != null && vehicleNumber.trim().isNotEmpty)
+                'vehicleNumber': vehicleNumber.trim(),
+              if (driverName != null && driverName.trim().isNotEmpty)
+                'driverName': driverName.trim(),
+              if (driverPhone != null && driverPhone.trim().isNotEmpty)
+                'driverPhone': driverPhone.trim(),
+            }),
+          );
+        }
       } catch (_) {}
     }
 
@@ -302,10 +339,35 @@ class DeliveryNoteRepository {
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (response.data is Map) {
-          final serverNote = DeliveryNote.fromJson(
+          var serverNote = DeliveryNote.fromJson(
             Map<String, dynamic>.from(response.data as Map),
           );
-          final syncedNote = serverNote.copyWith(isSynced: true);
+
+          if (effectiveStatus == DeliveryNoteStatus.dispatched) {
+            try {
+              final dispatchResp = await _apiClient.post<dynamic>(
+                ApiRoutes.v1('/delivery-notes/$clientId/dispatch'),
+                body: <String, dynamic>{
+                  if (carrierName != null) 'carrierName': carrierName,
+                  if (trackingNumber != null) 'trackingNumber': trackingNumber,
+                  if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
+                  if (driverName != null) 'driverName': driverName,
+                  if (driverPhone != null) 'driverPhone': driverPhone,
+                },
+              );
+              if (dispatchResp.statusCode == 200 && dispatchResp.data is Map) {
+                serverNote = DeliveryNote.fromJson(
+                  Map<String, dynamic>.from(dispatchResp.data as Map),
+                );
+              }
+            } catch (_) {}
+          }
+
+          final syncedNote = serverNote.copyWith(
+            status: effectiveStatus,
+            dispatchedAt: effectiveDispatchedAt,
+            isSynced: true,
+          );
           await _persistLocally(syncedNote);
           if (_queue != null) {
             await _queue.markSynced(clientId, serverNote.number);

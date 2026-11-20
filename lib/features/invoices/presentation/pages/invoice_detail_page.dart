@@ -61,11 +61,11 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
     });
   }
 
-  Future<void> _run(Future<CustomerInvoice?> Function() action) async {
-    if (_working) return;
+  Future<CustomerInvoice?> _run(Future<CustomerInvoice?> Function() action) async {
+    if (_working) return null;
     setState(() => _working = true);
     final invoice = await action();
-    if (!mounted) return;
+    if (!mounted) return invoice;
     final state = ref.read(invoicesControllerProvider);
     setState(() {
       _working = false;
@@ -76,6 +76,7 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
         _error = state.message;
       }
     });
+    return invoice;
   }
 
   Organization _resolveOrganization() {
@@ -1124,25 +1125,33 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
                       onPressed: () async {
                         Navigator.of(sheetContext).pop();
                         final vrn = _orNull(vrnController.text);
-                        await _run(() => ref
+                        final newTaxInvoice = await _run(() => ref
                             .read(invoicesControllerProvider.notifier)
                             .convertToTaxInvoice(
                               id: invoice.id,
                               vatRate: vatRate,
                               customerVrn: vrn,
                               isTaxInclusive: isTaxInclusive,
+                              invoicePrefix: organization.invoicePrefix,
                             ));
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isSwahili
-                                  ? 'Ankara imebadilishwa kuwa Tax Invoice yenye VAT!'
-                                  : 'Invoice successfully converted to Tax Invoice!',
+                        if (newTaxInvoice != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                isSwahili
+                                    ? 'Tax Invoice mpya #${newTaxInvoice.displayNumber(organization.invoicePrefix)} imetengenezwa kutoka ${invoice.documentTitle}!'
+                                    : 'New Tax Invoice #${newTaxInvoice.displayNumber(organization.invoicePrefix)} created from ${invoice.documentTitle}!',
+                              ),
+                              backgroundColor: AppColors.success,
                             ),
-                            backgroundColor: AppColors.success,
-                          ),
-                        );
+                          );
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute<void>(
+                              builder: (_) => InvoiceDetailPage(invoiceId: newTaxInvoice.id),
+                            ),
+                          );
+                        }
                       },
                     ),
                   ],

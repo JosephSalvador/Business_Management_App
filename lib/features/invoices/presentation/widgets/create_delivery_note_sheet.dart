@@ -53,6 +53,7 @@ class _CreateDeliveryNoteSheetState
   static const _uuid = Uuid();
 
   late final TextEditingController _driverController;
+  late final TextEditingController _driverPhoneController;
   late final TextEditingController _vehicleController;
   late final TextEditingController _destinationController;
   late final TextEditingController _notesController;
@@ -65,8 +66,11 @@ class _CreateDeliveryNoteSheetState
   @override
   void initState() {
     super.initState();
-    _driverController = TextEditingController();
-    _vehicleController = TextEditingController();
+    _driverController = TextEditingController()
+      ..addListener(() => setState(() {}));
+    _driverPhoneController = TextEditingController();
+    _vehicleController = TextEditingController()
+      ..addListener(() => setState(() {}));
     _destinationController = TextEditingController(
       text: widget.invoice.customerAddress ?? '',
     );
@@ -87,6 +91,7 @@ class _CreateDeliveryNoteSheetState
   @override
   void dispose() {
     _driverController.dispose();
+    _driverPhoneController.dispose();
     _vehicleController.dispose();
     _destinationController.dispose();
     _notesController.dispose();
@@ -96,7 +101,7 @@ class _CreateDeliveryNoteSheetState
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit({bool directDispatch = false}) async {
     final loc = context.loc;
     final isSwahili = context.isSwahili;
     final totalQty = _quantities.values.fold<double>(0, (sum, q) => sum + q);
@@ -159,11 +164,23 @@ class _CreateDeliveryNoteSheetState
         deliveryAddress: _destinationController.text.trim().isNotEmpty
             ? _destinationController.text.trim()
             : widget.invoice.customerAddress,
-        driverName: _driverController.text.trim(),
-        vehicleNumber: _vehicleController.text.trim(),
-        notes: _notesController.text.trim(),
+        driverName: _driverController.text.trim().isNotEmpty
+            ? _driverController.text.trim()
+            : null,
+        driverPhone: _driverPhoneController.text.trim().isNotEmpty
+            ? _driverPhoneController.text.trim()
+            : null,
+        vehicleNumber: _vehicleController.text.trim().isNotEmpty
+            ? _vehicleController.text.trim()
+            : null,
+        notes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
         issueDate: DateTime.now(),
+        directDispatch: directDispatch,
       );
+
+      ref.read(deliveryNotesControllerProvider.notifier).load(silent: true);
 
       if (!mounted) return;
 
@@ -171,7 +188,13 @@ class _CreateDeliveryNoteSheetState
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(loc.deliveryNoteSuccess),
+          content: Text(
+            directDispatch
+                ? (isSwahili
+                    ? 'Waraka wa mzigo #${note.number} umetengenezwa na kusafirishwa moja kwa moja!'
+                    : 'Delivery note #${note.number} created and dispatched directly!')
+                : loc.deliveryNoteSuccess,
+          ),
           backgroundColor: AppColors.success,
         ),
       );
@@ -307,6 +330,27 @@ class _CreateDeliveryNoteSheetState
                       labelText: loc.deliveryNoteDriver,
                       hintText: loc.deliveryNoteDriverHint,
                       prefixIcon: const Icon(Icons.person_pin_outlined, size: 20),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Driver Phone Field
+                  TextField(
+                    controller: _driverPhoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: isSwahili
+                          ? 'Namba ya Simu ya Dereva'
+                          : 'Driver Phone Number',
+                      hintText: isSwahili ? 'mf. 0712345678' : 'e.g. 0712345678',
+                      prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -546,40 +590,112 @@ class _CreateDeliveryNoteSheetState
                   ),
                   const SizedBox(height: 24),
 
-                  // Submit Button
-                  SizedBox(
-                    height: 50,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0284C7),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: _isCreating ? null : _submit,
-                      icon: _isCreating
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                  // Submit Action Section
+                  Builder(
+                    builder: (context) {
+                      final hasTransport = _driverController.text.trim().isNotEmpty ||
+                          _vehicleController.text.trim().isNotEmpty;
+
+                      if (hasTransport) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(
+                              height: 50,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D9488),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: _isCreating
+                                    ? null
+                                    : () => _submit(directDispatch: true),
+                                icon: _isCreating
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.local_shipping_outlined),
+                                label: Text(
+                                  _isCreating
+                                      ? (isSwahili ? 'Inasafirisha...' : 'Dispatching...')
+                                      : (isSwahili
+                                          ? 'Tengeneza na Safirisha Moja kwa Moja'
+                                          : 'Create & Dispatch Directly'),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            )
-                          : const Icon(Icons.print_outlined),
-                      label: Text(
-                        _isCreating
-                            ? (isSwahili
-                                ? 'Inatengeneza...'
-                                : 'Generating...')
-                            : loc.deliveryNoteConfirmCreate,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: _isCreating
+                                    ? null
+                                    : () => _submit(directDispatch: false),
+                                icon: const Icon(Icons.save_outlined, size: 18),
+                                label: Text(
+                                  isSwahili
+                                      ? 'Hifadhi kama Rasimu (Draft)'
+                                      : 'Save as Draft',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return SizedBox(
+                        height: 50,
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: _isCreating
+                              ? null
+                              : () => _submit(directDispatch: false),
+                          icon: _isCreating
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.print_outlined),
+                          label: Text(
+                            _isCreating
+                                ? (isSwahili ? 'Inatengeneza...' : 'Generating...')
+                                : loc.deliveryNoteConfirmCreate,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                 ],

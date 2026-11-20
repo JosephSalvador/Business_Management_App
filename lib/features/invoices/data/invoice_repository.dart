@@ -380,6 +380,8 @@ class InvoiceRepository {
       for (var i = 0; i < lines.length; i++)
         InvoiceLine(
           id: _uuid.v4(),
+          productId: lines[i].productId,
+          sku: lines[i].sku,
           description: lines[i].description.trim(),
           unitOfMeasure: lines[i].unitOfMeasure.trim().isEmpty
               ? 'Pcs'
@@ -707,6 +709,8 @@ class InvoiceRepository {
   /// If [isTaxInclusive] is true, the current item prices already contain VAT:
   ///   Net = Gross / (1 + vatRate / 100)
   ///   VAT = Gross - Net
+  /// Generates a NEW official Tax Invoice from an existing proforma invoice,
+  /// preserving the original proforma completely intact for audit/lineage trails.
   /// If [isTaxInclusive] is false (standard), VAT is added on top of the taxable subtotal:
   ///   Net = Price
   ///   VAT = Net * (vatRate / 100)
@@ -716,125 +720,72 @@ class InvoiceRepository {
     double vatRate = 18.0,
     String? customerVrn,
     bool isTaxInclusive = false,
+    String? invoicePrefix,
   }) async {
     final existing = await getById(id);
 
-    final updatedLines = <InvoiceLine>[];
+    final draftLines = <InvoiceDraftLine>[];
     for (final line in existing.lines) {
       double unitPrice;
-      double lineTotal;
-      double lineTax;
+      double discount;
 
       if (isTaxInclusive) {
-        final gross = line.quantity * line.unitPrice;
-        final netGross = gross / (1.0 + (vatRate / 100.0));
         unitPrice = line.unitPrice / (1.0 + (vatRate / 100.0));
-        lineTotal = netGross - line.discountAmount;
-        lineTax = gross - lineTotal;
+        discount = line.discountAmount / (1.0 + (vatRate / 100.0));
       } else {
         unitPrice = line.unitPrice;
-        lineTotal = (line.quantity * unitPrice) - line.discountAmount;
-        lineTax = lineTotal * (vatRate / 100.0);
+        discount = line.discountAmount;
       }
 
-      updatedLines.add(
-        line.copyWith(
+      draftLines.add(
+        InvoiceDraftLine(
+          productId: line.productId,
+          sku: line.sku,
+          description: line.description,
+          unitOfMeasure: line.unitOfMeasure,
+          quantity: line.quantity,
           unitPrice: unitPrice,
+          discountAmount: discount,
           taxRatePercent: vatRate,
-          lineTotal: lineTotal,
-          taxAmount: lineTax,
         ),
       );
     }
 
-    final newSubtotal =
-        updatedLines.fold<double>(0, (sum, l) => sum + l.lineTotal);
-    final newTaxAmount =
-        updatedLines.fold<double>(0, (sum, l) => sum + l.taxAmount);
-    final newTotalAmount =
-        (newSubtotal - existing.discountAmount).clamp(0.0, double.infinity) +
-            newTaxAmount;
-    final newBalanceDue =
-        (newTotalAmount - existing.amountPaid).clamp(0.0, double.infinity);
-    final newStatus = newBalanceDue <= 0
-        ? InvoiceStatus.paid
-        : (existing.amountPaid > 0
-            ? InvoiceStatus.partiallyPaid
-            : InvoiceStatus.unpaid);
-
-    final updatedInvoice = existing.copyWith(
-      documentTitle: 'TAX INVOICE',
+    final newInvoice = await create(
+      lines: draftLines,
+      customerId: existing.customerId,
+      customerName: existing.customerName,
+      customerAttention: existing.customerAttention,
+      customerPhone: existing.customerPhone,
+      customerEmail: existing.customerEmail,
+      customerAddress: existing.customerAddress,
+      customerTin: existing.customerTin,
       customerVrn: (customerVrn != null && customerVrn.trim().isNotEmpty)
           ? customerVrn.trim()
           : existing.customerVrn,
-      lines: updatedLines,
-      subtotal: newSubtotal,
-      taxAmount: newTaxAmount,
-      totalAmount: newTotalAmount,
-      balanceDue: newBalanceDue,
-      status: newStatus,
-      isSynced: false,
+      currency: existing.currency,
+      documentTitle: 'TAX INVOICE',
+      referenceNumber: 'Proforma #${existing.displayNumber(invoicePrefix)}',
+      paymentTerms: existing.paymentTerms,
+      issueDate: DateTime.now(),
+      dueDate: existing.dueDate,
+      discountAmount: isTaxInclusive
+          ? (existing.discountAmount / (1.0 + (vatRate / 100.0)))
+          : existing.discountAmount,
+      initialAmountPaid: existing.amountPaid,
+      initialPayments: existing.payments,
+      paymentMethod: existing.paymentMethod,
+      paymentReference: existing.paymentReference,
+      paymentInstructions: existing.paymentInstructions,
+      notes: existing.notes != null && existing.notes!.trim().isNotEmpty
+          ? '${existing.notes}\n(Kutoka Proforma #${existing.displayNumber(invoicePrefix)})'
+          : 'Kutoka Proforma #${existing.displayNumber(invoicePrefix)}',
+      authorizedSignatoryName: existing.authorizedSignatoryName,
+      authorizedSignatoryTitle: existing.authorizedSignatoryTitle,
+      invoicePrefix: invoicePrefix,
     );
 
-    await _persistLocally(updatedInvoice);
-
-    // Enqueue into persistent SyncQueue if available
-    if (_queue != null) {
-      try {
-        final tenantId = (await _tenantIdOf?.call()) ?? 'tenant';
-        final branchId = (await _branchIdOf?.call()) ?? 'branch';
-        final deviceId = (await _deviceIdOf?.call()) ?? 'device';
-
-        await _queue.enqueue(
-          operationId: _uuid.v4(),
-          tenantId: tenantId,
-          branchId: branchId,
-          deviceId: deviceId,
-          operationType: 'invoice.convert_to_tax',
-          aggregateType: 'Invoice',
-          aggregateId: id,
-          payload: jsonEncode({
-            'invoiceId': id,
-            'vatRate': vatRate,
-            'customerVrn': updatedInvoice.customerVrn,
-            'documentTitle': 'TAX INVOICE',
-            'subtotal': newSubtotal,
-            'taxAmount': newTaxAmount,
-            'totalAmount': newTotalAmount,
-            'lines': updatedLines.map((l) => l.toJson()).toList(),
-          }),
-        );
-      } catch (_) {}
-    }
-
-    // Attempt remote update opportunistically
-    try {
-      final response = await _apiClient.put<dynamic>(
-        ApiRoutes.v1('/invoices/$id'),
-        body: <String, dynamic>{
-          'documentTitle': 'TAX INVOICE',
-          'customerVrn': updatedInvoice.customerVrn,
-          'vatRate': vatRate,
-          'subtotal': newSubtotal,
-          'taxAmount': newTaxAmount,
-          'totalAmount': newTotalAmount,
-          'lines': updatedLines.map((l) => l.toJson()).toList(),
-        },
-      );
-      if (response.statusCode == 200 && response.data is Map) {
-        final serverUpdated = CustomerInvoice.fromJson(
-          Map<String, dynamic>.from(response.data as Map),
-        ).copyWith(isSynced: true);
-        final merged =
-            _mergePreservingLocalDetails(updatedInvoice, serverUpdated);
-        await _persistLocally(merged);
-        return merged;
-      }
-    } catch (_) {
-      // Offline fallback: keep local updated invoice
-    }
-
-    return updatedInvoice;
+    return newInvoice;
   }
 
   /// Lists all pending invoices that need to be synced to the cloud.

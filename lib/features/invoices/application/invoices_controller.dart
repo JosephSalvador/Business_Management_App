@@ -185,6 +185,7 @@ class InvoicesController extends Notifier<InvoicesState> {
     double vatRate = 18.0,
     String? customerVrn,
     bool isTaxInclusive = false,
+    String? invoicePrefix,
   }) async {
     try {
       final invoice = await _repository.convertToTaxInvoice(
@@ -192,6 +193,7 @@ class InvoicesController extends Notifier<InvoicesState> {
         vatRate: vatRate,
         customerVrn: customerVrn,
         isTaxInclusive: isTaxInclusive,
+        invoicePrefix: invoicePrefix,
       );
       await load(silent: true);
       return invoice;

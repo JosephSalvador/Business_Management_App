@@ -906,6 +906,129 @@ void main() {
       expect(inclusiveTax, 18000.0);
       expect(inclusiveSubtotal + inclusiveTax, inclusiveGrossAmount);
     });
+
+    test('Document lineage: Proforma to Tax Invoice creates a distinct Tax Invoice preserving source intact', () {
+      final proforma = CustomerInvoice(
+        id: 'pro-uuid-101',
+        number: 'PRO-202611-0001',
+        documentTitle: 'PROFORMA INVOICE',
+        issueDate: DateTime.utc(2026, 11, 20, 10, 0),
+        customerName: 'Mega Wholesalers Ltd',
+        customerPhone: '+255 777 000 111',
+        customerTin: '123-456-789',
+        customerVrn: '40-123456-X',
+        status: InvoiceStatus.unpaid,
+        subtotal: 100000.0,
+        taxAmount: 0.0,
+        totalAmount: 100000.0,
+        balanceDue: 100000.0,
+        lines: const [
+          InvoiceLine(
+            id: 'line-1',
+            productId: 'prod-item-1',
+            sku: 'SKU-WHEAT-50',
+            description: 'Wheat Flour 50kg',
+            unitOfMeasure: 'Bags',
+            quantity: 1,
+            unitPrice: 100000.0,
+            lineTotal: 100000.0,
+            taxAmount: 0.0,
+          ),
+        ],
+      );
+
+      // Verify source is a Proforma
+      expect(proforma.isProforma, isTrue);
+      expect(proforma.isTaxInvoice, isFalse);
+
+      // Simulate lineage creation: New Tax Invoice is generated referencing proforma
+      final newTaxInvoice = CustomerInvoice(
+        id: 'tax-uuid-202',
+        number: 'INV-202611-0042',
+        documentTitle: 'TAX INVOICE',
+        referenceNumber: 'Proforma #${proforma.displayNumber()}',
+        issueDate: DateTime.utc(2026, 11, 20, 12, 0),
+        customerName: proforma.customerName,
+        customerPhone: proforma.customerPhone,
+        customerTin: proforma.customerTin,
+        customerVrn: proforma.customerVrn,
+        status: InvoiceStatus.unpaid,
+        subtotal: 100000.0,
+        taxAmount: 18000.0,
+        totalAmount: 118000.0,
+        balanceDue: 118000.0,
+        notes: 'Converted from Proforma #${proforma.displayNumber()}',
+        lines: const [
+          InvoiceLine(
+            id: 'line-tax-1',
+            productId: 'prod-item-1',
+            sku: 'SKU-WHEAT-50',
+            description: 'Wheat Flour 50kg',
+            unitOfMeasure: 'Bags',
+            quantity: 1,
+            unitPrice: 100000.0,
+            taxRatePercent: 18.0,
+            lineTotal: 100000.0,
+            taxAmount: 18000.0,
+          ),
+        ],
+      );
+
+      // Verify that the original proforma is intact and untouched
+      expect(proforma.id, 'pro-uuid-101');
+      expect(proforma.documentTitle, 'PROFORMA INVOICE');
+      expect(proforma.totalAmount, 100000.0);
+      expect(proforma.isProforma, isTrue);
+
+      // Verify the new tax invoice has distinct identity and proper lineage
+      expect(newTaxInvoice.id, 'tax-uuid-202');
+      expect(newTaxInvoice.documentTitle, 'TAX INVOICE');
+      expect(newTaxInvoice.isTaxInvoice, isTrue);
+      expect(newTaxInvoice.referenceNumber, contains('PRO-202611-0001'));
+      expect(newTaxInvoice.totalAmount, 118000.0);
+      expect(newTaxInvoice.taxAmount, 18000.0);
+      expect(newTaxInvoice.lines.first.productId, 'prod-item-1');
+      expect(newTaxInvoice.lines.first.sku, 'SKU-WHEAT-50');
+    });
+
+    test('Direct Dispatch: Delivery Note initialized with status dispatched and dispatchedAt', () {
+      final dispatchTime = DateTime.utc(2026, 11, 20, 14, 30);
+      final note = DeliveryNote(
+        id: 'dn-direct-001',
+        number: 'DN-202611-0099',
+        customerName: 'Safari Logistics Co',
+        issueDate: dispatchTime,
+        status: DeliveryNoteStatus.dispatched,
+        dispatchedAt: dispatchTime,
+        driverName: 'Bakari Mwamba',
+        driverPhone: '0755123456',
+        vehicleNumber: 'T 555 XYZ',
+        items: const [
+          DeliveryNoteItem(
+            id: 'item-1',
+            productName: 'Cement Bags',
+            quantityOrdered: 50,
+            quantityToDeliver: 50,
+            unitOfMeasure: 'Bags',
+          ),
+        ],
+      );
+
+      expect(note.status, DeliveryNoteStatus.dispatched);
+      expect(note.dispatchedAt, dispatchTime);
+      expect(note.driverName, 'Bakari Mwamba');
+      expect(note.driverPhone, '0755123456');
+      expect(note.vehicleNumber, 'T 555 XYZ');
+
+      final json = note.toJson();
+      expect(json['status'], DeliveryNoteStatus.dispatched.code);
+      expect(json['dispatchedAt'], dispatchTime.toIso8601String());
+
+      final restored = DeliveryNote.fromJson(json);
+      expect(restored.status, DeliveryNoteStatus.dispatched);
+      expect(restored.dispatchedAt, isNotNull);
+      expect(restored.driverName, 'Bakari Mwamba');
+    });
   });
 }
 

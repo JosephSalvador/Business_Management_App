@@ -383,6 +383,14 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 7: Unit Tests & Verification — Add comprehensive tests in `test/features/invoices/offline_invoicing_test.dart` verifying VAT calculations, tax inclusive/exclusive modes, and conversion from proforma to tax invoice. All 21 tests pass with zero warnings.
 - [x] Task 8: Version Bump — Bump version code to `1.0.0+94` in `pubspec.yaml` and `app_update_service.dart`.
 
+## Implementation Plan — Document Lineage for Tax Invoices & Frictionless Delivery Dispatch (Build 95)
+- [x] Task 1: Document Lineage & Immutability — Updated `InvoiceRepository.convertToTaxInvoice` so converting a Proforma generates a brand-NEW `CustomerInvoice` (`documentTitle: 'TAX INVOICE'`, new sequential number, reference pointing back to `'Proforma #${existing.displayNumber}'`, line taxes calculated), while leaving the original Proforma 100% intact as a permanent legal audit trail.
+- [x] Task 2: Seamless Navigation in Invoice Details — Updated `InvoiceDetailPage._promptConvertToTaxInvoice` to receive the newly created Tax Invoice, display a clear success notification with the new invoice number, and immediately navigate (`pushReplacement`) to the new Tax Invoice.
+- [x] Task 3: Intelligent Direct Dispatch in Sheet — Added `_driverPhoneController` and `directDispatch` support to `CreateDeliveryNoteSheet` and `DeliveryNoteRepository.create`. When driver or vehicle is entered, users can tap "Tengeneza na Safirisha Moja kwa Moja" (Create & Dispatch Directly) to generate the note already in `dispatched` status with zero redundant dialogs, or choose "Hifadhi kama Rasimu (Draft)".
+- [x] Task 4: State-Aware 1-Tap Quick Confirmation for Dispatch — Upgraded dispatch actions in `invoices_page.dart` and `invoice_preview_screen.dart`: if transport details (driver/vehicle) already exist on the draft delivery note, clicking "Safirisha / Dispatch" displays a 1-tap confirmation card ("Safirisha Sasa") with an edit option, eliminating repetitive 4-field re-entry forms.
+- [x] Task 5: Unit Tests — Added tests in `test/features/invoices/offline_invoicing_test.dart` verifying document lineage immutability and direct dispatch state persistence. All 23 tests pass cleanly.
+- [x] Task 6: Version Bump — Bumped version code to `1.0.0+95` in `pubspec.yaml` and `app_update_service.dart`.
+- [x] Task 7: Commit, Push & Remote CI/CD Staging Build — Push to `feature/invoice-delivery` and trigger remote GitHub Actions workflow `build-clients.yml`.
 
 
 
