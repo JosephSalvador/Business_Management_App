@@ -124,6 +124,10 @@ class Organization {
     this.email,
     this.website,
     this.taxId,
+    this.vrn,
+    this.isVatRegistered = false,
+    this.defaultVatRate = 18.0,
+    this.isTaxInclusive = false,
     this.countryCode,
     this.currency,
     this.logoBase64,
@@ -151,6 +155,10 @@ class Organization {
   final String? email;
   final String? website;
   final String? taxId;
+  final String? vrn;
+  final bool isVatRegistered;
+  final double defaultVatRate;
+  final bool isTaxInclusive;
   final String? countryCode;
   final String? currency;
   final String? logoBase64;
@@ -225,6 +233,10 @@ class Organization {
       'contactEmail': email,
       'website': website,
       'taxId': taxId,
+      'vrn': vrn,
+      'isVatRegistered': isVatRegistered,
+      'defaultVatRate': defaultVatRate,
+      'isTaxInclusive': isTaxInclusive,
       'countryCode': countryCode,
       'currency': currency,
       'logoBase64': logoBase64,
@@ -310,6 +322,10 @@ class Organization {
       email: (json['email'] as String?) ?? (json['contactEmail'] as String?),
       website: json['website'] as String?,
       taxId: json['taxId'] as String?,
+      vrn: json['vrn'] as String?,
+      isVatRegistered: json['isVatRegistered'] as bool? ?? false,
+      defaultVatRate: (json['defaultVatRate'] as num?)?.toDouble() ?? 18.0,
+      isTaxInclusive: json['isTaxInclusive'] as bool? ?? false,
       countryCode: json['countryCode'] as String?,
       currency: json['currency'] as String?,
       logoBase64: json['logoBase64'] as String?,
@@ -339,6 +355,10 @@ class Organization {
     String? email,
     String? website,
     String? taxId,
+    String? vrn,
+    bool? isVatRegistered,
+    double? defaultVatRate,
+    bool? isTaxInclusive,
     String? countryCode,
     String? currency,
     String? logoBase64,
@@ -364,6 +384,10 @@ class Organization {
         email: email ?? this.email,
         website: website ?? this.website,
         taxId: taxId ?? this.taxId,
+        vrn: vrn ?? this.vrn,
+        isVatRegistered: isVatRegistered ?? this.isVatRegistered,
+        defaultVatRate: defaultVatRate ?? this.defaultVatRate,
+        isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
         countryCode: countryCode ?? this.countryCode,
         currency: currency ?? this.currency,
         logoBase64: logoBase64 ?? this.logoBase64,
@@ -464,6 +488,16 @@ class OrganizationRepository {
           : current.website,
       taxId:
           body.containsKey('taxId') ? body['taxId'] as String? : current.taxId,
+      vrn: body.containsKey('vrn') ? body['vrn'] as String? : current.vrn,
+      isVatRegistered: body.containsKey('isVatRegistered')
+          ? (body['isVatRegistered'] as bool? ?? false)
+          : current.isVatRegistered,
+      defaultVatRate: body.containsKey('defaultVatRate')
+          ? ((body['defaultVatRate'] as num?)?.toDouble() ?? 18.0)
+          : current.defaultVatRate,
+      isTaxInclusive: body.containsKey('isTaxInclusive')
+          ? (body['isTaxInclusive'] as bool? ?? false)
+          : current.isTaxInclusive,
       countryCode: body.containsKey('countryCode')
           ? body['countryCode'] as String?
           : current.countryCode,
@@ -536,6 +570,10 @@ class OrganizationRepository {
         'contactEmail': optimistic.email,
         'website': optimistic.website,
         'taxId': optimistic.taxId,
+        'vrn': optimistic.vrn,
+        'isVatRegistered': optimistic.isVatRegistered,
+        'defaultVatRate': optimistic.defaultVatRate,
+        'isTaxInclusive': optimistic.isTaxInclusive,
         'countryCode': optimistic.countryCode ?? 'TZ',
         'currency': optimistic.currency ?? 'TZS',
         'logoBase64': optimistic.logoBase64,
@@ -588,6 +626,12 @@ class OrganizationRepository {
       email: primary.email ?? fallback.email,
       website: primary.website ?? fallback.website,
       taxId: primary.taxId ?? fallback.taxId,
+      vrn: primary.vrn ?? fallback.vrn,
+      isVatRegistered: primary.isVatRegistered || fallback.isVatRegistered,
+      defaultVatRate: primary.defaultVatRate > 0
+          ? primary.defaultVatRate
+          : fallback.defaultVatRate,
+      isTaxInclusive: primary.isTaxInclusive || fallback.isTaxInclusive,
       countryCode: primary.countryCode ?? fallback.countryCode,
       currency: primary.currency ?? fallback.currency,
       logoBase64: primary.logoBase64 ?? fallback.logoBase64,

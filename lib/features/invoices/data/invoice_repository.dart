@@ -205,6 +205,7 @@ class InvoiceRepository {
       customerAddress:
           _preferNonEmpty(remote.customerAddress, local.customerAddress),
       customerTin: _preferNonEmpty(remote.customerTin, local.customerTin),
+      customerVrn: _preferNonEmpty(remote.customerVrn, local.customerVrn),
       currency: remote.currency.isNotEmpty ? remote.currency : local.currency,
       issueDate: remote.issueDate,
       dueDate: remote.dueDate ?? local.dueDate,
@@ -258,6 +259,7 @@ class InvoiceRepository {
     String? customerEmail,
     String? customerAddress,
     String? customerTin,
+    String? customerVrn,
     String currency = 'TZS',
     String documentTitle = 'INVOICE',
     String? referenceNumber,
@@ -288,6 +290,7 @@ class InvoiceRepository {
       customerEmail: customerEmail,
       customerAddress: customerAddress,
       customerTin: customerTin,
+      customerVrn: customerVrn,
       currency: currency,
       documentTitle: documentTitle,
       referenceNumber: referenceNumber,
@@ -304,6 +307,7 @@ class InvoiceRepository {
       authorizedSignatoryName: authorizedSignatoryName,
       authorizedSignatoryTitle: authorizedSignatoryTitle,
       invoicePrefix: invoicePrefix,
+    );
     _inFlightCreates[clientId] = future;
     return future.whenComplete(() => _inFlightCreates.remove(clientId));
   }
@@ -351,6 +355,7 @@ class InvoiceRepository {
     String? customerEmail,
     String? customerAddress,
     String? customerTin,
+    String? customerVrn,
     String currency = 'TZS',
     String documentTitle = 'INVOICE',
     String? referenceNumber,
@@ -435,6 +440,7 @@ class InvoiceRepository {
       customerEmail: customerEmail?.trim(),
       customerAddress: customerAddress?.trim(),
       customerTin: customerTin?.trim(),
+      customerVrn: customerVrn?.trim(),
       currency: currency,
       issueDate: issued,
       dueDate: dueDate,
@@ -479,6 +485,8 @@ class InvoiceRepository {
         'customerAddress': customerAddress.trim(),
       if (customerTin != null && customerTin.trim().isNotEmpty)
         'customerTin': customerTin.trim(),
+      if (customerVrn != null && customerVrn.trim().isNotEmpty)
+        'customerVrn': customerVrn.trim(),
       'currency': currency,
       'documentTitle': documentTitle,
       if (referenceNumber != null && referenceNumber.trim().isNotEmpty)
@@ -691,6 +699,142 @@ class InvoiceRepository {
       if (cached != null) return CustomerInvoice.fromJson(cached);
     }
     throw ServerException('Ankara haikuweza kufutwa.');
+  }
+
+  /// Converts an existing Proforma or Standard Invoice into an official Tax Invoice (Ankara ya Kodi).
+  ///
+  /// Recalculates taxable subtotal, 18% VAT (or custom vatRate), and total amount.
+  /// If [isTaxInclusive] is true, the current item prices already contain VAT:
+  ///   Net = Gross / (1 + vatRate / 100)
+  ///   VAT = Gross - Net
+  /// If [isTaxInclusive] is false (standard), VAT is added on top of the taxable subtotal:
+  ///   Net = Price
+  ///   VAT = Net * (vatRate / 100)
+  ///   Total = Net + VAT
+  Future<CustomerInvoice> convertToTaxInvoice({
+    required String id,
+    double vatRate = 18.0,
+    String? customerVrn,
+    bool isTaxInclusive = false,
+  }) async {
+    final existing = await getById(id);
+
+    final updatedLines = <InvoiceLine>[];
+    for (final line in existing.lines) {
+      double unitPrice;
+      double lineTotal;
+      double lineTax;
+
+      if (isTaxInclusive) {
+        final gross = line.quantity * line.unitPrice;
+        final netGross = gross / (1.0 + (vatRate / 100.0));
+        unitPrice = line.unitPrice / (1.0 + (vatRate / 100.0));
+        lineTotal = netGross - line.discountAmount;
+        lineTax = gross - lineTotal;
+      } else {
+        unitPrice = line.unitPrice;
+        lineTotal = (line.quantity * unitPrice) - line.discountAmount;
+        lineTax = lineTotal * (vatRate / 100.0);
+      }
+
+      updatedLines.add(
+        line.copyWith(
+          unitPrice: unitPrice,
+          taxRatePercent: vatRate,
+          lineTotal: lineTotal,
+          taxAmount: lineTax,
+        ),
+      );
+    }
+
+    final newSubtotal =
+        updatedLines.fold<double>(0, (sum, l) => sum + l.lineTotal);
+    final newTaxAmount =
+        updatedLines.fold<double>(0, (sum, l) => sum + l.taxAmount);
+    final newTotalAmount =
+        (newSubtotal - existing.discountAmount).clamp(0.0, double.infinity) +
+            newTaxAmount;
+    final newBalanceDue =
+        (newTotalAmount - existing.amountPaid).clamp(0.0, double.infinity);
+    final newStatus = newBalanceDue <= 0
+        ? InvoiceStatus.paid
+        : (existing.amountPaid > 0
+            ? InvoiceStatus.partiallyPaid
+            : InvoiceStatus.unpaid);
+
+    final updatedInvoice = existing.copyWith(
+      documentTitle: 'TAX INVOICE',
+      customerVrn: (customerVrn != null && customerVrn.trim().isNotEmpty)
+          ? customerVrn.trim()
+          : existing.customerVrn,
+      lines: updatedLines,
+      subtotal: newSubtotal,
+      taxAmount: newTaxAmount,
+      totalAmount: newTotalAmount,
+      balanceDue: newBalanceDue,
+      status: newStatus,
+      isSynced: false,
+    );
+
+    await _persistLocally(updatedInvoice);
+
+    // Enqueue into persistent SyncQueue if available
+    if (_queue != null) {
+      try {
+        final tenantId = (await _tenantIdOf?.call()) ?? 'tenant';
+        final branchId = (await _branchIdOf?.call()) ?? 'branch';
+        final deviceId = (await _deviceIdOf?.call()) ?? 'device';
+
+        await _queue.enqueue(
+          operationId: _uuid.v4(),
+          tenantId: tenantId,
+          branchId: branchId,
+          deviceId: deviceId,
+          operationType: 'invoice.convert_to_tax',
+          aggregateType: 'Invoice',
+          aggregateId: id,
+          payload: jsonEncode({
+            'invoiceId': id,
+            'vatRate': vatRate,
+            'customerVrn': updatedInvoice.customerVrn,
+            'documentTitle': 'TAX INVOICE',
+            'subtotal': newSubtotal,
+            'taxAmount': newTaxAmount,
+            'totalAmount': newTotalAmount,
+            'lines': updatedLines.map((l) => l.toJson()).toList(),
+          }),
+        );
+      } catch (_) {}
+    }
+
+    // Attempt remote update opportunistically
+    try {
+      final response = await _apiClient.put<dynamic>(
+        ApiRoutes.v1('/invoices/$id'),
+        body: <String, dynamic>{
+          'documentTitle': 'TAX INVOICE',
+          'customerVrn': updatedInvoice.customerVrn,
+          'vatRate': vatRate,
+          'subtotal': newSubtotal,
+          'taxAmount': newTaxAmount,
+          'totalAmount': newTotalAmount,
+          'lines': updatedLines.map((l) => l.toJson()).toList(),
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final serverUpdated = CustomerInvoice.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        ).copyWith(isSynced: true);
+        final merged =
+            _mergePreservingLocalDetails(updatedInvoice, serverUpdated);
+        await _persistLocally(merged);
+        return merged;
+      }
+    } catch (_) {
+      // Offline fallback: keep local updated invoice
+    }
+
+    return updatedInvoice;
   }
 
   /// Lists all pending invoices that need to be synced to the cloud.

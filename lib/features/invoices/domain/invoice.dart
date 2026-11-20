@@ -77,6 +77,33 @@ class InvoiceLine {
         'lineTotal': lineTotal,
         'taxAmount': taxAmount,
       };
+
+  InvoiceLine copyWith({
+    String? id,
+    String? productId,
+    String? sku,
+    String? description,
+    String? unitOfMeasure,
+    double? quantity,
+    double? unitPrice,
+    double? discountAmount,
+    double? taxRatePercent,
+    double? lineTotal,
+    double? taxAmount,
+  }) =>
+      InvoiceLine(
+        id: id ?? this.id,
+        productId: productId ?? this.productId,
+        sku: sku ?? this.sku,
+        description: description ?? this.description,
+        unitOfMeasure: unitOfMeasure ?? this.unitOfMeasure,
+        quantity: quantity ?? this.quantity,
+        unitPrice: unitPrice ?? this.unitPrice,
+        discountAmount: discountAmount ?? this.discountAmount,
+        taxRatePercent: taxRatePercent ?? this.taxRatePercent,
+        lineTotal: lineTotal ?? this.lineTotal,
+        taxAmount: taxAmount ?? this.taxAmount,
+      );
 }
 
 typedef CustomerInvoiceLine = InvoiceLine;
@@ -159,6 +186,7 @@ class CustomerInvoice {
     this.customerEmail,
     this.customerAddress,
     this.customerTin,
+    this.customerVrn,
     this.discountAmount = 0,
     this.paymentInstructions,
     this.authorizedSignatoryName,
@@ -179,6 +207,7 @@ class CustomerInvoice {
   final String? customerEmail;
   final String? customerAddress;
   final String? customerTin;
+  final String? customerVrn;
   final String currency;
   final DateTime issueDate;
   final DateTime? dueDate;
@@ -230,6 +259,13 @@ class CustomerInvoice {
   String get customerLabel =>
       customerName != null && customerName!.isNotEmpty ? customerName! : '—';
 
+  bool get isTaxInvoice =>
+      documentTitle.toUpperCase().contains('TAX') ||
+      documentTitle.toUpperCase().contains('KODI');
+
+  bool get isProforma =>
+      documentTitle.toUpperCase().contains('PROFORMA');
+
   bool get canTakePayment => status.isOpen && balanceDue > 0;
 
   bool get canVoid =>
@@ -257,17 +293,40 @@ class CustomerInvoice {
         currency: currency,
         isSynced: isSynced,
         verificationToken: effectiveVerificationToken,
+        customerVrn: customerVrn,
       );
 
   CustomerInvoice copyWith({
     String? number,
     String? invoiceNumber,
+    String? documentTitle,
+    String? referenceNumber,
+    String? paymentTerms,
+    String? customerId,
+    String? customerName,
+    String? customerAttention,
+    String? customerPhone,
+    String? customerEmail,
+    String? customerAddress,
+    String? customerTin,
+    String? customerVrn,
+    DateTime? issueDate,
+    DateTime? dueDate,
+    String? notes,
+    String? paymentInstructions,
+    String? authorizedSignatoryName,
+    String? authorizedSignatoryTitle,
     InvoiceStatus? status,
+    double? subtotal,
+    double? discountAmount,
+    double? taxAmount,
+    double? totalAmount,
     double? amountPaid,
     double? balanceDue,
     String? paymentMethod,
     String? paymentReference,
     DateTime? paidAtUtc,
+    List<InvoiceLine>? lines,
     List<CustomerInvoicePayment>? payments,
     bool? isSynced,
     String? verificationToken,
@@ -275,34 +334,37 @@ class CustomerInvoice {
       CustomerInvoice(
         id: id,
         number: number ?? invoiceNumber ?? this.number,
-        documentTitle: documentTitle,
-        referenceNumber: referenceNumber,
-        paymentTerms: paymentTerms,
-        customerId: customerId,
-        customerName: customerName,
-        customerAttention: customerAttention,
-        customerPhone: customerPhone,
-        customerEmail: customerEmail,
-        customerAddress: customerAddress,
-        customerTin: customerTin,
+        documentTitle: documentTitle ?? this.documentTitle,
+        referenceNumber: referenceNumber ?? this.referenceNumber,
+        paymentTerms: paymentTerms ?? this.paymentTerms,
+        customerId: customerId ?? this.customerId,
+        customerName: customerName ?? this.customerName,
+        customerAttention: customerAttention ?? this.customerAttention,
+        customerPhone: customerPhone ?? this.customerPhone,
+        customerEmail: customerEmail ?? this.customerEmail,
+        customerAddress: customerAddress ?? this.customerAddress,
+        customerTin: customerTin ?? this.customerTin,
+        customerVrn: customerVrn ?? this.customerVrn,
         currency: currency,
-        issueDate: issueDate,
-        dueDate: dueDate,
-        notes: notes,
-        paymentInstructions: paymentInstructions,
-        authorizedSignatoryName: authorizedSignatoryName,
-        authorizedSignatoryTitle: authorizedSignatoryTitle,
+        issueDate: issueDate ?? this.issueDate,
+        dueDate: dueDate ?? this.dueDate,
+        notes: notes ?? this.notes,
+        paymentInstructions: paymentInstructions ?? this.paymentInstructions,
+        authorizedSignatoryName:
+            authorizedSignatoryName ?? this.authorizedSignatoryName,
+        authorizedSignatoryTitle:
+            authorizedSignatoryTitle ?? this.authorizedSignatoryTitle,
         status: status ?? this.status,
-        subtotal: subtotal,
-        discountAmount: discountAmount,
-        taxAmount: taxAmount,
-        totalAmount: totalAmount,
+        subtotal: subtotal ?? this.subtotal,
+        discountAmount: discountAmount ?? this.discountAmount,
+        taxAmount: taxAmount ?? this.taxAmount,
+        totalAmount: totalAmount ?? this.totalAmount,
         amountPaid: amountPaid ?? this.amountPaid,
         balanceDue: balanceDue ?? this.balanceDue,
         paymentMethod: paymentMethod ?? this.paymentMethod,
         paymentReference: paymentReference ?? this.paymentReference,
         paidAtUtc: paidAtUtc ?? this.paidAtUtc,
-        lines: lines,
+        lines: lines ?? this.lines,
         payments: payments ?? this.payments,
         isSynced: isSynced ?? this.isSynced,
         verificationToken: verificationToken ?? this.verificationToken,
@@ -321,6 +383,7 @@ class CustomerInvoice {
         'customerEmail': customerEmail,
         'customerAddress': customerAddress,
         'customerTin': customerTin,
+        'customerVrn': customerVrn,
         'currency': currency,
         'issueDate': issueDate.toIso8601String(),
         'dueDate': dueDate?.toIso8601String(),
@@ -385,6 +448,7 @@ class CustomerInvoice {
       customerEmail: _optionalString(json, 'customerEmail'),
       customerAddress: _optionalString(json, 'customerAddress'),
       customerTin: _optionalString(json, 'customerTin'),
+      customerVrn: _optionalString(json, 'customerVrn'),
       currency: _optionalString(json, 'currency') ?? 'TZS',
       issueDate: issueDate,
       dueDate: _optionalDateTime(json, 'dueDate'),
@@ -434,6 +498,7 @@ class CustomerInvoiceSummary {
     this.currency = 'TZS',
     this.isSynced = true,
     this.verificationToken,
+    this.customerVrn,
   });
 
   final String id;
@@ -443,6 +508,7 @@ class CustomerInvoiceSummary {
   final String currency;
   final String? customerId;
   final String? customerName;
+  final String? customerVrn;
   final InvoiceStatus status;
   final DateTime issueDate;
   final DateTime? dueDate;
@@ -451,6 +517,13 @@ class CustomerInvoiceSummary {
   final double balanceDue;
   final bool isSynced;
   final String? verificationToken;
+
+  bool get isTaxInvoice =>
+      documentTitle.toUpperCase().contains('TAX') ||
+      documentTitle.toUpperCase().contains('KODI');
+
+  bool get isProforma =>
+      documentTitle.toUpperCase().contains('PROFORMA');
 
   String get effectiveVerificationToken {
     if (verificationToken != null && verificationToken!.trim().isNotEmpty) {
@@ -504,6 +577,7 @@ class CustomerInvoiceSummary {
       balanceDue: _requiredDouble(json, 'balanceDue'),
       isSynced: (json['isSynced'] as bool?) ?? true,
       verificationToken: _optionalString(json, 'verificationToken'),
+      customerVrn: _optionalString(json, 'customerVrn'),
     );
   }
 
@@ -515,6 +589,7 @@ class CustomerInvoiceSummary {
         'currency': currency,
         'customerId': customerId,
         'customerName': customerName,
+        'customerVrn': customerVrn,
         'status': status.code,
         'issueDate': issueDate.toIso8601String(),
         'dueDate': dueDate?.toIso8601String(),

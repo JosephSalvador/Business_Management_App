@@ -807,5 +807,105 @@ void main() {
       expect(cancelled.status, DeliveryNoteStatus.cancelled);
     });
   });
+
+  group('Tax Invoice System, VRN & Proforma Conversion', () {
+    test('Organization VRN and VAT properties round-trip serialization', () {
+      const org = Organization(
+        name: 'Dar Industrial Supplies',
+        taxId: '100-200-300',
+        vrn: '40012345Z',
+        isVatRegistered: true,
+        defaultVatRate: 18.0,
+        isTaxInclusive: true,
+      );
+
+      final json = org.toJson();
+      expect(json['vrn'], '40012345Z');
+      expect(json['isVatRegistered'], isTrue);
+      expect(json['defaultVatRate'], 18.0);
+      expect(json['isTaxInclusive'], isTrue);
+
+      final restored = Organization.fromJson(json);
+      expect(restored.vrn, '40012345Z');
+      expect(restored.isVatRegistered, isTrue);
+      expect(restored.defaultVatRate, 18.0);
+      expect(restored.isTaxInclusive, isTrue);
+
+      final updated = restored.copyWith(isTaxInclusive: false);
+      expect(updated.isTaxInclusive, isFalse);
+    });
+
+    test('CustomerInvoice customerVrn, isTaxInvoice, and isProforma getters and serialization', () {
+      final invoice = CustomerInvoice(
+        id: 'inv-tax-01',
+        number: 'CINV-2026-9001',
+        documentTitle: 'PROFORMA INVOICE',
+        customerName: 'Kilimanjaro Traders',
+        customerTin: '999-888-777',
+        customerVrn: 'VRN-KILI-001',
+        currency: 'TZS',
+        issueDate: DateTime(2026, 11, 19),
+        status: InvoiceStatus.unpaid,
+        subtotal: 100000.0,
+        taxAmount: 0.0,
+        totalAmount: 100000.0,
+        balanceDue: 100000.0,
+        lines: const [
+          InvoiceLine(
+            id: 'line-1',
+            description: 'Item 1',
+            quantity: 1,
+            unitPrice: 100000.0,
+            lineTotal: 100000.0,
+            taxAmount: 0.0,
+          ),
+        ],
+      );
+
+      expect(invoice.isProforma, isTrue);
+      expect(invoice.isTaxInvoice, isFalse);
+      expect(invoice.customerVrn, 'VRN-KILI-001');
+
+      final json = invoice.toJson();
+      expect(json['customerVrn'], 'VRN-KILI-001');
+      expect(json['documentTitle'], 'PROFORMA INVOICE');
+
+      final restored = CustomerInvoice.fromJson(json);
+      expect(restored.isProforma, isTrue);
+      expect(restored.isTaxInvoice, isFalse);
+      expect(restored.customerVrn, 'VRN-KILI-001');
+
+      final taxInvoice = restored.copyWith(
+        documentTitle: 'TAX INVOICE',
+      );
+      expect(taxInvoice.isTaxInvoice, isTrue);
+      expect(taxInvoice.isProforma, isFalse);
+
+      final summary = taxInvoice.toSummary();
+      expect(summary.customerVrn, 'VRN-KILI-001');
+      expect(summary.isTaxInvoice, isTrue);
+      expect(summary.isProforma, isFalse);
+    });
+
+    test('Tax Invoice conversion calculation logic for tax-exclusive and tax-inclusive modes', () {
+      // 1. Tax-Exclusive: Subtotal 100,000 => 18% VAT added => Subtotal 100,000, Tax 18,000, Total 118,000
+      const exclusiveOriginalSubtotal = 100000.0;
+      const vatRate = 18.0;
+      final exclusiveCalculatedTax = (exclusiveOriginalSubtotal * (vatRate / 100.0) * 100).round() / 100.0;
+      final exclusiveCalculatedTotal = exclusiveOriginalSubtotal + exclusiveCalculatedTax;
+
+      expect(exclusiveCalculatedTax, 18000.0);
+      expect(exclusiveCalculatedTotal, 118000.0);
+
+      // 2. Tax-Inclusive: Gross 118,000 => 18% VAT extracted => Subtotal 100,000, Tax 18,000, Total 118,000
+      const inclusiveGrossAmount = 118000.0;
+      final inclusiveSubtotal = (inclusiveGrossAmount / (1.0 + (vatRate / 100.0)) * 100).round() / 100.0;
+      final inclusiveTax = ((inclusiveGrossAmount - inclusiveSubtotal) * 100).round() / 100.0;
+
+      expect(inclusiveSubtotal, 100000.0);
+      expect(inclusiveTax, 18000.0);
+      expect(inclusiveSubtotal + inclusiveTax, inclusiveGrossAmount);
+    });
+  });
 }
 

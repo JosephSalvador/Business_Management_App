@@ -140,6 +140,8 @@ class DeliveryNote {
         totalQuantity: totalQuantity,
         carrierName: carrierName,
         vehicleNumber: vehicleNumber,
+        driverName: driverName,
+        driverPhone: driverPhone,
         invoiceId: invoiceId,
         invoiceNumber: invoiceNumber,
         isSynced: isSynced,
@@ -153,6 +155,11 @@ class DeliveryNote {
     String? recipientSignature,
     bool? isSynced,
     String? invoiceNumber,
+    String? driverName,
+    String? driverPhone,
+    String? vehicleNumber,
+    String? carrierName,
+    String? trackingNumber,
   }) =>
       DeliveryNote(
         id: id,
@@ -165,11 +172,11 @@ class DeliveryNote {
         customerPhone: customerPhone,
         customerAddress: customerAddress,
         deliveryAddress: deliveryAddress,
-        carrierName: carrierName,
-        trackingNumber: trackingNumber,
-        vehicleNumber: vehicleNumber,
-        driverName: driverName,
-        driverPhone: driverPhone,
+        carrierName: carrierName ?? this.carrierName,
+        trackingNumber: trackingNumber ?? this.trackingNumber,
+        vehicleNumber: vehicleNumber ?? this.vehicleNumber,
+        driverName: driverName ?? this.driverName,
+        driverPhone: driverPhone ?? this.driverPhone,
         status: status ?? this.status,
         issueDate: issueDate,
         dispatchedAt: dispatchedAt ?? this.dispatchedAt,
@@ -262,6 +269,8 @@ class DeliveryNoteSummary {
     required this.totalQuantity,
     this.carrierName,
     this.vehicleNumber,
+    this.driverName,
+    this.driverPhone,
     this.invoiceId,
     this.invoiceNumber,
     this.isSynced = true,
@@ -276,6 +285,8 @@ class DeliveryNoteSummary {
   final double totalQuantity;
   final String? carrierName;
   final String? vehicleNumber;
+  final String? driverName;
+  final String? driverPhone;
   final String? invoiceId;
   final String? invoiceNumber;
   final bool isSynced;
@@ -293,6 +304,8 @@ class DeliveryNoteSummary {
         totalQuantity: (json['totalQuantity'] as num?)?.toDouble() ?? 0,
         carrierName: json['carrierName']?.toString(),
         vehicleNumber: json['vehicleNumber']?.toString(),
+        driverName: json['driverName']?.toString(),
+        driverPhone: json['driverPhone']?.toString(),
         invoiceId: json['invoiceId']?.toString(),
         invoiceNumber: json['invoiceNumber']?.toString(),
         isSynced: (json['isSynced'] as bool?) ?? true,
@@ -308,6 +321,8 @@ class DeliveryNoteSummary {
         'totalQuantity': totalQuantity,
         if (carrierName != null) 'carrierName': carrierName,
         if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
+        if (driverName != null) 'driverName': driverName,
+        if (driverPhone != null) 'driverPhone': driverPhone,
         if (invoiceId != null) 'invoiceId': invoiceId,
         if (invoiceNumber != null) 'invoiceNumber': invoiceNumber,
         'isSynced': isSynced,

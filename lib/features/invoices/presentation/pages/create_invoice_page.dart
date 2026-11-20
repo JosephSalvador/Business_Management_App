@@ -28,6 +28,7 @@ class CreateInvoicePage extends ConsumerStatefulWidget {
 
 class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   static const List<String> _documentTitles = [
+    'TAX INVOICE',
     'INVOICE',
     'PROFORMA INVOICE',
     'QUOTATION',
@@ -74,6 +75,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   final _customerNameController = TextEditingController();
   final _customerAttentionController = TextEditingController();
   final _customerTinController = TextEditingController();
+  final _customerVrnController = TextEditingController();
   final _customerPhoneController = TextEditingController();
   final _customerEmailController = TextEditingController();
   final _customerAddressController = TextEditingController();
@@ -118,6 +120,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
     _customerNameController.dispose();
     _customerAttentionController.dispose();
     _customerTinController.dispose();
+    _customerVrnController.dispose();
     _customerPhoneController.dispose();
     _customerEmailController.dispose();
     _customerAddressController.dispose();
@@ -138,6 +141,16 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
   void _syncDefaultsFromOrganization(Organization org) {
     if (_prefilledFromOrg) return;
     _prefilledFromOrg = true;
+
+    if (org.isVatRegistered) {
+      _documentTitle = 'TAX INVOICE';
+      final vatRate = org.defaultVatRate > 0 ? org.defaultVatRate : 18.0;
+      for (final line in _lines) {
+        if (line.taxRatePercent == 0) {
+          line.taxRatePercent = vatRate;
+        }
+      }
+    }
 
     final bankLines = <String>[];
     if (org.bankName != null && org.bankName!.trim().isNotEmpty) {
@@ -180,12 +193,14 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
 
   double get _subtotal => _lines.fold(0, (sum, line) => sum + line.lineTotal);
 
+  double get _totalTax => _lines.fold(0, (sum, line) => sum + line.lineTax);
+
   double get _invoiceDiscount =>
       double.tryParse(_invoiceDiscountController.text.trim()) ?? 0;
 
   double get _totalAmount {
-    final total = _subtotal - _invoiceDiscount;
-    return total < 0 ? 0 : total;
+    final net = (_subtotal - _invoiceDiscount).clamp(0.0, double.infinity);
+    return net + _totalTax;
   }
 
   double get _initialPaid => _hasInitialDeposit
@@ -254,9 +269,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
         quantity: line.parsedQuantity,
         unitPrice: line.parsedUnitPrice,
         discountAmount: line.parsedDiscount,
-        taxRatePercent: 0,
+        taxRatePercent: line.taxRatePercent,
         lineTotal: line.lineTotal,
-        taxAmount: 0,
+        taxAmount: line.lineTax,
       );
     });
     final status = _balanceDue <= 0 && _totalAmount > 0
@@ -309,6 +324,9 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       customerTin: _customerTinController.text.trim().isEmpty
           ? null
           : _customerTinController.text.trim(),
+      customerVrn: _customerVrnController.text.trim().isEmpty
+          ? null
+          : _customerVrnController.text.trim(),
       currency: org?.currency ?? 'TZS',
       issueDate: _issueDate,
       dueDate: _dueDate,
@@ -327,7 +345,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
       status: status,
       subtotal: _subtotal,
       discountAmount: _invoiceDiscount,
-      taxAmount: 0,
+      taxAmount: _totalTax,
       totalAmount: _totalAmount,
       amountPaid: _initialPaid,
       balanceDue: _balanceDue,
@@ -487,8 +505,26 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                                     ? AppColors.primary
                                     : textPrimary,
                               ),
-                              onSelected: (_) =>
-                                  setState(() => _documentTitle = docTitle),
+                              onSelected: (_) => setState(() {
+                                _documentTitle = docTitle;
+                                final orgState =
+                                    ref.read(settingsControllerProvider);
+                                final vatRate = (orgState is SettingsLoaded &&
+                                        orgState.organization.defaultVatRate > 0)
+                                    ? orgState.organization.defaultVatRate
+                                    : 18.0;
+                                if (docTitle == 'TAX INVOICE') {
+                                  for (final line in _lines) {
+                                    if (line.taxRatePercent == 0) {
+                                      line.taxRatePercent = vatRate;
+                                    }
+                                  }
+                                } else {
+                                  for (final line in _lines) {
+                                    line.taxRatePercent = 0;
+                                  }
+                                }
+                              }),
                             ),
                         ],
                       ),
@@ -797,6 +833,23 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _customerVrnController,
+                        onChanged: (_) => setState(() {}),
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: isSw
+                              ? 'VRN ya Mteja (Usajili wa VAT - Hiari)'
+                              : 'Receiver VRN (VAT Registration - Optional)',
+                          hintText: isSw
+                              ? 'Mfano: 40-123456-X'
+                              : 'e.g. 40-123456-X',
+                        ),
+                      ),
                       if (_customerNameController.text.trim().isEmpty) ...[
                         const SizedBox(height: 8),
                         Row(
@@ -932,6 +985,28 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
                               const Icon(Icons.discount_outlined, size: 18),
                         ),
                       ),
+                      if (_totalTax > 0) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              isSw ? 'VAT (Kodi ya Ongezeko)' : 'VAT Amount',
+                              style: const TextStyle(
+                                color: Color(0xFF2563EB),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              formatMoney(_totalTax),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2563EB),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const Divider(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1444,7 +1519,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
             quantity: line.parsedQuantity,
             unitPrice: line.parsedUnitPrice,
             discountAmount: line.parsedDiscount,
-            taxRatePercent: 0,
+            taxRatePercent: line.taxRatePercent,
           ),
         )
         .toList(growable: false);
@@ -1488,6 +1563,7 @@ class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
           customerEmail: _customerEmailController.text,
           customerAddress: _customerAddressController.text,
           customerTin: _customerTinController.text,
+          customerVrn: _customerVrnController.text,
           issueDate: _issueDate,
           dueDate: _dueDate,
           discountAmount: _invoiceDiscount,
@@ -1567,6 +1643,7 @@ class _LineInputs {
   final quantity = TextEditingController(text: '1');
   final unitPrice = TextEditingController();
   final discount = TextEditingController();
+  double taxRatePercent = 0;
 
   double get parsedQuantity => double.tryParse(quantity.text.trim()) ?? 1;
 
@@ -1579,6 +1656,8 @@ class _LineInputs {
     final net = gross - parsedDiscount;
     return net < 0 ? 0 : net;
   }
+
+  double get lineTax => lineTotal * taxRatePercent / 100;
 
   void dispose() {
     description.dispose();

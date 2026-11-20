@@ -125,6 +125,7 @@ class InvoicesController extends Notifier<InvoicesState> {
     String? customerEmail,
     String? customerAddress,
     String? customerTin,
+    String? customerVrn,
     String currency = 'TZS',
     String documentTitle = 'INVOICE',
     String? referenceNumber,
@@ -153,6 +154,7 @@ class InvoicesController extends Notifier<InvoicesState> {
         customerEmail: customerEmail,
         customerAddress: customerAddress,
         customerTin: customerTin,
+        customerVrn: customerVrn,
         currency: currency,
         documentTitle: documentTitle,
         referenceNumber: referenceNumber,
@@ -171,6 +173,27 @@ class InvoicesController extends Notifier<InvoicesState> {
         invoicePrefix: invoicePrefix,
       );
       await load();
+      return invoice;
+    } on AppException catch (error) {
+      state = InvoicesFailure(error.message);
+      return null;
+    }
+  }
+
+  Future<CustomerInvoice?> convertToTaxInvoice({
+    required String id,
+    double vatRate = 18.0,
+    String? customerVrn,
+    bool isTaxInclusive = false,
+  }) async {
+    try {
+      final invoice = await _repository.convertToTaxInvoice(
+        id: id,
+        vatRate: vatRate,
+        customerVrn: customerVrn,
+        isTaxInclusive: isTaxInclusive,
+      );
+      await load(silent: true);
       return invoice;
     } on AppException catch (error) {
       state = InvoicesFailure(error.message);

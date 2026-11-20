@@ -373,5 +373,16 @@ documentation, migration, permissions, audit, API, offline, and sync are complet
 - [x] Task 5: Unit Tests — Added unit tests in `test/features/invoices/offline_invoicing_test.dart` verifying `DeliveryNoteStatus` transitions (Draft -> Dispatched -> Delivered -> Cancelled) and sequential numbering format compliance.
 - [x] Task 6: Version Bump — Bumped version code to `1.0.0+93` in `pubspec.yaml` and `app_update_service.dart`.
 
+## Implementation Plan — Tax Invoice System, Conversion from Proforma/Normal & VRN Configuration (Build 94)
+- [x] Task 1: Domain & Organization Layer — Extend `Organization` model in `organization_repository.dart` with `vrn`, `isVatRegistered`, `defaultVatRate` (18.0%), and `isTaxInclusive`. Extend `CustomerInvoice` & `CustomerInvoiceSummary` in `invoice.dart` with `customerVrn` and support for `TAX INVOICE` / `PROFORMA INVOICE` / `INVOICE`.
+- [x] Task 2: Repository Conversion & VAT Engine — Add `convertToTaxInvoice({required String id, double vatRate = 18.0, String? customerVrn, bool isTaxInclusive = false})` to `InvoiceRepository` with automatic recalculation of taxable subtotal, 18% VAT amount, and gross total, updating title to `'TAX INVOICE'`.
+- [x] Task 3: Interactive Conversion Modal in Invoice Details — Add "Badilisha kuwa Tax Invoice" (Convert to Tax Invoice) action button and modal in `InvoiceDetailPage` with live VAT preview and optional customer VRN input.
+- [x] Task 4: Document Type & VAT in Invoice Creation Wizard — Update `CreateInvoicePage` to allow choosing Document Type (Tax Invoice with 18% VAT, Proforma Invoice, or Standard Invoice), defaulting to Tax Invoice if business is VAT-registered.
+- [x] Task 5: Organization VRN & VAT Settings UI — Add VRN input, VAT-registered toggle, and default VAT rate configuration in `SettingsPage` and `OrganizationRepository`.
+- [x] Task 6: Executive Tax Invoice PDF & Print Layout — Update `LocalPdfDocumentGenerator` and `InvoiceA4PreviewCard` across all archetypes to render official `TAX INVOICE / ANKARA YA KODI` layout with seller TIN & VRN, customer TIN & VRN, and full Tax Breakdown table (Taxable Subtotal, VAT @ 18%, Total Amount).
+- [x] Task 7: Unit Tests & Verification — Add comprehensive tests in `test/features/invoices/offline_invoicing_test.dart` verifying VAT calculations, tax inclusive/exclusive modes, and conversion from proforma to tax invoice. All 21 tests pass with zero warnings.
+- [x] Task 8: Version Bump — Bump version code to `1.0.0+94` in `pubspec.yaml` and `app_update_service.dart`.
+
+
 
 

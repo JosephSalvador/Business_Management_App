@@ -193,7 +193,7 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                 isSwahili: isSwahili,
               );
       } else {
-        DeliveryNote note;
+        DeliveryNote? note;
         try {
           note = await ref
               .read(deliveryNoteRepositoryProvider)
@@ -219,6 +219,9 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
                 secondaryHex: _themeSecondaryHex,
                 isSwahili: isSwahili,
               );
+        if (mounted) {
+          _currentDeliveryNote = note;
+        }
       }
 
       if (!mounted) return;
@@ -227,9 +230,6 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         _rawPdfBytes = pdfBytes;
         _isLoading = false;
         _isSynced = isDocSynced;
-        if (widget.documentType == DocumentType.deliveryNote) {
-          _currentDeliveryNote = note;
-        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -291,6 +291,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
         setState(() => _isPrinting = false);
       }
     }
+  }
+
   Future<void> _showDispatchDialog() async {
     final note = _currentDeliveryNote;
     if (note == null) return;

@@ -133,6 +133,18 @@ class SettingsPage extends ConsumerWidget {
               onTap: () => _editOrganization(context, ref, organization),
             ),
             _SettingsTile(
+              icon: Icons.receipt_long_outlined,
+              title: isSw
+                  ? 'VRN (Namba ya Usajili wa VAT)'
+                  : 'VRN (VAT Registration No.)',
+              subtitle: organization.isVatRegistered
+                  ? '${organization.vrn ?? "Imesajiliwa"} • VAT ${organization.defaultVatRate.toStringAsFixed(0)}%'
+                  : (isSw
+                      ? 'Haijasajiliwa VAT (Gusa kusanidi)'
+                      : 'Not VAT Registered (Tap to configure)'),
+              onTap: () => _editOrganization(context, ref, organization),
+            ),
+            _SettingsTile(
               icon: Icons.account_balance_outlined,
               title: isSw ? 'Akaunti ya Malipo ya Ankara' : 'Invoice Payment Accounts',
               subtitle: organization.formattedPaymentInstructions.isNotEmpty
@@ -356,6 +368,10 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
   late final TextEditingController _phoneController;
   late final TextEditingController _emailController;
   late final TextEditingController _taxIdController;
+  late final TextEditingController _vrnController;
+  late bool _isVatRegistered;
+  late final TextEditingController _defaultVatRateController;
+  late bool _isTaxInclusive;
   late final TextEditingController _invoicePrefixController;
   bool _saving = false;
 
@@ -372,6 +388,15 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
         TextEditingController(text: widget.organization.email ?? '');
     _taxIdController =
         TextEditingController(text: widget.organization.taxId ?? '');
+    _vrnController =
+        TextEditingController(text: widget.organization.vrn ?? '');
+    _isVatRegistered = widget.organization.isVatRegistered;
+    _defaultVatRateController = TextEditingController(
+      text: widget.organization.defaultVatRate > 0
+          ? widget.organization.defaultVatRate.toStringAsFixed(0)
+          : '18',
+    );
+    _isTaxInclusive = widget.organization.isTaxInclusive;
     _invoicePrefixController =
         TextEditingController(text: widget.organization.effectiveInvoicePrefix);
   }
@@ -384,6 +409,8 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
       _phoneController,
       _emailController,
       _taxIdController,
+      _vrnController,
+      _defaultVatRateController,
       _invoicePrefixController,
     ]) {
       c.dispose();
@@ -438,6 +465,64 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
                 decoration: InputDecoration(labelText: loc.settingsTIN)),
             const SizedBox(height: 14),
             TextFormField(
+              controller: _vrnController,
+              decoration: const InputDecoration(
+                labelText: 'VRN (VAT Registration No.)',
+                hintText: '40-123456-X',
+              ),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Biashara Imesajiliwa VAT?',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                'Inaruhusu kutoa Ankara Rasmi za Kodi zenye 18% VAT moja kwa moja',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.resolveTextSecondary(context),
+                ),
+              ),
+              value: _isVatRegistered,
+              onChanged: (val) => setState(() => _isVatRegistered = val),
+            ),
+            if (_isVatRegistered) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _defaultVatRateController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Kiwango cha VAT (%)',
+                        suffixText: '%',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Bei Zinajumuisha VAT',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      value: _isTaxInclusive,
+                      onChanged: (val) =>
+                          setState(() => _isTaxInclusive = val),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
+            TextFormField(
               controller: _invoicePrefixController,
               textCapitalization: TextCapitalization.characters,
               decoration: InputDecoration(
@@ -480,6 +565,13 @@ class _EditOrgSheetState extends State<_EditOrgSheet> {
         'phone': _phoneController.text,
         'email': _emailController.text,
         'taxId': _taxIdController.text,
+        'vrn': _vrnController.text.trim().isEmpty
+            ? null
+            : _vrnController.text.trim(),
+        'isVatRegistered': _isVatRegistered,
+        'defaultVatRate':
+            double.tryParse(_defaultVatRateController.text.trim()) ?? 18.0,
+        'isTaxInclusive': _isTaxInclusive,
         'invoicePrefix': _invoicePrefixController.text.trim().toUpperCase(),
       });
       if (mounted) {

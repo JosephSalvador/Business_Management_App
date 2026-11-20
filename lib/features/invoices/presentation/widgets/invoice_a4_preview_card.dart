@@ -269,6 +269,19 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                             ),
                           ),
                         ),
+                      if (organization.vrn != null &&
+                          organization.vrn!.trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'VRN: ${organization.vrn!.trim()}',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: _slate500,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -361,6 +374,16 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                         invoice.customerTin!.trim().isNotEmpty)
                       Text(
                         'TIN: ${invoice.customerTin!.trim()}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _slate700,
+                        ),
+                      ),
+                    if (invoice.customerVrn != null &&
+                        invoice.customerVrn!.trim().isNotEmpty)
+                      Text(
+                        'VRN: ${invoice.customerVrn!.trim()}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -697,6 +720,14 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
               isSwahili ? 'Punguzo (Discount):' : 'Discount:',
               '- ${fmtMoney(invoice.discountAmount)}',
               valueColor: const Color(0xFFB45309),
+            ),
+          ],
+          if (invoice.taxAmount > 0 || invoice.isTaxInvoice) ...[
+            const SizedBox(height: 4),
+            _summaryRow(
+              isSwahili ? 'VAT @ 18% (Kodi ya Ongezeko):' : 'VAT @ 18%:',
+              fmtMoney(invoice.taxAmount),
+              valueColor: primaryColor,
             ),
           ],
           const SizedBox(height: 6),
@@ -1043,6 +1074,16 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                               color: _slate700,
                             ),
                           ),
+                        if (organization.vrn != null &&
+                            organization.vrn!.trim().isNotEmpty)
+                          Text(
+                            'VRN: ${organization.vrn!.trim()}',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: _slate700,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1091,6 +1132,26 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                             style: const TextStyle(
                               fontSize: 10.5,
                               color: _slate700,
+                            ),
+                          ),
+                        if (invoice.customerTin != null &&
+                            invoice.customerTin!.trim().isNotEmpty)
+                          Text(
+                            'TIN: ${invoice.customerTin!.trim()}',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: _slate700,
+                            ),
+                          ),
+                        if (invoice.customerVrn != null &&
+                            invoice.customerVrn!.trim().isNotEmpty)
+                          Text(
+                            'VRN: ${invoice.customerVrn!.trim()}',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: _navy,
                             ),
                           ),
                         const SizedBox(height: 4),
@@ -1188,6 +1249,28 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
             ),
             child: Column(
               children: [
+                if (invoice.discountAmount > 0 || invoice.taxAmount > 0) ...[
+                  _summaryRow(
+                    isSwahili ? 'Jumla Ndogo (Subtotal)' : 'Subtotal',
+                    fmtMoney(invoice.subtotal),
+                  ),
+                  const SizedBox(height: 4),
+                  if (invoice.discountAmount > 0) ...[
+                    _summaryRow(
+                      isSwahili ? 'Punguzo (Discount)' : 'Discount',
+                      '- ${fmtMoney(invoice.discountAmount)}',
+                      valueColor: const Color(0xFFDC2626),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  if (invoice.taxAmount > 0) ...[
+                    _summaryRow(
+                      isSwahili ? 'VAT / Kodi (18%)' : 'VAT / Tax (18%)',
+                      fmtMoney(invoice.taxAmount),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                ],
                 _summaryRow(
                   isSwahili ? 'Jumla Kuu ($currency)' : 'TOTAL ($currency)',
                   fmtMoney(invoice.totalAmount),
@@ -1573,6 +1656,19 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                                 ),
                               ),
                             ),
+                          if (organization.vrn != null &&
+                              organization.vrn!.trim().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                'VRN: ${organization.vrn!.trim()}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: secondaryColor,
+                                ),
+                              ),
+                            ),
                           if (organization.address != null &&
                               organization.address!.trim().isNotEmpty)
                             Padding(
@@ -1751,7 +1847,8 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                         ),
                       if ((invoice.customerPhone?.trim().isNotEmpty ?? false) ||
                           (invoice.customerEmail?.trim().isNotEmpty ?? false) ||
-                          (invoice.customerTin?.trim().isNotEmpty ?? false)) ...[
+                          (invoice.customerTin?.trim().isNotEmpty ?? false) ||
+                          (invoice.customerVrn?.trim().isNotEmpty ?? false)) ...[
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 14,
@@ -1780,6 +1877,16 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
                                 invoice.customerTin!.trim().isNotEmpty)
                               Text(
                                 'TIN: ${invoice.customerTin!.trim()}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: secondaryColor,
+                                ),
+                              ),
+                            if (invoice.customerVrn != null &&
+                                invoice.customerVrn!.trim().isNotEmpty)
+                              Text(
+                                'VRN: ${invoice.customerVrn!.trim()}',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
@@ -2087,6 +2194,13 @@ class InvoiceA4PreviewCard extends ConsumerWidget {
               isSwahili ? 'Punguzo (Discount)' : 'Discount',
               '- ${fmtMoney(invoice.discountAmount)}',
               valueColor: const Color(0xFFB45309),
+            ),
+          ],
+          if (invoice.taxAmount > 0) ...[
+            const SizedBox(height: 4),
+            _summaryRow(
+              isSwahili ? 'VAT / Kodi (18%)' : 'VAT / Tax (18%)',
+              fmtMoney(invoice.taxAmount),
             ),
           ],
           const Divider(height: 14),

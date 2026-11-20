@@ -415,6 +415,12 @@ class LocalPdfDocumentGenerator {
                     'TIN: ${organization.taxId!.trim()}',
                     style: const pw.TextStyle(color: _slate500, fontSize: 9),
                   ),
+                if (organization?.vrn != null &&
+                    organization!.vrn!.trim().isNotEmpty)
+                  pw.Text(
+                    'VRN: ${organization.vrn!.trim()}',
+                    style: const pw.TextStyle(color: _slate500, fontSize: 9),
+                  ),
               ],
             ),
           ),
@@ -494,6 +500,16 @@ class LocalPdfDocumentGenerator {
                     invoice.customerTin!.trim().isNotEmpty)
                   pw.Text(
                     'TIN: ${invoice.customerTin!.trim()}',
+                    style: pw.TextStyle(
+                      color: _slate700,
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                if (invoice.customerVrn != null &&
+                    invoice.customerVrn!.trim().isNotEmpty)
+                  pw.Text(
+                    'VRN: ${invoice.customerVrn!.trim()}',
                     style: pw.TextStyle(
                       color: _slate700,
                       fontSize: 9,
@@ -723,6 +739,12 @@ class LocalPdfDocumentGenerator {
           isSwahili ? 'Punguzo (Discount):' : 'Discount:',
           '-${fmtMoney(invoice.discountAmount)}',
           valueColor: _amber700,
+        ),
+      if (invoice.taxAmount > 0 || invoice.isTaxInvoice)
+        _buildTotalRow(
+          isSwahili ? 'VAT @ 18% (Kodi ya Ongezeko):' : 'VAT @ 18%:',
+          fmtMoney(invoice.taxAmount),
+          valueColor: _defaultPrimary,
         ),
       pw.SizedBox(height: 4),
       _buildTotalRow(
@@ -1002,6 +1024,16 @@ class LocalPdfDocumentGenerator {
                         fontWeight: pw.FontWeight.bold,
                       ),
                     ),
+                  if (organization?.vrn != null &&
+                      organization!.vrn!.trim().isNotEmpty)
+                    pw.Text(
+                      'VRN: ${organization.vrn!.trim()}',
+                      style: pw.TextStyle(
+                        color: _slate700,
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1037,6 +1069,26 @@ class LocalPdfDocumentGenerator {
                     pw.Text(
                       'Tel: ${invoice.customerPhone!.trim()}',
                       style: const pw.TextStyle(color: _slate700, fontSize: 9),
+                    ),
+                  if (invoice.customerTin != null &&
+                      invoice.customerTin!.trim().isNotEmpty)
+                    pw.Text(
+                      'TIN: ${invoice.customerTin!.trim()}',
+                      style: pw.TextStyle(
+                        color: _slate700,
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  if (invoice.customerVrn != null &&
+                      invoice.customerVrn!.trim().isNotEmpty)
+                    pw.Text(
+                      'VRN: ${invoice.customerVrn!.trim()}',
+                      style: pw.TextStyle(
+                        color: _slate700,
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
                     ),
                   pw.Text(
                     '${isSwahili ? "Tarehe" : "Date"}: ${slashDateFmt.format(invoice.issueDate.toLocal())}',
@@ -1104,6 +1156,22 @@ class LocalPdfDocumentGenerator {
         ),
         child: pw.Column(
           children: [
+            _buildTotalRow(
+              isSwahili ? 'Jumla Ndogo (Subtotal):' : 'Subtotal:',
+              fmtMoney(invoice.subtotal),
+            ),
+            if (invoice.discountAmount > 0)
+              _buildTotalRow(
+                isSwahili ? 'Punguzo (Discount):' : 'Discount:',
+                '-${fmtMoney(invoice.discountAmount)}',
+                valueColor: _amber700,
+              ),
+            if (invoice.taxAmount > 0 || invoice.isTaxInvoice)
+              _buildTotalRow(
+                isSwahili ? 'VAT @ 18% (Kodi ya Ongezeko):' : 'VAT @ 18%:',
+                fmtMoney(invoice.taxAmount),
+                valueColor: primaryColor,
+              ),
             _buildTotalRow(
               isSwahili ? 'JUMLA KUU ($currency):' : 'TOTAL ($currency):',
               fmtMoney(invoice.totalAmount),
@@ -1358,6 +1426,19 @@ class LocalPdfDocumentGenerator {
                               ),
                             ),
                           ),
+                        if (organization?.vrn != null &&
+                            organization!.vrn!.trim().isNotEmpty)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(top: 2),
+                            child: pw.Text(
+                              'VRN: ${organization.vrn!.trim()}',
+                              style: pw.TextStyle(
+                                color: secondaryColor,
+                                fontSize: 9.5,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         if (organization?.address != null &&
                             organization!.address!.trim().isNotEmpty)
                           pw.Padding(
@@ -1539,6 +1620,19 @@ class LocalPdfDocumentGenerator {
                       padding: const pw.EdgeInsets.only(top: 2),
                       child: pw.Text(
                         'TIN: ${invoice.customerTin!.trim()}',
+                        style: pw.TextStyle(
+                          color: secondaryColor,
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  if (invoice.customerVrn != null &&
+                      invoice.customerVrn!.trim().isNotEmpty)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(top: 2),
+                      child: pw.Text(
+                        'VRN: ${invoice.customerVrn!.trim()}',
                         style: pw.TextStyle(
                           color: secondaryColor,
                           fontSize: 9,
@@ -1771,6 +1865,12 @@ class LocalPdfDocumentGenerator {
                       '-${fmtMoney(invoice.discountAmount)}',
                       valueColor: _amber700,
                     ),
+                  if (invoice.taxAmount > 0 || invoice.isTaxInvoice)
+                    _buildTotalRow(
+                      isSwahili ? 'VAT @ 18%:' : 'VAT @ 18%:',
+                      fmtMoney(invoice.taxAmount),
+                      valueColor: primaryColor,
+                    ),
                   pw.Divider(color: _slate200, thickness: 0.6),
                   _buildTotalRow(
                     isSwahili ? 'JUMLA KUU:' : 'TOTAL AMOUNT:',
@@ -1982,6 +2082,11 @@ class LocalPdfDocumentGenerator {
               pw.Text('TIN: ${organization.taxId!}',
                   style: pw.TextStyle(
                       fontSize: 8, fontWeight: pw.FontWeight.bold)),
+            if (organization?.vrn != null &&
+                organization!.vrn!.isNotEmpty)
+              pw.Text('VRN: ${organization.vrn!}',
+                  style: pw.TextStyle(
+                      fontSize: 8, fontWeight: pw.FontWeight.bold)),
 
             pw.SizedBox(height: 4),
             _buildThermalDashedLine(),
@@ -2023,6 +2128,15 @@ class LocalPdfDocumentGenerator {
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
+            if (invoice.customerVrn != null &&
+                invoice.customerVrn!.trim().isNotEmpty)
+              pw.Text(
+                'VRN: ${invoice.customerVrn!.trim()}',
+                style: pw.TextStyle(
+                  fontSize: 7.5,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
 
             pw.SizedBox(height: 4),
             _buildThermalDashedLine(),
@@ -2044,7 +2158,7 @@ class LocalPdfDocumentGenerator {
                   pw.Text(
                     numFmt.format(line.lineTotal),
                     style: pw.TextStyle(
-                        fontSize: 8, fontWeight: pw.FontWeight.bold),
+                          fontSize: 8, fontWeight: pw.FontWeight.bold),
                   ),
                 ],
               ),
@@ -2074,6 +2188,8 @@ class LocalPdfDocumentGenerator {
             if (invoice.discountAmount > 0)
               _buildThermalRow(
                   'Discount:', '-${fmtMoney(invoice.discountAmount)}'),
+            if (invoice.taxAmount > 0 || invoice.isTaxInvoice)
+              _buildThermalRow('VAT @ 18%:', fmtMoney(invoice.taxAmount)),
             _buildThermalRow('TOTAL:', fmtMoney(invoice.totalAmount),
                 isBold: true, fontSize: 10),
             if (invoice.amountPaid > 0)

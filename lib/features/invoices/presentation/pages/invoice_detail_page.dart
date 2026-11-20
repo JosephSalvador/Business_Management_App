@@ -396,6 +396,83 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
             ],
           ),
         ),
+        // Convert to Tax Invoice Action Card (if not already Tax Invoice)
+        if (!invoice.isTaxInvoice) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1E293B)
+                  : const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFBFDBFE),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.receipt_long_outlined,
+                    color: Color(0xFF2563EB),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isSwahili
+                            ? 'Badilisha kuwa Tax Invoice'
+                            : 'Convert to Tax Invoice',
+                        style: TextStyle(
+                          color: AppColors.resolveTextPrimary(context),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isSwahili
+                            ? (invoice.isProforma
+                                ? 'Ankara ya makadirio (Proforma) inaweza kubadilishwa kuwa Ankara Rasmi ya Kodi (18% VAT)'
+                                : 'Ongeza kodi ya VAT na VRN ya mteja kuifanya Ankara Rasmi ya Kodi')
+                            : 'Convert this invoice into an official Tax Invoice with VAT and customer VRN',
+                        style: TextStyle(
+                          color: AppColors.resolveTextSecondary(context),
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                  ),
+                  onPressed: () => _promptConvertToTaxInvoice(
+                      invoice, organization, isSwahili),
+                  icon: const Icon(Icons.transform_outlined, size: 16),
+                  label: Text(isSwahili ? 'Badilisha' : 'Convert'),
+                ),
+              ],
+            ),
+          ),
+        ],
 
         const SizedBox(height: 14),
 
@@ -818,6 +895,265 @@ class _InvoiceDetailPageState extends ConsumerState<InvoiceDetailPage> {
       amountController.dispose();
       methodController.dispose();
       referenceController.dispose();
+    }
+  }
+
+  Future<void> _promptConvertToTaxInvoice(
+    CustomerInvoice invoice,
+    Organization organization,
+    bool isSwahili,
+  ) async {
+    final vrnController =
+        TextEditingController(text: invoice.customerVrn ?? '');
+    final vatRate =
+        organization.defaultVatRate > 0 ? organization.defaultVatRate : 18.0;
+    bool isTaxInclusive = organization.isTaxInclusive;
+
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) {
+          return StatefulBuilder(
+            builder: (innerContext, setModalState) {
+              final subtotal = invoice.subtotal;
+              double previewSubtotal;
+              double previewTax;
+              double previewTotal;
+
+              if (isTaxInclusive) {
+                previewSubtotal = subtotal / (1.0 + (vatRate / 100.0));
+                previewTax = subtotal - previewSubtotal;
+                previewTotal = subtotal;
+              } else {
+                previewSubtotal = subtotal;
+                previewTax = subtotal * (vatRate / 100.0);
+                previewTotal =
+                    (previewSubtotal - invoice.discountAmount) + previewTax;
+              }
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 24,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFF2563EB).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.receipt_long,
+                            color: Color(0xFF2563EB),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isSwahili
+                                    ? 'Badilisha kuwa Tax Invoice'
+                                    : 'Convert to Tax Invoice',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                isSwahili
+                                    ? 'Hesabu VAT ya ${vatRate.toStringAsFixed(0)}% kisheria'
+                                    : 'Compute ${vatRate.toStringAsFixed(0)}% VAT legally',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      AppColors.resolveTextSecondary(context),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: vrnController,
+                      style: TextStyle(
+                        color: AppColors.resolveTextPrimary(sheetContext),
+                      ),
+                      decoration: InputDecoration(
+                        labelText: isSwahili
+                            ? 'Namba ya VRN ya Mteja (Hiari)'
+                            : 'Customer VRN (Optional)',
+                        hintText: isSwahili
+                            ? 'Mfano: 40-123456-X'
+                            : 'e.g. 40-123456-X',
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        isSwahili
+                            ? 'Bei ya sasa inajumuisha VAT'
+                            : 'Current price already includes VAT',
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        isSwahili
+                            ? 'Jumla ya ankara haitaongezeka, VAT itatenganishwa'
+                            : 'Invoice total won\'t increase, VAT will be extracted',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.resolveTextSecondary(context),
+                        ),
+                      ),
+                      value: isTaxInclusive,
+                      onChanged: (val) {
+                        setModalState(() {
+                          isTaxInclusive = val;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isSwahili
+                                    ? 'Kiasi kabla ya Kodi:'
+                                    : 'Taxable Subtotal:',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              Text(
+                                formatMoney(previewSubtotal,
+                                    symbol: invoice.currency),
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${isSwahili ? "VAT" : "VAT"} @ ${vatRate.toStringAsFixed(0)}%:',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Color(0xFF2563EB)),
+                              ),
+                              Text(
+                                formatMoney(previewTax,
+                                    symbol: invoice.currency),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isSwahili
+                                    ? 'Jumla Kuu Mpya:'
+                                    : 'New Total Gross:',
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                formatMoney(previewTotal,
+                                    symbol: invoice.currency),
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: Text(
+                        isSwahili
+                            ? 'Thibitisha na Badilisha kuwa Tax Invoice'
+                            : 'Confirm & Convert to Tax Invoice',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        final vrn = _orNull(vrnController.text);
+                        await _run(() => ref
+                            .read(invoicesControllerProvider.notifier)
+                            .convertToTaxInvoice(
+                              id: invoice.id,
+                              vatRate: vatRate,
+                              customerVrn: vrn,
+                              isTaxInclusive: isTaxInclusive,
+                            ));
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isSwahili
+                                  ? 'Ankara imebadilishwa kuwa Tax Invoice yenye VAT!'
+                                  : 'Invoice successfully converted to Tax Invoice!',
+                            ),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      vrnController.dispose();
     }
   }
 

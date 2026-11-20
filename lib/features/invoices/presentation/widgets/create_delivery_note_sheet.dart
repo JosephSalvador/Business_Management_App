@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../l10n/loc.dart';
 import '../../../../shared/design_system/app_colors.dart';
+import '../../../products/application/products_controller.dart';
 import '../../../products/data/product_providers.dart';
 import '../../../settings/data/organization_repository.dart';
 import '../../data/invoice_providers.dart';
