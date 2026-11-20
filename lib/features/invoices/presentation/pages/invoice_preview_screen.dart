@@ -492,6 +492,8 @@ class _InvoicePreviewScreenState extends ConsumerState<InvoicePreviewScreen>
       }
     }
 
+    if (!mounted) return;
+
     final driverController = TextEditingController(text: note.driverName ?? '');
     final phoneController = TextEditingController(text: note.driverPhone ?? '');
     final vehicleController = TextEditingController(text: note.vehicleNumber ?? '');

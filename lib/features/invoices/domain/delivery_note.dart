@@ -139,6 +139,7 @@ class DeliveryNote {
         itemCount: items.length,
         totalQuantity: totalQuantity,
         carrierName: carrierName,
+        trackingNumber: trackingNumber,
         vehicleNumber: vehicleNumber,
         driverName: driverName,
         driverPhone: driverPhone,
@@ -268,6 +269,7 @@ class DeliveryNoteSummary {
     required this.itemCount,
     required this.totalQuantity,
     this.carrierName,
+    this.trackingNumber,
     this.vehicleNumber,
     this.driverName,
     this.driverPhone,
@@ -284,6 +286,7 @@ class DeliveryNoteSummary {
   final int itemCount;
   final double totalQuantity;
   final String? carrierName;
+  final String? trackingNumber;
   final String? vehicleNumber;
   final String? driverName;
   final String? driverPhone;
@@ -303,6 +306,7 @@ class DeliveryNoteSummary {
         itemCount: (json['itemCount'] as num?)?.toInt() ?? 0,
         totalQuantity: (json['totalQuantity'] as num?)?.toDouble() ?? 0,
         carrierName: json['carrierName']?.toString(),
+        trackingNumber: json['trackingNumber']?.toString(),
         vehicleNumber: json['vehicleNumber']?.toString(),
         driverName: json['driverName']?.toString(),
         driverPhone: json['driverPhone']?.toString(),
@@ -320,6 +324,7 @@ class DeliveryNoteSummary {
         'itemCount': itemCount,
         'totalQuantity': totalQuantity,
         if (carrierName != null) 'carrierName': carrierName,
+        if (trackingNumber != null) 'trackingNumber': trackingNumber,
         if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
         if (driverName != null) 'driverName': driverName,
         if (driverPhone != null) 'driverPhone': driverPhone,

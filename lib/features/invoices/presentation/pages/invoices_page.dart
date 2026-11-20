@@ -678,6 +678,8 @@ class _DeliveryNoteCard extends ConsumerWidget {
         }
       }
 
+      if (!context.mounted) return;
+
       final driverController = TextEditingController(text: note.driverName ?? '');
       final phoneController = TextEditingController(text: note.driverPhone ?? '');
       final vehicleController = TextEditingController(text: note.vehicleNumber ?? '');
