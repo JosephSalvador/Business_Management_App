@@ -502,7 +502,7 @@ export default function App() {
 
   const resolveTenantName = (tenantId) => {
     if (!tenantId) return null;
-    const found = tenants.find(
+    const found = (clients || []).find(
       (t) =>
         (t.tenantId || t.id || '').toLowerCase() ===
         String(tenantId).toLowerCase()
@@ -510,11 +510,11 @@ export default function App() {
     return found ? found.name : null;
   };
 
-  const selectedVoucherTenant = tenants.find(
+  const selectedVoucherTenant = (clients || []).find(
     (t) => (t.tenantId || t.id) === newVoucherTarget
   );
 
-  const filteredVoucherTenants = tenants.filter((t) => {
+  const filteredVoucherTenants = (clients || []).filter((t) => {
     if (!voucherTenantSearch.trim()) return true;
     const q = voucherTenantSearch.toLowerCase();
     return (
