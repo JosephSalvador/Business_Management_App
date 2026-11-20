@@ -5,6 +5,14 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  ShieldAlert,
+  KeyRound,
+  Lock,
+  Unlock,
+  LogOut,
+  CheckCircle2,
+  Circle,
+  Tag,
 } from 'lucide-react';
 import OmniProductsTable from './OmniProductsTable';
 import OmniSalesTable from './OmniSalesTable';
@@ -16,6 +24,12 @@ import {
   extendTenantTrial,
   directActivateTenant,
   updateTenantFeatures,
+  listTenantUsers,
+  resetTenantUserPassword,
+  toggleTenantUserStatus,
+  forceLogoutTenantUser,
+  updateTenantStatus,
+  updateTenantOnboarding,
 } from '../services/api';
 import {
   Container,
@@ -118,6 +132,24 @@ export default function TenantDetailConsole({
   });
   const [savingFeatures, setSavingFeatures] = useState(false);
 
+  // Suspend / Reactivate Tenant
+  const [suspendModalOpen, setSuspendModalOpen] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [updatingTenantStatus, setUpdatingTenantStatus] = useState(false);
+
+  // Onboarding Checklist, 35,000 TZS Training Paid & Tags
+  const [tagsInput, setTagsInput] = useState(tenant?.tags || '');
+  const [trainingPaidInput, setTrainingPaidInput] = useState(Boolean(tenant?.trainingPaid));
+  const [savingOnboarding, setSavingOnboarding] = useState(false);
+
+  // Tenant Users & Security
+  const [tenantUsers, setTenantUsers] = useState(tenant?.users || []);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [resetPwdUser, setResetPwdUser] = useState(null);
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [resettingPwd, setResettingPwd] = useState(false);
+  const [userActionLoadingId, setUserActionLoadingId] = useState(null);
+
   useEffect(() => {
     setActiveSubTab(initialSubTab || 'overview');
   }, [initialSubTab]);
@@ -125,6 +157,9 @@ export default function TenantDetailConsole({
   const handleTabSwitch = (tabId) => {
     setActiveSubTab(tabId);
     onSubTabChange?.(tabId);
+    if (tabId === 'users') {
+      fetchUsers();
+    }
   };
 
   const fetchDetail = async () => {
@@ -134,6 +169,11 @@ export default function TenantDetailConsole({
       const res = await getTenantAdminDetail(tenant.tenantId);
       if (res) {
         setDetail((prev) => ({ ...prev, ...res }));
+        setTagsInput(res.tags || '');
+        setTrainingPaidInput(Boolean(res.trainingPaid));
+        if (Array.isArray(res.users)) {
+          setTenantUsers(res.users);
+        }
         if (res.features && typeof res.features === 'object') {
           setFeatureOverrides((prev) => ({ ...prev, ...res.features }));
         }
@@ -145,10 +185,108 @@ export default function TenantDetailConsole({
     }
   };
 
+  const fetchUsers = async () => {
+    if (!tenant?.tenantId) return;
+    setLoadingUsers(true);
+    try {
+      const res = await listTenantUsers(tenant.tenantId);
+      if (Array.isArray(res)) {
+        setTenantUsers(res);
+      }
+    } catch {
+      // fallback to detail.users
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
     setDetail(tenant);
+    setTagsInput(tenant?.tags || '');
+    setTrainingPaidInput(Boolean(tenant?.trainingPaid));
+    setTenantUsers(tenant?.users || []);
     fetchDetail();
   }, [tenant?.tenantId]);
+
+  const handleToggleTenantStatus = async (e) => {
+    if (e) e.preventDefault();
+    const nextActive = detail?.isActive === false;
+    setUpdatingTenantStatus(true);
+    try {
+      await updateTenantStatus(tenant.tenantId, nextActive, suspendReason.trim());
+      setDetail((prev) => ({ ...prev, isActive: nextActive }));
+      setSuspendModalOpen(false);
+      setSuspendReason('');
+      onNotification?.(
+        `${nextActive ? 'Reactivated' : 'Suspended'} tenant ${detail?.name}.`
+      );
+    } catch (err) {
+      onNotification?.(`Failed to update tenant status: ${err.message || 'Please try again'}`);
+    } finally {
+      setUpdatingTenantStatus(false);
+    }
+  };
+
+  const handleSaveOnboarding = async () => {
+    setSavingOnboarding(true);
+    try {
+      await updateTenantOnboarding(tenant.tenantId, tagsInput, trainingPaidInput);
+      setDetail((prev) => ({
+        ...prev,
+        tags: tagsInput.trim() || null,
+        trainingPaid: trainingPaidInput,
+      }));
+      onNotification?.(`Saved onboarding & tags for ${detail?.name}.`);
+    } catch (err) {
+      onNotification?.(`Failed to save onboarding: ${err.message || 'Please try again'}`);
+    } finally {
+      setSavingOnboarding(false);
+    }
+  };
+
+  const handleResetUserPassword = async (e) => {
+    e.preventDefault();
+    if (!resetPwdUser || !newUserPassword.trim()) return;
+    setResettingPwd(true);
+    try {
+      await resetTenantUserPassword(tenant.tenantId, resetPwdUser.id, newUserPassword.trim());
+      setResetPwdUser(null);
+      setNewUserPassword('');
+      onNotification?.(`Password reset & sessions revoked for ${resetPwdUser.email}.`);
+    } catch (err) {
+      onNotification?.(`Password reset failed: ${err.message || 'Please try again'}`);
+    } finally {
+      setResettingPwd(false);
+    }
+  };
+
+  const handleToggleUserStatus = async (u) => {
+    setUserActionLoadingId(u.id);
+    try {
+      const nextActive = !u.isActive;
+      await toggleTenantUserStatus(tenant.tenantId, u.id, nextActive);
+      setTenantUsers((prev) =>
+        prev.map((item) => (item.id === u.id ? { ...item, isActive: nextActive, isLockedOut: false } : item))
+      );
+      onNotification?.(`${nextActive ? 'Unlocked' : 'Locked'} user ${u.email}.`);
+    } catch (err) {
+      onNotification?.(`Failed to update user: ${err.message || 'Please try again'}`);
+    } finally {
+      setUserActionLoadingId(null);
+    }
+  };
+
+  const handleForceLogoutUser = async (u) => {
+    setUserActionLoadingId(u.id);
+    try {
+      await forceLogoutTenantUser(tenant.tenantId, u.id);
+      onNotification?.(`Revoked all active sessions for ${u.email}.`);
+    } catch (err) {
+      onNotification?.(`Failed to force sign-out: ${err.message || 'Please try again'}`);
+    } finally {
+      setUserActionLoadingId(null);
+    }
+  };
 
   const handleLaunchSupportSession = async () => {
     setLaunchingSupport(true);
@@ -281,6 +419,11 @@ export default function TenantDetailConsole({
     },
     { id: 'invoices', label: 'Invoices' },
     { id: 'cash', label: 'Cash sessions' },
+    {
+      id: 'users',
+      label: 'Users & security',
+      count: detail?.userCount ?? tenantUsers.length,
+    },
     { id: 'subscription', label: 'Subscription & quotas' },
   ];
 
@@ -311,9 +454,16 @@ export default function TenantDetailConsole({
       <PageHeader
         title={detail?.name || 'Tenant workspace'}
         badge={
-          <div className="flex items-center gap-2">
-            {renderStatusBadge()}
+          <div className="flex items-center gap-2 flex-wrap">
+            {detail?.isActive === false ? (
+              <StatusIndicator type="error">Suspended</StatusIndicator>
+            ) : (
+              renderStatusBadge()
+            )}
             <Badge color="blue">{detail?.planCode || 'Pro'} plan</Badge>
+            {detail?.trainingPaid && (
+              <Badge color="green">Training Paid</Badge>
+            )}
             {detail?.paidUntil && (
               <span className="text-[12px] text-[#5F6B7A]">
                 Paid until {detail.paidUntil}
@@ -333,6 +483,14 @@ export default function TenantDetailConsole({
               onClick={fetchDetail}
             >
               Refresh
+            </Button>
+            <Button
+              size="md"
+              variant={detail?.isActive === false ? 'default' : 'danger'}
+              icon={ShieldAlert}
+              onClick={() => setSuspendModalOpen(true)}
+            >
+              {detail?.isActive === false ? 'Reactivate' : 'Suspend'}
             </Button>
             <Button size="md" onClick={() => setExtendModalOpen(true)}>
               Extend trial
@@ -526,6 +684,139 @@ export default function TenantDetailConsole({
                   </table>
                 </Container>
               </div>
+
+              {/* Onboarding Checklist, 35,000 TZS Training Fee, Tags & Usage Quotas */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Container
+                  title="Onboarding checklist & tenant tags"
+                  description="Track shop activation readiness, 35,000 TZS training & installation fee, and segmentation tags."
+                >
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2.5 text-[13px]">
+                      {[
+                        { label: 'Profile completed', ok: Boolean(detail?.hasProfileCompleted) },
+                        { label: 'Catalog products (> 0)', ok: Boolean(detail?.hasProducts || (detail?.totalProducts || 0) > 0) },
+                        { label: 'First sale recorded', ok: Boolean(detail?.hasSales || (detail?.salesCount30Days || 0) > 0) },
+                        { label: '35,000 TZS Training Paid', ok: Boolean(detail?.trainingPaid) },
+                      ].map((step) => (
+                        <div
+                          key={step.label}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-[4px] border ${
+                            step.ok
+                              ? 'bg-[#F2F8F0] border-[#B8E0B4] text-[#037F0C]'
+                              : 'bg-[#FAFAFA] border-[#E9EBED] text-[#5F6B7A]'
+                          }`}
+                        >
+                          {step.ok ? (
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          ) : (
+                            <Circle className="w-4 h-4 shrink-0" />
+                          )}
+                          <span className="font-medium">{step.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 border-t border-[#E9EBED] space-y-3">
+                      <label className="flex items-center justify-between gap-3 cursor-pointer p-2.5 rounded-[4px] border border-[#D5DBDB] bg-[#FAFAFA]">
+                        <div>
+                          <div className="text-[13px] font-semibold text-[#16191F]">
+                            35,000 TZS Training & Installation Paid
+                          </div>
+                          <div className="text-[11px] text-[#5F6B7A]">
+                            Mark once onboarding training and setup fee is settled.
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={trainingPaidInput}
+                          onChange={(e) => setTrainingPaidInput(e.target.checked)}
+                          className="w-4 h-4 accent-[#0972D3]"
+                        />
+                      </label>
+
+                      <div>
+                        <label className="flex items-center gap-1.5 text-[12px] font-semibold text-[#16191F] mb-1">
+                          <Tag className="w-3.5 h-3.5 text-[#5F6B7A]" />
+                          <span>Tenant tags (comma-separated)</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={tagsInput}
+                            onChange={(e) => setTagsInput(e.target.value)}
+                            placeholder="e.g. VIP, Kariakoo, Needs-Training"
+                            className="flex-1 px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px] bg-white"
+                          />
+                          <Button
+                            variant="primary"
+                            size="md"
+                            loading={savingOnboarding}
+                            onClick={handleSaveOnboarding}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Container>
+
+                <Container
+                  title="Plan usage & quotas"
+                  description={`Resource consumption against ${detail?.planCode || 'Pro'} plan limits.`}
+                >
+                  <div className="space-y-4">
+                    {[
+                      {
+                        label: 'Catalog products',
+                        used: detail?.totalProducts ?? 0,
+                        max: detail?.maxProducts,
+                      },
+                      {
+                        label: 'Active staff users',
+                        used: detail?.userCount ?? tenantUsers.length ?? 1,
+                        max: detail?.maxUsers,
+                      },
+                      {
+                        label: 'Shop branches',
+                        used: detail?.branchCount ?? (detail?.branches || []).length ?? 1,
+                        max: detail?.maxBranches,
+                      },
+                    ].map((meter) => {
+                      const limit = meter.max && meter.max > 0 ? meter.max : null;
+                      const pct = limit ? Math.min(100, Math.round((meter.used / limit) * 100)) : 0;
+                      const barColor =
+                        pct >= 90 ? 'bg-[#D91515]' : pct >= 75 ? 'bg-[#D97706]' : 'bg-[#0972D3]';
+                      return (
+                        <div key={meter.label}>
+                          <div className="flex items-center justify-between text-[13px] mb-1">
+                            <span className="font-medium text-[#16191F]">{meter.label}</span>
+                            <span className="font-mono text-[12px] text-[#5F6B7A]">
+                              {meter.used} / {limit ?? 'Unlimited'}
+                              {limit ? ` (${pct}%)` : ''}
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-[#E9EBED] rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${barColor} transition-all`}
+                              style={{ width: `${limit ? pct : 12}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="pt-2 border-t border-[#E9EBED] text-[12px] text-[#5F6B7A] flex items-center justify-between">
+                      <span>Last recorded activity</span>
+                      <span className="font-mono text-[#16191F]">
+                        {detail?.lastActivityAt
+                          ? new Date(detail.lastActivityAt).toLocaleString()
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </Container>
+              </div>
             </div>
           )}
 
@@ -557,6 +848,100 @@ export default function TenantDetailConsole({
           {/* TAB: CASH SESSIONS */}
           {activeSubTab === 'cash' && (
             <OmniCashSessionsTable tenantId={detail?.tenantId} />
+          )}
+
+          {/* TAB: USERS & SECURITY */}
+          {activeSubTab === 'users' && (
+            <Container
+              title="Tenant users & access security"
+              description="Manage tenant staff accounts, reset forgotten passwords, lock/unlock compromised accounts, or revoke active POS sessions."
+              count={tenantUsers.length}
+              noPadding
+              actions={
+                <Button size="sm" icon={RefreshCw} loading={loadingUsers} onClick={fetchUsers}>
+                  Refresh
+                </Button>
+              }
+            >
+              <table className="w-full text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase text-[#5F6B7A]">
+                    <th className="py-2.5 px-4">Name</th>
+                    <th className="py-2.5 px-4">Email / Phone</th>
+                    <th className="py-2.5 px-4">Role</th>
+                    <th className="py-2.5 px-4">Status</th>
+                    <th className="py-2.5 px-4 text-right">Security actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E9EBED]">
+                  {tenantUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-[#5F6B7A]">
+                        {loadingUsers ? 'Loading tenant users...' : 'No users found for this tenant.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    tenantUsers.map((u) => {
+                      const busy = userActionLoadingId === u.id;
+                      return (
+                        <tr key={u.id} className="hover:bg-[#F9FAFB]">
+                          <td className="py-2.5 px-4 font-semibold text-[#16191F]">
+                            {u.fullName || 'User'}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono text-[12px] text-[#5F6B7A]">
+                            <div>{u.email || '—'}</div>
+                            {u.phone && <div className="text-[11px]">{u.phone}</div>}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <Badge color="blue">{u.role || 'Staff'}</Badge>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            {!u.isActive ? (
+                              <StatusIndicator type="error">Locked / Disabled</StatusIndicator>
+                            ) : u.isLockedOut ? (
+                              <StatusIndicator type="warning">Temp Lockout</StatusIndicator>
+                            ) : (
+                              <StatusIndicator type="success">Active</StatusIndicator>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              <Button
+                                size="sm"
+                                icon={KeyRound}
+                                disabled={busy}
+                                onClick={() => {
+                                  setResetPwdUser(u);
+                                  setNewUserPassword('');
+                                }}
+                              >
+                                Reset password
+                              </Button>
+                              <Button
+                                size="sm"
+                                icon={u.isActive ? Lock : Unlock}
+                                loading={busy}
+                                onClick={() => handleToggleUserStatus(u)}
+                              >
+                                {u.isActive ? 'Lock' : 'Unlock'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                icon={LogOut}
+                                loading={busy}
+                                onClick={() => handleForceLogoutUser(u)}
+                              >
+                                Force sign-out
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </Container>
           )}
 
           {/* TAB: SUBSCRIPTION & QUOTAS */}
@@ -844,6 +1229,86 @@ export default function TenantDetailConsole({
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Suspend / Reactivate Tenant Modal */}
+      <Modal
+        open={suspendModalOpen}
+        onClose={() => setSuspendModalOpen(false)}
+        title={detail?.isActive === false ? 'Reactivate tenant' : 'Suspend tenant'}
+        footer={
+          <>
+            <Button onClick={() => setSuspendModalOpen(false)}>Cancel</Button>
+            <Button
+              variant={detail?.isActive === false ? 'primary' : 'danger'}
+              loading={updatingTenantStatus}
+              onClick={handleToggleTenantStatus}
+            >
+              {detail?.isActive === false ? 'Confirm reactivate' : 'Confirm suspend'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleToggleTenantStatus} className="space-y-3">
+          <p className="text-[13px] text-[#5F6B7A]">
+            {detail?.isActive === false
+              ? `Reactivating ${detail?.name} will restore POS and API access immediately.`
+              : `Suspending ${detail?.name} will block all active users from logging in or syncing POS sales.`}
+          </p>
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Reason (recorded in platform audit log)
+            </label>
+            <input
+              type="text"
+              value={suspendReason}
+              onChange={(e) => setSuspendReason(e.target.value)}
+              placeholder="e.g. Non-payment / Account review"
+              className="w-full px-3 py-1.5 text-[13px] border border-[#879596] rounded-[4px]"
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* Reset Tenant User Password Modal */}
+      <Modal
+        open={Boolean(resetPwdUser)}
+        onClose={() => setResetPwdUser(null)}
+        title={`Reset password · ${resetPwdUser?.fullName || resetPwdUser?.email || 'User'}`}
+        footer={
+          <>
+            <Button onClick={() => setResetPwdUser(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              loading={resettingPwd}
+              disabled={!newUserPassword || newUserPassword.trim().length < 8}
+              onClick={handleResetUserPassword}
+            >
+              Reset password & revoke sessions
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleResetUserPassword} className="space-y-3">
+          <p className="text-[13px] text-[#5F6B7A]">
+            Set a temporary password for{' '}
+            <span className="font-semibold text-[#16191F]">{resetPwdUser?.email}</span>.
+            All existing POS sessions will be signed out immediately.
+          </p>
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              New password (minimum 8 characters)
+            </label>
+            <input
+              type="text"
+              value={newUserPassword}
+              onChange={(e) => setNewUserPassword(e.target.value)}
+              placeholder="Enter temporary password..."
+              className="w-full px-3 py-1.5 text-[13px] font-mono border border-[#879596] rounded-[4px]"
+              autoFocus
+            />
+          </div>
+        </form>
       </Modal>
     </div>
   );

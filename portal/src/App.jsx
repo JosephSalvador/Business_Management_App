@@ -15,6 +15,7 @@ import {
 
 import TenantDetailConsole from './components/TenantDetailConsole';
 import PlatformTeamManager from './components/PlatformTeamManager';
+import PlatformAuditLogsView from './components/PlatformAuditLogsView';
 import {
   getFleetSummary,
   listFleetTenants,
@@ -1176,13 +1177,29 @@ export default function App() {
               </ul>
             </div>
 
-            {/* Section: Platform IAM */}
-            {isSuperAdmin && (
-              <div>
-                <div className="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#5F6B7A]">
-                  Platform Governance
-                </div>
-                <ul className="space-y-0.5">
+            {/* Section: Platform Governance */}
+            <div>
+              <div className="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#5F6B7A]">
+                Platform Governance
+              </div>
+              <ul className="space-y-0.5">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('audit');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-[4px] border-l-4 transition-colors ${
+                      activeTab === 'audit'
+                        ? 'border-[#0972D3] bg-[#F1F8FF] text-[#0972D3] font-semibold'
+                        : 'border-transparent text-[#16191F] hover:bg-[#F2F3F3]'
+                    }`}
+                  >
+                    Audit logs
+                  </button>
+                </li>
+                {isSuperAdmin && (
                   <li>
                     <button
                       type="button"
@@ -1199,9 +1216,9 @@ export default function App() {
                       Team & IAM roles
                     </button>
                   </li>
-                </ul>
-              </div>
-            )}
+                )}
+              </ul>
+            </div>
           </div>
         </aside>
 
@@ -1425,6 +1442,23 @@ export default function App() {
                                     <div className="text-[11px] font-mono text-[#5F6B7A]">
                                       {client.tenantId?.slice(0, 8)}...
                                     </div>
+                                    {(client.tags || client.trainingPaid) && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {client.trainingPaid && (
+                                          <Badge color="green">Training Paid</Badge>
+                                        )}
+                                        {String(client.tags || '')
+                                          .split(',')
+                                          .map((t) => t.trim())
+                                          .filter(Boolean)
+                                          .slice(0, 3)
+                                          .map((tag) => (
+                                            <Badge key={tag} color="gray">
+                                              {tag}
+                                            </Badge>
+                                          ))}
+                                      </div>
+                                    )}
                                   </td>
                                   <td className="py-2.5 px-4 text-[#16191F]">
                                     <div>
@@ -1442,7 +1476,11 @@ export default function App() {
                                     </Badge>
                                   </td>
                                   <td className="py-2.5 px-4">
-                                    {st === 'active' || st === 'paid' ? (
+                                    {client.isActive === false ? (
+                                      <StatusIndicator type="error">
+                                        Suspended
+                                      </StatusIndicator>
+                                    ) : st === 'active' || st === 'paid' ? (
                                       <StatusIndicator type="success">
                                         Active
                                       </StatusIndicator>
@@ -2396,6 +2434,9 @@ export default function App() {
               </Container>
             </div>
           )}
+
+          {/* ── VIEW 7: PLATFORM AUDIT LOGS ── */}
+          {activeTab === 'audit' && <PlatformAuditLogsView />}
         </main>
       </div>
 

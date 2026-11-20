@@ -328,6 +328,8 @@ var schemaSelfHealingStatements = new (string sql, string description)[]
     (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryName"" character varying(150);", "Tenants.AuthorizedSignatoryName"),
     (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""AuthorizedSignatoryTitle"" character varying(150);", "Tenants.AuthorizedSignatoryTitle"),
     (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""PaymentAccountsJson"" text;", "Tenants.PaymentAccountsJson"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""Tags"" text;", "Tenants.Tags"),
+    (@"ALTER TABLE public.""Tenants"" ADD COLUMN IF NOT EXISTS ""TrainingPaid"" boolean NOT NULL DEFAULT false;", "Tenants.TrainingPaid"),
 
     (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""DocumentTitle"" character varying(50) DEFAULT 'INVOICE';", "CustomerInvoices.DocumentTitle"),
     (@"ALTER TABLE public.""CustomerInvoices"" ADD COLUMN IF NOT EXISTS ""ReferenceNumber"" character varying(100);", "CustomerInvoices.ReferenceNumber"),

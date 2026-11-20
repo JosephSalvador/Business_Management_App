@@ -108,6 +108,12 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             if (!string.IsNullOrWhiteSpace(health) && !string.Equals(healthStatus, health, StringComparison.OrdinalIgnoreCase))
                 continue;
 
+            var primaryUserEmail = await _db.Users.AsNoTracking()
+                .Where(u => u.TenantId == t.Id)
+                .OrderBy(u => u.CreatedAt)
+                .Select(u => u.Email)
+                .FirstOrDefaultAsync(cancellationToken);
+
             items.Add(new TenantAdminSummaryDto(
                 t.Id,
                 t.Name,
@@ -123,7 +129,11 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
                 gmv,
                 healthStatus,
                 TodaySales: $"TZS {todaySalesAmount:N0}",
-                t.CreatedAt));
+                t.CreatedAt,
+                IsActive: t.IsActive,
+                Tags: t.Tags,
+                TrainingPaid: t.TrainingPaid,
+                OwnerEmail: primaryUserEmail));
         }
 
         return new PagedResult<TenantAdminSummaryDto>(items, page, pageSize, total);
@@ -135,6 +145,8 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         if (tenant is null) return null;
 
         var sub = await _db.Subscriptions.AsNoTracking().FirstOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
+        var planCode = sub?.PlanCode ?? "Pro";
+        var plan = await _db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Code == planCode, cancellationToken);
         var totalProducts = await _db.Products.AsNoTracking().CountAsync(p => p.TenantId == tenantId, cancellationToken);
 
         var lowStock = await _db.StockBalances.AsNoTracking()
@@ -143,6 +155,13 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
         var salesCount = await _db.Sales.AsNoTracking()
             .CountAsync(s => s.TenantId == tenantId && s.SaleDate >= thirtyDaysAgo && s.Status == SaleStatus.Completed, cancellationToken);
+
+        var totalSalesCount = await _db.Sales.AsNoTracking()
+            .CountAsync(s => s.TenantId == tenantId && s.Status == SaleStatus.Completed, cancellationToken);
+
+        var lastSaleAt = await _db.Sales.AsNoTracking()
+            .Where(s => s.TenantId == tenantId)
+            .MaxAsync(s => (DateTime?)s.SaleDate, cancellationToken);
 
         var invCount = await _db.CustomerInvoices.IgnoreQueryFilters().AsNoTracking()
             .CountAsync(i => i.TenantId == tenantId, cancellationToken);
@@ -159,7 +178,18 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         var flags = await _db.FeatureFlags.AsNoTracking().Where(f => f.TenantId == tenantId).ToListAsync(cancellationToken);
         var featureDict = flags.ToDictionary(f => f.Key, f => f.IsEnabled);
 
-        var primaryUser = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.TenantId == tenantId, cancellationToken);
+        var primaryUser = await _db.Users.AsNoTracking()
+            .Where(u => u.TenantId == tenantId)
+            .OrderBy(u => u.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var branches = await _db.Branches.AsNoTracking()
+            .Where(b => b.TenantId == tenantId)
+            .OrderBy(b => b.Name)
+            .Select(b => new TenantBranchDto(b.Id, b.Name, b.Address, b.IsActive))
+            .ToListAsync(cancellationToken);
+
+        var users = await ListTenantUsersAsync(tenantId, cancellationToken);
 
         var subStatus = sub?.Status.ToString() ?? "Trial";
         var daysLeft = sub != null
@@ -170,12 +200,14 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
         if (subStatus == "Active" && salesCount > 20) healthStatus = "Excellent";
         else if (subStatus != "Active" && daysLeft <= 2) healthStatus = "AtRisk";
 
+        var hasProfileCompleted = !string.IsNullOrWhiteSpace(tenant.Name) && !string.IsNullOrWhiteSpace(tenant.ContactPhone);
+
         return new TenantAdminDetailDto(
             tenant.Id,
             tenant.Name,
             tenant.ContactPhone,
             Category: tenant.BusinessType,
-            sub?.PlanCode ?? "Pro",
+            planCode,
             subStatus,
             daysLeft,
             sub?.PaidUntilUtc?.ToString("yyyy-MM-dd"),
@@ -189,7 +221,21 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             featureDict,
             primaryUser?.Email,
             primaryUser?.FullName,
-            tenant.CreatedAt);
+            tenant.CreatedAt,
+            IsActive: tenant.IsActive,
+            Tags: tenant.Tags,
+            TrainingPaid: tenant.TrainingPaid,
+            BranchCount: branches.Count,
+            UserCount: users.Count,
+            MaxBranches: plan?.MaxBranches,
+            MaxUsers: plan?.MaxUsers,
+            MaxProducts: plan?.MaxProducts,
+            HasProfileCompleted: hasProfileCompleted,
+            HasProducts: totalProducts > 0,
+            HasSales: totalSalesCount > 0,
+            LastActivityAt: lastSaleAt ?? tenant.CreatedAt,
+            Branches: branches,
+            Users: users);
     }
 
     public Task<Tenant?> GetTenantByIdAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -197,6 +243,120 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
 
     public Task<User?> GetPrimaryOwnerAsync(Guid tenantId, CancellationToken cancellationToken = default)
         => _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenantId, cancellationToken);
+
+    public async Task<IReadOnlyList<TenantUserAdminDto>> ListTenantUsersAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var users = await _db.Users.AsNoTracking()
+            .Include(u => u.Roles)
+            .Where(u => u.TenantId == tenantId)
+            .OrderBy(u => u.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return users.Select(u => new TenantUserAdminDto(
+            u.Id,
+            u.FullName,
+            u.Email,
+            u.Phone,
+            u.Roles.FirstOrDefault()?.RoleName ?? "Staff",
+            u.IsActive,
+            u.IsLockedOut,
+            u.TwoFactorEnabled,
+            u.CreatedAt)).ToList();
+    }
+
+    public Task<User?> GetTenantUserByIdAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default)
+        => _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Id == userId, cancellationToken);
+
+    public async Task UpdateUserAsync(User user, CancellationToken cancellationToken = default)
+    {
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> RevokeAllUserRefreshTokensAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var activeTokens = await _db.RefreshTokens
+            .Where(rt => rt.TenantId == tenantId && rt.UserId == userId && rt.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in activeTokens)
+        {
+            token.Revoke();
+        }
+
+        if (activeTokens.Count > 0)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return activeTokens.Count;
+    }
+
+    public async Task UpdateTenantAsync(Tenant tenant, CancellationToken cancellationToken = default)
+    {
+        _db.Tenants.Update(tenant);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PagedResult<PlatformAuditLogDto>> ListPlatformAuditLogsAsync(
+        Guid? tenantId,
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = _db.AuditLogs.IgnoreQueryFilters().AsNoTracking().AsQueryable();
+
+        if (tenantId.HasValue)
+        {
+            query = query.Where(a => a.TenantId == tenantId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(a =>
+                a.Action.ToLower().Contains(term) ||
+                a.EntityType.ToLower().Contains(term) ||
+                a.EntityId.ToLower().Contains(term) ||
+                (a.Details != null && a.Details.ToLower().Contains(term)));
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var logs = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var tenantIds = logs.Select(l => l.TenantId).Distinct().ToList();
+        var userIds = logs.Where(l => l.UserId.HasValue).Select(l => l.UserId!.Value).Distinct().ToList();
+
+        var tenantNames = await _db.Tenants.AsNoTracking()
+            .Where(t => tenantIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken);
+
+        var userEmails = await _db.Users.AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Email, cancellationToken);
+
+        var items = logs.Select(l => new PlatformAuditLogDto(
+            l.Id,
+            l.TenantId,
+            tenantNames.TryGetValue(l.TenantId, out var tName) ? tName : null,
+            l.UserId,
+            l.UserId.HasValue && userEmails.TryGetValue(l.UserId.Value, out var uEmail) ? uEmail : null,
+            l.Action,
+            l.EntityType,
+            l.EntityId,
+            l.Details,
+            l.CreatedAt)).ToList();
+
+        return new PagedResult<PlatformAuditLogDto>(items, page, pageSize, total);
+    }
 }
 
 public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
@@ -545,6 +705,148 @@ public sealed class OmniTenantCatalogRepository : IOmniTenantCatalogRepository
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<BulkImportResultDto> BulkImportProductsAsync(
+        Guid tenantId,
+        IReadOnlyList<BulkImportProductItemDto> items,
+        Guid? operatorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (items.Count == 0)
+            return new BulkImportResultDto(0, 0, Array.Empty<string>());
+
+        var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.TenantId == tenantId, cancellationToken);
+        var branchId = warehouse?.BranchId ?? await _db.Branches.Where(b => b.TenantId == tenantId).Select(b => b.Id).FirstOrDefaultAsync(cancellationToken);
+        if (branchId == Guid.Empty)
+        {
+            var branch = Branch.Create(tenantId, "Main Branch", "MAIN", "Dar es Salaam");
+            await _db.Branches.AddAsync(branch, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            branchId = branch.Id;
+        }
+
+        if (warehouse is null)
+        {
+            warehouse = Warehouse.Create(tenantId, branchId, "Main Store", "MAIN-WH");
+            await _db.Warehouses.AddAsync(warehouse, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var pieceUnit = await _db.UnitsOfMeasure.FirstOrDefaultAsync(u => u.TenantId == tenantId, cancellationToken);
+        if (pieceUnit is null)
+        {
+            pieceUnit = UnitOfMeasure.Create(tenantId, "Pieces", "PCS");
+            await _db.UnitsOfMeasure.AddAsync(pieceUnit, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var defaultPriceList = await _db.PriceLists.FirstOrDefaultAsync(pl => pl.TenantId == tenantId && pl.IsDefault, cancellationToken);
+        if (defaultPriceList is null)
+        {
+            defaultPriceList = PriceList.Create(tenantId, "Standard Retail", "TZS", isDefault: true);
+            await _db.PriceLists.AddAsync(defaultPriceList, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var existingProducts = await _db.Products.AsNoTracking()
+            .Where(p => p.TenantId == tenantId)
+            .Select(p => new { p.Name, p.Barcode })
+            .ToListAsync(cancellationToken);
+
+        var existingNames = new HashSet<string>(existingProducts.Select(p => p.Name.Trim().ToLowerInvariant()));
+        var existingBarcodes = new HashSet<string>(existingProducts
+            .Where(p => !string.IsNullOrWhiteSpace(p.Barcode))
+            .Select(p => p.Barcode!.Trim().ToLowerInvariant()));
+
+        int createdCount = 0;
+        int skippedCount = 0;
+        var errors = new List<string>();
+
+        foreach (var item in items)
+        {
+            var name = item.Name?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                skippedCount++;
+                errors.Add("Skipped row with empty product name.");
+                continue;
+            }
+
+            var barcode = string.IsNullOrWhiteSpace(item.Barcode) ? null : item.Barcode.Trim();
+            if (existingNames.Contains(name.ToLowerInvariant()) ||
+                (barcode != null && existingBarcodes.Contains(barcode.ToLowerInvariant())))
+            {
+                skippedCount++;
+                errors.Add($"Skipped duplicate product '{name}'.");
+                continue;
+            }
+
+            var product = Product.Create(
+                tenantId: tenantId,
+                name: name,
+                description: string.IsNullOrWhiteSpace(item.Category) ? name : $"{item.Category.Trim()}: {name}",
+                sku: $"SKU-{Random.Shared.Next(10000, 99999)}",
+                barcode: barcode,
+                categoryId: null,
+                brandId: null,
+                unitOfMeasureId: pieceUnit.Id,
+                productType: ProductType.Product,
+                status: ProductStatus.Active,
+                taxCategoryId: null,
+                costPrice: Math.Max(0m, item.BuyingPrice));
+
+            await _db.Products.AddAsync(product, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            var productPrice = ProductPrice.Assign(
+                tenantId,
+                defaultPriceList.Id,
+                Guid.NewGuid(),
+                product.Id,
+                variantId: null,
+                branchId: null,
+                PriceType.Retail,
+                Math.Max(0m, item.SellingPrice),
+                defaultPriceList.Currency,
+                minQuantity: 1m,
+                effectiveFrom: null,
+                effectiveTo: null,
+                isActive: true);
+
+            await _db.ProductPrices.AddAsync(productPrice, cancellationToken);
+
+            var initialStock = Math.Max(0m, item.Stock);
+            var balance = StockBalance.Create(tenantId, warehouse.Id, Guid.Empty, product.Id, null);
+            balance.Apply(initialStock);
+            await _db.StockBalances.AddAsync(balance, cancellationToken);
+
+            if (initialStock > 0m)
+            {
+                var movement = StockMovement.Record(
+                    tenantId,
+                    branchId,
+                    warehouse.Id,
+                    Guid.Empty,
+                    product.Id,
+                    null,
+                    StockMovementType.Adjustment,
+                    initialStock,
+                    pieceUnit.Id,
+                    DateTime.UtcNow,
+                    reason: "[Portal Bulk CSV Import]",
+                    createdBy: operatorUserId);
+
+                await _db.StockMovements.AddAsync(movement, cancellationToken);
+            }
+
+            existingNames.Add(name.ToLowerInvariant());
+            if (barcode != null) existingBarcodes.Add(barcode.ToLowerInvariant());
+            createdCount++;
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return new BulkImportResultDto(createdCount, skippedCount, errors);
     }
 }
 

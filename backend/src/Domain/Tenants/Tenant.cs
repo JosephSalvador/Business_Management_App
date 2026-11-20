@@ -37,6 +37,8 @@ public sealed class Tenant : AggregateRoot
     public string? BusinessType { get; private set; }
     public DateTime? OnboardingCompletedAt { get; private set; }
     public bool IsActive { get; private set; } = true;
+    public string? Tags { get; private set; }
+    public bool TrainingPaid { get; private set; }
 
     public static Tenant Create(
         Guid id, string name, string? currency = null, string? databaseSchema = null, string? countryCode = null)
@@ -129,6 +131,10 @@ public sealed class Tenant : AggregateRoot
         Currency = currency.Trim().ToUpperInvariant();
         OnboardingCompletedAt = DateTime.UtcNow;
     }
+
+    public void UpdateTags(string? tags) => Tags = string.IsNullOrWhiteSpace(tags) ? null : tags.Trim();
+
+    public void SetTrainingPaid(bool paid) => TrainingPaid = paid;
 
     public void Activate() => IsActive = true;
 

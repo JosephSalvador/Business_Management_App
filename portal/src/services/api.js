@@ -533,3 +533,62 @@ export async function updatePaymentInstructionsAdmin(payload) {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ENTERPRISE TENANT OPERATIONS, USERS, BULK IMPORT & AUDIT LOGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listTenantUsers(tenantId) {
+  return request(`/api/v1/admin/tenants/${tenantId}/users`);
+}
+
+export async function resetTenantUserPassword(tenantId, userId, newPassword) {
+  return request(`/api/v1/admin/tenants/${tenantId}/users/${userId}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ newPassword }),
+  });
+}
+
+export async function toggleTenantUserStatus(tenantId, userId, isActive) {
+  return request(`/api/v1/admin/tenants/${tenantId}/users/${userId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ isActive }),
+  });
+}
+
+export async function forceLogoutTenantUser(tenantId, userId) {
+  return request(`/api/v1/admin/tenants/${tenantId}/users/${userId}/force-logout`, {
+    method: 'POST',
+  });
+}
+
+export async function updateTenantStatus(tenantId, isActive, reason = '') {
+  return request(`/api/v1/admin/tenants/${tenantId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ isActive, reason }),
+  });
+}
+
+export async function updateTenantOnboarding(tenantId, tags, trainingPaid) {
+  return request(`/api/v1/admin/tenants/${tenantId}/onboarding`, {
+    method: 'PUT',
+    body: JSON.stringify({ tags: tags || null, trainingPaid: Boolean(trainingPaid) }),
+  });
+}
+
+export async function bulkImportTenantProducts(tenantId, items) {
+  return request(`/api/v1/admin/tenants/${tenantId}/products/bulk-import`, {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
+}
+
+export async function listPlatformAuditLogs({ tenantId = '', search = '', page = 1, pageSize = 50 } = {}) {
+  const params = new URLSearchParams();
+  if (tenantId) params.append('tenantId', tenantId);
+  if (search) params.append('search', search);
+  params.append('page', page);
+  params.append('pageSize', pageSize);
+  return request(`/api/v1/admin/audit-logs?${params.toString()}`);
+}
+
+

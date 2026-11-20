@@ -4,12 +4,14 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Upload,
 } from 'lucide-react';
 import {
   listTenantProducts,
   updateTenantProduct,
   adjustTenantStock,
   seedStarterCatalog,
+  bulkImportTenantProducts,
 } from '../services/api';
 import {
   Container,
@@ -56,6 +58,40 @@ export default function OmniProductsTable({
   // Starter catalog seed modal
   const [starterPackModal, setStarterPackModal] = useState(false);
   const [seedingLoading, setSeedingLoading] = useState(false);
+
+  // Bulk CSV product import modal
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [csvText, setCsvText] = useState(
+    'Name,Barcode,Category,BuyingPrice,SellingPrice,Stock\nAzam Unga 1kg,61611001,Food,1800,2200,50\nMaji Kilimanjaro 500ml,61611002,Beverages,400,700,120'
+  );
+  const [importingBulk, setImportingBulk] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+
+  const parseCsvRows = (raw) => {
+    const lines = String(raw || '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return [];
+    const firstLower = lines[0].toLowerCase();
+    const startIdx =
+      firstLower.includes('name') && (firstLower.includes('price') || firstLower.includes('stock'))
+        ? 1
+        : 0;
+    return lines.slice(startIdx).map((line) => {
+      const cols = line.split(',').map((c) => c.trim());
+      return {
+        name: cols[0] || '',
+        barcode: cols[1] || null,
+        category: cols[2] || null,
+        buyingPrice: Number(cols[3]) || 0,
+        sellingPrice: Number(cols[4]) || 0,
+        stock: Number(cols[5]) || 0,
+      };
+    }).filter((r) => r.name.length > 0);
+  };
+
+  const parsedBulkRows = parseCsvRows(csvText);
 
   const fetchProducts = async () => {
     if (!tenantId) return;
@@ -194,6 +230,35 @@ export default function OmniProductsTable({
     }
   };
 
+  const handleCsvFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      setCsvText(String(evt.target?.result || ''));
+      setBulkResult(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkImport = async () => {
+    if (parsedBulkRows.length === 0) return;
+    setImportingBulk(true);
+    setBulkResult(null);
+    try {
+      const res = await bulkImportTenantProducts(tenantId, parsedBulkRows);
+      setBulkResult(res);
+      onNotification?.(
+        `Imported ${res?.createdCount ?? 0} products (${res?.skippedCount ?? 0} skipped) for ${tenantName || 'tenant'}.`
+      );
+      fetchProducts();
+    } catch (err) {
+      onNotification?.(`Bulk import failed: ${err.message || 'Please try again'}`);
+    } finally {
+      setImportingBulk(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {error && (
@@ -217,6 +282,16 @@ export default function OmniProductsTable({
         noPadding
         actions={
           <>
+            <Button
+              size="sm"
+              icon={Upload}
+              onClick={() => {
+                setBulkResult(null);
+                setBulkModalOpen(true);
+              }}
+            >
+              Bulk import CSV
+            </Button>
             <Button
               size="sm"
               onClick={() => setStarterPackModal(true)}
@@ -587,6 +662,105 @@ export default function OmniProductsTable({
               </div>
             ))}
           </div>
+        </div>
+      </Modal>
+
+      {/* Bulk CSV Product Import Modal */}
+      <Modal
+        open={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        title={`Bulk CSV product import — ${tenantName || 'Tenant'}`}
+        size="lg"
+        footer={
+          <>
+            <Button onClick={() => setBulkModalOpen(false)}>Close</Button>
+            <Button
+              variant="primary"
+              loading={importingBulk}
+              disabled={parsedBulkRows.length === 0 || parsedBulkRows.length > 500}
+              onClick={handleBulkImport}
+            >
+              Import {parsedBulkRows.length} product{parsedBulkRows.length === 1 ? '' : 's'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#F8F9FA] border border-[#E9EBED] rounded-[4px] p-3">
+            <div className="text-[12px] text-[#5F6B7A]">
+              Format: <span className="font-mono text-[#16191F]">Name,Barcode,Category,BuyingPrice,SellingPrice,Stock</span> (max 500 rows)
+            </div>
+            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] border border-[#879596] bg-white hover:bg-[#F2F3F3] text-[12px] font-semibold text-[#16191F] cursor-pointer">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload .csv file</span>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleCsvFileChange}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          <div>
+            <label className="block text-[12px] font-semibold text-[#16191F] mb-1">
+              Paste CSV rows
+            </label>
+            <textarea
+              rows={5}
+              value={csvText}
+              onChange={(e) => {
+                setCsvText(e.target.value);
+                setBulkResult(null);
+              }}
+              className="w-full px-3 py-2 text-[12px] font-mono border border-[#879596] rounded-[4px] focus:outline-none focus:border-[#0972D3]"
+            />
+          </div>
+
+          {bulkResult && (
+            <Alert
+              type={bulkResult.createdCount > 0 ? 'success' : 'warning'}
+              title={`Import complete: ${bulkResult.createdCount} created, ${bulkResult.skippedCount} skipped`}
+            >
+              {Array.isArray(bulkResult.errors) && bulkResult.errors.length > 0
+                ? bulkResult.errors.slice(0, 5).join(' · ')
+                : 'All valid rows were added to the tenant catalog.'}
+            </Alert>
+          )}
+
+          {parsedBulkRows.length > 0 && (
+            <div className="border border-[#E9EBED] rounded-[4px] max-h-52 overflow-auto">
+              <table className="w-full text-left border-collapse text-[12px]">
+                <thead className="bg-[#FAFAFA] border-b border-[#E9EBED] text-[11px] font-bold uppercase text-[#5F6B7A] sticky top-0">
+                  <tr>
+                    <th className="py-1.5 px-3">Name</th>
+                    <th className="py-1.5 px-3">Barcode</th>
+                    <th className="py-1.5 px-3">Category</th>
+                    <th className="py-1.5 px-3 text-right">Cost</th>
+                    <th className="py-1.5 px-3 text-right">Sell</th>
+                    <th className="py-1.5 px-3 text-right">Stock</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E9EBED]">
+                  {parsedBulkRows.slice(0, 20).map((row, idx) => (
+                    <tr key={idx}>
+                      <td className="py-1.5 px-3 font-medium text-[#16191F]">{row.name}</td>
+                      <td className="py-1.5 px-3 font-mono text-[#5F6B7A]">{row.barcode || '—'}</td>
+                      <td className="py-1.5 px-3 text-[#5F6B7A]">{row.category || '—'}</td>
+                      <td className="py-1.5 px-3 text-right tabular-nums">{row.buyingPrice.toLocaleString()}</td>
+                      <td className="py-1.5 px-3 text-right tabular-nums font-semibold">{row.sellingPrice.toLocaleString()}</td>
+                      <td className="py-1.5 px-3 text-right tabular-nums">{row.stock}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {parsedBulkRows.length > 20 && (
+                <div className="py-1.5 px-3 text-[11px] text-[#5F6B7A] bg-[#FAFAFA] border-t border-[#E9EBED]">
+                  Showing first 20 of {parsedBulkRows.length} parsed rows.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>

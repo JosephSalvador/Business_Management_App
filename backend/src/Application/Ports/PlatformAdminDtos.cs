@@ -28,7 +28,28 @@ public sealed record TenantAdminSummaryDto(
     decimal TotalGmv30Days,
     string HealthStatus,
     string TodaySales,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool IsActive = true,
+    string? Tags = null,
+    bool TrainingPaid = false,
+    string? OwnerEmail = null);
+
+public sealed record TenantBranchDto(
+    Guid Id,
+    string Name,
+    string? Address,
+    bool IsActive);
+
+public sealed record TenantUserAdminDto(
+    Guid Id,
+    string FullName,
+    string Email,
+    string? Phone,
+    string Role,
+    bool IsActive,
+    bool IsLockedOut,
+    bool TwoFactorEnabled,
+    DateTime CreatedAt);
 
 public sealed record TenantAdminDetailDto(
     Guid TenantId,
@@ -49,6 +70,45 @@ public sealed record TenantAdminDetailDto(
     IReadOnlyDictionary<string, bool> Features,
     string? OwnerEmail,
     string? OwnerFullName,
+    DateTime CreatedAtUtc,
+    bool IsActive = true,
+    string? Tags = null,
+    bool TrainingPaid = false,
+    int BranchCount = 1,
+    int UserCount = 1,
+    int? MaxBranches = null,
+    int? MaxUsers = null,
+    int? MaxProducts = null,
+    bool HasProfileCompleted = false,
+    bool HasProducts = false,
+    bool HasSales = false,
+    DateTime? LastActivityAt = null,
+    IReadOnlyList<TenantBranchDto>? Branches = null,
+    IReadOnlyList<TenantUserAdminDto>? Users = null);
+
+public sealed record BulkImportProductItemDto(
+    string Name,
+    string? Barcode,
+    string? Category,
+    decimal BuyingPrice,
+    decimal SellingPrice,
+    decimal Stock);
+
+public sealed record BulkImportResultDto(
+    int CreatedCount,
+    int SkippedCount,
+    IReadOnlyList<string> Errors);
+
+public sealed record PlatformAuditLogDto(
+    Guid Id,
+    Guid TenantId,
+    string? TenantName,
+    Guid? UserId,
+    string? OperatorEmail,
+    string Action,
+    string EntityType,
+    string EntityId,
+    string? Details,
     DateTime CreatedAtUtc);
 
 public sealed record OmniProductDto(

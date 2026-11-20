@@ -110,6 +110,39 @@ public static class PlatformAdminEndpoints
             .RequirePlatformSuperAdmin()
             .WithName("RevokePlatformRole");
 
+        // ── 4. Enterprise Tenant Operations, Users & Audit Logs ──────
+        admin.MapGet("/tenants/{tenantId:guid}/users", ListTenantUsersAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("ListTenantUsersAdmin");
+
+        admin.MapPost("/tenants/{tenantId:guid}/users/{userId:guid}/reset-password", ResetTenantUserPasswordAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("ResetTenantUserPasswordAdmin");
+
+        admin.MapPut("/tenants/{tenantId:guid}/users/{userId:guid}/status", ToggleTenantUserStatusAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("ToggleTenantUserStatusAdmin");
+
+        admin.MapPost("/tenants/{tenantId:guid}/users/{userId:guid}/force-logout", ForceLogoutTenantUserAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("ForceLogoutTenantUserAdmin");
+
+        admin.MapPut("/tenants/{tenantId:guid}/status", UpdateTenantStatusAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("UpdateTenantStatusAdmin");
+
+        admin.MapPut("/tenants/{tenantId:guid}/onboarding", UpdateTenantOnboardingAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("UpdateTenantOnboardingAdmin");
+
+        admin.MapPost("/tenants/{tenantId:guid}/products/bulk-import", BulkImportTenantProductsAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("BulkImportTenantProductsAdmin");
+
+        admin.MapGet("/audit-logs", ListPlatformAuditLogsAsync)
+            .RequirePlatformStaffOrSuperAdmin()
+            .WithName("ListPlatformAuditLogsAdmin");
+
         return app;
     }
 
@@ -190,6 +223,38 @@ public static class PlatformAdminEndpoints
         Guid id, ISender sender, CancellationToken ct)
         => (await sender.Send(new RevokePlatformRoleCommand(id), ct)).ToApiResult();
 
+    private static async Task<IResult> ListTenantUsersAsync(
+        Guid tenantId, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ListTenantUsersAdminQuery(tenantId), ct)).ToApiResult();
+
+    private static async Task<IResult> ResetTenantUserPasswordAsync(
+        Guid tenantId, Guid userId, ResetUserPasswordRequest request, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ResetTenantUserPasswordAdminCommand(tenantId, userId, request.NewPassword), ct)).ToApiResult();
+
+    private static async Task<IResult> ToggleTenantUserStatusAsync(
+        Guid tenantId, Guid userId, ToggleUserStatusRequest request, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ToggleTenantUserStatusAdminCommand(tenantId, userId, request.IsActive), ct)).ToApiResult();
+
+    private static async Task<IResult> ForceLogoutTenantUserAsync(
+        Guid tenantId, Guid userId, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ForceLogoutTenantUserAdminCommand(tenantId, userId), ct)).ToApiResult();
+
+    private static async Task<IResult> UpdateTenantStatusAsync(
+        Guid tenantId, UpdateTenantStatusRequest request, ISender sender, CancellationToken ct)
+        => (await sender.Send(new UpdateTenantStatusAdminCommand(tenantId, request.IsActive, request.Reason), ct)).ToApiResult();
+
+    private static async Task<IResult> UpdateTenantOnboardingAsync(
+        Guid tenantId, UpdateTenantOnboardingRequest request, ISender sender, CancellationToken ct)
+        => (await sender.Send(new UpdateTenantOnboardingAdminCommand(tenantId, request.Tags, request.TrainingPaid), ct)).ToApiResult();
+
+    private static async Task<IResult> BulkImportTenantProductsAsync(
+        Guid tenantId, BulkImportProductsRequest request, ISender sender, CancellationToken ct)
+        => (await sender.Send(new BulkImportTenantProductsAdminCommand(tenantId, request.Items), ct)).ToApiResult();
+
+    private static async Task<IResult> ListPlatformAuditLogsAsync(
+        Guid? tenantId, string? search, int? page, int? pageSize, ISender sender, CancellationToken ct)
+        => (await sender.Send(new ListPlatformAuditLogsAdminQuery(tenantId, search, page ?? 1, pageSize ?? 50), ct)).ToApiResult();
+
     // Request records
     private sealed record UpdateTenantProductRequest(string Name, string? Barcode, decimal BuyingPrice, decimal SellingPrice, string? Category, bool IsActive);
     private sealed record AdjustStockRequest(decimal NewQuantity, string Reason);
@@ -198,4 +263,9 @@ public static class PlatformAdminEndpoints
     private sealed record UpdateInvoiceStatusRequest(string NewStatus);
     private sealed record UpdateFeaturesRequest(string[] Features);
     private sealed record AssignPlatformRoleRequest(string Email, PlatformRoleType Role);
+    private sealed record ResetUserPasswordRequest(string NewPassword);
+    private sealed record ToggleUserStatusRequest(bool IsActive);
+    private sealed record UpdateTenantStatusRequest(bool IsActive, string? Reason);
+    private sealed record UpdateTenantOnboardingRequest(string? Tags, bool TrainingPaid);
+    private sealed record BulkImportProductsRequest(IReadOnlyList<BulkImportProductItemDto> Items);
 }

@@ -141,6 +141,8 @@ public sealed class BusinessDbContext : DbContext, IUnitOfWork
             entity.Property(t => t.AuthorizedSignatoryName).HasMaxLength(150);
             entity.Property(t => t.AuthorizedSignatoryTitle).HasMaxLength(150);
             entity.Property(t => t.DatabaseSchema).HasMaxLength(64);
+            entity.Property(t => t.Tags).HasColumnType("text");
+            entity.Property(t => t.TrainingPaid).HasDefaultValue(false);
             entity.HasIndex(t => t.Name).IsUnique();
         });
 

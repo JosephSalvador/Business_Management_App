@@ -941,6 +941,12 @@ public interface IFleetAdminRepository
     Task<TenantAdminDetailDto?> GetTenantDetailAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task<Tenant?> GetTenantByIdAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task<User?> GetPrimaryOwnerAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TenantUserAdminDto>> ListTenantUsersAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task<User?> GetTenantUserByIdAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+    Task UpdateUserAsync(User user, CancellationToken cancellationToken = default);
+    Task<int> RevokeAllUserRefreshTokensAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken = default);
+    Task UpdateTenantAsync(Tenant tenant, CancellationToken cancellationToken = default);
+    Task<PagedResult<PlatformAuditLogDto>> ListPlatformAuditLogsAsync(Guid? tenantId, string? search, int page, int pageSize, CancellationToken cancellationToken = default);
 }
 
 public interface IOmniTenantCatalogRepository
@@ -950,6 +956,7 @@ public interface IOmniTenantCatalogRepository
     Task<OmniProductDto?> UpdateProductAsync(Guid tenantId, Guid productId, string name, string? barcode, decimal buyingPrice, decimal sellingPrice, string? category, bool isActive, CancellationToken cancellationToken = default);
     Task AdjustProductStockAsync(Guid tenantId, Guid productId, decimal newStockQuantity, string reason, Guid? operatorUserId, CancellationToken cancellationToken = default);
     Task SeedStarterCatalogAsync(Guid tenantId, string templateType, Guid? operatorUserId, CancellationToken cancellationToken = default);
+    Task<BulkImportResultDto> BulkImportProductsAsync(Guid tenantId, IReadOnlyList<BulkImportProductItemDto> items, Guid? operatorUserId, CancellationToken cancellationToken = default);
 }
 
 public interface IOmniTenantSalesRepository
