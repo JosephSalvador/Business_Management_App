@@ -257,7 +257,7 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             u.FullName,
             u.Email,
             u.Phone,
-            u.Roles.FirstOrDefault()?.RoleName ?? "Staff",
+            u.Roles.FirstOrDefault()?.Name ?? "Staff",
             u.IsActive,
             u.IsLockedOut,
             u.TwoFactorEnabled,
@@ -321,8 +321,8 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             query = query.Where(a =>
                 a.Action.ToLower().Contains(term) ||
                 a.EntityType.ToLower().Contains(term) ||
-                a.EntityId.ToLower().Contains(term) ||
-                (a.Details != null && a.Details.ToLower().Contains(term)));
+                (a.EntityId != null && a.EntityId.ToLower().Contains(term)) ||
+                (a.Changes != null && a.Changes.ToLower().Contains(term)));
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -351,8 +351,8 @@ public sealed class FleetAdminRepository : IFleetAdminRepository
             l.UserId.HasValue && userEmails.TryGetValue(l.UserId.Value, out var uEmail) ? uEmail : null,
             l.Action,
             l.EntityType,
-            l.EntityId,
-            l.Details,
+            l.EntityId ?? string.Empty,
+            l.Changes,
             l.CreatedAt)).ToList();
 
         return new PagedResult<PlatformAuditLogDto>(items, page, pageSize, total);
